@@ -1,8 +1,11 @@
 use crate::error::RelentlessResult;
+use format::Format;
 use reqwest::{Request, Url};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fs::File, path::Path, str::FromStr};
+use std::{collections::HashMap, path::Path, str::FromStr};
 use tower::Service;
+
+pub mod format;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Testcase {
@@ -30,8 +33,7 @@ pub struct Grpc {
 
 impl Testcase {
     pub fn import<P: AsRef<Path>>(path: P) -> RelentlessResult<Self> {
-        // TODO other formats such as json
-        Ok(serde_yaml::from_reader(File::open(path)?)?)
+        Ok(Format::from_path(path.as_ref())?.import_testcase(path.as_ref())?)
     }
 
     pub async fn run(&self) -> RelentlessResult<()> {
