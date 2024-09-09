@@ -1,11 +1,12 @@
 use crate::error::RelentlessResult;
 use format::Format;
-use reqwest::{Request, Url};
+use reqwest::Request;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, path::Path, str::FromStr};
+use std::{collections::HashMap, path::Path};
 use tower::Service;
 
 pub mod format;
+pub mod http;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Testcase {
@@ -41,17 +42,11 @@ impl Testcase {
             Protocol::Http(ref http) => {
                 let requests = http
                     .iter()
-                    .map(|h| {
-                        self.host.iter().map(|(_, host)| {
-                            let method = reqwest::Method::from_str(&h.method).unwrap();
-                            let url = Url::parse(host).unwrap().join(&h.pathname).unwrap();
-                            Request::new(method.clone(), url)
-                        })
-                    })
+                    .map(|h| self.host.iter().map(|(_, host)| h.to_request(host)))
                     .flatten(); // TODO do not flatten (for compare test)
                 for r in requests {
                     let client = reqwest::Client::new();
-                    self.request(client, r).await?;
+                    self.request(client, r?).await?;
                 }
             }
             _ => unimplemented!(),

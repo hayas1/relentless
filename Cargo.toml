@@ -9,12 +9,15 @@ json = ["serde_json"]
 yaml = ["serde_yaml"]
 
 [dependencies]
-reqwest = "0.12.7"
-serde = { version = "1.0.210", features = ["derive"] }
 thiserror = "1.0.63"
-tokio = { version = "1.40.0", features = ["full"] }
-tower = "0.5.0"
 
+tokio = { version = "1.40.0", features = ["full"] }
+reqwest = "0.12.7"
+tower = "0.5.0"
+http = "1.1.0"
+url = "2.5.2"
+
+serde = { version = "1.0.210", features = ["derive"] }
 serde_json = { version = "1.0.128", optional = true }
 serde_yaml = { version = "0.9.34", optional = true }
 toml = { version = "0.8.19", optional = true }
