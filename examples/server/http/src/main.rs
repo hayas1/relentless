@@ -1,4 +1,4 @@
-use axum::routing::get;
+use axum::{body::HttpBody, routing::get};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -28,8 +28,8 @@ pub async fn logging(
 ) -> impl axum::response::IntoResponse {
     let (method, uri) = (req.method().clone(), req.uri().clone());
     let res = next.run(req).await;
-    let status = res.status();
-    tracing::info!("{} {} {}", status, method, uri);
+    let (status, bytes) = (res.status(), res.size_hint().lower());
+    tracing::info!("{} {} {} {}", status, method, uri, bytes);
     res
 }
 
