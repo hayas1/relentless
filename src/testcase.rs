@@ -30,6 +30,7 @@ pub struct Grpc {
 
 impl Testcase {
     pub fn import<P: AsRef<Path>>(path: P) -> RelentlessResult<Self> {
+        // TODO other formats such as json
         Ok(serde_yaml::from_reader(File::open(path)?)?)
     }
 
