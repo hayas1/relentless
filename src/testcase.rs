@@ -1,3 +1,4 @@
+use crate::error::RelentlessResult;
 use reqwest::{Request, Url};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fs::File, path::Path, str::FromStr};
@@ -28,11 +29,11 @@ pub struct Grpc {
 }
 
 impl Testcase {
-    pub fn import<P: AsRef<Path>>(path: P) -> Result<Self, serde_yaml::Error> {
-        serde_yaml::from_reader(File::open(path).unwrap())
+    pub fn import<P: AsRef<Path>>(path: P) -> RelentlessResult<Self> {
+        Ok(serde_yaml::from_reader(File::open(path)?)?)
     }
 
-    pub async fn run(&self) -> Result<(), ()> {
+    pub async fn run(&self) -> RelentlessResult<()> {
         match self.protocol {
             Protocol::Http(ref http) => {
                 let requests = http
@@ -47,7 +48,7 @@ impl Testcase {
                     .flatten(); // TODO do not flatten (for compare test)
                 for r in requests {
                     let client = reqwest::Client::new();
-                    let _ = self.request(client, r).await;
+                    self.request(client, r).await?;
                 }
             }
             _ => unimplemented!(),

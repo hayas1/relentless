@@ -2,8 +2,8 @@ use relentless::testcase::Testcase;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let testcase = Testcase::import("./examples/assault.yaml").unwrap();
-    let result = testcase.run().await.unwrap();
+    let testcase = Testcase::import("./examples/assault.yaml")?;
+    let result = testcase.run().await?;
     Ok(result)
 }
 

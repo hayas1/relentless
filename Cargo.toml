@@ -7,5 +7,6 @@ edition = "2021"
 reqwest = "0.12.7"
 serde = { version = "1.0.210", features = ["derive"] }
 serde_yaml = "0.9.34"
+thiserror = "1.0.63"
 tokio = { version = "1.40.0", features = ["full"] }
 tower = "0.5.0"
