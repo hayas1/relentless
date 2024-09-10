@@ -10,26 +10,14 @@ use thiserror::Error;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Testcase {
     pub name: Option<String>,
-    pub host: HashMap<String, String>,
-
-    #[serde(flatten)]
-    pub protocol: Protocol,
-}
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum Protocol {
-    Http(Vec<Http>),
-    Grpc(Vec<Grpc>),
+    pub origin: HashMap<String, String>,
+    pub testcase: Vec<Http>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Http {
     pub description: Option<String>,
     pub method: String,
     pub pathname: String,
-}
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Grpc {
-    // TODO
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

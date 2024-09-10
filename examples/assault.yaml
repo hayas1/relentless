@@ -1,7 +1,7 @@
 name: example yaml of basic assault test
-host:
+origin:
   target: http://localhost:3000
 
-http:
+testcase:
   - method: GET
     pathname: /

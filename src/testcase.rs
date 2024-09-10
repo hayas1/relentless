@@ -1,5 +1,5 @@
 use crate::error::RelentlessResult;
-use format::{Format, Protocol, Testcase};
+use format::{Format, Testcase};
 use reqwest::Request;
 use std::path::Path;
 use tower::Service;
@@ -13,18 +13,14 @@ impl Testcase {
     }
 
     pub async fn run(&self) -> RelentlessResult<()> {
-        match self.protocol {
-            Protocol::Http(ref http) => {
-                let requests = http
-                    .iter()
-                    .map(|h| self.host.iter().map(|(_, host)| h.to_request(host)))
-                    .flatten(); // TODO do not flatten (for compare test)
-                for r in requests {
-                    let client = reqwest::Client::new();
-                    self.request(client, r?).await?;
-                }
-            }
-            _ => unimplemented!(),
+        let requests = self
+            .testcase
+            .iter()
+            .map(|h| self.origin.iter().map(|(_, host)| h.to_request(host)))
+            .flatten(); // TODO do not flatten (for compare test)
+        for r in requests {
+            let client = reqwest::Client::new();
+            self.request(client, r?).await?;
         }
         Ok(())
     }
