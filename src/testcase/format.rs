@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Testcases {
+pub struct Testcase {
     pub name: Option<String>,
     pub host: HashMap<String, String>,
 
@@ -23,6 +23,7 @@ pub enum Protocol {
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Http {
+    pub description: Option<String>,
     pub method: String,
     pub pathname: String,
 }
@@ -76,7 +77,7 @@ impl Format {
         }
     }
 
-    pub fn import_testcase<P: AsRef<Path>>(&self, path: P) -> Result<Testcases, FormatError> {
+    pub fn import_testcase<P: AsRef<Path>>(&self, path: P) -> Result<Testcase, FormatError> {
         match self {
             #[cfg(feature = "json")]
             Format::Json => Ok(serde_json::from_reader(File::open(path)?)?),
@@ -87,7 +88,7 @@ impl Format {
         }
     }
 
-    pub fn import_testcase_str(&self, content: &str) -> Result<Testcases, FormatError> {
+    pub fn import_testcase_str(&self, content: &str) -> Result<Testcase, FormatError> {
         match self {
             #[cfg(feature = "json")]
             Format::Json => Ok(serde_json::from_str(content)?),

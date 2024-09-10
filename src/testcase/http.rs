@@ -18,6 +18,7 @@ pub enum HttpError {
 
 impl Http {
     pub fn to_request(&self, host: &str) -> Result<reqwest::Request, HttpError> {
+        // TODO post body
         let method = reqwest::Method::from_str(&self.method)?;
         let url = reqwest::Url::parse(host)?.join(&self.pathname)?;
         Ok(reqwest::Request::new(method, url))

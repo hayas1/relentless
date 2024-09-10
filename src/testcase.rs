@@ -1,5 +1,5 @@
 use crate::error::RelentlessResult;
-use format::{Format, Protocol, Testcases};
+use format::{Format, Protocol, Testcase};
 use reqwest::Request;
 use std::path::Path;
 use tower::Service;
@@ -7,7 +7,7 @@ use tower::Service;
 pub mod format;
 pub mod http;
 
-impl Testcases {
+impl Testcase {
     pub fn import<P: AsRef<Path>>(path: P) -> RelentlessResult<Self> {
         Ok(Format::from_path(path.as_ref())?.import_testcase(path.as_ref())?)
     }
