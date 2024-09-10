@@ -1,11 +1,35 @@
 use std::{
+    collections::HashMap,
     fs::{read_to_string, File},
     path::Path,
 };
 
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use super::Testcase;
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Testcases {
+    pub name: Option<String>,
+    pub host: HashMap<String, String>,
+
+    #[serde(flatten)]
+    pub protocol: Protocol,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Protocol {
+    Http(Vec<Http>),
+    Grpc(Vec<Grpc>),
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Http {
+    pub method: String,
+    pub pathname: String,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Grpc {
+    // TODO
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Format {
@@ -52,7 +76,7 @@ impl Format {
         }
     }
 
-    pub fn import_testcase<P: AsRef<Path>>(&self, path: P) -> Result<Testcase, FormatError> {
+    pub fn import_testcase<P: AsRef<Path>>(&self, path: P) -> Result<Testcases, FormatError> {
         match self {
             #[cfg(feature = "json")]
             Format::Json => Ok(serde_json::from_reader(File::open(path)?)?),
@@ -63,7 +87,7 @@ impl Format {
         }
     }
 
-    pub fn import_testcase_str(&self, content: &str) -> Result<Testcase, FormatError> {
+    pub fn import_testcase_str(&self, content: &str) -> Result<Testcases, FormatError> {
         match self {
             #[cfg(feature = "json")]
             Format::Json => Ok(serde_json::from_str(content)?),

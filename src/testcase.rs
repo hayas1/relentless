@@ -1,38 +1,13 @@
 use crate::error::RelentlessResult;
-use format::Format;
+use format::{Format, Protocol, Testcases};
 use reqwest::Request;
-use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, path::Path};
+use std::path::Path;
 use tower::Service;
 
 pub mod format;
 pub mod http;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Testcase {
-    pub name: Option<String>,
-    pub host: HashMap<String, String>,
-
-    #[serde(flatten)]
-    pub protocol: Protocol,
-}
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum Protocol {
-    Http(Vec<Http>),
-    Grpc(Vec<Grpc>),
-}
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Http {
-    pub method: String,
-    pub pathname: String,
-}
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Grpc {
-    // TODO
-}
-
-impl Testcase {
+impl Testcases {
     pub fn import<P: AsRef<Path>>(path: P) -> RelentlessResult<Self> {
         Ok(Format::from_path(path.as_ref())?.import_testcase(path.as_ref())?)
     }
