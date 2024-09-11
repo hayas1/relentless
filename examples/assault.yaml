@@ -1,6 +1,8 @@
 name: example yaml of basic assault test
-origin:
-  target: http://localhost:3000
+setting:
+  origin:
+    target: http://localhost:3000
+
 
 testcase:
   - method: GET

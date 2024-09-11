@@ -16,7 +16,12 @@ impl Testcase {
         let requests = self
             .testcase
             .iter()
-            .map(|h| self.origin.iter().map(|(_, host)| h.to_request(host)))
+            .map(|h| {
+                self.setting
+                    .origin
+                    .iter()
+                    .map(|(_, host)| h.to_request(host))
+            })
             .flatten(); // TODO do not flatten (for compare test)
         for r in requests {
             let client = reqwest::Client::new();

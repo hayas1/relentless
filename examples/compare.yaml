@@ -1,0 +1,14 @@
+name: example yaml of basic compare test
+setting:
+  origin:
+    actual: http://localhost:3000
+    expect: http://localhost:3000
+  template:
+    version:
+      actual: v1
+      expect: v2
+
+
+testcase:
+  - method: GET
+    pathname: /

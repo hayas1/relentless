@@ -10,14 +10,20 @@ use thiserror::Error;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Testcase {
     pub name: Option<String>,
-    pub origin: HashMap<String, String>,
+    pub setting: Setting,
     pub testcase: Vec<Http>,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Setting {
+    pub origin: HashMap<String, String>,
+    pub template: Option<HashMap<String, HashMap<String, String>>>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Http {
     pub description: Option<String>,
     pub method: String,
     pub pathname: String,
+    pub setting: Option<Setting>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
