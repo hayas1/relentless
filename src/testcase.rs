@@ -1,10 +1,10 @@
 use crate::error::RelentlessResult;
-use format::{Format, Testcase};
+use config::{Config, Format};
 use reqwest::{Client, Request};
 use std::path::Path;
 use tower::{timeout::TimeoutLayer, Layer, Service};
 
-pub mod format;
+pub mod config;
 pub mod http;
 
 #[derive(Debug, Clone)]
@@ -32,20 +32,20 @@ where
     }
 }
 
-impl Testcase {
+impl Config {
     pub fn import<P: AsRef<Path>>(path: P) -> RelentlessResult<Self> {
         Ok(Format::from_path(path.as_ref())?.import_testcase(path.as_ref())?)
     }
 
     pub async fn run(&self) -> RelentlessResult<()> {
-        let requests = self.testcase.iter().flat_map(|h| {
-            self.setting
-                .origin.values().map(|host| h.to_request(host))
-        }); // TODO do not flatten (for compare test)
+        let requests = self
+            .testcase
+            .iter()
+            .flat_map(|h| self.setting.origin.values().map(|host| h.to_request(host))); // TODO do not flatten (for compare test)
 
         let worker = self.worker();
         for r in requests {
-            worker.clone().run(r?).await?;
+            let _res = worker.clone().run(r?).await?;
         }
         Ok(())
     }

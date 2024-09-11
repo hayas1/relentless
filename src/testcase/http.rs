@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use thiserror::Error;
 
-use super::format::Http;
+use super::config::Http;
 
 #[derive(Error, Debug)]
 pub enum HttpError {

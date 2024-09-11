@@ -1,8 +1,8 @@
-use relentless::testcase::format::Testcase;
+use relentless::testcase::config::Config;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let testcase = Testcase::import("./examples/assault.yaml")?;
+    let testcase = Config::import("./examples/assault.yaml")?;
     let result = testcase.run().await?;
     Ok(result)
 }
