@@ -1,12 +1,11 @@
-use crate::error::{RelentlessError, RelentlessResult};
-use config::{Config, Format, Testcase};
+use crate::error::{HttpError, RelentlessError, RelentlessResult};
+use config::{Config, Format, Setting, Testcase};
 use reqwest::{Client, Request};
-use std::path::Path;
+use std::{path::Path, str::FromStr};
 use tokio::task::JoinSet;
 use tower::{timeout::TimeoutLayer, Layer, Service};
 
 pub mod config;
-pub mod http;
 
 #[derive(Debug, Clone)]
 pub struct Worker<S, L> {
@@ -94,12 +93,20 @@ impl Config {
     }
 
     pub fn chunk(&self, testcase: &Testcase) -> RelentlessResult<Chunk<TimeoutLayer>> {
-        let requests = self
-            .setting
+        let requests = Self::to_requests(&self.setting, testcase)?;
+
+        Ok(Chunk::new(requests, None))
+    }
+
+    pub fn to_requests(setting: &Setting, testcase: &Testcase) -> RelentlessResult<Vec<Request>> {
+        Ok(setting
             .origin
             .values()
-            .map(|host| testcase.to_request(host));
-
-        Ok(Chunk::new(requests.collect::<Result<Vec<_>, _>>()?, None))
+            .map(|origin| {
+                let method = reqwest::Method::from_str(&testcase.method)?;
+                let url = reqwest::Url::parse(origin)?.join(&testcase.pathname)?;
+                Ok::<_, HttpError>(Request::new(method, url))
+            })
+            .collect::<Result<Vec<_>, _>>()?)
     }
 }
