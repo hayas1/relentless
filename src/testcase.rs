@@ -1,7 +1,8 @@
-use crate::error::RelentlessResult;
-use config::{Config, Format};
+use crate::error::{RelentlessError, RelentlessResult};
+use config::{Config, Format, Testcase};
 use reqwest::{Client, Request};
 use std::path::Path;
+use tokio::task::JoinSet;
 use tower::{timeout::TimeoutLayer, Layer, Service};
 
 pub mod config;
@@ -27,8 +28,47 @@ where
         <<L as Layer<S>>::Service as Service<Request>>::Response,
         <<L as Layer<S>>::Service as Service<Request>>::Error,
     > {
-        let mut client = self.layer.layer(self.service);
-        client.call(req).await
+        let mut worker = self.layer.layer(self.service);
+        worker.call(req).await
+    }
+}
+impl<S, L> Worker<S, L>
+where
+    S: Service<Request> + Clone + Send + 'static,
+    L: Layer<S> + Clone + Send + 'static,
+    L::Service: Service<Request>,
+    <L as Layer<S>>::Service: Send,
+    <<L as Layer<S>>::Service as Service<Request>>::Future: Send,
+    <<L as Layer<S>>::Service as Service<Request>>::Response: Send + 'static,
+    <<L as Layer<S>>::Service as Service<Request>>::Error: Send + 'static,
+    RelentlessError: From<<<L as Layer<S>>::Service as Service<Request>>::Error>,
+{
+    pub async fn run_chunk(
+        self,
+        chunk: Chunk<L>,
+    ) -> RelentlessResult<Vec<<<L as Layer<S>>::Service as Service<Request>>::Response>> {
+        let mut join_set = JoinSet::new();
+        for req in chunk.req {
+            let worker = self.clone();
+            join_set.spawn(async move { worker.run(req).await });
+        }
+
+        let mut response = Vec::new();
+        while let Some(res) = join_set.join_next().await {
+            response.push(res??);
+        }
+        Ok(response)
+    }
+}
+
+#[derive(Debug)]
+pub struct Chunk<L> {
+    pub req: Vec<Request>,
+    pub layer: Option<L>,
+}
+impl<L: Layer<reqwest::Client>> Chunk<L> {
+    pub fn new(req: Vec<Request>, layer: Option<L>) -> Self {
+        Self { req, layer }
     }
 }
 
@@ -38,14 +78,11 @@ impl Config {
     }
 
     pub async fn run(&self) -> RelentlessResult<()> {
-        let requests = self
-            .testcase
-            .iter()
-            .flat_map(|h| self.setting.origin.values().map(|host| h.to_request(host))); // TODO do not flatten (for compare test)
+        let chunks = self.testcase.iter().map(|h| self.chunk(h));
 
         let worker = self.worker();
-        for r in requests {
-            let _res = worker.clone().run(r?).await?;
+        for chunk in chunks {
+            let _res = worker.clone().run_chunk(chunk?).await?;
         }
         Ok(())
     }
@@ -54,5 +91,15 @@ impl Config {
         let client = reqwest::Client::new();
         let timeout = TimeoutLayer::new(self.setting.timeout);
         Worker::new(client, timeout)
+    }
+
+    pub fn chunk(&self, testcase: &Testcase) -> RelentlessResult<Chunk<TimeoutLayer>> {
+        let requests = self
+            .setting
+            .origin
+            .values()
+            .map(|host| testcase.to_request(host));
+
+        Ok(Chunk::new(requests.collect::<Result<Vec<_>, _>>()?, None))
     }
 }
