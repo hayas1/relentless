@@ -1,11 +1,36 @@
 use crate::error::RelentlessResult;
 use format::{Format, Testcase};
-use reqwest::Request;
+use reqwest::{Client, Request};
 use std::path::Path;
-use tower::Service;
+use tower::{timeout::TimeoutLayer, Layer, Service};
 
 pub mod format;
 pub mod http;
+
+#[derive(Debug, Clone)]
+pub struct Worker<S, L> {
+    pub service: S,
+    pub layer: L,
+}
+impl<S: Service<Request>, L: Layer<S>> Worker<S, L>
+where
+    L::Service: Service<Request>,
+{
+    pub fn new(service: S, layer: L) -> Self {
+        Self { service, layer }
+    }
+
+    pub async fn run(
+        self,
+        req: Request,
+    ) -> Result<
+        <<L as Layer<S>>::Service as Service<Request>>::Response,
+        <<L as Layer<S>>::Service as Service<Request>>::Error,
+    > {
+        let mut client = self.layer.layer(self.service);
+        client.call(req).await
+    }
+}
 
 impl Testcase {
     pub fn import<P: AsRef<Path>>(path: P) -> RelentlessResult<Self> {
@@ -13,28 +38,21 @@ impl Testcase {
     }
 
     pub async fn run(&self) -> RelentlessResult<()> {
-        let requests = self
-            .testcase
-            .iter()
-            .map(|h| {
-                self.setting
-                    .origin
-                    .iter()
-                    .map(|(_, host)| h.to_request(host))
-            })
-            .flatten(); // TODO do not flatten (for compare test)
+        let requests = self.testcase.iter().flat_map(|h| {
+            self.setting
+                .origin.values().map(|host| h.to_request(host))
+        }); // TODO do not flatten (for compare test)
+
+        let worker = self.worker();
         for r in requests {
-            let client = reqwest::Client::new();
-            self.request(client, r?).await?;
+            worker.clone().run(r?).await?;
         }
         Ok(())
     }
 
-    pub async fn request<S: Service<Request>>(
-        &self,
-        mut service: S,
-        request: Request,
-    ) -> Result<S::Response, S::Error> {
-        service.call(request).await
+    pub fn worker(&self) -> Worker<Client, TimeoutLayer> {
+        let client = reqwest::Client::new();
+        let timeout = TimeoutLayer::new(self.setting.timeout);
+        Worker::new(client, timeout)
     }
 }

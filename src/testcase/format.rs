@@ -2,6 +2,7 @@ use std::{
     collections::HashMap,
     fs::{read_to_string, File},
     path::Path,
+    time::Duration,
 };
 
 use serde::{Deserialize, Serialize};
@@ -16,8 +17,16 @@ pub struct Testcase {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Setting {
     pub origin: HashMap<String, String>,
-    pub header: Option<HashMap<String, Vec<String>>>, // TODO use multi map ?
-    pub template: Option<HashMap<String, HashMap<String, String>>>,
+    #[serde(default)]
+    pub header: HashMap<String, Vec<String>>, // TODO use multi map ?
+    #[serde(default)]
+    pub template: HashMap<String, HashMap<String, String>>,
+    #[serde(default = "default_timeout")]
+    pub timeout: Duration,
+}
+// TODO Setting::default_timeout
+pub fn default_timeout() -> Duration {
+    Duration::from_secs(10)
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Http {
