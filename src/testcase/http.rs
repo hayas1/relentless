@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use thiserror::Error;
 
-use super::config::Http;
+use super::config::Testcase;
 
 #[derive(Error, Debug)]
 pub enum HttpError {
@@ -16,7 +16,7 @@ pub enum HttpError {
     InvalidUrl(#[from] url::ParseError),
 }
 
-impl Http {
+impl Testcase {
     pub fn to_request(&self, host: &str) -> Result<reqwest::Request, HttpError> {
         // TODO post body
         let method = reqwest::Method::from_str(&self.method)?;

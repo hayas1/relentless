@@ -12,7 +12,7 @@ use thiserror::Error;
 pub struct Config {
     pub name: Option<String>,
     pub setting: Setting,
-    pub testcase: Vec<Http>,
+    pub testcase: Vec<Testcase>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Setting {
@@ -29,7 +29,7 @@ pub fn default_timeout() -> Duration {
     Duration::from_secs(10)
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Http {
+pub struct Testcase {
     pub description: Option<String>,
     pub method: String,
     pub pathname: String,
