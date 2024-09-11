@@ -16,6 +16,7 @@ pub struct Testcase {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Setting {
     pub origin: HashMap<String, String>,
+    pub header: Option<HashMap<String, Vec<String>>>, // TODO use multi map ?
     pub template: Option<HashMap<String, HashMap<String, String>>>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
