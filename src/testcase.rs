@@ -8,11 +8,11 @@ use tower::{timeout::TimeoutLayer, Layer, Service};
 pub mod config;
 
 #[derive(Debug, Clone)]
-pub struct Worker<S, L> {
+pub struct HttpClient<S, L> {
     pub service: S,
     pub layer: L,
 }
-impl<S: Service<Request>, L: Layer<S>> Worker<S, L>
+impl<S: Service<Request>, L: Layer<S>> HttpClient<S, L>
 where
     L::Service: Service<Request>,
 {
@@ -27,11 +27,11 @@ where
         <<L as Layer<S>>::Service as Service<Request>>::Response,
         <<L as Layer<S>>::Service as Service<Request>>::Error,
     > {
-        let mut worker = self.layer.layer(self.service);
-        worker.call(req).await
+        let mut client = self.layer.layer(self.service);
+        client.call(req).await
     }
 }
-impl<S, L> Worker<S, L>
+impl<S, L> HttpClient<S, L>
 where
     S: Service<Request> + Clone + Send + 'static,
     L: Layer<S> + Clone + Send + 'static,
@@ -48,8 +48,8 @@ where
     ) -> RelentlessResult<Vec<<<L as Layer<S>>::Service as Service<Request>>::Response>> {
         let mut join_set = JoinSet::new();
         for req in chunk.req {
-            let worker = self.clone();
-            join_set.spawn(async move { worker.run(req).await });
+            let client = self.clone();
+            join_set.spawn(async move { client.run(req).await });
         }
 
         let mut response = Vec::new();
@@ -84,17 +84,17 @@ impl Config {
     pub async fn run(&self) -> RelentlessResult<()> {
         let chunks = self.testcase.iter().map(|h| self.chunk(h));
 
-        let worker = self.worker();
+        let client = self.client();
         for chunk in chunks {
-            let _res = worker.clone().run_chunk(chunk?).await?;
+            let _res = client.clone().run_chunk(chunk?).await?;
         }
         Ok(())
     }
 
-    pub fn worker(&self) -> Worker<Client, TimeoutLayer> {
+    pub fn client(&self) -> HttpClient<Client, TimeoutLayer> {
         let client = reqwest::Client::new();
         let timeout = TimeoutLayer::new(self.setting.timeout);
-        Worker::new(client, timeout)
+        HttpClient::new(client, timeout)
     }
 
     pub fn chunk(&self, testcase: &Testcase) -> RelentlessResult<Chunk<TimeoutLayer>> {
