@@ -62,12 +62,17 @@ where
 
 #[derive(Debug)]
 pub struct Chunk<L> {
+    pub description: Option<String>,
     pub req: Vec<Request>,
     pub layer: Option<L>,
 }
 impl<L: Layer<reqwest::Client>> Chunk<L> {
-    pub fn new(req: Vec<Request>, layer: Option<L>) -> Self {
-        Self { req, layer }
+    pub fn new(description: Option<String>, req: Vec<Request>, layer: Option<L>) -> Self {
+        Self {
+            description,
+            req,
+            layer,
+        }
     }
 }
 
@@ -93,9 +98,10 @@ impl Config {
     }
 
     pub fn chunk(&self, testcase: &Testcase) -> RelentlessResult<Chunk<TimeoutLayer>> {
+        let description = testcase.description.clone();
         let requests = Self::to_requests(&self.setting, testcase)?;
 
-        Ok(Chunk::new(requests, None))
+        Ok(Chunk::new(description, requests, None))
     }
 
     pub fn to_requests(setting: &Setting, testcase: &Testcase) -> RelentlessResult<Vec<Request>> {
