@@ -66,7 +66,7 @@ pub struct Chunk<L> {
     pub req: Vec<Request>,
     pub layer: Option<L>,
 }
-impl<L: Layer<reqwest::Client>> Chunk<L> {
+impl<L: Layer<Client>> Chunk<L> {
     pub fn new(description: Option<String>, req: Vec<Request>, layer: Option<L>) -> Self {
         Self {
             description,
