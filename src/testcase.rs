@@ -8,17 +8,17 @@ use tower::{timeout::TimeoutLayer, Layer, Service};
 pub mod config;
 
 #[derive(Debug)]
-pub struct Chunk<L> {
+pub struct Unit<LU> {
     pub description: Option<String>,
     pub req: Vec<Request>,
-    pub layer: Option<L>,
+    pub layer: Option<LU>,
     pub setting: Option<Setting>, // TODO
 }
-impl<L> Chunk<L> {
+impl<LU> Unit<LU> {
     pub fn new(
         description: Option<String>,
         req: Vec<Request>,
-        layer: Option<L>,
+        layer: Option<LU>,
         setting: Option<Setting>,
     ) -> Self {
         Self {
@@ -29,15 +29,15 @@ impl<L> Chunk<L> {
         }
     }
 
-    pub async fn run<LW>(self, layer: Option<LW>) -> RelentlessResult<Vec<Response>>
+    pub async fn process<LW>(self, layer: Option<LW>) -> RelentlessResult<Vec<Response>>
     where
-        L: Layer<Client> + Clone + Send + 'static,
-        L::Service: Service<Request>,
-        <L as Layer<Client>>::Service: Send,
-        <<L as Layer<Client>>::Service as Service<Request>>::Future: Send,
-        <<L as Layer<Client>>::Service as Service<Request>>::Response:
+        LU: Layer<Client> + Clone + Send + 'static,
+        LU::Service: Service<Request>,
+        <LU as Layer<Client>>::Service: Send,
+        <<LU as Layer<Client>>::Service as Service<Request>>::Future: Send,
+        <<LU as Layer<Client>>::Service as Service<Request>>::Response:
             Into<Response> + Send + 'static,
-        <<L as Layer<Client>>::Service as Service<Request>>::Error: Send + 'static,
+        <<LU as Layer<Client>>::Service as Service<Request>>::Error: Send + 'static,
         LW: Layer<Client> + Clone + Send + 'static,
         LW::Service: Service<Request>,
         <LW as Layer<Client>>::Service: Send,
@@ -45,15 +45,15 @@ impl<L> Chunk<L> {
         <<LW as Layer<Client>>::Service as Service<Request>>::Response:
             Into<Response> + Send + 'static,
         <<LW as Layer<Client>>::Service as Service<Request>>::Error: Send + 'static,
-        RelentlessError: From<<<L as Layer<Client>>::Service as Service<Request>>::Error>
+        RelentlessError: From<<<LU as Layer<Client>>::Service as Service<Request>>::Error>
             + From<<<LW as Layer<Client>>::Service as Service<Request>>::Error>,
     {
         let mut join_set = JoinSet::<RelentlessResult<Response>>::new();
         for req in self.req {
             let mut client = Client::new();
-            let (chunk_layer, worker_layer) = (self.layer.clone(), layer.clone());
+            let (unit_layer, worker_layer) = (self.layer.clone(), layer.clone());
             join_set.spawn(async move {
-                let res = match chunk_layer {
+                let res = match unit_layer {
                     Some(layer) => layer.layer(client).call(req).await?.into(),
                     None => match worker_layer {
                         Some(layer) => layer.layer(client).call(req).await?.into(),
@@ -72,13 +72,13 @@ impl<L> Chunk<L> {
     }
 }
 
-pub struct Worker<L> {
+pub struct Worker<LW> {
     pub name: Option<String>,
-    pub layer: Option<L>,
+    pub layer: Option<LW>,
     pub setting: Option<Setting>, // TODO
 }
-impl<L> Worker<L> {
-    pub fn new(name: Option<String>, layer: Option<L>, setting: Option<Setting>) -> Self {
+impl<LW> Worker<LW> {
+    pub fn new(name: Option<String>, layer: Option<LW>, setting: Option<Setting>) -> Self {
         Self {
             name,
             layer,
@@ -86,15 +86,15 @@ impl<L> Worker<L> {
         }
     }
 
-    pub async fn run<LC>(self, chunks: Vec<Chunk<LC>>) -> RelentlessResult<()>
+    pub async fn assault<LC>(self, units: Vec<Unit<LC>>) -> RelentlessResult<()>
     where
-        L: Layer<Client> + Clone + Send + 'static,
-        L::Service: Service<Request>,
-        <L as Layer<Client>>::Service: Send,
-        <<L as Layer<Client>>::Service as Service<Request>>::Future: Send,
-        <<L as Layer<Client>>::Service as Service<Request>>::Response:
+        LW: Layer<Client> + Clone + Send + 'static,
+        LW::Service: Service<Request>,
+        <LW as Layer<Client>>::Service: Send,
+        <<LW as Layer<Client>>::Service as Service<Request>>::Future: Send,
+        <<LW as Layer<Client>>::Service as Service<Request>>::Response:
             Into<Response> + Send + 'static,
-        <<L as Layer<Client>>::Service as Service<Request>>::Error: Send + 'static,
+        <<LW as Layer<Client>>::Service as Service<Request>>::Error: Send + 'static,
         LC: Layer<Client> + Clone + Send + 'static,
         LC::Service: Service<Request>,
         <LC as Layer<Client>>::Service: Send,
@@ -102,11 +102,11 @@ impl<L> Worker<L> {
         <<LC as Layer<Client>>::Service as Service<Request>>::Response:
             Into<Response> + Send + 'static,
         <<LC as Layer<Client>>::Service as Service<Request>>::Error: Send + 'static,
-        RelentlessError: From<<<L as Layer<Client>>::Service as Service<Request>>::Error>
+        RelentlessError: From<<<LW as Layer<Client>>::Service as Service<Request>>::Error>
             + From<<<LC as Layer<Client>>::Service as Service<Request>>::Error>,
     {
-        for chunk in chunks {
-            let _res = chunk.run(self.layer.clone()).await?;
+        for unit in units {
+            let _res = unit.process(self.layer.clone()).await?;
         }
         Ok(())
     }
@@ -119,13 +119,13 @@ impl Config {
 
     pub async fn run(&self) -> RelentlessResult<()> {
         let worker = self.worker()?;
-        let chunks = self
+        let units = self
             .testcase
             .iter()
-            .map(|h| self.chunk(h))
+            .map(|h| self.unit(h))
             .collect::<Result<Vec<_>, _>>();
 
-        worker.run(chunks?).await?;
+        worker.assault(units?).await?;
         Ok(())
     }
 
@@ -138,11 +138,11 @@ impl Config {
         ))
     }
 
-    pub fn chunk(&self, testcase: &Testcase) -> RelentlessResult<Chunk<TimeoutLayer>> {
+    pub fn unit(&self, testcase: &Testcase) -> RelentlessResult<Unit<TimeoutLayer>> {
         let description = testcase.description.clone();
         let requests = Self::to_requests(&self.setting.clone().unwrap(), testcase)?;
 
-        Ok(Chunk::new(
+        Ok(Unit::new(
             description,
             requests,
             None,
