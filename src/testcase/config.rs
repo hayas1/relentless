@@ -11,7 +11,7 @@ use thiserror::Error;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Config {
     pub name: Option<String>,
-    pub setting: Setting,
+    pub setting: Option<Setting>,
     pub testcase: Vec<Testcase>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

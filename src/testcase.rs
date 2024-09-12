@@ -1,55 +1,67 @@
 use crate::error::{HttpError, RelentlessError, RelentlessResult};
 use config::{Config, Format, Setting, Testcase};
-use reqwest::{Client, Request};
+use reqwest::{Client, Request, Response};
 use std::{path::Path, str::FromStr};
 use tokio::task::JoinSet;
 use tower::{timeout::TimeoutLayer, Layer, Service};
 
 pub mod config;
 
-#[derive(Debug, Clone)]
-pub struct HttpClient<S, L> {
-    pub service: S,
-    pub layer: L,
+#[derive(Debug)]
+pub struct Chunk<L> {
+    pub description: Option<String>,
+    pub req: Vec<Request>,
+    pub layer: Option<L>,
+    pub setting: Option<Setting>, // TODO
 }
-impl<S: Service<Request>, L: Layer<S>> HttpClient<S, L>
-where
-    L::Service: Service<Request>,
-{
-    pub fn new(service: S, layer: L) -> Self {
-        Self { service, layer }
+impl<L> Chunk<L> {
+    pub fn new(
+        description: Option<String>,
+        req: Vec<Request>,
+        layer: Option<L>,
+        setting: Option<Setting>,
+    ) -> Self {
+        Self {
+            description,
+            req,
+            layer,
+            setting,
+        }
     }
 
-    pub async fn run(
-        self,
-        req: Request,
-    ) -> Result<
-        <<L as Layer<S>>::Service as Service<Request>>::Response,
-        <<L as Layer<S>>::Service as Service<Request>>::Error,
-    > {
-        let mut client = self.layer.layer(self.service);
-        client.call(req).await
-    }
-}
-impl<S, L> HttpClient<S, L>
-where
-    S: Service<Request> + Clone + Send + 'static,
-    L: Layer<S> + Clone + Send + 'static,
-    L::Service: Service<Request>,
-    <L as Layer<S>>::Service: Send,
-    <<L as Layer<S>>::Service as Service<Request>>::Future: Send,
-    <<L as Layer<S>>::Service as Service<Request>>::Response: Send + 'static,
-    <<L as Layer<S>>::Service as Service<Request>>::Error: Send + 'static,
-    RelentlessError: From<<<L as Layer<S>>::Service as Service<Request>>::Error>,
-{
-    pub async fn run_chunk(
-        self,
-        chunk: Chunk<L>,
-    ) -> RelentlessResult<Vec<<<L as Layer<S>>::Service as Service<Request>>::Response>> {
-        let mut join_set = JoinSet::new();
-        for req in chunk.req {
-            let client = self.clone();
-            join_set.spawn(async move { client.run(req).await });
+    pub async fn run<LW>(self, layer: Option<LW>) -> RelentlessResult<Vec<Response>>
+    where
+        L: Layer<Client> + Clone + Send + 'static,
+        L::Service: Service<Request>,
+        <L as Layer<Client>>::Service: Send,
+        <<L as Layer<Client>>::Service as Service<Request>>::Future: Send,
+        <<L as Layer<Client>>::Service as Service<Request>>::Response:
+            Into<Response> + Send + 'static,
+        <<L as Layer<Client>>::Service as Service<Request>>::Error: Send + 'static,
+        LW: Layer<Client> + Clone + Send + 'static,
+        LW::Service: Service<Request>,
+        <LW as Layer<Client>>::Service: Send,
+        <<LW as Layer<Client>>::Service as Service<Request>>::Future: Send,
+        <<LW as Layer<Client>>::Service as Service<Request>>::Response:
+            Into<Response> + Send + 'static,
+        <<LW as Layer<Client>>::Service as Service<Request>>::Error: Send + 'static,
+        RelentlessError: From<<<L as Layer<Client>>::Service as Service<Request>>::Error>
+            + From<<<LW as Layer<Client>>::Service as Service<Request>>::Error>,
+    {
+        let mut join_set = JoinSet::<RelentlessResult<Response>>::new();
+        for req in self.req {
+            let mut client = Client::new();
+            let (chunk_layer, worker_layer) = (self.layer.clone(), layer.clone());
+            join_set.spawn(async move {
+                let res = match chunk_layer {
+                    Some(layer) => layer.layer(client).call(req).await?.into(),
+                    None => match worker_layer {
+                        Some(layer) => layer.layer(client).call(req).await?.into(),
+                        None => client.call(req).await?,
+                    },
+                };
+                Ok(res)
+            });
         }
 
         let mut response = Vec::new();
@@ -60,19 +72,43 @@ where
     }
 }
 
-#[derive(Debug)]
-pub struct Chunk<L> {
-    pub description: Option<String>,
-    pub req: Vec<Request>,
+pub struct Worker<L> {
+    pub name: Option<String>,
     pub layer: Option<L>,
+    pub setting: Option<Setting>, // TODO
 }
-impl<L: Layer<Client>> Chunk<L> {
-    pub fn new(description: Option<String>, req: Vec<Request>, layer: Option<L>) -> Self {
+impl<L> Worker<L> {
+    pub fn new(name: Option<String>, layer: Option<L>, setting: Option<Setting>) -> Self {
         Self {
-            description,
-            req,
+            name,
             layer,
+            setting,
         }
+    }
+
+    pub async fn run<LC>(self, chunks: Vec<Chunk<LC>>) -> RelentlessResult<()>
+    where
+        L: Layer<Client> + Clone + Send + 'static,
+        L::Service: Service<Request>,
+        <L as Layer<Client>>::Service: Send,
+        <<L as Layer<Client>>::Service as Service<Request>>::Future: Send,
+        <<L as Layer<Client>>::Service as Service<Request>>::Response:
+            Into<Response> + Send + 'static,
+        <<L as Layer<Client>>::Service as Service<Request>>::Error: Send + 'static,
+        LC: Layer<Client> + Clone + Send + 'static,
+        LC::Service: Service<Request>,
+        <LC as Layer<Client>>::Service: Send,
+        <<LC as Layer<Client>>::Service as Service<Request>>::Future: Send,
+        <<LC as Layer<Client>>::Service as Service<Request>>::Response:
+            Into<Response> + Send + 'static,
+        <<LC as Layer<Client>>::Service as Service<Request>>::Error: Send + 'static,
+        RelentlessError: From<<<L as Layer<Client>>::Service as Service<Request>>::Error>
+            + From<<<LC as Layer<Client>>::Service as Service<Request>>::Error>,
+    {
+        for chunk in chunks {
+            let _res = chunk.run(self.layer.clone()).await?;
+        }
+        Ok(())
     }
 }
 
@@ -82,26 +118,36 @@ impl Config {
     }
 
     pub async fn run(&self) -> RelentlessResult<()> {
-        let chunks = self.testcase.iter().map(|h| self.chunk(h));
+        let worker = self.worker()?;
+        let chunks = self
+            .testcase
+            .iter()
+            .map(|h| self.chunk(h))
+            .collect::<Result<Vec<_>, _>>();
 
-        let client = self.client();
-        for chunk in chunks {
-            let _res = client.clone().run_chunk(chunk?).await?;
-        }
+        worker.run(chunks?).await?;
         Ok(())
     }
 
-    pub fn client(&self) -> HttpClient<Client, TimeoutLayer> {
-        let client = reqwest::Client::new();
-        let timeout = TimeoutLayer::new(self.setting.timeout);
-        HttpClient::new(client, timeout)
+    pub fn worker(&self) -> RelentlessResult<Worker<TimeoutLayer>> {
+        let timeout = self.setting.clone().unwrap().timeout;
+        Ok(Worker::new(
+            self.name.clone(),
+            Some(TimeoutLayer::new(timeout)),
+            self.setting.clone(),
+        ))
     }
 
     pub fn chunk(&self, testcase: &Testcase) -> RelentlessResult<Chunk<TimeoutLayer>> {
         let description = testcase.description.clone();
-        let requests = Self::to_requests(&self.setting, testcase)?;
+        let requests = Self::to_requests(&self.setting.clone().unwrap(), testcase)?;
 
-        Ok(Chunk::new(description, requests, None))
+        Ok(Chunk::new(
+            description,
+            requests,
+            None,
+            testcase.setting.clone(),
+        ))
     }
 
     pub fn to_requests(setting: &Setting, testcase: &Testcase) -> RelentlessResult<Vec<Request>> {
