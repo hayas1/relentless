@@ -1,11 +1,10 @@
 use crate::{
-    config::{Config, Format, Setting, Testcase},
-    error::{HttpError, RelentlessError, RelentlessResult},
+    config::Setting,
+    error::{RelentlessError, RelentlessResult},
 };
 use reqwest::{Client, Request, Response};
-use std::{path::Path, str::FromStr};
 use tokio::task::JoinSet;
-use tower::{timeout::TimeoutLayer, Layer, Service};
+use tower::{Layer, Service};
 
 #[derive(Debug)]
 pub struct Unit<LU> {
@@ -109,56 +108,5 @@ impl<LW> Worker<LW> {
             let _res = unit.process(self.layer.clone()).await?;
         }
         Ok(())
-    }
-}
-
-impl Config {
-    pub fn import<P: AsRef<Path>>(path: P) -> RelentlessResult<Self> {
-        Ok(Format::from_path(path.as_ref())?.import_testcase(path.as_ref())?)
-    }
-
-    pub async fn run(&self) -> RelentlessResult<()> {
-        let worker = self.worker()?;
-        let units = self
-            .testcase
-            .iter()
-            .map(|h| self.unit(h))
-            .collect::<Result<Vec<_>, _>>();
-
-        worker.assault(units?).await?;
-        Ok(())
-    }
-
-    pub fn worker(&self) -> RelentlessResult<Worker<TimeoutLayer>> {
-        let timeout = self.setting.clone().unwrap().timeout;
-        Ok(Worker::new(
-            self.name.clone(),
-            Some(TimeoutLayer::new(timeout)),
-            self.setting.clone(),
-        ))
-    }
-
-    pub fn unit(&self, testcase: &Testcase) -> RelentlessResult<Unit<TimeoutLayer>> {
-        let description = testcase.description.clone();
-        let requests = Self::to_requests(&self.setting.clone().unwrap(), testcase)?;
-
-        Ok(Unit::new(
-            description,
-            requests,
-            None,
-            testcase.setting.clone(),
-        ))
-    }
-
-    pub fn to_requests(setting: &Setting, testcase: &Testcase) -> RelentlessResult<Vec<Request>> {
-        Ok(setting
-            .origin
-            .values()
-            .map(|origin| {
-                let method = reqwest::Method::from_str(&testcase.method)?;
-                let url = reqwest::Url::parse(origin)?.join(&testcase.pathname)?;
-                Ok::<_, HttpError>(Request::new(method, url))
-            })
-            .collect::<Result<Vec<_>, _>>()?)
     }
 }
