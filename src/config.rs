@@ -28,12 +28,8 @@ pub struct Setting {
     pub header: HashMap<String, Vec<String>>, // TODO use multi map ?
     #[serde(default)]
     pub template: HashMap<String, HashMap<String, String>>,
-    #[serde(default = "default_timeout")]
+    #[serde(default = "Config::default_timeout")]
     pub timeout: Duration,
-}
-// TODO Setting::default_timeout
-pub fn default_timeout() -> Duration {
-    Duration::from_secs(10)
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Testcase {
@@ -44,20 +40,18 @@ pub struct Testcase {
 }
 
 impl Config {
-    pub fn import<P: AsRef<Path>>(path: P) -> RelentlessResult<Self> {
+    pub fn read<P: AsRef<Path>>(path: P) -> RelentlessResult<Self> {
         Ok(Format::from_path(path.as_ref())?.import_testcase(path.as_ref())?)
     }
 
-    pub async fn run(&self) -> RelentlessResult<()> {
+    pub fn instance(self) -> RelentlessResult<(Worker<TimeoutLayer>, Vec<Unit<TimeoutLayer>>)> {
         let worker = self.worker()?;
         let units = self
             .testcase
             .iter()
-            .map(|h| self.unit(h))
-            .collect::<Result<Vec<_>, _>>();
-
-        worker.assault(units?).await?;
-        Ok(())
+            .map(|t| self.unit(t))
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok((worker, units))
     }
 
     pub fn worker(&self) -> RelentlessResult<Worker<TimeoutLayer>> {
@@ -91,6 +85,10 @@ impl Config {
                 Ok::<_, HttpError>(Request::new(method, url))
             })
             .collect::<Result<Vec<_>, _>>()?)
+    }
+
+    pub fn default_timeout() -> Duration {
+        Duration::from_secs(10)
     }
 }
 
