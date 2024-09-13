@@ -6,7 +6,8 @@ use std::{
 };
 
 use serde::{Deserialize, Serialize};
-use thiserror::Error;
+
+use crate::error::FormatError;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Config {
@@ -44,26 +45,6 @@ pub enum Format {
     Yaml,
     #[cfg(feature = "toml")]
     Toml,
-}
-
-#[derive(Error, Debug)]
-pub enum FormatError {
-    #[error("unknown format extension: {0}")]
-    UnknownFormatExtension(String),
-    #[error("cannot specify format")]
-    CannotSpecifyFormat,
-
-    #[error(transparent)]
-    StdIoError(#[from] std::io::Error),
-    #[cfg(feature = "json")]
-    #[error(transparent)]
-    JsonError(#[from] serde_json::Error),
-    #[cfg(feature = "yaml")]
-    #[error(transparent)]
-    YamlError(#[from] serde_yaml::Error),
-    #[cfg(feature = "toml")]
-    #[error(transparent)]
-    TomlError(#[from] toml::de::Error),
 }
 
 impl Format {

@@ -1,7 +1,5 @@
 use thiserror::Error;
 
-use crate::config::FormatError;
-
 pub type RelentlessResult<T, E = RelentlessError> = Result<T, E>;
 
 #[derive(Error, Debug)]
@@ -14,6 +12,26 @@ pub enum RelentlessError {
     TokioTaskJoinError(#[from] tokio::task::JoinError),
 
     BoxError(#[from] Box<dyn std::error::Error + Send + Sync + 'static>),
+}
+
+#[derive(Error, Debug)]
+pub enum FormatError {
+    #[error("unknown format extension: {0}")]
+    UnknownFormatExtension(String),
+    #[error("cannot specify format")]
+    CannotSpecifyFormat,
+
+    #[error(transparent)]
+    StdIoError(#[from] std::io::Error),
+    #[cfg(feature = "json")]
+    #[error(transparent)]
+    JsonError(#[from] serde_json::Error),
+    #[cfg(feature = "yaml")]
+    #[error(transparent)]
+    YamlError(#[from] serde_yaml::Error),
+    #[cfg(feature = "toml")]
+    #[error(transparent)]
+    TomlError(#[from] toml::de::Error),
 }
 
 #[derive(Error, Debug)]
