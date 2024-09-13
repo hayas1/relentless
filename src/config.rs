@@ -2,10 +2,10 @@ use std::{
     collections::HashMap,
     fs::{read_to_string, File},
     path::Path,
-    str::FromStr,
     time::Duration,
 };
 
+use http::{HeaderMap, Method};
 use reqwest::Request;
 use serde::{Deserialize, Serialize};
 use tower::timeout::TimeoutLayer;
@@ -23,18 +23,20 @@ pub struct Config {
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Setting {
-    pub origin: HashMap<String, String>,
     #[serde(default)]
-    pub header: HashMap<String, Vec<String>>, // TODO use multi map ?
+    pub origin: HashMap<String, String>,
+    #[serde(default = "Setting::default_method", with = "http_serde::method")]
+    pub method: Method,
+    #[serde(default, with = "http_serde::header_map")]
+    pub header: HeaderMap, // TODO use multi map ?
     #[serde(default)]
     pub template: HashMap<String, HashMap<String, String>>,
-    #[serde(default = "Config::default_timeout")]
+    #[serde(default = "Setting::default_timeout")]
     pub timeout: Duration,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Testcase {
     pub description: Option<String>,
-    pub method: String,
     pub pathname: String,
     pub setting: Option<Setting>,
 }
@@ -80,15 +82,19 @@ impl Config {
             .origin
             .values()
             .map(|origin| {
-                let method = reqwest::Method::from_str(&testcase.method)?;
+                let method = testcase.setting.clone().unwrap().method;
                 let url = reqwest::Url::parse(origin)?.join(&testcase.pathname)?;
                 Ok::<_, HttpError>(Request::new(method, url))
             })
             .collect::<Result<Vec<_>, _>>()?)
     }
-
+}
+impl Setting {
     pub fn default_timeout() -> Duration {
         Duration::from_secs(10)
+    }
+    pub fn default_method() -> Method {
+        Method::GET
     }
 }
 

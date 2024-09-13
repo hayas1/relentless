@@ -10,5 +10,6 @@ setting:
 
 
 testcase:
-  - method: GET
-    pathname: /
+  - pathname: /
+    setting:
+      method: GET
