@@ -76,8 +76,8 @@ impl Config {
             .unwrap_or_else(Setting::default_timeout);
         Ok(Worker::new(
             self.name.clone(),
+            self.setting.clone().unwrap_or_default(),
             Some(TimeoutLayer::new(timeout)),
-            self.setting.clone(),
         ))
     }
 
@@ -87,8 +87,8 @@ impl Config {
         Ok(Unit::new(
             description,
             testcase.target.clone(),
+            testcase.setting.clone().unwrap_or_default(),
             None,
-            testcase.setting.clone(),
         ))
     }
 }
