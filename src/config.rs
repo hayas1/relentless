@@ -23,21 +23,32 @@ pub struct Config {
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Setting {
+    #[serde(flatten)]
+    pub protocol: Option<Protocol>,
     #[serde(default)]
-    pub origin: HashMap<String, String>,
-    #[serde(default = "Setting::default_method", with = "http_serde::method")]
-    pub method: Method,
-    #[serde(default, with = "http_serde::header_map")]
-    pub header: HeaderMap, // TODO use multi map ?
+    pub host: HashMap<String, String>,
     #[serde(default)]
     pub template: HashMap<String, HashMap<String, String>>,
     #[serde(default = "Setting::default_timeout")]
     pub timeout: Duration,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Protocol {
+    Http(Http),
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Http {
+    #[serde(default, with = "http_serde::option::method")]
+    pub method: Option<Method>,
+    #[serde(default, with = "http_serde::option::header_map")]
+    pub header: Option<HeaderMap>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Testcase {
     pub description: Option<String>,
-    pub pathname: String,
+    pub target: String,
     pub setting: Option<Setting>,
 }
 
@@ -79,11 +90,14 @@ impl Config {
 
     pub fn to_requests(setting: &Setting, testcase: &Testcase) -> RelentlessResult<Vec<Request>> {
         Ok(setting
-            .origin
+            .host
             .values()
-            .map(|origin| {
-                let method = testcase.setting.clone().unwrap().method;
-                let url = reqwest::Url::parse(origin)?.join(&testcase.pathname)?;
+            .map(|host| {
+                let method = match testcase.setting.clone().unwrap().protocol {
+                    Some(Protocol::Http(http)) => http.method.unwrap(),
+                    None => Method::GET,
+                };
+                let url = reqwest::Url::parse(host)?.join(&testcase.target)?;
                 Ok::<_, HttpError>(Request::new(method, url))
             })
             .collect::<Result<Vec<_>, _>>()?)
@@ -92,9 +106,6 @@ impl Config {
 impl Setting {
     pub fn default_timeout() -> Duration {
         Duration::from_secs(10)
-    }
-    pub fn default_method() -> Method {
-        Method::GET
     }
 }
 
