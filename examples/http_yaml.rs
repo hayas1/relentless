@@ -1,4 +1,4 @@
-use relentless::testcase::config::Config;
+use relentless::config::Config;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {

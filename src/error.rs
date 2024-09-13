@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use crate::testcase::config::FormatError;
+use crate::config::FormatError;
 
 pub type RelentlessResult<T, E = RelentlessError> = Result<T, E>;
 

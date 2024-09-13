@@ -1,11 +1,11 @@
-use crate::error::{HttpError, RelentlessError, RelentlessResult};
-use config::{Config, Format, Setting, Testcase};
+use crate::{
+    config::{Config, Format, Setting, Testcase},
+    error::{HttpError, RelentlessError, RelentlessResult},
+};
 use reqwest::{Client, Request, Response};
 use std::{path::Path, str::FromStr};
 use tokio::task::JoinSet;
 use tower::{timeout::TimeoutLayer, Layer, Service};
-
-pub mod config;
 
 #[derive(Debug)]
 pub struct Unit<LU> {
