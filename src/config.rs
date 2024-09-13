@@ -15,13 +15,13 @@ use crate::{
     worker::{Unit, Worker},
 };
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct Config {
     pub name: Option<String>,
     pub setting: Option<Setting>,
     pub testcase: Vec<Testcase>,
 }
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct Setting {
     #[serde(flatten)]
     pub protocol: Option<Protocol>,
@@ -29,15 +29,15 @@ pub struct Setting {
     pub host: HashMap<String, String>,
     #[serde(default)]
     pub template: HashMap<String, HashMap<String, String>>,
-    #[serde(default = "Setting::default_timeout")]
-    pub timeout: Duration,
+    #[serde(default)]
+    pub timeout: Option<Duration>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Protocol {
     Http(Http),
 }
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct Http {
     #[serde(default, with = "http_serde::option::method")]
     pub method: Option<Method>,
@@ -45,7 +45,7 @@ pub struct Http {
     pub header: Option<HeaderMap>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct Testcase {
     pub description: Option<String>,
     pub target: String,
@@ -68,7 +68,12 @@ impl Config {
     }
 
     pub fn worker(&self) -> RelentlessResult<Worker<TimeoutLayer>> {
-        let timeout = self.setting.clone().unwrap().timeout;
+        let timeout = self
+            .setting
+            .clone()
+            .unwrap()
+            .timeout
+            .unwrap_or_else(Setting::default_timeout);
         Ok(Worker::new(
             self.name.clone(),
             Some(TimeoutLayer::new(timeout)),
@@ -78,34 +83,58 @@ impl Config {
 
     pub fn unit(&self, testcase: &Testcase) -> RelentlessResult<Unit<TimeoutLayer>> {
         let description = testcase.description.clone();
-        let requests = Self::to_requests(&self.setting.clone().unwrap(), testcase)?;
 
         Ok(Unit::new(
             description,
-            requests,
+            testcase.target.clone(),
             None,
             testcase.setting.clone(),
         ))
-    }
-
-    pub fn to_requests(setting: &Setting, testcase: &Testcase) -> RelentlessResult<Vec<Request>> {
-        Ok(setting
-            .host
-            .values()
-            .map(|host| {
-                let method = match testcase.setting.clone().unwrap().protocol {
-                    Some(Protocol::Http(http)) => http.method.unwrap(),
-                    None => Method::GET,
-                };
-                let url = reqwest::Url::parse(host)?.join(&testcase.target)?;
-                Ok::<_, HttpError>(Request::new(method, url))
-            })
-            .collect::<Result<Vec<_>, _>>()?)
     }
 }
 impl Setting {
     pub fn default_timeout() -> Duration {
         Duration::from_secs(10)
+    }
+
+    pub fn coalesce(self, other: Self) -> Self {
+        Self {
+            protocol: self.protocol.or(other.protocol),
+            host: if self.host.is_empty() {
+                other.host
+            } else {
+                self.host
+            },
+            template: if self.template.is_empty() {
+                other.template
+            } else {
+                self.template
+            },
+            timeout: self.timeout.or(other.timeout),
+        }
+    }
+
+    pub fn requests(self, target: &str) -> RelentlessResult<HashMap<String, Request>> {
+        let Self {
+            protocol,
+            host,
+            template,
+            timeout,
+        } = self;
+        Ok(host
+            .into_iter()
+            .map(|(name, hostname)| {
+                let (method, headers) = match protocol.clone() {
+                    Some(Protocol::Http(http)) => (http.method, http.header),
+                    None => (None, None),
+                };
+                let url = reqwest::Url::parse(&hostname)?.join(target)?;
+                let mut request = Request::new(method.unwrap_or(Method::GET), url);
+                *request.timeout_mut() = timeout.or(Some(Duration::from_secs(10)));
+                *request.headers_mut() = headers.unwrap_or_default();
+                Ok::<_, HttpError>((name, request))
+            })
+            .collect::<Result<HashMap<_, _>, _>>()?)
     }
 }
 

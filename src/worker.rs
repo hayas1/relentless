@@ -9,26 +9,30 @@ use tower::{Layer, Service};
 #[derive(Debug)]
 pub struct Unit<LU> {
     pub description: Option<String>,
-    pub req: Vec<Request>,
+    pub target: String,
     pub layer: Option<LU>,
-    pub setting: Option<Setting>, // TODO
+    pub setting: Option<Setting>,
 }
 impl<LU> Unit<LU> {
     pub fn new(
         description: Option<String>,
-        req: Vec<Request>,
+        target: String,
         layer: Option<LU>,
         setting: Option<Setting>,
     ) -> Self {
         Self {
             description,
-            req,
+            target,
             layer,
             setting,
         }
     }
 
-    pub async fn process<LW>(self, layer: Option<LW>) -> RelentlessResult<Vec<Response>>
+    pub async fn process<LW>(
+        self,
+        layer: Option<LW>,
+        setting: Option<Setting>,
+    ) -> RelentlessResult<Vec<Response>>
     where
         LU: Layer<Client> + Clone + Send + 'static,
         LU::Service: Service<Request>,
@@ -48,7 +52,12 @@ impl<LU> Unit<LU> {
             + From<<<LW as Layer<Client>>::Service as Service<Request>>::Error>,
     {
         let mut join_set = JoinSet::<RelentlessResult<Response>>::new();
-        for req in self.req {
+        for (name, req) in self
+            .setting
+            .unwrap_or_default()
+            .coalesce(setting.unwrap_or_default())
+            .requests(&self.target)?
+        {
             let mut client = Client::new();
             let (unit_layer, worker_layer) = (self.layer.clone(), layer.clone());
             join_set.spawn(async move {
@@ -74,7 +83,7 @@ impl<LU> Unit<LU> {
 pub struct Worker<LW> {
     pub name: Option<String>,
     pub layer: Option<LW>,
-    pub setting: Option<Setting>, // TODO
+    pub setting: Option<Setting>,
 }
 impl<LW> Worker<LW> {
     pub fn new(name: Option<String>, layer: Option<LW>, setting: Option<Setting>) -> Self {
@@ -105,7 +114,9 @@ impl<LW> Worker<LW> {
             + From<<<LC as Layer<Client>>::Service as Service<Request>>::Error>,
     {
         for unit in units {
-            let _res = unit.process(self.layer.clone()).await?;
+            let _res = unit
+                .process(self.layer.clone(), self.setting.clone())
+                .await?;
         }
         Ok(())
     }
