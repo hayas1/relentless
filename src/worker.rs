@@ -1,5 +1,5 @@
 use crate::{
-    config::Setting,
+    config::{Attribute, Setting},
     error::{RelentlessError, RelentlessResult},
     outcome::{CaseOutcome, Compare, Evaluator, Status, WorkerOutcome},
 };
@@ -12,11 +12,18 @@ pub struct Case<LC> {
     description: Option<String>,
     target: String,
     setting: Setting,
+    attr: Attribute,
     layer: Option<LC>,
 }
 impl<LC> Case<LC> {
-    pub fn new(description: Option<String>, target: String, setting: Setting, layer: Option<LC>) -> Self {
-        Self { description, target, setting, layer }
+    pub fn new(
+        description: Option<String>,
+        target: String,
+        setting: Setting,
+        attr: Attribute,
+        layer: Option<LC>,
+    ) -> Self {
+        Self { description, target, setting, attr, layer }
     }
 
     pub fn description(&self) -> &Option<String> {

@@ -10,3 +10,5 @@ testcase:
   - target: /healthz
   - target: /health/rich
   - target: /health/disabled
+    attr:
+      invalid: true

@@ -50,6 +50,14 @@ pub struct Testcase {
     pub description: Option<String>,
     pub target: String,
     pub setting: Option<Setting>,
+    pub attr: Option<Attribute>,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct Attribute {
+    #[serde(default)]
+    pub invalid: bool,
+    #[serde(default)]
+    pub repeat: usize,
 }
 
 impl Config {
@@ -78,9 +86,9 @@ impl Config {
     }
 
     pub fn case(testcase: Testcase) -> RelentlessResult<Case<TimeoutLayer>> {
-        let Testcase { description, target, setting } = testcase;
+        let Testcase { description, target, setting, attr } = testcase;
 
-        Ok(Case::new(description, target, setting.unwrap_or_default(), None))
+        Ok(Case::new(description, target, setting.unwrap_or_default(), attr.unwrap_or_default(), None))
     }
 }
 impl Setting {
