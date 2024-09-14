@@ -12,7 +12,7 @@ use tower::timeout::TimeoutLayer;
 
 use crate::{
     error::{FormatError, HttpError, RelentlessResult},
-    worker::{Unit, Worker},
+    worker::{Case, Worker},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -57,22 +57,22 @@ impl Config {
         Ok(Format::from_path(path.as_ref())?.import_testcase(path.as_ref())?)
     }
 
-    pub fn instance(self) -> RelentlessResult<(Worker<TimeoutLayer>, Vec<Unit<TimeoutLayer>>)> {
+    pub fn instance(self) -> RelentlessResult<(Worker<TimeoutLayer>, Vec<Case<TimeoutLayer>>)> {
         let Self { name, setting, testcase } = self;
 
         let worker = Self::worker(name, setting)?;
-        let units = testcase.into_iter().map(Self::unit).collect::<Result<Vec<_>, _>>()?;
-        Ok((worker, units))
+        let cases = testcase.into_iter().map(Self::case).collect::<Result<Vec<_>, _>>()?;
+        Ok((worker, cases))
     }
 
     pub fn worker(name: Option<String>, setting: Option<Setting>) -> RelentlessResult<Worker<TimeoutLayer>> {
         Ok(Worker::new(name, setting.unwrap_or_default(), None))
     }
 
-    pub fn unit(testcase: Testcase) -> RelentlessResult<Unit<TimeoutLayer>> {
+    pub fn case(testcase: Testcase) -> RelentlessResult<Case<TimeoutLayer>> {
         let Testcase { description, target, setting } = testcase;
 
-        Ok(Unit::new(description, target, setting.unwrap_or_default(), None))
+        Ok(Case::new(description, target, setting.unwrap_or_default(), None))
     }
 }
 impl Setting {

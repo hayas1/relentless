@@ -7,14 +7,14 @@ use tokio::task::JoinSet;
 use tower::{Layer, Service};
 
 #[derive(Debug)]
-pub struct Unit<LU> {
+pub struct Case<LC> {
     description: Option<String>,
     target: String,
     setting: Setting,
-    layer: Option<LU>,
+    layer: Option<LC>,
 }
-impl<LU> Unit<LU> {
-    pub fn new(description: Option<String>, target: String, setting: Setting, layer: Option<LU>) -> Self {
+impl<LC> Case<LC> {
+    pub fn new(description: Option<String>, target: String, setting: Setting, layer: Option<LC>) -> Self {
         Self { description, target, setting, layer }
     }
 
@@ -27,27 +27,27 @@ impl<LU> Unit<LU> {
 
     pub async fn process<LW>(self, layer: Option<LW>, setting: Setting) -> RelentlessResult<Vec<Response>>
     where
-        LU: Layer<Client> + Clone + Send + 'static,
-        LU::Service: Service<Request>,
-        <LU as Layer<Client>>::Service: Send,
-        <<LU as Layer<Client>>::Service as Service<Request>>::Future: Send,
-        <<LU as Layer<Client>>::Service as Service<Request>>::Response: Into<Response> + Send + 'static,
-        <<LU as Layer<Client>>::Service as Service<Request>>::Error: Send + 'static,
+        LC: Layer<Client> + Clone + Send + 'static,
+        LC::Service: Service<Request>,
+        <LC as Layer<Client>>::Service: Send,
+        <<LC as Layer<Client>>::Service as Service<Request>>::Future: Send,
+        <<LC as Layer<Client>>::Service as Service<Request>>::Response: Into<Response> + Send + 'static,
+        <<LC as Layer<Client>>::Service as Service<Request>>::Error: Send + 'static,
         LW: Layer<Client> + Clone + Send + 'static,
         LW::Service: Service<Request>,
         <LW as Layer<Client>>::Service: Send,
         <<LW as Layer<Client>>::Service as Service<Request>>::Future: Send,
         <<LW as Layer<Client>>::Service as Service<Request>>::Response: Into<Response> + Send + 'static,
         <<LW as Layer<Client>>::Service as Service<Request>>::Error: Send + 'static,
-        RelentlessError: From<<<LU as Layer<Client>>::Service as Service<Request>>::Error>
+        RelentlessError: From<<<LC as Layer<Client>>::Service as Service<Request>>::Error>
             + From<<<LW as Layer<Client>>::Service as Service<Request>>::Error>,
     {
         let mut join_set = JoinSet::<RelentlessResult<Response>>::new();
         for (name, req) in self.setting.coalesce(setting).requests(&self.target)? {
             let mut client = Client::new();
-            let (unit_layer, worker_layer) = (self.layer.clone(), layer.clone());
+            let (case_layer, worker_layer) = (self.layer.clone(), layer.clone());
             join_set.spawn(async move {
-                let res = match unit_layer {
+                let res = match case_layer {
                     Some(layer) => layer.layer(client).call(req).await?.into(),
                     None => match worker_layer {
                         Some(layer) => layer.layer(client).call(req).await?.into(),
@@ -83,7 +83,7 @@ impl<LW> Worker<LW> {
         &mut self.name
     }
 
-    pub async fn assault<LC>(self, units: Vec<Unit<LC>>) -> RelentlessResult<()>
+    pub async fn assault<LC>(self, cases: Vec<Case<LC>>) -> RelentlessResult<()>
     where
         LW: Layer<Client> + Clone + Send + 'static,
         LW::Service: Service<Request>,
@@ -100,8 +100,8 @@ impl<LW> Worker<LW> {
         RelentlessError: From<<<LW as Layer<Client>>::Service as Service<Request>>::Error>
             + From<<<LC as Layer<Client>>::Service as Service<Request>>::Error>,
     {
-        for unit in units {
-            let _res = unit.process(self.layer.clone(), self.setting.clone()).await?;
+        for case in cases {
+            let _res = case.process(self.layer.clone(), self.setting.clone()).await?;
         }
         Ok(())
     }
