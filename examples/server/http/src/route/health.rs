@@ -75,24 +75,35 @@ pub async fn disabled() -> AppResult<(), Health> {
 
 #[cfg(test)]
 mod tests {
-    use axum::{body::Body, http::StatusCode};
+    use axum::{
+        body::Body,
+        http::{HeaderMap, StatusCode},
+    };
 
     use super::*;
-    use crate::tests::{oneshot, oneshot_bytes};
+    use crate::tests::{send, send_bytes};
 
     #[tokio::test]
     async fn test_health_call() {
-        let (uri, body) = ("/health", Body::empty());
-        let (status, body) = oneshot_bytes(uri, body).await;
+        let (uri, body, headers) = ("/health", Body::empty(), HeaderMap::new());
+        let (status, body) = send_bytes(uri, body, headers).await;
         assert_eq!(status, StatusCode::OK);
         assert_eq!(&body[..], b"ok");
     }
 
     #[tokio::test]
     async fn test_health_rich_call() {
-        let (uri, body) = ("/health/rich", Body::empty());
-        let (status, health) = oneshot::<Health>(uri, body).await;
+        let (uri, body, headers) = ("/health/rich", Body::empty(), HeaderMap::new());
+        let (status, health) = send::<Health>(uri, body, headers).await;
         assert_eq!(status, StatusCode::OK);
         assert_eq!(health, Health { status: StatusCode::OK });
+    }
+
+    #[tokio::test]
+    async fn test_disabled_call() {
+        let (uri, body, headers) = ("/health/disabled", Body::empty(), HeaderMap::new());
+        let (status, health) = send::<Health>(uri, body, headers).await;
+        assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(health, Health { status: StatusCode::SERVICE_UNAVAILABLE });
     }
 }

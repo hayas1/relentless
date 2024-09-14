@@ -27,14 +27,17 @@ pub async fn logging(
 
 #[cfg(test)]
 mod tests {
-    use axum::{body::Body, http::StatusCode};
+    use axum::{
+        body::Body,
+        http::{HeaderMap, StatusCode},
+    };
 
-    use crate::tests::oneshot_bytes;
+    use crate::tests::send_bytes;
 
     #[tokio::test]
     async fn test_healthz_call() {
-        let (uri, body) = ("/healthz", Body::empty());
-        let (status, body) = oneshot_bytes(uri, body).await;
+        let (uri, body, headers) = ("/healthz", Body::empty(), HeaderMap::new());
+        let (status, body) = send_bytes(uri, body, headers).await;
         assert_eq!(status, StatusCode::OK);
         assert_eq!(&body[..], b"ok");
     }
