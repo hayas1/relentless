@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use tower::timeout::TimeoutLayer;
 
 use crate::{
-    error::{FormatError, HttpError, RelentlessResult},
+    error::{FormatError, HttpError, RelentlessError, RelentlessResult},
     worker::{Case, Worker},
 };
 
@@ -54,7 +54,15 @@ pub struct Testcase {
 
 impl Config {
     pub fn read<P: AsRef<Path>>(path: P) -> RelentlessResult<Self> {
-        Ok(Format::from_path(path.as_ref())?.import_testcase(path.as_ref())?)
+        Ok(Format::from_path(path.as_ref())?.deserialize_testcase(path.as_ref())?)
+    }
+    pub fn read_str(s: &str, format: Format) -> RelentlessResult<Self> {
+        Ok(format.deserialize_testcase_str(s)?)
+    }
+    pub fn read_dir<P: AsRef<Path>>(path: P) -> RelentlessResult<Vec<Self>> {
+        // TODO logging read files
+        // TODO filter by format
+        std::fs::read_dir(path)?.map(|f| Self::read(f?.path())).filter(Result::is_ok).collect::<Result<Vec<_>, _>>()
     }
 
     pub fn instance(self) -> RelentlessResult<(Worker<TimeoutLayer>, Vec<Case<TimeoutLayer>>)> {
@@ -117,7 +125,6 @@ pub enum Format {
     #[cfg(feature = "toml")]
     Toml,
 }
-
 impl Format {
     pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Self, FormatError> {
         let basename = path.as_ref().extension().and_then(|ext| ext.to_str());
@@ -133,7 +140,7 @@ impl Format {
         }
     }
 
-    pub fn import_testcase<P: AsRef<Path>>(&self, path: P) -> Result<Config, FormatError> {
+    pub fn deserialize_testcase<P: AsRef<Path>>(&self, path: P) -> Result<Config, FormatError> {
         match self {
             #[cfg(feature = "json")]
             Format::Json => Ok(serde_json::from_reader(File::open(path)?)?),
@@ -144,7 +151,7 @@ impl Format {
         }
     }
 
-    pub fn import_testcase_str(&self, content: &str) -> Result<Config, FormatError> {
+    pub fn deserialize_testcase_str(&self, content: &str) -> Result<Config, FormatError> {
         match self {
             #[cfg(feature = "json")]
             Format::Json => Ok(serde_json::from_str(content)?),

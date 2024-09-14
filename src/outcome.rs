@@ -42,4 +42,7 @@ impl Outcome {
     pub fn new(description: Option<String>, status: bool) -> Self {
         Self { description, status }
     }
+    pub fn status(&self) -> bool {
+        self.status
+    }
 }
