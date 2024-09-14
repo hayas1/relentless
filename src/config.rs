@@ -58,36 +58,38 @@ impl Config {
     }
 
     pub fn instance(self) -> RelentlessResult<(Worker<TimeoutLayer>, Vec<Unit<TimeoutLayer>>)> {
-        let worker = self.worker()?;
-        let units = self
-            .testcase
-            .iter()
-            .map(|t| self.unit(t))
+        let Self {
+            name,
+            setting,
+            testcase,
+        } = self;
+
+        let worker = Self::worker(name, setting)?;
+        let units = testcase
+            .into_iter()
+            .map(Self::unit)
             .collect::<Result<Vec<_>, _>>()?;
         Ok((worker, units))
     }
 
-    pub fn worker(&self) -> RelentlessResult<Worker<TimeoutLayer>> {
-        let timeout = self
-            .setting
-            .clone()
-            .unwrap()
-            .timeout
-            .unwrap_or_else(Setting::default_timeout);
-        Ok(Worker::new(
-            self.name.clone(),
-            self.setting.clone().unwrap_or_default(),
-            Some(TimeoutLayer::new(timeout)),
-        ))
+    pub fn worker(
+        name: Option<String>,
+        setting: Option<Setting>,
+    ) -> RelentlessResult<Worker<TimeoutLayer>> {
+        Ok(Worker::new(name, setting.unwrap_or_default(), None))
     }
 
-    pub fn unit(&self, testcase: &Testcase) -> RelentlessResult<Unit<TimeoutLayer>> {
-        let description = testcase.description.clone();
+    pub fn unit(testcase: Testcase) -> RelentlessResult<Unit<TimeoutLayer>> {
+        let Testcase {
+            description,
+            target,
+            setting,
+        } = testcase;
 
         Ok(Unit::new(
             description,
-            testcase.target.clone(),
-            testcase.setting.clone().unwrap_or_default(),
+            target,
+            setting.unwrap_or_default(),
             None,
         ))
     }
