@@ -4,5 +4,6 @@ use relentless::config::Config;
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let (worker, testcases) = Config::read("./examples/assault.yaml")?.instance()?;
     let result = worker.assault(testcases).await?;
-    Ok(result)
+    println!("{:#?}", result);
+    Ok(())
 }

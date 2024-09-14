@@ -1,6 +1,7 @@
 use crate::{
     config::Setting,
     error::{RelentlessError, RelentlessResult},
+    outcome::{Compare, Evaluator, Outcome},
 };
 use reqwest::{Client, Request, Response};
 use tokio::task::JoinSet;
@@ -83,7 +84,7 @@ impl<LW> Worker<LW> {
         &mut self.name
     }
 
-    pub async fn assault<LC>(self, cases: Vec<Case<LC>>) -> RelentlessResult<()>
+    pub async fn assault<LC>(self, cases: Vec<Case<LC>>) -> RelentlessResult<Vec<Outcome>>
     where
         LW: Layer<Client> + Clone + Send + 'static,
         LW::Service: Service<Request>,
@@ -100,9 +101,12 @@ impl<LW> Worker<LW> {
         RelentlessError: From<<<LW as Layer<Client>>::Service as Service<Request>>::Error>
             + From<<<LC as Layer<Client>>::Service as Service<Request>>::Error>,
     {
+        let mut outcome = Vec::new();
         for case in cases {
-            let _res = case.process(self.layer.clone(), self.setting.clone()).await?;
+            let description = case.description().clone();
+            let res = case.process(self.layer.clone(), self.setting.clone()).await?;
+            outcome.push(Compare::evaluate(description, res).await?);
         }
-        Ok(())
+        Ok(outcome)
     }
 }

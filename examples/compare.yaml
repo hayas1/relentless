@@ -11,5 +11,7 @@ setting:
 
 testcase:
   - target: /
+  - target: /
+    description: test description
     setting:
       method: GET
