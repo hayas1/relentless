@@ -1,3 +1,4 @@
+pub mod health;
 pub mod root;
 
 use axum::{body::HttpBody, middleware, routing::get};
@@ -5,7 +6,11 @@ use axum::{body::HttpBody, middleware, routing::get};
 use crate::state::State;
 
 pub fn app() -> axum::Router<State> {
-    axum::Router::new().route("/", get(root::root)).layer(middleware::from_fn(logging))
+    axum::Router::new()
+        .route("/", get(root::root))
+        .nest("/health", health::route_health())
+        .route("/healthz", get(health::health_raw))
+        .layer(middleware::from_fn(logging))
 }
 
 pub async fn logging(
