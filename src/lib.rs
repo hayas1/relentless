@@ -43,10 +43,10 @@ impl Outcome {
     pub fn new(outcome: Vec<outcome::WorkerOutcome>) -> Self {
         Self { outcome }
     }
-    pub fn success(&self) -> bool {
-        self.outcome.iter().all(|o| o.success())
+    pub fn pass(&self) -> bool {
+        self.outcome.iter().all(|o| o.pass())
     }
     pub fn exit_code(&self) -> std::process::ExitCode {
-        (!self.success() as u8).into()
+        (!self.pass() as u8).into()
     }
 }

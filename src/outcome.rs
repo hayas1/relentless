@@ -20,8 +20,8 @@ impl Evaluator<Response> for Compare {
         for res in iter {
             v.push((res.status(), res.text().await?));
         }
-        let success = v.windows(2).all(|w| w[0] == w[1]);
-        Ok(CaseOutcome::new(description, success))
+        let pass = v.windows(2).all(|w| w[0] == w[1]);
+        Ok(CaseOutcome::new(description, pass))
     }
 }
 
@@ -31,22 +31,22 @@ impl Evaluator<Response> for Status {
         description: Option<String>,
         iter: I,
     ) -> RelentlessResult<CaseOutcome> {
-        let success = iter.into_iter().all(|res| res.status().is_success());
-        Ok(CaseOutcome::new(description, success))
+        let pass = iter.into_iter().all(|res| res.status().is_success());
+        Ok(CaseOutcome::new(description, pass))
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct CaseOutcome {
     description: Option<String>,
-    success: bool,
+    pass: bool,
 }
 impl CaseOutcome {
-    pub fn new(description: Option<String>, success: bool) -> Self {
-        Self { description, success }
+    pub fn new(description: Option<String>, pass: bool) -> Self {
+        Self { description, pass }
     }
-    pub fn success(&self) -> bool {
-        self.success
+    pub fn pass(&self) -> bool {
+        self.pass
     }
 }
 
@@ -59,7 +59,7 @@ impl WorkerOutcome {
     pub fn new(name: Option<String>, outcome: Vec<CaseOutcome>) -> Self {
         Self { name, outcome }
     }
-    pub fn success(&self) -> bool {
-        self.outcome.iter().all(|o| o.success())
+    pub fn pass(&self) -> bool {
+        self.outcome.iter().all(|o| o.pass())
     }
 }
