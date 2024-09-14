@@ -1,7 +1,7 @@
 use crate::{
     config::Setting,
     error::{RelentlessError, RelentlessResult},
-    outcome::{Compare, Evaluator, Outcome},
+    outcome::{Compare, Evaluator, Outcome, Status},
 };
 use reqwest::{Client, Request, Response};
 use tokio::task::JoinSet;
@@ -105,7 +105,11 @@ impl<LW> Worker<LW> {
         for case in cases {
             let description = case.description().clone();
             let res = case.process(self.layer.clone(), self.setting.clone()).await?;
-            outcome.push(Compare::evaluate(description, res).await?);
+            outcome.push(if res.len() == 1 {
+                Status::evaluate(description, res).await?
+            } else {
+                Compare::evaluate(description, res).await?
+            });
         }
         Ok(outcome)
     }
