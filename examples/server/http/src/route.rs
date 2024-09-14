@@ -9,7 +9,7 @@ pub fn app() -> axum::Router<State> {
     axum::Router::new()
         .route("/", get(root::root))
         .nest("/health", health::route_health())
-        .route("/healthz", get(health::health_raw))
+        .route("/healthz", get(health::health))
         .layer(middleware::from_fn(logging))
 }
 

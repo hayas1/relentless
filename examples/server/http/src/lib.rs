@@ -1,4 +1,5 @@
 pub mod env;
+pub mod error;
 pub mod route;
 pub mod state;
 
