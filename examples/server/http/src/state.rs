@@ -1,6 +1,6 @@
 use crate::env::Env;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct State {
+pub struct AppState {
     pub env: Env,
 }

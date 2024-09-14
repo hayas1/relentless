@@ -8,10 +8,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     error::{AppResult, ResponseWithError},
-    state::State,
+    state::AppState,
 };
 
-pub fn route_health() -> axum::Router<State> {
+pub fn route_health() -> axum::Router<AppState> {
     axum::Router::new()
         .route("/", get(health))
         .route("/rich", get(health_rich))
