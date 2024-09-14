@@ -5,7 +5,6 @@ use axum::{
     Json,
 };
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 
 use crate::{
     error::{AppResult, ResponseWithError},
@@ -15,21 +14,41 @@ use crate::{
 pub fn route_health() -> axum::Router<State> {
     axum::Router::new()
         .route("/", get(health))
-        .route("/rich", get(health_json))
+        .route("/rich", get(health_rich))
         .route("/heavy", get(health_heavy))
         .route("/disabled", get(disabled))
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Health {
-    #[serde(with = "http_serde::status_code")]
+    #[serde(flatten, with = "health_response")]
     status: StatusCode,
 }
 impl IntoResponse for Health {
     fn into_response(self) -> Response {
-        // TODO must be used json! macro?
-        let content = json!({ "status": self.status.to_string(), "code": self.status.as_u16() });
-        (self.status, Json(content)).into_response()
+        (self.status, Json(self)).into_response()
+    }
+}
+mod health_response {
+    use super::*;
+    #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+    struct HealthResponse {
+        status: String,
+        code: u16,
+    }
+    pub fn serialize<S>(value: &StatusCode, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let (status, code) = (value.to_string(), value.as_u16());
+        HealthResponse { status, code }.serialize(serializer)
+    }
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<StatusCode, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let HealthResponse { code, .. } = HealthResponse::deserialize(deserializer)?;
+        Ok(StatusCode::from_u16(code).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR))
     }
 }
 
@@ -39,7 +58,7 @@ pub async fn health() -> String {
 }
 
 #[tracing::instrument]
-pub async fn health_json() -> Health {
+pub async fn health_rich() -> Health {
     Health { status: StatusCode::OK }
 }
 
