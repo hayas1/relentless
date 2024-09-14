@@ -24,27 +24,29 @@ impl Relentless {
     }
 
     /// TODO document
-    pub async fn assault(self) -> error::RelentlessResult<RelentlessOutcome> {
+    pub async fn assault(self) -> error::RelentlessResult<Outcome> {
         let mut outcomes = Vec::new();
         // TODO async
         for config in self.configs {
             let (worker, cases) = config.instance()?;
             outcomes.push(worker.assault(cases).await?);
         }
-        Ok(RelentlessOutcome::new(outcomes))
+        Ok(Outcome::new(outcomes))
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct RelentlessOutcome {
-    outcome: Vec<Vec<outcome::Outcome>>,
+pub struct Outcome {
+    outcome: Vec<outcome::WorkerOutcome>,
 }
-impl RelentlessOutcome {
-    pub fn new(outcome: Vec<Vec<outcome::Outcome>>) -> Self {
+impl Outcome {
+    pub fn new(outcome: Vec<outcome::WorkerOutcome>) -> Self {
         Self { outcome }
     }
+    pub fn success(&self) -> bool {
+        self.outcome.iter().all(|o| o.success())
+    }
     pub fn exit_code(&self) -> std::process::ExitCode {
-        let success = self.outcome.iter().all(|v| v.iter().all(|o| o.status()));
-        (!success as u8).into()
+        (!self.success() as u8).into()
     }
 }
