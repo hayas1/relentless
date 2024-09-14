@@ -58,40 +58,21 @@ impl Config {
     }
 
     pub fn instance(self) -> RelentlessResult<(Worker<TimeoutLayer>, Vec<Unit<TimeoutLayer>>)> {
-        let Self {
-            name,
-            setting,
-            testcase,
-        } = self;
+        let Self { name, setting, testcase } = self;
 
         let worker = Self::worker(name, setting)?;
-        let units = testcase
-            .into_iter()
-            .map(Self::unit)
-            .collect::<Result<Vec<_>, _>>()?;
+        let units = testcase.into_iter().map(Self::unit).collect::<Result<Vec<_>, _>>()?;
         Ok((worker, units))
     }
 
-    pub fn worker(
-        name: Option<String>,
-        setting: Option<Setting>,
-    ) -> RelentlessResult<Worker<TimeoutLayer>> {
+    pub fn worker(name: Option<String>, setting: Option<Setting>) -> RelentlessResult<Worker<TimeoutLayer>> {
         Ok(Worker::new(name, setting.unwrap_or_default(), None))
     }
 
     pub fn unit(testcase: Testcase) -> RelentlessResult<Unit<TimeoutLayer>> {
-        let Testcase {
-            description,
-            target,
-            setting,
-        } = testcase;
+        let Testcase { description, target, setting } = testcase;
 
-        Ok(Unit::new(
-            description,
-            target,
-            setting.unwrap_or_default(),
-            None,
-        ))
+        Ok(Unit::new(description, target, setting.unwrap_or_default(), None))
     }
 }
 impl Setting {
@@ -102,27 +83,14 @@ impl Setting {
     pub fn coalesce(self, other: Self) -> Self {
         Self {
             protocol: self.protocol.or(other.protocol),
-            host: if self.host.is_empty() {
-                other.host
-            } else {
-                self.host
-            },
-            template: if self.template.is_empty() {
-                other.template
-            } else {
-                self.template
-            },
+            host: if self.host.is_empty() { other.host } else { self.host },
+            template: if self.template.is_empty() { other.template } else { self.template },
             timeout: self.timeout.or(other.timeout),
         }
     }
 
     pub fn requests(self, target: &str) -> RelentlessResult<HashMap<String, Request>> {
-        let Self {
-            protocol,
-            host,
-            template,
-            timeout,
-        } = self;
+        let Self { protocol, host, template, timeout } = self;
         Ok(host
             .into_iter()
             .map(|(name, hostname)| {

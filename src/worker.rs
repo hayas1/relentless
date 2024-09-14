@@ -14,39 +14,23 @@ pub struct Unit<LU> {
     pub layer: Option<LU>,
 }
 impl<LU> Unit<LU> {
-    pub fn new(
-        description: Option<String>,
-        target: String,
-        setting: Setting,
-        layer: Option<LU>,
-    ) -> Self {
-        Self {
-            description,
-            target,
-            setting,
-            layer,
-        }
+    pub fn new(description: Option<String>, target: String, setting: Setting, layer: Option<LU>) -> Self {
+        Self { description, target, setting, layer }
     }
 
-    pub async fn process<LW>(
-        self,
-        layer: Option<LW>,
-        setting: Setting,
-    ) -> RelentlessResult<Vec<Response>>
+    pub async fn process<LW>(self, layer: Option<LW>, setting: Setting) -> RelentlessResult<Vec<Response>>
     where
         LU: Layer<Client> + Clone + Send + 'static,
         LU::Service: Service<Request>,
         <LU as Layer<Client>>::Service: Send,
         <<LU as Layer<Client>>::Service as Service<Request>>::Future: Send,
-        <<LU as Layer<Client>>::Service as Service<Request>>::Response:
-            Into<Response> + Send + 'static,
+        <<LU as Layer<Client>>::Service as Service<Request>>::Response: Into<Response> + Send + 'static,
         <<LU as Layer<Client>>::Service as Service<Request>>::Error: Send + 'static,
         LW: Layer<Client> + Clone + Send + 'static,
         LW::Service: Service<Request>,
         <LW as Layer<Client>>::Service: Send,
         <<LW as Layer<Client>>::Service as Service<Request>>::Future: Send,
-        <<LW as Layer<Client>>::Service as Service<Request>>::Response:
-            Into<Response> + Send + 'static,
+        <<LW as Layer<Client>>::Service as Service<Request>>::Response: Into<Response> + Send + 'static,
         <<LW as Layer<Client>>::Service as Service<Request>>::Error: Send + 'static,
         RelentlessError: From<<<LU as Layer<Client>>::Service as Service<Request>>::Error>
             + From<<<LW as Layer<Client>>::Service as Service<Request>>::Error>,
@@ -82,11 +66,7 @@ pub struct Worker<LW> {
 }
 impl<LW> Worker<LW> {
     pub fn new(name: Option<String>, setting: Setting, layer: Option<LW>) -> Self {
-        Self {
-            name,
-            setting,
-            layer,
-        }
+        Self { name, setting, layer }
     }
 
     pub async fn assault<LC>(self, units: Vec<Unit<LC>>) -> RelentlessResult<()>
@@ -95,23 +75,19 @@ impl<LW> Worker<LW> {
         LW::Service: Service<Request>,
         <LW as Layer<Client>>::Service: Send,
         <<LW as Layer<Client>>::Service as Service<Request>>::Future: Send,
-        <<LW as Layer<Client>>::Service as Service<Request>>::Response:
-            Into<Response> + Send + 'static,
+        <<LW as Layer<Client>>::Service as Service<Request>>::Response: Into<Response> + Send + 'static,
         <<LW as Layer<Client>>::Service as Service<Request>>::Error: Send + 'static,
         LC: Layer<Client> + Clone + Send + 'static,
         LC::Service: Service<Request>,
         <LC as Layer<Client>>::Service: Send,
         <<LC as Layer<Client>>::Service as Service<Request>>::Future: Send,
-        <<LC as Layer<Client>>::Service as Service<Request>>::Response:
-            Into<Response> + Send + 'static,
+        <<LC as Layer<Client>>::Service as Service<Request>>::Response: Into<Response> + Send + 'static,
         <<LC as Layer<Client>>::Service as Service<Request>>::Error: Send + 'static,
         RelentlessError: From<<<LW as Layer<Client>>::Service as Service<Request>>::Error>
             + From<<<LC as Layer<Client>>::Service as Service<Request>>::Error>,
     {
         for unit in units {
-            let _res = unit
-                .process(self.layer.clone(), self.setting.clone())
-                .await?;
+            let _res = unit.process(self.layer.clone(), self.setting.clone()).await?;
         }
         Ok(())
     }
