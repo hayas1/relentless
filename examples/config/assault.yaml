@@ -10,5 +10,6 @@ testcase:
   - target: /healthz
   - target: /health/rich
   - target: /health/disabled
+    description: this endpoint will respond with 503 service unavailable
     attr:
       invalid: true

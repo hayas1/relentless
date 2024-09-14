@@ -1,6 +1,6 @@
 use crate::{
     config::{Attribute, Setting},
-    error::{RelentlessError, RelentlessResult},
+    error::{CaseError, RelentlessError, RelentlessResult},
     outcome::{CaseOutcome, Compare, Evaluator, Status, WorkerOutcome},
 };
 use reqwest::{Client, Request, Response};
@@ -52,18 +52,21 @@ impl<LC> Case<LC> {
     {
         let mut join_set = JoinSet::<RelentlessResult<Response>>::new();
         for (name, req) in self.setting.coalesce(setting).requests(&self.target)? {
-            let mut client = Client::new();
-            let (case_layer, worker_layer) = (self.layer.clone(), layer.clone());
-            join_set.spawn(async move {
-                let res = match case_layer {
-                    Some(layer) => layer.layer(client).call(req).await?.into(),
-                    None => match worker_layer {
-                        Some(layer) => layer.layer(client).call(req).await?.into(),
-                        None => client.call(req).await?,
-                    },
-                };
-                Ok(res)
-            });
+            for _ in 0..self.attr.repeat.unwrap_or(1) {
+                let r = req.try_clone().ok_or(CaseError::FailCloneRequest)?;
+                let mut client = Client::new();
+                let (case_layer, worker_layer) = (self.layer.clone(), layer.clone());
+                join_set.spawn(async move {
+                    let res = match case_layer {
+                        Some(layer) => layer.layer(client).call(r).await?.into(),
+                        None => match worker_layer {
+                            Some(layer) => layer.layer(client).call(r).await?.into(),
+                            None => client.call(r).await?,
+                        },
+                    };
+                    Ok(res)
+                });
+            }
         }
 
         let mut response = Vec::new();

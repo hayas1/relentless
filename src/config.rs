@@ -57,7 +57,7 @@ pub struct Attribute {
     #[serde(default)]
     pub invalid: bool,
     #[serde(default)]
-    pub repeat: usize,
+    pub repeat: Option<usize>,
 }
 
 impl Config {
@@ -92,10 +92,6 @@ impl Config {
     }
 }
 impl Setting {
-    pub fn default_timeout() -> Duration {
-        Duration::from_secs(10)
-    }
-
     pub fn coalesce(self, other: Self) -> Self {
         Self {
             protocol: self.protocol.or(other.protocol),

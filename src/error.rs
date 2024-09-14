@@ -7,6 +7,7 @@ pub type RelentlessResult<T, E = RelentlessError> = Result<T, E>;
 pub enum RelentlessError {
     FormatError(#[from] FormatError),
     HttpError(#[from] HttpError),
+    CaseError(#[from] CaseError),
 
     ReqwestError(#[from] reqwest::Error),
     TokioTaskJoinError(#[from] tokio::task::JoinError),
@@ -45,4 +46,10 @@ pub enum HttpError {
 
     #[error(transparent)]
     InvalidUrl(#[from] url::ParseError),
+}
+
+#[derive(Error, Debug)]
+pub enum CaseError {
+    #[error("fail to clone request")]
+    FailCloneRequest,
 }
