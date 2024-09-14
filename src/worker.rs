@@ -8,14 +8,21 @@ use tower::{Layer, Service};
 
 #[derive(Debug)]
 pub struct Unit<LU> {
-    pub description: Option<String>,
-    pub target: String,
-    pub setting: Setting,
-    pub layer: Option<LU>,
+    description: Option<String>,
+    target: String,
+    setting: Setting,
+    layer: Option<LU>,
 }
 impl<LU> Unit<LU> {
     pub fn new(description: Option<String>, target: String, setting: Setting, layer: Option<LU>) -> Self {
         Self { description, target, setting, layer }
+    }
+
+    pub fn description(&self) -> &Option<String> {
+        &self.description
+    }
+    pub fn description_mut(&mut self) -> &mut Option<String> {
+        &mut self.description
     }
 
     pub async fn process<LW>(self, layer: Option<LW>, setting: Setting) -> RelentlessResult<Vec<Response>>
@@ -60,13 +67,20 @@ impl<LU> Unit<LU> {
 }
 
 pub struct Worker<LW> {
-    pub name: Option<String>,
-    pub setting: Setting,
-    pub layer: Option<LW>,
+    name: Option<String>,
+    setting: Setting,
+    layer: Option<LW>,
 }
 impl<LW> Worker<LW> {
     pub fn new(name: Option<String>, setting: Setting, layer: Option<LW>) -> Self {
         Self { name, setting, layer }
+    }
+
+    pub fn name(&self) -> &Option<String> {
+        &self.name
+    }
+    pub fn name_mut(&mut self) -> &mut Option<String> {
+        &mut self.name
     }
 
     pub async fn assault<LC>(self, units: Vec<Unit<LC>>) -> RelentlessResult<()>
