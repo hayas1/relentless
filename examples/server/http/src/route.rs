@@ -24,21 +24,3 @@ pub async fn logging(
     tracing::info!("{} {} {} {}", status, method, uri, bytes);
     res
 }
-
-#[cfg(test)]
-mod tests {
-    use axum::{
-        body::Body,
-        http::{HeaderMap, StatusCode},
-    };
-
-    use crate::tests::send_bytes;
-
-    #[tokio::test]
-    async fn test_healthz_call() {
-        let (uri, body, headers) = ("/healthz", Body::empty(), HeaderMap::new());
-        let (status, body) = send_bytes(uri, body, headers).await;
-        assert_eq!(status, StatusCode::OK);
-        assert_eq!(&body[..], b"ok");
-    }
-}

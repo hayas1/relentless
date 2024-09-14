@@ -22,7 +22,7 @@ pub fn route_health() -> axum::Router<AppState> {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Health {
     #[serde(flatten, with = "health_response")]
-    status: StatusCode,
+    pub status: StatusCode,
 }
 impl IntoResponse for Health {
     fn into_response(self) -> Response {
@@ -71,39 +71,4 @@ pub async fn health_heavy() -> Health {
 #[tracing::instrument]
 pub async fn disabled() -> AppResult<(), Health> {
     Err(ResponseWithError::new(StatusCode::SERVICE_UNAVAILABLE, Health { status: StatusCode::SERVICE_UNAVAILABLE }))?
-}
-
-#[cfg(test)]
-mod tests {
-    use axum::{
-        body::Body,
-        http::{HeaderMap, StatusCode},
-    };
-
-    use super::*;
-    use crate::tests::{send, send_bytes};
-
-    #[tokio::test]
-    async fn test_health_call() {
-        let (uri, body, headers) = ("/health", Body::empty(), HeaderMap::new());
-        let (status, body) = send_bytes(uri, body, headers).await;
-        assert_eq!(status, StatusCode::OK);
-        assert_eq!(&body[..], b"ok");
-    }
-
-    #[tokio::test]
-    async fn test_health_rich_call() {
-        let (uri, body, headers) = ("/health/rich", Body::empty(), HeaderMap::new());
-        let (status, health) = send::<Health>(uri, body, headers).await;
-        assert_eq!(status, StatusCode::OK);
-        assert_eq!(health, Health { status: StatusCode::OK });
-    }
-
-    #[tokio::test]
-    async fn test_disabled_call() {
-        let (uri, body, headers) = ("/health/disabled", Body::empty(), HeaderMap::new());
-        let (status, health) = send::<Health>(uri, body, headers).await;
-        assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
-        assert_eq!(health, Health { status: StatusCode::SERVICE_UNAVAILABLE });
-    }
 }
