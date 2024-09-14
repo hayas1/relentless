@@ -55,7 +55,7 @@ pub struct Testcase {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct Attribute {
     #[serde(default)]
-    pub invalid: bool,
+    pub allow: bool,
     #[serde(default)]
     pub repeat: Option<usize>,
 }

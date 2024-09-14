@@ -5,5 +5,5 @@ async fn main() -> Result<std::process::ExitCode, Box<dyn std::error::Error + Se
     let relentless = Relentless::read_paths(vec!["./examples/config/assault.yaml"])?;
     let result = relentless.assault().await?;
     println!("{:#?}", result);
-    Ok(result.exit_code())
+    Ok(result.exit_code(false))
 }

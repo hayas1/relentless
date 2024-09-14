@@ -37,14 +37,10 @@ impl CaseOutcome {
         Self { description, pass, attr }
     }
     pub fn pass(&self) -> bool {
-        // TODO option: do not pass, but status code will be success
-        let strict = false;
-        // if strict {
-        //     self.pass
-        // } else {
-        //     self.pass || self.attr.invalid
-        // }
-        self.pass || !strict && self.attr.invalid
+        self.pass
+    }
+    pub fn allow(&self, strict: bool) -> bool {
+        self.pass() || !strict && self.attr.allow
     }
 }
 
@@ -59,5 +55,8 @@ impl WorkerOutcome {
     }
     pub fn pass(&self) -> bool {
         self.outcome.iter().all(|o| o.pass())
+    }
+    pub fn allow(&self, strict: bool) -> bool {
+        self.outcome.iter().all(|o| o.allow(strict))
     }
 }

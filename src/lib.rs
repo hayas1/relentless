@@ -46,7 +46,7 @@ impl Outcome {
     pub fn pass(&self) -> bool {
         self.outcome.iter().all(|o| o.pass())
     }
-    pub fn exit_code(&self) -> std::process::ExitCode {
-        (!self.pass() as u8).into()
+    pub fn exit_code(&self, strict: bool) -> std::process::ExitCode {
+        (!self.outcome.iter().all(|o| o.allow(strict)) as u8).into()
     }
 }
