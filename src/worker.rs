@@ -110,13 +110,10 @@ impl<LW> Worker<LW> {
     {
         let mut outcome = Vec::new();
         for case in cases {
-            let description = case.description().clone();
+            let (description, attr) = (case.description().clone(), case.attr.clone());
             let res = case.process(self.layer.clone(), self.setting.clone()).await?;
-            outcome.push(if res.len() == 1 {
-                Status::evaluate(description, res).await?
-            } else {
-                Compare::evaluate(description, res).await?
-            });
+            let pass = if res.len() == 1 { Status::evaluate(res).await? } else { Compare::evaluate(res).await? };
+            outcome.push(CaseOutcome::new(description, pass, attr));
         }
         Ok(WorkerOutcome::new(self.name, outcome))
     }
