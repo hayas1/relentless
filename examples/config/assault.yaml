@@ -1,6 +1,6 @@
 name: example yaml of basic assault test
 setting:
-  host:
+  origin:
     test-api: http://localhost:3000
 
 

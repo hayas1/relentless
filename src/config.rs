@@ -26,7 +26,7 @@ pub struct Setting {
     #[serde(flatten)]
     pub protocol: Option<Protocol>,
     #[serde(default)]
-    pub host: HashMap<String, String>,
+    pub origin: HashMap<String, String>,
     #[serde(default)]
     pub template: HashMap<String, HashMap<String, String>>,
     #[serde(default)]
@@ -91,22 +91,22 @@ impl Setting {
     pub fn coalesce(self, other: Self) -> Self {
         Self {
             protocol: self.protocol.or(other.protocol),
-            host: if self.host.is_empty() { other.host } else { self.host },
+            origin: if self.origin.is_empty() { other.origin } else { self.origin },
             template: if self.template.is_empty() { other.template } else { self.template },
             timeout: self.timeout.or(other.timeout),
         }
     }
 
     pub fn requests(self, target: &str) -> RelentlessResult<HashMap<String, Request>> {
-        let Self { protocol, host, template, timeout } = self;
-        Ok(host
+        let Self { protocol, origin, template, timeout } = self;
+        Ok(origin
             .into_iter()
-            .map(|(name, hostname)| {
+            .map(|(name, origin)| {
                 let (method, headers) = match protocol.clone() {
                     Some(Protocol::Http(http)) => (http.method, http.header),
                     None => (None, None),
                 };
-                let url = reqwest::Url::parse(&hostname)?.join(target)?;
+                let url = reqwest::Url::parse(&origin)?.join(target)?;
                 let mut request = Request::new(method.unwrap_or(Method::GET), url);
                 *request.timeout_mut() = timeout.or(Some(Duration::from_secs(10)));
                 *request.headers_mut() = headers.unwrap_or_default();
