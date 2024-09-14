@@ -1,9 +1,9 @@
-use relentless::config::Config;
+use relentless::Relentless;
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let (worker, testcases) = Config::read("./examples/config/assault.yaml")?.instance()?;
-    let result = worker.assault(testcases).await?;
+async fn main() -> Result<std::process::ExitCode, Box<dyn std::error::Error + Send + Sync>> {
+    let relentless = Relentless::read_paths(vec!["./examples/config/assault.yaml"])?;
+    let result = relentless.assault().await?;
     println!("{:#?}", result);
-    Ok(())
+    Ok(result.exit_code())
 }

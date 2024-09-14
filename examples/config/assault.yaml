@@ -6,5 +6,7 @@ setting:
 
 testcase:
   - target: /
-    setting:
-      method: GET
+  - target: /health
+  - target: /healthz
+  - target: /health/rich
+  - target: /health/disabled
