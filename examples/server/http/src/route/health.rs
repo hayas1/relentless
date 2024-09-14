@@ -72,3 +72,27 @@ pub async fn health_heavy() -> Health {
 pub async fn disabled() -> AppResult<(), Health> {
     Err(ResponseWithError::new(StatusCode::SERVICE_UNAVAILABLE, Health { status: StatusCode::SERVICE_UNAVAILABLE }))?
 }
+
+#[cfg(test)]
+mod tests {
+    use axum::{body::Body, http::StatusCode};
+
+    use super::*;
+    use crate::tests::{oneshot, oneshot_bytes};
+
+    #[tokio::test]
+    async fn test_health_call() {
+        let (uri, body) = ("/health", Body::empty());
+        let (status, body) = oneshot_bytes(uri, body).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(&body[..], b"ok");
+    }
+
+    #[tokio::test]
+    async fn test_health_rich_call() {
+        let (uri, body) = ("/health/rich", Body::empty());
+        let (status, health) = oneshot::<Health>(uri, body).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(health, Health { status: StatusCode::OK });
+    }
+}
