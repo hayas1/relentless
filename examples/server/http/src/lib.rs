@@ -6,7 +6,8 @@ pub mod state;
 pub async fn serve(env: env::Env) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     tracing_subscriber::fmt::init();
     let listener = tokio::net::TcpListener::bind(&env.bind).await?;
-    let app = route::app().with_state(state::AppState { env });
+    let state = state::AppState { env };
+    let app = route::app(state.clone());
     tracing::info!("start app on {}", listener.local_addr()?);
     let serve = axum::serve(listener, app).with_graceful_shutdown(async {
         tokio::signal::ctrl_c().await.expect("failed to install Ctrl+C handler");

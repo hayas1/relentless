@@ -11,7 +11,8 @@ use example_http_server::{
 };
 
 pub async fn send_bytes(uri: &str, body: Body, headers: HeaderMap) -> (StatusCode, Bytes) {
-    let app = route::app().with_state(AppState { env: Default::default() });
+    let state = AppState { env: Default::default() };
+    let app = route::app(state);
     let mut req = Request::builder().uri(uri).body(body).unwrap();
     for (key, val) in headers {
         req.headers_mut().insert(key.unwrap(), val);

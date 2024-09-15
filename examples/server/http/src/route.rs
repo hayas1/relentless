@@ -1,23 +1,27 @@
 pub mod health;
 pub mod root;
 
-use axum::{body::HttpBody, middleware, routing::get};
+use axum::{
+    body::{Body, HttpBody},
+    http::Request,
+    middleware::{self, Next},
+    response::IntoResponse,
+    routing::get,
+    Router,
+};
 
 use crate::state::AppState;
 
-pub fn app() -> axum::Router<AppState> {
-    axum::Router::new()
+pub fn app(state: AppState) -> Router<()> {
+    Router::new()
         .route("/", get(root::root))
         .nest("/health", health::route_health())
         .route("/healthz", get(health::health))
-        .layer(middleware::from_fn(logging))
+        .layer(middleware::from_fn_with_state(state.clone(), logging))
+        .with_state(state)
 }
 
-pub async fn logging(
-    req: axum::http::Request<axum::body::Body>,
-    next: axum::middleware::Next,
-    // ) -> Result<impl axum::response::IntoResponse, (axum::http::StatusCode, String)> {
-) -> impl axum::response::IntoResponse {
+pub async fn logging(req: Request<Body>, next: Next) -> impl IntoResponse {
     let (method, uri) = (req.method().clone(), req.uri().clone());
     let res = next.run(req).await;
     let (status, bytes) = (res.status(), res.size_hint().lower());
