@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use tower::timeout::TimeoutLayer;
 
 use crate::{
-    error::{FormatError, HttpError, RelentlessError, RelentlessResult},
+    error::{FormatError, HttpError, RelentlessResult},
     worker::{Case, Worker},
 };
 
@@ -43,6 +43,8 @@ pub struct Http {
     pub method: Option<Method>,
     #[serde(default, with = "http_serde::option::header_map")]
     pub header: Option<HeaderMap>,
+    #[serde(default)]
+    pub body: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -106,14 +108,15 @@ impl Setting {
         Ok(origin
             .into_iter()
             .map(|(name, origin)| {
-                let (method, headers) = match protocol.clone() {
-                    Some(Protocol::Http(http)) => (http.method, http.header),
-                    None => (None, None),
+                let (method, headers, body) = match protocol.clone() {
+                    Some(Protocol::Http(http)) => (http.method, http.header, http.body),
+                    None => (None, None, None),
                 };
                 let url = reqwest::Url::parse(&origin)?.join(target)?;
                 let mut request = Request::new(method.unwrap_or(Method::GET), url);
                 *request.timeout_mut() = timeout.or(Some(Duration::from_secs(10)));
                 *request.headers_mut() = headers.unwrap_or_default();
+                *request.body_mut() = body.map(|b| b.into());
                 Ok::<_, HttpError>((name, request))
             })
             .collect::<Result<HashMap<_, _>, _>>()?)
