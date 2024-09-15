@@ -23,19 +23,17 @@ impl<LC> Case<LC> {
     pub async fn process<LW>(&self, layer: Option<LW>, worker_config: &WorkerConfig) -> RelentlessResult<Vec<Response>>
     where
         LC: Layer<Client> + Clone + Send + 'static,
-        LC::Service: Service<Request>,
-        <LC as Layer<Client>>::Service: Send,
-        <<LC as Layer<Client>>::Service as Service<Request>>::Future: Send,
-        <<LC as Layer<Client>>::Service as Service<Request>>::Response: Into<Response> + Send + 'static,
-        <<LC as Layer<Client>>::Service as Service<Request>>::Error: Send + 'static,
+        LC::Service: Service<Request> + Send,
+        <LC::Service as Service<Request>>::Future: Send,
+        <LC::Service as Service<Request>>::Response: Into<Response> + Send + 'static,
+        <LC::Service as Service<Request>>::Error: Send + 'static,
         LW: Layer<Client> + Clone + Send + 'static,
-        LW::Service: Service<Request>,
-        <LW as Layer<Client>>::Service: Send,
-        <<LW as Layer<Client>>::Service as Service<Request>>::Future: Send,
-        <<LW as Layer<Client>>::Service as Service<Request>>::Response: Into<Response> + Send + 'static,
-        <<LW as Layer<Client>>::Service as Service<Request>>::Error: Send + 'static,
-        RelentlessError: From<<<LC as Layer<Client>>::Service as Service<Request>>::Error>
-            + From<<<LW as Layer<Client>>::Service as Service<Request>>::Error>,
+        LW::Service: Service<Request> + Send,
+        <LW::Service as Service<Request>>::Future: Send,
+        <LW::Service as Service<Request>>::Response: Into<Response> + Send + 'static,
+        <LW::Service as Service<Request>>::Error: Send + 'static,
+        RelentlessError:
+            From<<LC::Service as Service<Request>>::Error> + From<<LW::Service as Service<Request>>::Error>,
     {
         let mut join_set = JoinSet::<RelentlessResult<Response>>::new();
         for (name, req) in
@@ -97,19 +95,17 @@ impl<LW> Worker<LW> {
     pub async fn assault<LC>(self, cases: Vec<Case<LC>>) -> RelentlessResult<WorkerOutcome>
     where
         LW: Layer<Client> + Clone + Send + 'static,
-        LW::Service: Service<Request>,
-        <LW as Layer<Client>>::Service: Send,
-        <<LW as Layer<Client>>::Service as Service<Request>>::Future: Send,
-        <<LW as Layer<Client>>::Service as Service<Request>>::Response: Into<Response> + Send + 'static,
-        <<LW as Layer<Client>>::Service as Service<Request>>::Error: Send + 'static,
+        LW::Service: Service<Request> + Send,
+        <LW::Service as Service<Request>>::Future: Send,
+        <LW::Service as Service<Request>>::Response: Into<Response> + Send + 'static,
+        <LW::Service as Service<Request>>::Error: Send + 'static,
         LC: Layer<Client> + Clone + Send + 'static,
-        LC::Service: Service<Request>,
-        <LC as Layer<Client>>::Service: Send,
-        <<LC as Layer<Client>>::Service as Service<Request>>::Future: Send,
-        <<LC as Layer<Client>>::Service as Service<Request>>::Response: Into<Response> + Send + 'static,
-        <<LC as Layer<Client>>::Service as Service<Request>>::Error: Send + 'static,
-        RelentlessError: From<<<LW as Layer<Client>>::Service as Service<Request>>::Error>
-            + From<<<LC as Layer<Client>>::Service as Service<Request>>::Error>,
+        LC::Service: Service<Request> + Send,
+        <LC::Service as Service<Request>>::Future: Send,
+        <LC::Service as Service<Request>>::Response: Into<Response> + Send + 'static,
+        <LC::Service as Service<Request>>::Error: Send + 'static,
+        RelentlessError:
+            From<<LW::Service as Service<Request>>::Error> + From<<LC::Service as Service<Request>>::Error>,
     {
         let mut outcome = Vec::new();
         for case in cases {
