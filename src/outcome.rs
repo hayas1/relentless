@@ -1,6 +1,9 @@
 use reqwest::Response;
 
-use crate::{config::Attribute, error::RelentlessResult};
+use crate::{
+    config::{Setting, Testcase, WorkerConfig},
+    error::RelentlessResult,
+};
 
 #[allow(async_fn_in_trait)] // TODO #[warn(async_fn_in_trait)] by default
 pub trait Evaluator<Res> {
@@ -28,30 +31,30 @@ impl Evaluator<Response> for Status {
 
 #[derive(Debug, Clone)]
 pub struct CaseOutcome {
-    description: Option<String>,
+    testcase: Testcase,
     pass: bool,
-    attr: Attribute,
 }
 impl CaseOutcome {
-    pub fn new(description: Option<String>, pass: bool, attr: Attribute) -> Self {
-        Self { description, pass, attr }
+    pub fn new(testcase: Testcase, pass: bool) -> Self {
+        Self { testcase, pass }
     }
     pub fn pass(&self) -> bool {
         self.pass
     }
     pub fn allow(&self, strict: bool) -> bool {
-        self.pass() || !strict && self.attr.allow
+        let allowed = self.testcase.attr.allow;
+        self.pass() || !strict && allowed
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct WorkerOutcome {
-    name: Option<String>,
+    config: WorkerConfig,
     outcome: Vec<CaseOutcome>,
 }
 impl WorkerOutcome {
-    pub fn new(name: Option<String>, outcome: Vec<CaseOutcome>) -> Self {
-        Self { name, outcome }
+    pub fn new(config: WorkerConfig, outcome: Vec<CaseOutcome>) -> Self {
+        Self { config, outcome }
     }
     pub fn pass(&self) -> bool {
         self.outcome.iter().all(|o| o.pass())

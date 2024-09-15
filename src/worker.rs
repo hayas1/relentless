@@ -1,39 +1,26 @@
+use std::{collections::HashMap, time::Duration};
+
 use crate::{
-    config::{Attribute, Setting},
-    error::{CaseError, RelentlessError, RelentlessResult},
+    config::{Protocol, Setting, Testcase, WorkerConfig},
+    error::{CaseError, HttpError, RelentlessError, RelentlessResult},
     outcome::{CaseOutcome, Compare, Evaluator, Status, WorkerOutcome},
 };
+use http::Method;
 use reqwest::{Client, Request, Response};
 use tokio::task::JoinSet;
 use tower::{Layer, Service};
 
 #[derive(Debug)]
 pub struct Case<LC> {
-    description: Option<String>,
-    target: String,
-    setting: Setting,
-    attr: Attribute,
+    testcase: Testcase,
     layer: Option<LC>,
 }
 impl<LC> Case<LC> {
-    pub fn new(
-        description: Option<String>,
-        target: String,
-        setting: Setting,
-        attr: Attribute,
-        layer: Option<LC>,
-    ) -> Self {
-        Self { description, target, setting, attr, layer }
+    pub fn new(testcase: Testcase, layer: Option<LC>) -> Self {
+        Self { testcase, layer }
     }
 
-    pub fn description(&self) -> &Option<String> {
-        &self.description
-    }
-    pub fn description_mut(&mut self) -> &mut Option<String> {
-        &mut self.description
-    }
-
-    pub async fn process<LW>(self, layer: Option<LW>, setting: Setting) -> RelentlessResult<Vec<Response>>
+    pub async fn process<LW>(&self, layer: Option<LW>, worker_config: &WorkerConfig) -> RelentlessResult<Vec<Response>>
     where
         LC: Layer<Client> + Clone + Send + 'static,
         LC::Service: Service<Request>,
@@ -51,8 +38,10 @@ impl<LC> Case<LC> {
             + From<<<LW as Layer<Client>>::Service as Service<Request>>::Error>,
     {
         let mut join_set = JoinSet::<RelentlessResult<Response>>::new();
-        for (name, req) in self.setting.coalesce(setting).requests(&self.target)? {
-            for _ in 0..self.attr.repeat.unwrap_or(1) {
+        for (name, req) in
+            Self::requests(&self.testcase.target, &self.testcase.setting.coalesce(&worker_config.setting))?
+        {
+            for _ in 0..self.testcase.attr.repeat.unwrap_or(1) {
                 let r = req.try_clone().ok_or(CaseError::FailCloneRequest)?;
                 let mut client = Client::new();
                 let (case_layer, worker_layer) = (self.layer.clone(), layer.clone());
@@ -75,23 +64,34 @@ impl<LC> Case<LC> {
         }
         Ok(response)
     }
+
+    pub fn requests(target: &str, setting: &Setting) -> RelentlessResult<HashMap<String, Request>> {
+        let Setting { protocol, origin, template, timeout } = setting;
+        Ok(origin
+            .iter()
+            .map(|(name, origin)| {
+                let (method, headers, body) = match protocol.clone() {
+                    Some(Protocol::Http(http)) => (http.method, http.header, http.body),
+                    None => (None, None, None),
+                };
+                let url = reqwest::Url::parse(origin)?.join(target)?;
+                let mut request = Request::new(method.unwrap_or(Method::GET), url);
+                *request.timeout_mut() = timeout.or(Some(Duration::from_secs(10)));
+                *request.headers_mut() = headers.unwrap_or_default();
+                *request.body_mut() = body.map(|b| b.into());
+                Ok::<_, HttpError>((name.clone(), request))
+            })
+            .collect::<Result<HashMap<_, _>, _>>()?)
+    }
 }
 
 pub struct Worker<LW> {
-    name: Option<String>,
-    setting: Setting,
+    config: WorkerConfig,
     layer: Option<LW>,
 }
 impl<LW> Worker<LW> {
-    pub fn new(name: Option<String>, setting: Setting, layer: Option<LW>) -> Self {
-        Self { name, setting, layer }
-    }
-
-    pub fn name(&self) -> &Option<String> {
-        &self.name
-    }
-    pub fn name_mut(&mut self) -> &mut Option<String> {
-        &mut self.name
+    pub fn new(config: WorkerConfig, layer: Option<LW>) -> Self {
+        Self { config, layer }
     }
 
     pub async fn assault<LC>(self, cases: Vec<Case<LC>>) -> RelentlessResult<WorkerOutcome>
@@ -113,11 +113,10 @@ impl<LW> Worker<LW> {
     {
         let mut outcome = Vec::new();
         for case in cases {
-            let (description, attr) = (case.description().clone(), case.attr.clone());
-            let res = case.process(self.layer.clone(), self.setting.clone()).await?;
+            let res = case.process(self.layer.clone(), &self.config).await?;
             let pass = if res.len() == 1 { Status::evaluate(res).await? } else { Compare::evaluate(res).await? };
-            outcome.push(CaseOutcome::new(description, pass, attr));
+            outcome.push(CaseOutcome::new(case.testcase, pass));
         }
-        Ok(WorkerOutcome::new(self.name, outcome))
+        Ok(WorkerOutcome::new(self.config, outcome))
     }
 }

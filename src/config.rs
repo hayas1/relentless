@@ -6,21 +6,28 @@ use std::{
 };
 
 use http::{HeaderMap, Method};
-use reqwest::Request;
 use serde::{Deserialize, Serialize};
 use tower::timeout::TimeoutLayer;
 
 use crate::{
-    error::{FormatError, HttpError, RelentlessResult},
+    error::{FormatError, RelentlessResult},
     worker::{Case, Worker},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct Config {
-    pub name: Option<String>,
-    pub setting: Option<Setting>,
+    #[serde(flatten, default)]
+    pub worker_config: WorkerConfig,
+
     pub testcase: Vec<Testcase>,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
+pub struct WorkerConfig {
+    pub name: Option<String>,
+    #[serde(default)]
+    pub setting: Setting,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
@@ -55,8 +62,11 @@ pub struct Http {
 pub struct Testcase {
     pub description: Option<String>,
     pub target: String,
-    pub setting: Option<Setting>,
-    pub attr: Option<Attribute>,
+
+    #[serde(default)]
+    pub setting: Setting,
+    #[serde(default)]
+    pub attr: Attribute,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
@@ -81,50 +91,31 @@ impl Config {
     }
 
     pub fn instance(self) -> RelentlessResult<(Worker<TimeoutLayer>, Vec<Case<TimeoutLayer>>)> {
-        let Self { name, setting, testcase } = self;
+        let Self { worker_config, testcase } = self;
 
-        let worker = Self::worker(name, setting)?;
+        let worker = Self::worker(worker_config)?;
         let cases = testcase.into_iter().map(Self::case).collect::<Result<Vec<_>, _>>()?;
         Ok((worker, cases))
     }
 
-    pub fn worker(name: Option<String>, setting: Option<Setting>) -> RelentlessResult<Worker<TimeoutLayer>> {
-        Ok(Worker::new(name, setting.unwrap_or_default(), None))
+    pub fn worker(config: WorkerConfig) -> RelentlessResult<Worker<TimeoutLayer>> {
+        // TODO layer
+        Ok(Worker::new(config, None))
     }
 
     pub fn case(testcase: Testcase) -> RelentlessResult<Case<TimeoutLayer>> {
-        let Testcase { description, target, setting, attr } = testcase;
-
-        Ok(Case::new(description, target, setting.unwrap_or_default(), attr.unwrap_or_default(), None))
+        // TODO layer
+        Ok(Case::new(testcase, None))
     }
 }
 impl Setting {
-    pub fn coalesce(self, other: Self) -> Self {
+    pub fn coalesce(&self, other: &Self) -> Self {
         Self {
-            protocol: self.protocol.or(other.protocol),
-            origin: if self.origin.is_empty() { other.origin } else { self.origin },
-            template: if self.template.is_empty() { other.template } else { self.template },
+            protocol: self.protocol.clone().or(other.protocol.clone()),
+            origin: if self.origin.is_empty() { other.origin.clone() } else { self.origin.clone() },
+            template: if self.template.is_empty() { other.template.clone() } else { self.template.clone() },
             timeout: self.timeout.or(other.timeout),
         }
-    }
-
-    pub fn requests(self, target: &str) -> RelentlessResult<HashMap<String, Request>> {
-        let Self { protocol, origin, template, timeout } = self;
-        Ok(origin
-            .into_iter()
-            .map(|(name, origin)| {
-                let (method, headers, body) = match protocol.clone() {
-                    Some(Protocol::Http(http)) => (http.method, http.header, http.body),
-                    None => (None, None, None),
-                };
-                let url = reqwest::Url::parse(&origin)?.join(target)?;
-                let mut request = Request::new(method.unwrap_or(Method::GET), url);
-                *request.timeout_mut() = timeout.or(Some(Duration::from_secs(10)));
-                *request.headers_mut() = headers.unwrap_or_default();
-                *request.body_mut() = body.map(|b| b.into());
-                Ok::<_, HttpError>((name, request))
-            })
-            .collect::<Result<HashMap<_, _>, _>>()?)
     }
 }
 
