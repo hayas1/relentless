@@ -16,12 +16,14 @@ use crate::{
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct Config {
     pub name: Option<String>,
     pub setting: Option<Setting>,
     pub testcase: Vec<Testcase>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct Setting {
     #[serde(flatten)]
     pub protocol: Option<Protocol>,
@@ -33,11 +35,12 @@ pub struct Setting {
     pub timeout: Option<Duration>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub enum Protocol {
     Http(Http),
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct Http {
     #[serde(default, with = "http_serde::option::method")]
     pub method: Option<Method>,
@@ -48,6 +51,7 @@ pub struct Http {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct Testcase {
     pub description: Option<String>,
     pub target: String,
@@ -55,6 +59,7 @@ pub struct Testcase {
     pub attr: Option<Attribute>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct Attribute {
     #[serde(default)]
     pub allow: bool,

@@ -14,7 +14,8 @@ testcase:
   - target: /health/rich
   - target: /health/disabled
     description: this endpoint will respond with 503 service unavailable
-    http:
-      method: GET
+    setting:
+      http:
+        method: GET
     attr:
       allow: true
