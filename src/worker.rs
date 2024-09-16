@@ -10,7 +10,12 @@ use reqwest::{Client, Request, Response};
 use tokio::task::JoinSet;
 use tower::Service;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
+pub enum CaseProtocol {
+    Http(Case<Client>),
+}
+
+#[derive(Debug, Clone)]
 pub struct Case<S> {
     testcase: Testcase,
     client: S,
@@ -74,6 +79,7 @@ where
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct Worker {
     config: WorkerConfig,
 }
@@ -82,18 +88,17 @@ impl Worker {
         Self { config }
     }
 
-    pub async fn assault<S>(self, cases: Vec<Case<S>>) -> RelentlessResult<WorkerOutcome>
-    where
-        S: Service<Request, Response = Response> + Clone + Send + 'static,
-        S::Future: Send + 'static,
-        S::Error: Send + 'static,
-        RelentlessError: From<S::Error>,
-    {
+    pub async fn assault(self, cases: Vec<CaseProtocol>) -> RelentlessResult<WorkerOutcome> {
         let mut outcome = Vec::new();
         for case in cases {
-            let res = case.process(&self.config).await?;
-            let pass = if res.len() == 1 { Status::evaluate(res).await? } else { Compare::evaluate(res).await? };
-            outcome.push(CaseOutcome::new(case.testcase, pass));
+            match case {
+                CaseProtocol::Http(case) => {
+                    let res = case.process(&self.config).await?;
+                    let pass =
+                        if res.len() == 1 { Status::evaluate(res).await? } else { Compare::evaluate(res).await? };
+                    outcome.push(CaseOutcome::new(case.testcase, pass));
+                }
+            };
         }
         Ok(WorkerOutcome::new(self.config, outcome))
     }
