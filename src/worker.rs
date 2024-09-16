@@ -28,7 +28,7 @@ impl Case<Client> {
 }
 impl<S> Case<S>
 where
-    S: Service<Request, Response = Response> + Clone + Send + 'static,
+    S: Clone + Service<Request, Response = Response> + Send + 'static,
     S::Future: Send + 'static,
     S::Error: Send + 'static,
     RelentlessError: From<S::Error>,
