@@ -5,14 +5,12 @@ use std::{
     time::Duration,
 };
 
-use http::{HeaderMap, Method, Request};
-use reqwest::Client;
+use http::{HeaderMap, Method};
 use serde::{Deserialize, Serialize};
-use tower::Service;
 
 use crate::{
     error::{FormatError, RelentlessResult},
-    worker::{Case, CaseProtocol, Worker},
+    worker::{Case, CaseService, Worker},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -91,7 +89,7 @@ impl Config {
         std::fs::read_dir(path)?.map(|f| Self::read(f?.path())).filter(Result::is_ok).collect::<Result<Vec<_>, _>>()
     }
 
-    pub fn instance(self) -> RelentlessResult<(Worker, Vec<CaseProtocol>)> {
+    pub fn instance(self) -> RelentlessResult<(Worker, Vec<CaseService>)> {
         let Self { worker_config, testcase } = self;
 
         let worker = Self::worker(worker_config)?;
@@ -104,11 +102,11 @@ impl Config {
         Ok(Worker::new(config))
     }
 
-    pub fn case(testcase: Testcase) -> RelentlessResult<CaseProtocol> {
+    pub fn case(testcase: Testcase) -> RelentlessResult<CaseService> {
         // TODO layer
         // TODO!!! coalesce protocol
         match testcase.setting.protocol {
-            None | Some(Protocol::Http(_)) => Ok(CaseProtocol::Http(Case::new_http(testcase))),
+            None | Some(Protocol::Http(_)) => Ok(CaseService::Http(Case::new_http(testcase))),
         }
     }
 }

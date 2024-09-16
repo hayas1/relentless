@@ -11,7 +11,7 @@ use tokio::task::JoinSet;
 use tower::Service;
 
 #[derive(Debug, Clone)]
-pub enum CaseProtocol {
+pub enum CaseService {
     Http(Case<Client>),
 }
 
@@ -88,11 +88,11 @@ impl Worker {
         Self { config }
     }
 
-    pub async fn assault(self, cases: Vec<CaseProtocol>) -> RelentlessResult<WorkerOutcome> {
+    pub async fn assault(self, cases: Vec<CaseService>) -> RelentlessResult<WorkerOutcome> {
         let mut outcome = Vec::new();
         for case in cases {
             match case {
-                CaseProtocol::Http(case) => {
+                CaseService::Http(case) => {
                     let res = case.process(&self.config).await?;
                     let pass =
                         if res.len() == 1 { Status::evaluate(res).await? } else { Compare::evaluate(res).await? };

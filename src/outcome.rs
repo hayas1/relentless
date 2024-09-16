@@ -1,7 +1,7 @@
 use reqwest::Response;
 
 use crate::{
-    config::{Setting, Testcase, WorkerConfig},
+    config::{Testcase, WorkerConfig},
     error::RelentlessResult,
 };
 
