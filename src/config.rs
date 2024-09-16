@@ -6,8 +6,8 @@ use std::{
 };
 
 use http::{HeaderMap, Method};
+use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use tower::timeout::TimeoutLayer;
 
 use crate::{
     error::{FormatError, RelentlessResult},
@@ -90,7 +90,7 @@ impl Config {
         std::fs::read_dir(path)?.map(|f| Self::read(f?.path())).filter(Result::is_ok).collect::<Result<Vec<_>, _>>()
     }
 
-    pub fn instance(self) -> RelentlessResult<(Worker<TimeoutLayer>, Vec<Case<TimeoutLayer>>)> {
+    pub fn instance(self) -> RelentlessResult<(Worker, Vec<Case<Client>>)> {
         let Self { worker_config, testcase } = self;
 
         let worker = Self::worker(worker_config)?;
@@ -98,14 +98,15 @@ impl Config {
         Ok((worker, cases))
     }
 
-    pub fn worker(config: WorkerConfig) -> RelentlessResult<Worker<TimeoutLayer>> {
+    pub fn worker(config: WorkerConfig) -> RelentlessResult<Worker> {
         // TODO layer
-        Ok(Worker::new(config, None))
+        Ok(Worker::new(config))
     }
 
-    pub fn case(testcase: Testcase) -> RelentlessResult<Case<TimeoutLayer>> {
+    pub fn case(testcase: Testcase) -> RelentlessResult<Case<Client>> {
         // TODO layer
-        Ok(Case::new(testcase, None))
+        // TODO type of Client
+        Ok(Case::new_http(testcase))
     }
 }
 impl Setting {

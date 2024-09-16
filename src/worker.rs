@@ -8,49 +8,40 @@ use crate::{
 use http::Method;
 use reqwest::{Client, Request, Response};
 use tokio::task::JoinSet;
-use tower::{Layer, Service};
+use tower::Service;
 
 #[derive(Debug)]
-pub struct Case<LC> {
+pub struct Case<S> {
     testcase: Testcase,
-    layer: Option<LC>,
+    client: S,
 }
-impl<LC> Case<LC> {
-    pub fn new(testcase: Testcase, layer: Option<LC>) -> Self {
-        Self { testcase, layer }
+impl Case<Client> {
+    pub fn new_http(testcase: Testcase) -> Self {
+        let client = Client::new();
+        Self::new(testcase, client)
+    }
+}
+impl<S> Case<S>
+where
+    S: Service<Request, Response = Response> + Clone + Send + 'static,
+    S::Future: Send + 'static,
+    S::Error: Send + 'static,
+    RelentlessError: From<S::Error>,
+{
+    pub fn new(testcase: Testcase, client: S) -> Self {
+        Self { testcase, client }
     }
 
-    pub async fn process<LW>(&self, layer: Option<LW>, worker_config: &WorkerConfig) -> RelentlessResult<Vec<Response>>
-    where
-        LC: Layer<Client> + Clone + Send + 'static,
-        LC::Service: Service<Request> + Send,
-        <LC::Service as Service<Request>>::Future: Send,
-        <LC::Service as Service<Request>>::Response: Into<Response> + Send + 'static,
-        <LC::Service as Service<Request>>::Error: Send + 'static,
-        LW: Layer<Client> + Clone + Send + 'static,
-        LW::Service: Service<Request> + Send,
-        <LW::Service as Service<Request>>::Future: Send,
-        <LW::Service as Service<Request>>::Response: Into<Response> + Send + 'static,
-        <LW::Service as Service<Request>>::Error: Send + 'static,
-        RelentlessError:
-            From<<LC::Service as Service<Request>>::Error> + From<<LW::Service as Service<Request>>::Error>,
-    {
+    pub async fn process(&self, worker_config: &WorkerConfig) -> RelentlessResult<Vec<Response>> {
         let mut join_set = JoinSet::<RelentlessResult<Response>>::new();
         for (name, req) in
             Self::requests(&self.testcase.target, &self.testcase.setting.coalesce(&worker_config.setting))?
         {
             for _ in 0..self.testcase.attr.repeat.unwrap_or(1) {
                 let r = req.try_clone().ok_or(CaseError::FailCloneRequest)?;
-                let mut client = Client::new();
-                let (case_layer, worker_layer) = (self.layer.clone(), layer.clone());
+                let mut client = self.client.clone();
                 join_set.spawn(async move {
-                    let res = match case_layer {
-                        Some(layer) => layer.layer(client).call(r).await?.into(),
-                        None => match worker_layer {
-                            Some(layer) => layer.layer(client).call(r).await?.into(),
-                            None => client.call(r).await?,
-                        },
-                    };
+                    let res = client.call(r).await?;
                     Ok(res)
                 });
             }
@@ -83,33 +74,24 @@ impl<LC> Case<LC> {
     }
 }
 
-pub struct Worker<LW> {
+pub struct Worker {
     config: WorkerConfig,
-    layer: Option<LW>,
 }
-impl<LW> Worker<LW> {
-    pub fn new(config: WorkerConfig, layer: Option<LW>) -> Self {
-        Self { config, layer }
+impl Worker {
+    pub fn new(config: WorkerConfig) -> Self {
+        Self { config }
     }
 
-    pub async fn assault<LC>(self, cases: Vec<Case<LC>>) -> RelentlessResult<WorkerOutcome>
+    pub async fn assault<S>(self, cases: Vec<Case<S>>) -> RelentlessResult<WorkerOutcome>
     where
-        LW: Layer<Client> + Clone + Send + 'static,
-        LW::Service: Service<Request> + Send,
-        <LW::Service as Service<Request>>::Future: Send,
-        <LW::Service as Service<Request>>::Response: Into<Response> + Send + 'static,
-        <LW::Service as Service<Request>>::Error: Send + 'static,
-        LC: Layer<Client> + Clone + Send + 'static,
-        LC::Service: Service<Request> + Send,
-        <LC::Service as Service<Request>>::Future: Send,
-        <LC::Service as Service<Request>>::Response: Into<Response> + Send + 'static,
-        <LC::Service as Service<Request>>::Error: Send + 'static,
-        RelentlessError:
-            From<<LW::Service as Service<Request>>::Error> + From<<LC::Service as Service<Request>>::Error>,
+        S: Service<Request, Response = Response> + Clone + Send + 'static,
+        S::Future: Send + 'static,
+        S::Error: Send + 'static,
+        RelentlessError: From<S::Error>,
     {
         let mut outcome = Vec::new();
         for case in cases {
-            let res = case.process(self.layer.clone(), &self.config).await?;
+            let res = case.process(&self.config).await?;
             let pass = if res.len() == 1 { Status::evaluate(res).await? } else { Compare::evaluate(res).await? };
             outcome.push(CaseOutcome::new(case.testcase, pass));
         }
