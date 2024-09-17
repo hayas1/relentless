@@ -6,10 +6,12 @@ use std::{
 };
 
 use http::{HeaderMap, Method};
+use reqwest::{Request, Response};
 use serde::{Deserialize, Serialize};
+use tower::Service;
 
 use crate::{
-    error::{FormatError, RelentlessResult},
+    error::{FormatError, RelentlessError, RelentlessResult},
     worker::{Case, CaseService, Worker},
 };
 
@@ -89,11 +91,18 @@ impl Config {
         std::fs::read_dir(path)?.map(|f| Self::read(f?.path())).filter(Result::is_ok).collect::<Result<Vec<_>, _>>()
     }
 
-    pub fn instance(self) -> RelentlessResult<(Worker, Vec<CaseService>)> {
+    pub fn instance<S>(self, client: Option<S>) -> RelentlessResult<(Worker, Vec<CaseService<S>>)>
+    where
+        S: Clone + Service<Request, Response = Response> + Send + 'static,
+        S::Future: Send + 'static,
+        S::Error: Send + 'static,
+        RelentlessError: From<S::Error>,
+    {
         let Self { worker_config, testcase } = self;
 
         let worker = Self::worker(worker_config)?;
-        let cases = testcase.into_iter().map(Self::case).collect::<Result<Vec<_>, _>>()?;
+        let cases =
+            testcase.into_iter().map(|tc| Self::case::<S>(tc, client.clone())).collect::<Result<Vec<_>, _>>()?;
         Ok((worker, cases))
     }
 
@@ -102,11 +111,20 @@ impl Config {
         Ok(Worker::new(config))
     }
 
-    pub fn case(testcase: Testcase) -> RelentlessResult<CaseService> {
+    pub fn case<S>(testcase: Testcase, client: Option<S>) -> RelentlessResult<CaseService<S>>
+    where
+        S: Clone + Service<Request, Response = Response> + Send + 'static,
+        S::Future: Send + 'static,
+        S::Error: Send + 'static,
+        RelentlessError: From<S::Error>,
+    {
         // TODO layer
         // TODO!!! coalesce protocol
-        match testcase.setting.protocol {
-            None | Some(Protocol::Http(_)) => Ok(CaseService::Http(Case::new_http(testcase))),
+        let protocol = &testcase.setting.protocol;
+        match (protocol, client) {
+            (&None, None) => Ok(CaseService::Http(Case::new_http(testcase))),
+            (&None, Some(client)) => Ok(CaseService::Default(Case::new(testcase, client))),
+            (&Some(Protocol::Http(_)), _) => Ok(CaseService::Http(Case::new_http(testcase))),
         }
     }
 }

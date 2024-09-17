@@ -762,6 +762,8 @@ dependencies = [
 name = "relentless"
 version = "0.1.0"
 dependencies = [
+ "axum",
+ "example-http-server",
  "http",
  "http-serde",
  "reqwest",
