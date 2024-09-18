@@ -6,7 +6,6 @@ use std::{
 };
 
 use http::{HeaderMap, Method};
-use reqwest::{Request, Response};
 use serde::{Deserialize, Serialize};
 use tower::Service;
 
@@ -91,9 +90,11 @@ impl Config {
         std::fs::read_dir(path)?.map(|f| Self::read(f?.path())).filter(Result::is_ok).collect::<Result<Vec<_>, _>>()
     }
 
-    pub fn instance<S>(self, client: Option<S>) -> RelentlessResult<(Worker, Vec<CaseService<S>>)>
+    pub fn instance<S, Req, Res>(self, client: Option<S>) -> RelentlessResult<(Worker, Vec<CaseService<S, Req, Res>>)>
     where
-        S: Clone + Service<Request, Response = Response> + Send + 'static,
+        Req: Send + 'static,
+        Res: Send + 'static,
+        S: Clone + Service<Req, Response = Res> + Send + 'static,
         S::Future: Send + 'static,
         S::Error: Send + 'static,
         RelentlessError: From<S::Error>,
@@ -101,8 +102,7 @@ impl Config {
         let Self { worker_config, testcase } = self;
 
         let worker = Self::worker(worker_config)?;
-        let cases =
-            testcase.into_iter().map(|tc| Self::case::<S>(tc, client.clone())).collect::<Result<Vec<_>, _>>()?;
+        let cases = testcase.into_iter().map(|tc| Self::case(tc, client.clone())).collect::<Result<Vec<_>, _>>()?;
         Ok((worker, cases))
     }
 
@@ -111,9 +111,11 @@ impl Config {
         Ok(Worker::new(config))
     }
 
-    pub fn case<S>(testcase: Testcase, client: Option<S>) -> RelentlessResult<CaseService<S>>
+    pub fn case<S, Req, Res>(testcase: Testcase, client: Option<S>) -> RelentlessResult<CaseService<S, Req, Res>>
     where
-        S: Clone + Service<Request, Response = Response> + Send + 'static,
+        Req: Send + 'static,
+        Res: Send + 'static,
+        S: Clone + Service<Req, Response = Res> + Send + 'static,
         S::Future: Send + 'static,
         S::Error: Send + 'static,
         RelentlessError: From<S::Error>,

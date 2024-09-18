@@ -1,5 +1,4 @@
 use error::RelentlessError;
-use reqwest::{Request, Response};
 use tower::Service;
 
 pub mod config;
@@ -8,11 +7,12 @@ pub mod outcome;
 pub mod worker;
 
 #[derive(Debug, Clone)]
-pub struct Relentless<S = reqwest::Client> {
+pub struct Relentless<S = reqwest::Client, Req = reqwest::Request, Res = reqwest::Response> {
     configs: Vec<config::Config>,
     client: Option<S>,
+    phantom: std::marker::PhantomData<(Req, Res)>,
 }
-impl Relentless<reqwest::Client> {
+impl Relentless<reqwest::Client, reqwest::Request, reqwest::Response> {
     /// TODO document
     pub fn read_paths<I: IntoIterator<Item = P>, P: AsRef<std::path::Path>>(paths: I) -> error::RelentlessResult<Self> {
         let configs = paths.into_iter().map(config::Config::read).collect::<error::RelentlessResult<Vec<_>>>()?;
@@ -24,20 +24,23 @@ impl Relentless<reqwest::Client> {
         Ok(Self::new(configs, None))
     }
 }
-impl<S> Relentless<S>
+impl<S, Req, Res> Relentless<S, Req, Res>
 where
-    S: Clone + Service<Request, Response = Response> + Send + 'static,
+    Req: Send + 'static,
+    Res: Send + 'static,
+    S: Clone + Service<Req, Response = Res> + Send + 'static,
     S::Future: Send + 'static,
     S::Error: Send + 'static,
     RelentlessError: From<S::Error>,
 {
     /// TODO document
     pub fn new(configs: Vec<config::Config>, client: Option<S>) -> Self {
-        Self { configs, client }
+        let phantom = std::marker::PhantomData;
+        Self { configs, client, phantom }
     }
     /// TODO document
     pub async fn assault(self) -> error::RelentlessResult<Outcome> {
-        let Self { configs, client } = self;
+        let Self { configs, client, .. } = self;
         let mut outcomes = Vec::new();
         // TODO async
         for config in configs {

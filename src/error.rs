@@ -12,6 +12,7 @@ pub enum RelentlessError {
     ReqwestError(#[from] reqwest::Error),
     TokioTaskJoinError(#[from] tokio::task::JoinError),
     StdIoError(#[from] std::io::Error),
+    Infallible(#[from] std::convert::Infallible),
 
     BoxError(#[from] Box<dyn std::error::Error + Send + Sync + 'static>),
 }

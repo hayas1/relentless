@@ -26,6 +26,7 @@ http-serde = "2.1.1"
 [dev-dependencies]
 example-http-server = { path = "examples/server/http" }
 axum = "0.7.5"
+tower = { version = "0.5.1", features = ["util"] }
 
 [workspace]
 members = ["examples/server/*"]

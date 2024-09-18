@@ -1,5 +1,3 @@
-use reqwest::Response;
-
 use crate::{
     config::{Testcase, WorkerConfig},
     error::RelentlessResult,
@@ -10,22 +8,26 @@ pub trait Evaluator<Res> {
     async fn evaluate<I: IntoIterator<Item = Res>>(iter: I) -> RelentlessResult<bool>;
 }
 pub struct Compare {} // TODO enum ?
-impl Evaluator<Response> for Compare {
-    async fn evaluate<I: IntoIterator<Item = Response>>(iter: I) -> RelentlessResult<bool> {
-        let mut v = Vec::new();
-        for res in iter {
-            v.push((res.status(), res.text().await?));
-        }
-        let pass = v.windows(2).all(|w| w[0] == w[1]);
-        Ok(pass)
+impl<Res> Evaluator<Res> for Compare {
+    async fn evaluate<I: IntoIterator<Item = Res>>(iter: I) -> RelentlessResult<bool> {
+        // TODO
+        // let mut v = Vec::new();
+        // for res in iter {
+        //     v.push((res.status(), res.text().await?));
+        // }
+        // let pass = v.windows(2).all(|w| w[0] == w[1]);
+        // Ok(pass)
+        Ok(true)
     }
 }
 
 pub struct Status {} // TODO enum ?
-impl Evaluator<Response> for Status {
-    async fn evaluate<I: IntoIterator<Item = Response>>(iter: I) -> RelentlessResult<bool> {
-        let pass = iter.into_iter().all(|res| res.status().is_success());
-        Ok(pass)
+impl<Res> Evaluator<Res> for Status {
+    async fn evaluate<I: IntoIterator<Item = Res>>(iter: I) -> RelentlessResult<bool> {
+        // TODO
+        // let pass = iter.into_iter().all(|res| res.status().is_success());
+        // Ok(pass)
+        Ok(true)
     }
 }
 

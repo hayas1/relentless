@@ -2,55 +2,76 @@ use std::{collections::HashMap, time::Duration};
 
 use crate::{
     config::{Protocol, Setting, Testcase, WorkerConfig},
-    error::{CaseError, HttpError, RelentlessError, RelentlessResult},
+    error::{HttpError, RelentlessError, RelentlessResult},
     outcome::{CaseOutcome, Compare, Evaluator, Status, WorkerOutcome},
 };
 use http::Method;
-use reqwest::{Client, Request, Response};
 use tokio::task::JoinSet;
 use tower::Service;
 
-#[derive(Debug, Clone)]
-pub enum CaseService<S> {
-    Default(Case<S>),
-    Http(Case<Client>),
+#[derive(Debug)]
+pub enum CaseService<S, Req, Res> {
+    Default(Case<S, Req, Res>),
+    Http(Case<reqwest::Client, reqwest::Request, reqwest::Response>),
+}
+#[derive(Debug)]
+pub enum CaseRequest<Req> {
+    Default(Req),
+    Http(reqwest::Request),
+}
+#[derive(Debug)]
+pub enum CaseResponse<Res> {
+    Default(Res),
+    Http(reqwest::Response),
 }
 
 #[derive(Debug, Clone)]
-pub struct Case<S> {
+pub struct Case<S, Req, Res> {
     testcase: Testcase,
     client: S,
+    phantom: std::marker::PhantomData<(Req, Res)>,
 }
-impl Case<Client> {
+impl Case<reqwest::Client, reqwest::Request, reqwest::Response> {
     pub fn new_http(testcase: Testcase) -> Self {
-        let client = Client::new();
+        let client = reqwest::Client::new();
         Self::new(testcase, client)
     }
 }
-impl<S> Case<S>
+impl<S, Req, Res> Case<S, Req, Res>
 where
-    S: Clone + Service<Request, Response = Response> + Send + 'static,
+    Req: Send + 'static,
+    Res: Send + 'static,
+    S: Clone + Service<Req, Response = Res> + Send + 'static,
     S::Future: Send + 'static,
     S::Error: Send + 'static,
     RelentlessError: From<S::Error>,
 {
     pub fn new(testcase: Testcase, client: S) -> Self {
-        Self { testcase, client }
+        let phantom = std::marker::PhantomData;
+        Self { testcase, client, phantom }
     }
 
-    pub async fn process(&self, worker_config: &WorkerConfig) -> RelentlessResult<Vec<Response>> {
-        let mut join_set = JoinSet::<RelentlessResult<Response>>::new();
+    pub async fn process(&self, worker_config: &WorkerConfig) -> RelentlessResult<Vec<CaseResponse<Res>>> {
+        let mut join_set = JoinSet::<RelentlessResult<CaseResponse<Res>>>::new();
         for (name, req) in
             Self::requests(&self.testcase.target, &self.testcase.setting.coalesce(&worker_config.setting))?
         {
-            for _ in 0..self.testcase.attr.repeat.unwrap_or(1) {
-                let r = req.try_clone().ok_or(CaseError::FailCloneRequest)?;
-                let mut client = self.client.clone();
-                join_set.spawn(async move {
-                    let res = client.call(r).await?;
-                    Ok(res)
-                });
-            }
+            // for _ in 0..self.testcase.attr.repeat.unwrap_or(1) {
+            let r = req; //.clone(); //.ok_or(CaseError::FailCloneRequest)?;
+            let mut client = self.client.clone();
+            join_set.spawn(async move {
+                match r {
+                    CaseRequest::Default(r) => {
+                        todo!()
+                    }
+                    CaseRequest::Http(req) => {
+                        let mut client = reqwest::Client::new(); // TODO
+                        let res = client.call(req).await?;
+                        Ok(CaseResponse::Http(res))
+                    }
+                }
+            });
+            // }
         }
 
         let mut response = Vec::new();
@@ -60,7 +81,7 @@ where
         Ok(response)
     }
 
-    pub fn requests(target: &str, setting: &Setting) -> RelentlessResult<HashMap<String, Request>> {
+    pub fn requests(target: &str, setting: &Setting) -> RelentlessResult<HashMap<String, CaseRequest<Req>>> {
         let Setting { protocol, origin, template, timeout } = setting;
         Ok(origin
             .iter()
@@ -70,11 +91,11 @@ where
                     None => (None, None, None),
                 };
                 let url = reqwest::Url::parse(origin)?.join(target)?;
-                let mut request = Request::new(method.unwrap_or(Method::GET), url);
+                let mut request = reqwest::Request::new(method.unwrap_or(Method::GET), url);
                 *request.timeout_mut() = timeout.or(Some(Duration::from_secs(10)));
                 *request.headers_mut() = headers.unwrap_or_default();
                 *request.body_mut() = body.map(|b| b.into());
-                Ok::<_, HttpError>((name.clone(), request))
+                Ok::<_, HttpError>((name.clone(), CaseRequest::Http(request)))
             })
             .collect::<Result<HashMap<_, _>, _>>()?)
     }
@@ -89,9 +110,11 @@ impl Worker {
         Self { config }
     }
 
-    pub async fn assault<S>(self, cases: Vec<CaseService<S>>) -> RelentlessResult<WorkerOutcome>
+    pub async fn assault<S, Req, Res>(self, cases: Vec<CaseService<S, Req, Res>>) -> RelentlessResult<WorkerOutcome>
     where
-        S: Clone + Service<Request, Response = Response> + Send + 'static,
+        Req: Send + 'static,
+        Res: Send + 'static,
+        S: Clone + Service<Req, Response = Res> + Send + 'static,
         S::Future: Send + 'static,
         S::Error: Send + 'static,
         RelentlessError: From<S::Error>,
