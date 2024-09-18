@@ -22,5 +22,6 @@ async fn test_example_assault() -> Result<(), Box<dyn std::error::Error>> {
     let relentless = Relentless::<_, http::Request<Body>, http::Response<Body>>::new(vec![config], Some(services));
     let result = relentless.assault().await?;
 
+    assert!(result.pass());
     Ok(())
 }
