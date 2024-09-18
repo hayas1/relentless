@@ -28,13 +28,13 @@ pub enum CaseResponse<Res> {
 #[derive(Debug, Clone)]
 pub struct Case<S, Req, Res> {
     testcase: Testcase,
-    client: S,
+    clients: HashMap<String, S>,
     phantom: std::marker::PhantomData<(Req, Res)>,
 }
 impl Case<reqwest::Client, reqwest::Request, reqwest::Response> {
     pub fn new_http(testcase: Testcase) -> Self {
-        let client = reqwest::Client::new();
-        Self::new(testcase, client)
+        let clients = testcase.setting.origin.keys().map(|name| (name.clone(), reqwest::Client::new())).collect();
+        Self::new(testcase, clients)
     }
 }
 impl<S, Req, Res> Case<S, Req, Res>
@@ -46,9 +46,9 @@ where
     S::Error: Send + 'static,
     RelentlessError: From<S::Error>,
 {
-    pub fn new(testcase: Testcase, client: S) -> Self {
+    pub fn new(testcase: Testcase, clients: HashMap<String, S>) -> Self {
         let phantom = std::marker::PhantomData;
-        Self { testcase, client, phantom }
+        Self { testcase, clients, phantom }
     }
 
     pub async fn process(&self, worker_config: &WorkerConfig) -> RelentlessResult<Vec<CaseResponse<Res>>> {
@@ -58,14 +58,15 @@ where
         {
             // for _ in 0..self.testcase.attr.repeat.unwrap_or(1) {
             let r = req; //.clone(); //.ok_or(CaseError::FailCloneRequest)?;
-            let mut client = self.client.clone();
+            let mut client = self.clients.clone();
             join_set.spawn(async move {
                 match r {
                     CaseRequest::Default(r) => {
                         todo!()
                     }
                     CaseRequest::Http(req) => {
-                        let mut client = reqwest::Client::new(); // TODO
+                        // let mut client = self.clients[&name]; // TODO
+                        let mut client = reqwest::Client::new();
                         let res = client.call(req).await?;
                         Ok(CaseResponse::Http(res))
                     }

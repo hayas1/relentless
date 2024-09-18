@@ -90,7 +90,10 @@ impl Config {
         std::fs::read_dir(path)?.map(|f| Self::read(f?.path())).filter(Result::is_ok).collect::<Result<Vec<_>, _>>()
     }
 
-    pub fn instance<S, Req, Res>(self, client: Option<S>) -> RelentlessResult<(Worker, Vec<CaseService<S, Req, Res>>)>
+    pub fn instance<S, Req, Res>(
+        self,
+        clients: Option<HashMap<String, S>>,
+    ) -> RelentlessResult<(Worker, Vec<CaseService<S, Req, Res>>)>
     where
         Req: Send + 'static,
         Res: Send + 'static,
@@ -102,7 +105,7 @@ impl Config {
         let Self { worker_config, testcase } = self;
 
         let worker = Self::worker(worker_config)?;
-        let cases = testcase.into_iter().map(|tc| Self::case(tc, client.clone())).collect::<Result<Vec<_>, _>>()?;
+        let cases = testcase.into_iter().map(|tc| Self::case(tc, clients.clone())).collect::<Result<Vec<_>, _>>()?;
         Ok((worker, cases))
     }
 
@@ -111,7 +114,10 @@ impl Config {
         Ok(Worker::new(config))
     }
 
-    pub fn case<S, Req, Res>(testcase: Testcase, client: Option<S>) -> RelentlessResult<CaseService<S, Req, Res>>
+    pub fn case<S, Req, Res>(
+        testcase: Testcase,
+        clients: Option<HashMap<String, S>>,
+    ) -> RelentlessResult<CaseService<S, Req, Res>>
     where
         Req: Send + 'static,
         Res: Send + 'static,
@@ -123,9 +129,9 @@ impl Config {
         // TODO layer
         // TODO!!! coalesce protocol
         let protocol = &testcase.setting.protocol;
-        match (protocol, client) {
+        match (protocol, clients) {
             (&None, None) => Ok(CaseService::Http(Case::new_http(testcase))),
-            (&None, Some(client)) => Ok(CaseService::Default(Case::new(testcase, client))),
+            (&None, Some(c)) => Ok(CaseService::Default(Case::new(testcase, c))),
             (&Some(Protocol::Http(_)), _) => Ok(CaseService::Http(Case::new_http(testcase))),
         }
     }

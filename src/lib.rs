@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use error::RelentlessError;
 use tower::Service;
 
@@ -9,7 +11,7 @@ pub mod worker;
 #[derive(Debug, Clone)]
 pub struct Relentless<S = reqwest::Client, Req = reqwest::Request, Res = reqwest::Response> {
     configs: Vec<config::Config>,
-    client: Option<S>,
+    clients: Option<HashMap<String, S>>,
     phantom: std::marker::PhantomData<(Req, Res)>,
 }
 impl Relentless<reqwest::Client, reqwest::Request, reqwest::Response> {
@@ -34,17 +36,17 @@ where
     RelentlessError: From<S::Error>,
 {
     /// TODO document
-    pub fn new(configs: Vec<config::Config>, client: Option<S>) -> Self {
+    pub fn new(configs: Vec<config::Config>, clients: Option<HashMap<String, S>>) -> Self {
         let phantom = std::marker::PhantomData;
-        Self { configs, client, phantom }
+        Self { configs, clients, phantom }
     }
     /// TODO document
     pub async fn assault(self) -> error::RelentlessResult<Outcome> {
-        let Self { configs, client, .. } = self;
+        let Self { configs, clients, .. } = self;
         let mut outcomes = Vec::new();
         // TODO async
         for config in configs {
-            let (worker, cases) = config.instance(client.clone())?;
+            let (worker, cases) = config.instance(clients.clone())?;
             outcomes.push(worker.assault(cases).await?);
         }
         Ok(Outcome::new(outcomes))
