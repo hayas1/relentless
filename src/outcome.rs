@@ -1,15 +1,17 @@
 use crate::{
     config::{Testcase, WorkerConfig},
-    error::RelentlessResult,
+    error::RelentlessError,
 };
 
 #[allow(async_fn_in_trait)] // TODO #[warn(async_fn_in_trait)] by default
 pub trait Evaluator<Res> {
-    async fn evaluate<I: IntoIterator<Item = Res>>(iter: I) -> RelentlessResult<bool>;
+    type Error;
+    async fn evaluate<I: IntoIterator<Item = Res>>(iter: I) -> Result<bool, Self::Error>;
 }
 pub struct Compare {} // TODO enum ?
 impl<Res> Evaluator<Res> for Compare {
-    async fn evaluate<I: IntoIterator<Item = Res>>(iter: I) -> RelentlessResult<bool> {
+    type Error = RelentlessError;
+    async fn evaluate<I: IntoIterator<Item = Res>>(iter: I) -> Result<bool, Self::Error> {
         // TODO
         // let mut v = Vec::new();
         // for res in iter {
@@ -23,7 +25,8 @@ impl<Res> Evaluator<Res> for Compare {
 
 pub struct Status {} // TODO enum ?
 impl<Res> Evaluator<Res> for Status {
-    async fn evaluate<I: IntoIterator<Item = Res>>(iter: I) -> RelentlessResult<bool> {
+    type Error = RelentlessError;
+    async fn evaluate<I: IntoIterator<Item = Res>>(iter: I) -> Result<bool, Self::Error> {
         // TODO
         // let pass = iter.into_iter().all(|res| res.status().is_success());
         // Ok(pass)
