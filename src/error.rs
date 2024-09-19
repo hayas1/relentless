@@ -9,6 +9,7 @@ pub enum RelentlessError {
     HttpError(#[from] HttpError),
     CaseError(#[from] CaseError),
 
+    HyperError(#[from] hyper::Error),
     ReqwestError(#[from] reqwest::Error),
     TokioTaskJoinError(#[from] tokio::task::JoinError),
     StdIoError(#[from] std::io::Error),

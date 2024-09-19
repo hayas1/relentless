@@ -97,7 +97,7 @@ impl Config {
     where
         Req: Send + 'static,
         Res: Send + 'static,
-        S: Clone + Service<Req, Response = Res> + Send + 'static,
+        S: Clone + Service<http::Request<Req>, Response = http::Response<Res>> + Send + 'static,
         S::Future: Send + 'static,
         S::Error: Send + 'static,
         RelentlessError: From<S::Error>,
@@ -121,7 +121,7 @@ impl Config {
     where
         Req: Send + 'static,
         Res: Send + 'static,
-        S: Clone + Service<Req, Response = Res> + Send + 'static,
+        S: Clone + Service<http::Request<Req>, Response = http::Response<Res>> + Send + 'static,
         S::Future: Send + 'static,
         S::Error: Send + 'static,
         RelentlessError: From<S::Error>,

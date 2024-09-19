@@ -1,11 +1,14 @@
 use std::collections::HashMap;
 
 use error::RelentlessError;
+use hyper::body::{Body, Incoming};
+use service::HyperClient;
 use tower::Service;
 
 pub mod config;
 pub mod error;
 pub mod outcome;
+pub mod service;
 pub mod worker;
 
 #[derive(Debug, Clone)]
@@ -14,7 +17,12 @@ pub struct Relentless<S = reqwest::Client, Req = reqwest::Request, Res = reqwest
     clients: Option<HashMap<String, S>>,
     phantom: std::marker::PhantomData<(Req, Res)>,
 }
-impl Relentless<reqwest::Client, reqwest::Request, reqwest::Response> {
+impl<BReq> Relentless<HyperClient<BReq>, http::Request<BReq>, http::Response<Incoming>>
+where
+    BReq: Clone + Body + Send + 'static,
+    BReq::Data: Send + 'static,
+    BReq::Error: std::error::Error + Sync + Send + 'static,
+{
     /// TODO document
     pub fn read_paths<I: IntoIterator<Item = P>, P: AsRef<std::path::Path>>(paths: I) -> error::RelentlessResult<Self> {
         let configs = paths.into_iter().map(config::Config::read).collect::<error::RelentlessResult<Vec<_>>>()?;
@@ -30,7 +38,7 @@ impl<S, Req, Res> Relentless<S, Req, Res>
 where
     Req: Send + 'static,
     Res: Send + 'static,
-    S: Clone + Service<Req, Response = Res> + Send + 'static,
+    S: Clone + Service<http::Request<Req>, Response = http::Response<Res>> + Send + 'static,
     S::Future: Send + 'static,
     S::Error: Send + 'static,
     RelentlessError: From<S::Error>,

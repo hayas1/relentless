@@ -41,7 +41,7 @@ impl<S, Req, Res> Case<S, Req, Res>
 where
     Req: Send + 'static,
     Res: Send + 'static,
-    S: Clone + Service<Req, Response = Res> + Send + 'static,
+    S: Clone + Service<http::Request<Req>, Response = http::Response<Res>> + Send + 'static,
     S::Future: Send + 'static,
     S::Error: Send + 'static,
     RelentlessError: From<S::Error>,
@@ -115,7 +115,7 @@ impl Worker {
     where
         Req: Send + 'static,
         Res: Send + 'static,
-        S: Clone + Service<Req, Response = Res> + Send + 'static,
+        S: Clone + Service<http::Request<Req>, Response = http::Response<Res>> + Send + 'static,
         S::Future: Send + 'static,
         S::Error: Send + 'static,
         RelentlessError: From<S::Error>,
