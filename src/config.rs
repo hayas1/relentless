@@ -6,6 +6,7 @@ use std::{
 };
 
 use http::{HeaderMap, Method};
+use hyper::body::Body;
 use serde::{Deserialize, Serialize};
 use tower::Service;
 
@@ -95,9 +96,11 @@ impl Config {
         clients: Option<HashMap<String, S>>,
     ) -> RelentlessResult<(Worker, Vec<CaseService<S, Req, Res>>)>
     where
-        Req: Send + 'static,
-        Res: Send + 'static,
-        S: Clone + Service<http::Request<Req>, Response = http::Response<Res>> + Send + 'static,
+        Req: Clone + Body + Send + Sync + 'static,
+        Req::Data: Send + 'static,
+        Req::Error: std::error::Error + Sync + Send + 'static,
+        Res: Send + Sync + 'static,
+        S: Clone + Service<http::Request<Req>, Response = http::Response<Res>> + Send + Sync + 'static,
         S::Future: Send + 'static,
         S::Error: Send + 'static,
         RelentlessError: From<S::Error>,
@@ -119,9 +122,11 @@ impl Config {
         clients: Option<HashMap<String, S>>,
     ) -> RelentlessResult<CaseService<S, Req, Res>>
     where
-        Req: Send + 'static,
-        Res: Send + 'static,
-        S: Clone + Service<http::Request<Req>, Response = http::Response<Res>> + Send + 'static,
+        Req: Clone + Body + Send + Sync + 'static,
+        Req::Data: Send + 'static,
+        Req::Error: std::error::Error + Sync + Send + 'static,
+        Res: Send + Sync + 'static,
+        S: Clone + Service<http::Request<Req>, Response = http::Response<Res>> + Send + Sync + 'static,
         S::Future: Send + 'static,
         S::Error: Send + 'static,
         RelentlessError: From<S::Error>,

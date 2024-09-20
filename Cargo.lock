@@ -765,6 +765,7 @@ dependencies = [
  "axum",
  "example-http-server",
  "http",
+ "http-body-util",
  "http-serde",
  "hyper",
  "hyper-util",

@@ -52,7 +52,7 @@ where
 impl<B: Body + Send + 'static> Service<http::Request<B>> for HyperClient<B> {
     type Response = http::Response<Incoming>;
     type Error = hyper::Error;
-    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))

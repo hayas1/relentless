@@ -17,9 +17,9 @@ pub struct Relentless<S = reqwest::Client, Req = reqwest::Request, Res = reqwest
     clients: Option<HashMap<String, S>>,
     phantom: std::marker::PhantomData<(Req, Res)>,
 }
-impl<BReq> Relentless<HyperClient<BReq>, http::Request<BReq>, http::Response<Incoming>>
+impl<BReq> Relentless<HyperClient<BReq>, BReq, Incoming>
 where
-    BReq: Clone + Body + Send + 'static,
+    BReq: Clone + Body + Send + Sync + 'static,
     BReq::Data: Send + 'static,
     BReq::Error: std::error::Error + Sync + Send + 'static,
 {
@@ -36,9 +36,11 @@ where
 }
 impl<S, Req, Res> Relentless<S, Req, Res>
 where
-    Req: Send + 'static,
-    Res: Send + 'static,
-    S: Clone + Service<http::Request<Req>, Response = http::Response<Res>> + Send + 'static,
+    Req: Clone + Body + Send + Sync + 'static,
+    Req::Data: Send + 'static,
+    Req::Error: std::error::Error + Sync + Send + 'static,
+    Res: Send + Sync + 'static,
+    S: Clone + Service<http::Request<Req>, Response = http::Response<Res>> + Send + Sync + 'static,
     S::Future: Send + 'static,
     S::Error: Send + 'static,
     RelentlessError: From<S::Error>,

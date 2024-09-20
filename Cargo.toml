@@ -24,6 +24,7 @@ toml = { version = "0.8.19", optional = true }
 http-serde = "2.1.1"
 hyper = "1.4.1"
 hyper-util = { version = "0.1.8", features = ["full"] }
+http-body-util = "0.1.2"
 
 [dev-dependencies]
 example-http-server = { path = "examples/server/http" }

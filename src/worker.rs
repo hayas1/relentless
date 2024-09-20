@@ -4,25 +4,28 @@ use crate::{
     config::{Protocol, Setting, Testcase, WorkerConfig},
     error::{HttpError, RelentlessError, RelentlessResult},
     outcome::{CaseOutcome, Compare, Evaluator, Status, WorkerOutcome},
+    service::HyperClient,
 };
 use http::Method;
-use tokio::task::JoinSet;
+use http_body_util::Empty;
+use hyper::body::{Body, Incoming};
+use tokio::{runtime::Runtime, task::JoinSet};
 use tower::Service;
 
 #[derive(Debug)]
 pub enum CaseService<S, Req, Res> {
     Default(Case<S, Req, Res>),
-    Http(Case<reqwest::Client, reqwest::Request, reqwest::Response>),
+    Http(Case<HyperClient<Req>, Req, Incoming>),
 }
 #[derive(Debug)]
 pub enum CaseRequest<Req> {
     Default(Req),
-    Http(reqwest::Request),
+    Http(http::Request<Req>),
 }
 #[derive(Debug)]
 pub enum CaseResponse<Res> {
     Default(Res),
-    Http(reqwest::Response),
+    Http(http::Response<Res>),
 }
 
 #[derive(Debug, Clone)]
@@ -31,17 +34,29 @@ pub struct Case<S, Req, Res> {
     clients: HashMap<String, S>,
     phantom: std::marker::PhantomData<(Req, Res)>,
 }
-impl Case<reqwest::Client, reqwest::Request, reqwest::Response> {
+impl<BReq> Case<HyperClient<BReq>, BReq, Incoming>
+where
+    BReq: Clone + Body + Send + Sync + 'static,
+    BReq::Data: Send + 'static,
+    BReq::Error: std::error::Error + Sync + Send + 'static,
+{
     pub fn new_http(testcase: Testcase) -> Self {
-        let clients = testcase.setting.origin.keys().map(|name| (name.clone(), reqwest::Client::new())).collect();
+        let clients = testcase
+            .setting
+            .origin
+            .iter()
+            .map(|(name, origin)| (name.clone(), Runtime::new().unwrap().block_on(HyperClient::new(origin)).unwrap())) // TODO async
+            .collect();
         Self::new(testcase, clients)
     }
 }
 impl<S, Req, Res> Case<S, Req, Res>
 where
-    Req: Send + 'static,
-    Res: Send + 'static,
-    S: Clone + Service<http::Request<Req>, Response = http::Response<Res>> + Send + 'static,
+    Req: Clone + Body + Send + Sync + 'static,
+    Req::Data: Send + 'static,
+    Req::Error: std::error::Error + Sync + Send + 'static,
+    Res: Send + Sync + 'static,
+    S: Clone + Service<http::Request<Req>, Response = http::Response<Res>> + Send + Sync + 'static,
     S::Future: Send + 'static,
     S::Error: Send + 'static,
     RelentlessError: From<S::Error>,
@@ -58,15 +73,14 @@ where
         {
             // for _ in 0..self.testcase.attr.repeat.unwrap_or(1) {
             let r = req; //.clone(); //.ok_or(CaseError::FailCloneRequest)?;
-            let mut client = self.clients.clone();
+            let clients = self.clients.clone();
             join_set.spawn(async move {
                 match r {
                     CaseRequest::Default(r) => {
                         todo!()
                     }
                     CaseRequest::Http(req) => {
-                        // let mut client = self.clients[&name]; // TODO
-                        let mut client = reqwest::Client::new();
+                        let mut client = clients[&name].clone(); // TODO
                         let res = client.call(req).await?;
                         Ok(CaseResponse::Http(res))
                     }
@@ -91,12 +105,19 @@ where
                     Some(Protocol::Http(http)) => (http.method, http.header, http.body),
                     None => (None, None, None),
                 };
-                let url = reqwest::Url::parse(origin)?.join(target)?;
-                let mut request = reqwest::Request::new(method.unwrap_or(Method::GET), url);
-                *request.timeout_mut() = timeout.or(Some(Duration::from_secs(10)));
-                *request.headers_mut() = headers.unwrap_or_default();
-                *request.body_mut() = body.map(|b| b.into());
-                Ok::<_, HttpError>((name.clone(), CaseRequest::Http(request)))
+                let uri = http::uri::Builder::new()
+                    .scheme("http")
+                    .authority("localhost:3000")
+                    .path_and_query(target)
+                    .build()
+                    .unwrap();
+                todo!();
+                // let request = http::Request::builder()
+                //     .uri(uri)
+                //     .method(method.unwrap_or(Method::GET))
+                //     .body(body.unwrap())
+                //     .unwrap();
+                // Ok::<_, HttpError>((name.clone(), CaseRequest::Http(request)))
             })
             .collect::<Result<HashMap<_, _>, _>>()?)
     }
@@ -113,9 +134,11 @@ impl Worker {
 
     pub async fn assault<S, Req, Res>(self, cases: Vec<CaseService<S, Req, Res>>) -> RelentlessResult<WorkerOutcome>
     where
-        Req: Send + 'static,
-        Res: Send + 'static,
-        S: Clone + Service<http::Request<Req>, Response = http::Response<Res>> + Send + 'static,
+        Req: Clone + Body + Send + Sync + 'static,
+        Req::Data: Send + 'static,
+        Req::Error: std::error::Error + Sync + Send + 'static,
+        Res: Send + Sync + 'static,
+        S: Clone + Service<http::Request<Req>, Response = http::Response<Res>> + Send + Sync + 'static,
         S::Future: Send + 'static,
         S::Error: Send + 'static,
         RelentlessError: From<S::Error>,
