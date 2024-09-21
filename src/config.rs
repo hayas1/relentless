@@ -96,7 +96,7 @@ impl Config {
         clients: Option<HashMap<String, S>>,
     ) -> RelentlessResult<(Worker, Vec<CaseService<S, Req, Res>>)>
     where
-        Req: Clone + Body + Send + Sync + 'static,
+        Req: Body + Send + Sync + 'static,
         Req::Data: Send + 'static,
         Req::Error: std::error::Error + Sync + Send + 'static,
         Res: Send + Sync + 'static,
@@ -122,7 +122,7 @@ impl Config {
         clients: Option<HashMap<String, S>>,
     ) -> RelentlessResult<CaseService<S, Req, Res>>
     where
-        Req: Clone + Body + Send + Sync + 'static,
+        Req: Body + Send + Sync + 'static,
         Req::Data: Send + 'static,
         Req::Error: std::error::Error + Sync + Send + 'static,
         Res: Send + Sync + 'static,

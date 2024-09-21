@@ -36,7 +36,7 @@ where
 }
 impl<S, Req, Res> Relentless<S, Req, Res>
 where
-    Req: Clone + Body + Send + Sync + 'static,
+    Req: Body + Send + Sync + 'static,
     Req::Data: Send + 'static,
     Req::Error: std::error::Error + Sync + Send + 'static,
     Res: Send + Sync + 'static,
