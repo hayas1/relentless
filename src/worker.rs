@@ -14,26 +14,26 @@ use tokio::{runtime::Runtime, task::JoinSet};
 use tower::Service;
 
 #[derive(Debug)]
-pub enum CaseService<S, Req, Res> {
-    Default(Case<S, Req, Res>),
-    Http(Case<HyperClient<Req>, Req, Incoming>),
+pub enum CaseService<S, ReqB, ResB> {
+    Default(Case<S, ReqB, ResB>),
+    Http(Case<HyperClient<ReqB>, ReqB, Incoming>),
 }
 #[derive(Debug)]
-pub enum CaseRequest<Req> {
-    Default(Req),
-    Http(http::Request<Req>),
+pub enum CaseRequest<ReqB> {
+    Default(ReqB),
+    Http(http::Request<ReqB>),
 }
 #[derive(Debug)]
-pub enum CaseResponse<Res> {
-    Default(Res),
-    Http(http::Response<Res>),
+pub enum CaseResponse<ResB> {
+    Default(ResB),
+    Http(http::Response<ResB>),
 }
 
 #[derive(Debug, Clone)]
-pub struct Case<S, Req, Res> {
+pub struct Case<S, ReqB, ResB> {
     testcase: Testcase,
     // clients: HashMap<String, S>,
-    phantom: std::marker::PhantomData<(S, Req, Res)>,
+    phantom: std::marker::PhantomData<(S, ReqB, ResB)>,
 }
 impl<BReq> Case<HyperClient<BReq>, BReq, Incoming>
 where
@@ -45,13 +45,13 @@ where
         Self::new(testcase)
     }
 }
-impl<S, Req, Res> Case<S, Req, Res>
+impl<S, ReqB, ResB> Case<S, ReqB, ResB>
 where
-    Req: Body + From<BodyStructure> + Send + 'static,
-    Req::Data: Send + 'static,
-    Req::Error: std::error::Error + Sync + Send + 'static,
-    Res: From<Incoming> + Send + 'static,
-    S: Clone + Service<http::Request<Req>, Response = http::Response<Res>> + Send + Sync + 'static,
+    ReqB: Body + From<BodyStructure> + Send + 'static,
+    ReqB::Data: Send + 'static,
+    ReqB::Error: std::error::Error + Sync + Send + 'static,
+    ResB: From<Incoming> + Send + 'static,
+    S: Clone + Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + Sync + 'static,
     S::Future: 'static,
     S::Error: Send + 'static,
     RelentlessError: From<S::Error>,
@@ -61,7 +61,7 @@ where
         Self { testcase, phantom }
     }
 
-    pub async fn process(&self, worker_config: &WorkerConfig) -> RelentlessResult<Vec<CaseResponse<Res>>> {
+    pub async fn process(&self, worker_config: &WorkerConfig) -> RelentlessResult<Vec<CaseResponse<ResB>>> {
         let setting = &self.testcase.setting.coalesce(&worker_config.setting);
         let mut clients = HashMap::new();
         for (name, origin) in &setting.origin {
@@ -98,7 +98,7 @@ where
         Ok(responses)
     }
 
-    pub fn requests(target: &str, setting: &Setting) -> RelentlessResult<HashMap<String, CaseRequest<Req>>> {
+    pub fn requests(target: &str, setting: &Setting) -> RelentlessResult<HashMap<String, CaseRequest<ReqB>>> {
         let Setting { protocol, origin, template, timeout } = setting;
         Ok(origin
             .iter()
@@ -116,7 +116,7 @@ where
                 let request = http::Request::builder()
                     .uri(uri)
                     .method(method.unwrap_or(Method::GET))
-                    .body(Req::from(body.unwrap_or_default()))
+                    .body(ReqB::from(body.unwrap_or_default()))
                     .unwrap();
                 Ok::<_, HttpError>((name.clone(), CaseRequest::Http(request)))
             })
@@ -133,13 +133,13 @@ impl Worker {
         Self { config }
     }
 
-    pub async fn assault<S, Req, Res>(self, cases: Vec<CaseService<S, Req, Res>>) -> RelentlessResult<WorkerOutcome>
+    pub async fn assault<S, ReqB, ResB>(self, cases: Vec<CaseService<S, ReqB, ResB>>) -> RelentlessResult<WorkerOutcome>
     where
-        Req: Body + From<BodyStructure> + Send + 'static,
-        Req::Data: Send + 'static,
-        Req::Error: std::error::Error + Sync + Send + 'static,
-        Res: From<Incoming> + Send + 'static,
-        S: Clone + Service<http::Request<Req>, Response = http::Response<Res>> + Send + Sync + 'static,
+        ReqB: Body + From<BodyStructure> + Send + 'static,
+        ReqB::Data: Send + 'static,
+        ReqB::Error: std::error::Error + Sync + Send + 'static,
+        ResB: From<Incoming> + Send + 'static,
+        S: Clone + Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + Sync + 'static,
         S::Future: 'static,
         S::Error: Send + 'static,
         RelentlessError: From<S::Error>,

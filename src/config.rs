@@ -128,16 +128,16 @@ impl Config {
         std::fs::read_dir(path)?.map(|f| Self::read(f?.path())).filter(Result::is_ok).collect::<Result<Vec<_>, _>>()
     }
 
-    pub fn instance<S, Req, Res>(
+    pub fn instance<S, ReqB, ResB>(
         self,
         clients: Option<HashMap<String, S>>,
-    ) -> RelentlessResult<(Worker, Vec<CaseService<S, Req, Res>>)>
+    ) -> RelentlessResult<(Worker, Vec<CaseService<S, ReqB, ResB>>)>
     where
-        Req: Body + From<BodyStructure> + Send + 'static,
-        Req::Data: Send + 'static,
-        Req::Error: std::error::Error + Sync + Send + 'static,
-        Res: From<Incoming> + Send + 'static,
-        S: Clone + Service<http::Request<Req>, Response = http::Response<Res>> + Send + Sync + 'static,
+        ReqB: Body + From<BodyStructure> + Send + 'static,
+        ReqB::Data: Send + 'static,
+        ReqB::Error: std::error::Error + Sync + Send + 'static,
+        ResB: From<Incoming> + Send + 'static,
+        S: Clone + Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + Sync + 'static,
         S::Future: 'static,
         S::Error: Send + 'static,
         RelentlessError: From<S::Error>,
@@ -154,16 +154,16 @@ impl Config {
         Ok(Worker::new(config))
     }
 
-    pub fn case<S, Req, Res>(
+    pub fn case<S, ReqB, ResB>(
         testcase: Testcase,
         clients: Option<HashMap<String, S>>,
-    ) -> RelentlessResult<CaseService<S, Req, Res>>
+    ) -> RelentlessResult<CaseService<S, ReqB, ResB>>
     where
-        Req: Body + From<BodyStructure> + Send + 'static,
-        Req::Data: Send + 'static,
-        Req::Error: std::error::Error + Sync + Send + 'static,
-        Res: From<Incoming> + Send + 'static,
-        S: Clone + Service<http::Request<Req>, Response = http::Response<Res>> + Send + Sync + 'static,
+        ReqB: Body + From<BodyStructure> + Send + 'static,
+        ReqB::Data: Send + 'static,
+        ReqB::Error: std::error::Error + Sync + Send + 'static,
+        ResB: From<Incoming> + Send + 'static,
+        S: Clone + Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + Sync + 'static,
         S::Future: 'static,
         S::Error: Send + 'static,
         RelentlessError: From<S::Error>,

@@ -18,16 +18,16 @@ pub type Relentless =
     Relentless_<HyperClient<UnsyncBoxBody<Bytes, RelentlessError>>, UnsyncBoxBody<Bytes, RelentlessError>, Incoming>;
 
 #[derive(Debug, Clone)]
-pub struct Relentless_<S = HyperClient<Bytes>, Req = Bytes, Res = Incoming> {
+pub struct Relentless_<S = HyperClient<Bytes>, ReqB = Bytes, ResB = Incoming> {
     configs: Vec<config::Config>,
     clients: Option<HashMap<String, S>>,
-    phantom: std::marker::PhantomData<(Req, Res)>,
+    phantom: std::marker::PhantomData<(ReqB, ResB)>,
 }
-impl<BReq> Relentless_<HyperClient<BReq>, BReq, Incoming>
+impl<ReqB> Relentless_<HyperClient<ReqB>, ReqB, Incoming>
 where
-    BReq: Body + From<BodyStructure> + Send + 'static,
-    BReq::Data: Send + 'static,
-    BReq::Error: std::error::Error + Sync + Send + 'static,
+    ReqB: Body + From<BodyStructure> + Send + 'static,
+    ReqB::Data: Send + 'static,
+    ReqB::Error: std::error::Error + Sync + Send + 'static,
 {
     /// TODO document
     pub fn read_paths<I: IntoIterator<Item = P>, P: AsRef<std::path::Path>>(paths: I) -> error::RelentlessResult<Self> {
@@ -40,13 +40,13 @@ where
         Ok(Self::new(configs, None))
     }
 }
-impl<S, Req, Res> Relentless_<S, Req, Res>
+impl<S, ReqB, ResB> Relentless_<S, ReqB, ResB>
 where
-    Req: Body + From<BodyStructure> + Send + 'static,
-    Req::Data: Send + 'static,
-    Req::Error: std::error::Error + Sync + Send + 'static,
-    Res: From<Incoming> + Send + 'static,
-    S: Clone + Service<http::Request<Req>, Response = http::Response<Res>> + Send + Sync + 'static,
+    ReqB: Body + From<BodyStructure> + Send + 'static,
+    ReqB::Data: Send + 'static,
+    ReqB::Error: std::error::Error + Sync + Send + 'static,
+    ResB: From<Incoming> + Send + 'static,
+    S: Clone + Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + Sync + 'static,
     S::Future: 'static,
     S::Error: Send + 'static,
     RelentlessError: From<S::Error>,

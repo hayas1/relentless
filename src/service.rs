@@ -20,13 +20,13 @@ use tower::Service;
 use crate::error::RelentlessResult;
 
 #[derive(Debug)]
-pub struct HyperClient<B> {
-    sender: hyper::client::conn::http1::SendRequest<B>,
+pub struct HyperClient<ReqB> {
+    sender: hyper::client::conn::http1::SendRequest<ReqB>,
 }
-impl<B: Body + Send + 'static> HyperClient<B>
+impl<ReqB: Body + Send + 'static> HyperClient<ReqB>
 where
-    B::Data: Send + 'static,
-    B::Error: std::error::Error + Sync + Send + 'static,
+    ReqB::Data: Send + 'static,
+    ReqB::Error: std::error::Error + Sync + Send + 'static,
 {
     pub async fn new<A>(origin: A) -> RelentlessResult<Self>
     where
@@ -39,19 +39,19 @@ where
         Ok(Self { sender })
     }
 }
-impl<B: Body + 'static> HyperClient<B> {
-    pub async fn send_request(&mut self, req: http::Request<B>) -> Result<http::Response<Bytes>, hyper::Error> {
+impl<ReqB: Body + 'static> HyperClient<ReqB> {
+    pub async fn send_request(&mut self, req: http::Request<ReqB>) -> Result<http::Response<Bytes>, hyper::Error> {
         let response = self.sender.send_request(req).await?;
         let (parts, incoming) = response.into_parts();
-        let body = BodyExt::collect(incoming).await.map(|buf| buf.to_bytes());
-        let response = http::Response::from_parts(parts, body?);
+        let body = BodyExt::collect(incoming).await.map(|buf| buf.to_bytes())?;
+        let response = http::Response::from_parts(parts, body);
         Ok(response)
     }
 }
-impl<B: Body + Send + 'static> Clone for HyperClient<B>
+impl<ReqB: Body + Send + 'static> Clone for HyperClient<ReqB>
 where
-    B::Data: Send + 'static,
-    B::Error: std::error::Error + Sync + Send + 'static,
+    ReqB::Data: Send + 'static,
+    ReqB::Error: std::error::Error + Sync + Send + 'static,
 {
     fn clone(&self) -> Self {
         // TODO
@@ -60,7 +60,7 @@ where
     }
 }
 
-impl<B: Body + 'static> Service<http::Request<B>> for HyperClient<B> {
+impl<ReqB: Body + 'static> Service<http::Request<ReqB>> for HyperClient<ReqB> {
     type Response = http::Response<Incoming>;
     type Error = hyper::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
@@ -69,7 +69,7 @@ impl<B: Body + 'static> Service<http::Request<B>> for HyperClient<B> {
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, req: http::Request<B>) -> Self::Future {
+    fn call(&mut self, req: http::Request<ReqB>) -> Self::Future {
         Box::pin(self.sender.send_request(req))
     }
 }
