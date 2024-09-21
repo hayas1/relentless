@@ -8,7 +8,7 @@ use std::{
 use bytes::Bytes;
 use http::{HeaderMap, Method};
 use http_body_util::{combinators::UnsyncBoxBody, Empty};
-use hyper::body::Body;
+use hyper::body::{Body, Incoming};
 use serde::{Deserialize, Serialize};
 use tower::Service;
 
@@ -136,7 +136,7 @@ impl Config {
         Req: Body + From<BodyStructure> + Send + 'static,
         Req::Data: Send + 'static,
         Req::Error: std::error::Error + Sync + Send + 'static,
-        Res: Send + 'static,
+        Res: From<Incoming> + Send + 'static,
         S: Clone + Service<http::Request<Req>, Response = http::Response<Res>> + Send + Sync + 'static,
         S::Future: 'static,
         S::Error: Send + 'static,
@@ -162,7 +162,7 @@ impl Config {
         Req: Body + From<BodyStructure> + Send + 'static,
         Req::Data: Send + 'static,
         Req::Error: std::error::Error + Sync + Send + 'static,
-        Res: Send + 'static,
+        Res: From<Incoming> + Send + 'static,
         S: Clone + Service<http::Request<Req>, Response = http::Response<Res>> + Send + Sync + 'static,
         S::Future: 'static,
         S::Error: Send + 'static,

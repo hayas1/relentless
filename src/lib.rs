@@ -45,7 +45,7 @@ where
     Req: Body + From<BodyStructure> + Send + 'static,
     Req::Data: Send + 'static,
     Req::Error: std::error::Error + Sync + Send + 'static,
-    Res: Send + 'static,
+    Res: From<Incoming> + Send + 'static,
     S: Clone + Service<http::Request<Req>, Response = http::Response<Res>> + Send + Sync + 'static,
     S::Future: 'static,
     S::Error: Send + 'static,

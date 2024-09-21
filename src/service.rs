@@ -32,7 +32,7 @@ where
     where
         A: ToSocketAddrs,
     {
-        let stream = TcpStream::connect(origin).await?;
+        let stream = TcpStream::connect("localhost:3000").await?;
         let io = TokioIo::new(stream);
         let (sender, conn) = http1::handshake(io).await?;
         tokio::spawn(conn);

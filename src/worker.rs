@@ -50,7 +50,7 @@ where
     Req: Body + From<BodyStructure> + Send + 'static,
     Req::Data: Send + 'static,
     Req::Error: std::error::Error + Sync + Send + 'static,
-    Res: Send + 'static,
+    Res: From<Incoming> + Send + 'static,
     S: Clone + Service<http::Request<Req>, Response = http::Response<Res>> + Send + Sync + 'static,
     S::Future: 'static,
     S::Error: Send + 'static,
@@ -63,11 +63,11 @@ where
 
     pub async fn process(&self, worker_config: &WorkerConfig) -> RelentlessResult<Vec<CaseResponse<Res>>> {
         let setting = &self.testcase.setting.coalesce(&worker_config.setting);
-        let clients = setting
-            .origin
-            .iter()
-            .map(|(name, origin)| (name.clone(), HyperClient::new(origin))) // TODO async
-            .collect::<HashMap<_, _>>();
+        let mut clients = HashMap::new();
+        for (name, origin) in &setting.origin {
+            let host = origin.parse::<http::Uri>()?.authority().unwrap().as_str().to_string(); // TODO
+            clients.insert(name.clone(), HyperClient::new(host).await?);
+        }
         // let mut join_set = JoinSet::<RelentlessResult<CaseResponse<Res>>>::new();
         let mut response = Vec::new();
         for (name, req) in Self::requests(&self.testcase.target, setting)? {
@@ -79,8 +79,10 @@ where
                     todo!()
                 }
                 CaseRequest::Http(req) => {
-                    let mut client = clients[&name].await?; // TODO
+                    let client = clients.get_mut(&name).unwrap(); // TODO
                     let res = client.call(req).await?;
+                    let (part, body) = res.into_parts();
+                    let res = http::Response::from_parts(part, body.into());
                     response.push(Ok(CaseResponse::Http(res)))
                 }
             }
@@ -136,7 +138,7 @@ impl Worker {
         Req: Body + From<BodyStructure> + Send + 'static,
         Req::Data: Send + 'static,
         Req::Error: std::error::Error + Sync + Send + 'static,
-        Res: Send + 'static,
+        Res: From<Incoming> + Send + 'static,
         S: Clone + Service<http::Request<Req>, Response = http::Response<Res>> + Send + Sync + 'static,
         S::Future: 'static,
         S::Error: Send + 'static,
