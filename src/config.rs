@@ -101,7 +101,7 @@ impl Config {
         Req::Error: std::error::Error + Sync + Send + 'static,
         Res: Send + Sync + 'static,
         S: Clone + Service<http::Request<Req>, Response = http::Response<Res>> + Send + Sync + 'static,
-        S::Future: Send + 'static,
+        S::Future: 'static,
         S::Error: Send + 'static,
         RelentlessError: From<S::Error>,
     {
@@ -127,7 +127,7 @@ impl Config {
         Req::Error: std::error::Error + Sync + Send + 'static,
         Res: Send + Sync + 'static,
         S: Clone + Service<http::Request<Req>, Response = http::Response<Res>> + Send + Sync + 'static,
-        S::Future: Send + 'static,
+        S::Future: 'static,
         S::Error: Send + 'static,
         RelentlessError: From<S::Error>,
     {

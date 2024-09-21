@@ -57,7 +57,7 @@ where
     Req::Error: std::error::Error + Sync + Send + 'static,
     Res: Send + Sync + 'static,
     S: Clone + Service<http::Request<Req>, Response = http::Response<Res>> + Send + Sync + 'static,
-    S::Future: Send + 'static,
+    S::Future: 'static,
     S::Error: Send + 'static,
     RelentlessError: From<S::Error>,
 {
@@ -67,33 +67,35 @@ where
     }
 
     pub async fn process(&self, worker_config: &WorkerConfig) -> RelentlessResult<Vec<CaseResponse<Res>>> {
-        let mut join_set = JoinSet::<RelentlessResult<CaseResponse<Res>>>::new();
+        // let mut join_set = JoinSet::<RelentlessResult<CaseResponse<Res>>>::new();
+        let mut response = Vec::new();
         for (name, req) in
             Self::requests(&self.testcase.target, &self.testcase.setting.coalesce(&worker_config.setting))?
         {
             // for _ in 0..self.testcase.attr.repeat.unwrap_or(1) {
             let r = req; //.clone(); //.ok_or(CaseError::FailCloneRequest)?;
             let clients = self.clients.clone();
-            join_set.spawn(async move {
-                match r {
-                    CaseRequest::Default(r) => {
-                        todo!()
-                    }
-                    CaseRequest::Http(req) => {
-                        let mut client = clients[&name].clone(); // TODO
-                        let res = client.call(req).await?;
-                        Ok(CaseResponse::Http(res))
-                    }
+            // join_set.spawn(async move {
+            match r {
+                CaseRequest::Default(r) => {
+                    todo!()
                 }
-            });
+                CaseRequest::Http(req) => {
+                    let mut client = clients[&name].clone(); // TODO
+                    let res = client.call(req).await?;
+                    response.push(Ok(CaseResponse::Http(res)))
+                }
+            }
+            // });
             // }
         }
 
-        let mut response = Vec::new();
-        while let Some(res) = join_set.join_next().await {
-            response.push(res??);
+        let mut responses = Vec::new();
+        // while let Some(res) = join_set.join_next().await {
+        for res in response {
+            responses.push(res?);
         }
-        Ok(response)
+        Ok(responses)
     }
 
     pub fn requests(target: &str, setting: &Setting) -> RelentlessResult<HashMap<String, CaseRequest<Req>>> {
@@ -139,7 +141,7 @@ impl Worker {
         Req::Error: std::error::Error + Sync + Send + 'static,
         Res: Send + Sync + 'static,
         S: Clone + Service<http::Request<Req>, Response = http::Response<Res>> + Send + Sync + 'static,
-        S::Future: Send + 'static,
+        S::Future: 'static,
         S::Error: Send + 'static,
         RelentlessError: From<S::Error>,
     {

@@ -4,6 +4,8 @@ use std::{
     task::{Context, Poll},
 };
 
+use bytes::Bytes;
+use http_body_util::BodyExt;
 use hyper::{
     body::{Body, Incoming},
     client::conn::http1,
@@ -37,6 +39,15 @@ where
         Ok(Self { sender })
     }
 }
+impl<B: Body + 'static> HyperClient<B> {
+    pub async fn send_request(&mut self, req: http::Request<B>) -> Result<http::Response<Bytes>, hyper::Error> {
+        let response = self.sender.send_request(req).await?;
+        let (parts, incoming) = response.into_parts();
+        let body = BodyExt::collect(incoming).await.map(|buf| buf.to_bytes());
+        let response = http::Response::from_parts(parts, body?);
+        Ok(response)
+    }
+}
 impl<B: Body + Send + 'static> Clone for HyperClient<B>
 where
     B::Data: Send + 'static,
@@ -49,10 +60,10 @@ where
     }
 }
 
-impl<B: Body + Send + 'static> Service<http::Request<B>> for HyperClient<B> {
+impl<B: Body + 'static> Service<http::Request<B>> for HyperClient<B> {
     type Response = http::Response<Incoming>;
     type Error = hyper::Error;
-    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
 
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
