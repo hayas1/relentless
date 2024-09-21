@@ -41,15 +41,6 @@ where
         Ok(Self { sender, phantom })
     }
 }
-impl<ReqB: Body + 'static, ResB> HyperClient<ReqB, ResB> {
-    pub async fn send_request(&mut self, req: http::Request<ReqB>) -> Result<http::Response<Bytes>, hyper::Error> {
-        let response = self.sender.send_request(req).await?;
-        let (parts, incoming) = response.into_parts();
-        let body = BodyExt::collect(incoming).await.map(|buf| buf.to_bytes())?;
-        let response = http::Response::from_parts(parts, body);
-        Ok(response)
-    }
-}
 impl<ReqB: Body + Send + 'static, ResB> Clone for HyperClient<ReqB, ResB>
 where
     ReqB::Data: Send + 'static,
@@ -62,7 +53,7 @@ where
     }
 }
 
-impl<ReqB: Body + 'static, ResB: From<Incoming>> Service<http::Request<ReqB>> for HyperClient<ReqB, ResB> {
+impl<ReqB: Body + 'static, ResB: From<Bytes>> Service<http::Request<ReqB>> for HyperClient<ReqB, ResB> {
     type Response = http::Response<ResB>;
     type Error = hyper::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
@@ -74,11 +65,35 @@ impl<ReqB: Body + 'static, ResB: From<Incoming>> Service<http::Request<ReqB>> fo
     fn call(&mut self, req: http::Request<ReqB>) -> Self::Future {
         let fut = self.sender.send_request(req);
         Box::pin(async {
-            fut.await.map(|r| {
-                let (parts, incoming) = r.into_parts();
-                let body = incoming.into();
-                http::Response::from_parts(parts, body)
-            })
+            match fut.await {
+                Ok(r) => {
+                    let (parts, incoming) = r.into_parts();
+                    let body = BodyExt::collect(incoming).await.map(|buf| buf.to_bytes())?;
+                    Ok(http::Response::from_parts(parts, body.into()))
+                }
+                Err(e) => Err(e),
+            }
         })
     }
 }
+
+// TODO stream ?
+// impl<ReqB: Body + 'static, ResB: From<Incoming>> Service<http::Request<ReqB>> for HyperClient<ReqB, ResB> {
+//     type Response = http::Response<ResB>;
+//     type Error = hyper::Error;
+//     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
+//
+//     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+//         Poll::Ready(Ok(()))
+//     }
+//
+//     fn call(&mut self, req: http::Request<ReqB>) -> Self::Future {
+//         let fut = self.sender.send_request(req);
+//         Box::pin(async {
+//             fut.await.map(|r| {
+//                 let (parts, incoming) = r.into_parts();
+//                 http::Response::from_parts(parts, incoming.into())
+//             })
+//         })
+//     }
+// }

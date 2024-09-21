@@ -16,7 +16,7 @@ use tower::Service;
 #[derive(Debug)]
 pub enum CaseService<S, ReqB, ResB> {
     Default(Case<S, ReqB, ResB>),
-    Http(Case<HyperClient<ReqB, Incoming>, ReqB, Incoming>),
+    Http(Case<HyperClient<ReqB, Bytes>, ReqB, Bytes>),
 }
 #[derive(Debug)]
 pub enum CaseRequest<ReqB> {
@@ -40,7 +40,7 @@ where
     ReqB: Body + From<BodyStructure> + Send + 'static,
     ReqB::Data: Send + 'static,
     ReqB::Error: std::error::Error + Sync + Send + 'static,
-    ResB: From<Incoming> + Send + Sync + 'static,
+    ResB: From<Bytes> + Send + Sync + 'static,
 {
     pub fn new_http(testcase: Testcase) -> Self {
         Self::new(testcase)
@@ -51,7 +51,7 @@ where
     ReqB: Body + From<BodyStructure> + Send + 'static,
     ReqB::Data: Send + 'static,
     ReqB::Error: std::error::Error + Sync + Send + 'static,
-    ResB: From<Incoming> + Send + 'static,
+    ResB: From<Bytes> + Send + 'static,
     S: Clone + Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + Sync + 'static,
     S::Future: 'static,
     S::Error: Send + 'static,
@@ -139,7 +139,7 @@ impl Worker {
         ReqB: Body + From<BodyStructure> + Send + 'static,
         ReqB::Data: Send + 'static,
         ReqB::Error: std::error::Error + Sync + Send + 'static,
-        ResB: From<Incoming> + Send + 'static,
+        ResB: From<Bytes> + Send + 'static,
         S: Clone + Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + Sync + 'static,
         S::Future: 'static,
         S::Error: Send + 'static,

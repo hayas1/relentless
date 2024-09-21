@@ -15,18 +15,18 @@ pub mod service;
 pub mod worker;
 
 pub type Relentless = Relentless_<
-    HyperClient<UnsyncBoxBody<Bytes, RelentlessError>, Incoming>,
+    HyperClient<UnsyncBoxBody<Bytes, RelentlessError>, Bytes>,
     UnsyncBoxBody<Bytes, RelentlessError>,
-    Incoming,
+    Bytes,
 >;
 
 #[derive(Debug, Clone)]
-pub struct Relentless_<S = HyperClient<Bytes, Incoming>, ReqB = Bytes, ResB = Incoming> {
+pub struct Relentless_<S = HyperClient<Bytes, Bytes>, ReqB = Bytes, ResB = Bytes> {
     configs: Vec<config::Config>,
     clients: Option<HashMap<String, S>>,
     phantom: std::marker::PhantomData<(ReqB, ResB)>,
 }
-impl<ReqB> Relentless_<HyperClient<ReqB, Incoming>, ReqB, Incoming>
+impl<ReqB> Relentless_<HyperClient<ReqB, Bytes>, ReqB, Bytes>
 where
     ReqB: Body + From<BodyStructure> + Send + 'static,
     ReqB::Data: Send + 'static,
@@ -48,7 +48,7 @@ where
     ReqB: Body + From<BodyStructure> + Send + 'static,
     ReqB::Data: Send + 'static,
     ReqB::Error: std::error::Error + Sync + Send + 'static,
-    ResB: From<Incoming> + Send + 'static,
+    ResB: From<Bytes> + Send + 'static,
     S: Clone + Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + Sync + 'static,
     S::Future: 'static,
     S::Error: Send + 'static,
