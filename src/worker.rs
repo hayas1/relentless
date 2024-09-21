@@ -7,7 +7,7 @@ use crate::{
     service::HyperClient,
 };
 use bytes::Bytes;
-use http::Method;
+use http::{Method, Response};
 use http_body_util::Empty;
 use hyper::body::{Body, Incoming};
 use tokio::{runtime::Runtime, task::JoinSet};
@@ -16,7 +16,7 @@ use tower::Service;
 #[derive(Debug)]
 pub enum CaseService<S, ReqB, ResB> {
     Default(Case<S, ReqB, ResB>),
-    Http(Case<HyperClient<ReqB>, ReqB, Incoming>),
+    Http(Case<HyperClient<ReqB, Incoming>, ReqB, Incoming>),
 }
 #[derive(Debug)]
 pub enum CaseRequest<ReqB> {
@@ -35,11 +35,12 @@ pub struct Case<S, ReqB, ResB> {
     // clients: HashMap<String, S>,
     phantom: std::marker::PhantomData<(S, ReqB, ResB)>,
 }
-impl<BReq> Case<HyperClient<BReq>, BReq, Incoming>
+impl<ReqB, ResB> Case<HyperClient<ReqB, ResB>, ReqB, ResB>
 where
-    BReq: Body + From<BodyStructure> + Send + 'static,
-    BReq::Data: Send + 'static,
-    BReq::Error: std::error::Error + Sync + Send + 'static,
+    ReqB: Body + From<BodyStructure> + Send + 'static,
+    ReqB::Data: Send + 'static,
+    ReqB::Error: std::error::Error + Sync + Send + 'static,
+    ResB: From<Incoming> + Send + Sync + 'static,
 {
     pub fn new_http(testcase: Testcase) -> Self {
         Self::new(testcase)
@@ -80,7 +81,7 @@ where
                 }
                 CaseRequest::Http(req) => {
                     let client = clients.get_mut(&name).unwrap(); // TODO
-                    let res = client.call(req).await?;
+                    let res: Response<ResB> = client.call(req).await?;
                     let (part, body) = res.into_parts();
                     let res = http::Response::from_parts(part, body.into());
                     response.push(Ok(CaseResponse::Http(res)))

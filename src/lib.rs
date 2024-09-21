@@ -14,16 +14,19 @@ pub mod outcome;
 pub mod service;
 pub mod worker;
 
-pub type Relentless =
-    Relentless_<HyperClient<UnsyncBoxBody<Bytes, RelentlessError>>, UnsyncBoxBody<Bytes, RelentlessError>, Incoming>;
+pub type Relentless = Relentless_<
+    HyperClient<UnsyncBoxBody<Bytes, RelentlessError>, Incoming>,
+    UnsyncBoxBody<Bytes, RelentlessError>,
+    Incoming,
+>;
 
 #[derive(Debug, Clone)]
-pub struct Relentless_<S = HyperClient<Bytes>, ReqB = Bytes, ResB = Incoming> {
+pub struct Relentless_<S = HyperClient<Bytes, Incoming>, ReqB = Bytes, ResB = Incoming> {
     configs: Vec<config::Config>,
     clients: Option<HashMap<String, S>>,
     phantom: std::marker::PhantomData<(ReqB, ResB)>,
 }
-impl<ReqB> Relentless_<HyperClient<ReqB>, ReqB, Incoming>
+impl<ReqB> Relentless_<HyperClient<ReqB, Incoming>, ReqB, Incoming>
 where
     ReqB: Body + From<BodyStructure> + Send + 'static,
     ReqB::Data: Send + 'static,
