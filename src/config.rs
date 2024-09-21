@@ -173,7 +173,7 @@ impl Config {
         let protocol = &testcase.setting.protocol;
         match (protocol, clients) {
             (&None, None) => Ok(CaseService::Http(Case::new_http(testcase))),
-            (&None, Some(c)) => Ok(CaseService::Default(Case::new(testcase, c))),
+            (&None, Some(c)) => Ok(CaseService::Default(Case::new(testcase))),
             (&Some(Protocol::Http(_)), _) => Ok(CaseService::Http(Case::new_http(testcase))),
         }
     }

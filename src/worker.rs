@@ -32,8 +32,8 @@ pub enum CaseResponse<Res> {
 #[derive(Debug, Clone)]
 pub struct Case<S, Req, Res> {
     testcase: Testcase,
-    clients: HashMap<String, S>,
-    phantom: std::marker::PhantomData<(Req, Res)>,
+    // clients: HashMap<String, S>,
+    phantom: std::marker::PhantomData<(S, Req, Res)>,
 }
 impl<BReq> Case<HyperClient<BReq>, BReq, Incoming>
 where
@@ -42,13 +42,7 @@ where
     BReq::Error: std::error::Error + Sync + Send + 'static,
 {
     pub fn new_http(testcase: Testcase) -> Self {
-        let clients = testcase
-            .setting
-            .origin
-            .iter()
-            .map(|(name, origin)| (name.clone(), Runtime::new().unwrap().block_on(HyperClient::new(origin)).unwrap())) // TODO async
-            .collect();
-        Self::new(testcase, clients)
+        Self::new(testcase)
     }
 }
 impl<S, Req, Res> Case<S, Req, Res>
@@ -62,27 +56,30 @@ where
     S::Error: Send + 'static,
     RelentlessError: From<S::Error>,
 {
-    pub fn new(testcase: Testcase, clients: HashMap<String, S>) -> Self {
+    pub fn new(testcase: Testcase) -> Self {
         let phantom = std::marker::PhantomData;
-        Self { testcase, clients, phantom }
+        Self { testcase, phantom }
     }
 
     pub async fn process(&self, worker_config: &WorkerConfig) -> RelentlessResult<Vec<CaseResponse<Res>>> {
+        let setting = &self.testcase.setting.coalesce(&worker_config.setting);
+        let clients = setting
+            .origin
+            .iter()
+            .map(|(name, origin)| (name.clone(), HyperClient::new(origin))) // TODO async
+            .collect::<HashMap<_, _>>();
         // let mut join_set = JoinSet::<RelentlessResult<CaseResponse<Res>>>::new();
         let mut response = Vec::new();
-        for (name, req) in
-            Self::requests(&self.testcase.target, &self.testcase.setting.coalesce(&worker_config.setting))?
-        {
+        for (name, req) in Self::requests(&self.testcase.target, setting)? {
             // for _ in 0..self.testcase.attr.repeat.unwrap_or(1) {
             let r = req; //.clone(); //.ok_or(CaseError::FailCloneRequest)?;
-            let clients = self.clients.clone();
-            // join_set.spawn(async move {
+                         // join_set.spawn(async move {
             match r {
                 CaseRequest::Default(r) => {
                     todo!()
                 }
                 CaseRequest::Http(req) => {
-                    let mut client = clients[&name].clone(); // TODO
+                    let mut client = clients[&name].await?; // TODO
                     let res = client.call(req).await?;
                     response.push(Ok(CaseResponse::Http(res)))
                 }
