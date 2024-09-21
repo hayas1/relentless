@@ -19,7 +19,7 @@ pub struct Relentless<S = reqwest::Client, Req = reqwest::Request, Res = reqwest
 }
 impl<BReq> Relentless<HyperClient<BReq>, BReq, Incoming>
 where
-    BReq: Clone + Body + Send + Sync + 'static,
+    BReq: Clone + Body + Send + 'static,
     BReq::Data: Send + 'static,
     BReq::Error: std::error::Error + Sync + Send + 'static,
 {
@@ -36,10 +36,10 @@ where
 }
 impl<S, Req, Res> Relentless<S, Req, Res>
 where
-    Req: Body + Send + Sync + 'static,
+    Req: Body + Send + 'static,
     Req::Data: Send + 'static,
     Req::Error: std::error::Error + Sync + Send + 'static,
-    Res: Send + Sync + 'static,
+    Res: Send + 'static,
     S: Clone + Service<http::Request<Req>, Response = http::Response<Res>> + Send + Sync + 'static,
     S::Future: 'static,
     S::Error: Send + 'static,

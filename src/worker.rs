@@ -36,7 +36,7 @@ pub struct Case<S, Req, Res> {
 }
 impl<BReq> Case<HyperClient<BReq>, BReq, Incoming>
 where
-    BReq: Body + Send + Sync + 'static,
+    BReq: Body + Send + 'static,
     BReq::Data: Send + 'static,
     BReq::Error: std::error::Error + Sync + Send + 'static,
 {
@@ -52,10 +52,10 @@ where
 }
 impl<S, Req, Res> Case<S, Req, Res>
 where
-    Req: Body + Send + Sync + 'static,
+    Req: Body + Send + 'static,
     Req::Data: Send + 'static,
     Req::Error: std::error::Error + Sync + Send + 'static,
-    Res: Send + Sync + 'static,
+    Res: Send + 'static,
     S: Clone + Service<http::Request<Req>, Response = http::Response<Res>> + Send + Sync + 'static,
     S::Future: 'static,
     S::Error: Send + 'static,
@@ -136,10 +136,10 @@ impl Worker {
 
     pub async fn assault<S, Req, Res>(self, cases: Vec<CaseService<S, Req, Res>>) -> RelentlessResult<WorkerOutcome>
     where
-        Req: Body + Send + Sync + 'static,
+        Req: Body + Send + 'static,
         Req::Data: Send + 'static,
         Req::Error: std::error::Error + Sync + Send + 'static,
-        Res: Send + Sync + 'static,
+        Res: Send + 'static,
         S: Clone + Service<http::Request<Req>, Response = http::Response<Res>> + Send + Sync + 'static,
         S::Future: 'static,
         S::Error: Send + 'static,
