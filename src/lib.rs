@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 
+use bytes::Bytes;
 use error::RelentlessError;
+use http_body_util::combinators::UnsyncBoxBody;
 use hyper::body::{Body, Incoming};
 use service::HyperClient;
 use tower::Service;
@@ -11,15 +13,18 @@ pub mod outcome;
 pub mod service;
 pub mod worker;
 
+pub type Relentless =
+    Relentless_<HyperClient<UnsyncBoxBody<Bytes, RelentlessError>>, UnsyncBoxBody<Bytes, RelentlessError>, Incoming>;
+
 #[derive(Debug, Clone)]
-pub struct Relentless<S = reqwest::Client, Req = reqwest::Request, Res = reqwest::Response> {
+pub struct Relentless_<S = HyperClient<Bytes>, Req = Bytes, Res = Incoming> {
     configs: Vec<config::Config>,
     clients: Option<HashMap<String, S>>,
     phantom: std::marker::PhantomData<(Req, Res)>,
 }
-impl<BReq> Relentless<HyperClient<BReq>, BReq, Incoming>
+impl<BReq> Relentless_<HyperClient<BReq>, BReq, Incoming>
 where
-    BReq: Clone + Body + Send + 'static,
+    BReq: Body + Send + 'static,
     BReq::Data: Send + 'static,
     BReq::Error: std::error::Error + Sync + Send + 'static,
 {
@@ -34,7 +39,7 @@ where
         Ok(Self::new(configs, None))
     }
 }
-impl<S, Req, Res> Relentless<S, Req, Res>
+impl<S, Req, Res> Relentless_<S, Req, Res>
 where
     Req: Body + Send + 'static,
     Req::Data: Send + 'static,

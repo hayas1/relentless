@@ -11,7 +11,6 @@ pub enum RelentlessError {
 
     HyperError(#[from] hyper::Error),
     HttpInvalidUri(#[from] http::uri::InvalidUri),
-    ReqwestError(#[from] reqwest::Error),
     TokioTaskJoinError(#[from] tokio::task::JoinError),
     StdIoError(#[from] std::io::Error),
     Infallible(#[from] std::convert::Infallible),
@@ -41,9 +40,6 @@ pub enum FormatError {
 
 #[derive(Error, Debug)]
 pub enum HttpError {
-    #[error(transparent)]
-    ReqwestError(#[from] reqwest::Error),
-
     #[error(transparent)]
     InvalidMethod(#[from] http::method::InvalidMethod),
 
