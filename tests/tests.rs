@@ -5,7 +5,7 @@ use axum::{
 use http_body_util::Empty;
 use hyper::body::Incoming;
 use relentless::{
-    config::{Config, Testcase},
+    config::{BodyStructure, Config, Testcase},
     Relentless_,
 };
 use serde::de::DeserializeOwned;

@@ -1,8 +1,9 @@
 use std::collections::HashMap;
 
 use bytes::Bytes;
+use config::BodyStructure;
 use error::RelentlessError;
-use http_body_util::combinators::UnsyncBoxBody;
+use http_body_util::{combinators::UnsyncBoxBody, Empty};
 use hyper::body::{Body, Incoming};
 use service::HyperClient;
 use tower::Service;
@@ -24,7 +25,7 @@ pub struct Relentless_<S = HyperClient<Bytes>, Req = Bytes, Res = Incoming> {
 }
 impl<BReq> Relentless_<HyperClient<BReq>, BReq, Incoming>
 where
-    BReq: Body + Send + 'static,
+    BReq: Body + From<BodyStructure> + Send + 'static,
     BReq::Data: Send + 'static,
     BReq::Error: std::error::Error + Sync + Send + 'static,
 {
@@ -41,7 +42,7 @@ where
 }
 impl<S, Req, Res> Relentless_<S, Req, Res>
 where
-    Req: Body + Send + 'static,
+    Req: Body + From<BodyStructure> + Send + 'static,
     Req::Data: Send + 'static,
     Req::Error: std::error::Error + Sync + Send + 'static,
     Res: Send + 'static,

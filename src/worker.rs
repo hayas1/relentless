@@ -1,11 +1,12 @@
 use std::{collections::HashMap, time::Duration};
 
 use crate::{
-    config::{Protocol, Setting, Testcase, WorkerConfig},
+    config::{BodyStructure, Protocol, Setting, Testcase, WorkerConfig},
     error::{HttpError, RelentlessError, RelentlessResult},
     outcome::{CaseOutcome, Compare, Evaluator, Status, WorkerOutcome},
     service::HyperClient,
 };
+use bytes::Bytes;
 use http::Method;
 use http_body_util::Empty;
 use hyper::body::{Body, Incoming};
@@ -36,7 +37,7 @@ pub struct Case<S, Req, Res> {
 }
 impl<BReq> Case<HyperClient<BReq>, BReq, Incoming>
 where
-    BReq: Body + Send + 'static,
+    BReq: Body + From<BodyStructure> + Send + 'static,
     BReq::Data: Send + 'static,
     BReq::Error: std::error::Error + Sync + Send + 'static,
 {
@@ -52,7 +53,7 @@ where
 }
 impl<S, Req, Res> Case<S, Req, Res>
 where
-    Req: Body + Send + 'static,
+    Req: Body + From<BodyStructure> + Send + 'static,
     Req::Data: Send + 'static,
     Req::Error: std::error::Error + Sync + Send + 'static,
     Res: Send + 'static,
@@ -113,13 +114,12 @@ where
                     .path_and_query(target)
                     .build()
                     .unwrap();
-                todo!();
-                // let request = http::Request::builder()
-                //     .uri(uri)
-                //     .method(method.unwrap_or(Method::GET))
-                //     .body(body.unwrap())
-                //     .unwrap();
-                // Ok::<_, HttpError>((name.clone(), CaseRequest::Http(request)))
+                let request = http::Request::builder()
+                    .uri(uri)
+                    .method(method.unwrap_or(Method::GET))
+                    .body(Req::from(body.unwrap_or_default()))
+                    .unwrap();
+                Ok::<_, HttpError>((name.clone(), CaseRequest::Http(request)))
             })
             .collect::<Result<HashMap<_, _>, _>>()?)
     }
@@ -136,7 +136,7 @@ impl Worker {
 
     pub async fn assault<S, Req, Res>(self, cases: Vec<CaseService<S, Req, Res>>) -> RelentlessResult<WorkerOutcome>
     where
-        Req: Body + Send + 'static,
+        Req: Body + From<BodyStructure> + Send + 'static,
         Req::Data: Send + 'static,
         Req::Error: std::error::Error + Sync + Send + 'static,
         Res: Send + 'static,

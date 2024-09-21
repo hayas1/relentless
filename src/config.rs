@@ -5,7 +5,9 @@ use std::{
     time::Duration,
 };
 
+use bytes::Bytes;
 use http::{HeaderMap, Method};
+use http_body_util::{combinators::UnsyncBoxBody, Empty};
 use hyper::body::Body;
 use serde::{Deserialize, Serialize};
 use tower::Service;
@@ -55,7 +57,42 @@ pub struct Http {
     #[serde(default, with = "http_serde::option::header_map")]
     pub header: Option<HeaderMap>,
     #[serde(default)]
-    pub body: Option<String>,
+    pub body: Option<BodyStructure>,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub enum BodyStructure {
+    Empty,
+}
+impl Default for BodyStructure {
+    fn default() -> Self {
+        Self::Empty
+    }
+}
+impl<T> From<BodyStructure> for Empty<T>
+where
+    T: Body,
+{
+    fn from(body: BodyStructure) -> Self {
+        match body {
+            BodyStructure::Empty => Empty::new(),
+        }
+    }
+}
+impl<E> From<BodyStructure> for UnsyncBoxBody<Bytes, E> {
+    fn from(body: BodyStructure) -> Self {
+        match body {
+            BodyStructure::Empty => Default::default(),
+        }
+    }
+}
+// TODO!!!
+impl From<BodyStructure> for axum::body::Body {
+    fn from(val: BodyStructure) -> Self {
+        match val {
+            BodyStructure::Empty => axum::body::Body::empty(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -96,7 +133,7 @@ impl Config {
         clients: Option<HashMap<String, S>>,
     ) -> RelentlessResult<(Worker, Vec<CaseService<S, Req, Res>>)>
     where
-        Req: Body + Send + 'static,
+        Req: Body + From<BodyStructure> + Send + 'static,
         Req::Data: Send + 'static,
         Req::Error: std::error::Error + Sync + Send + 'static,
         Res: Send + 'static,
@@ -122,7 +159,7 @@ impl Config {
         clients: Option<HashMap<String, S>>,
     ) -> RelentlessResult<CaseService<S, Req, Res>>
     where
-        Req: Body + Send + 'static,
+        Req: Body + From<BodyStructure> + Send + 'static,
         Req::Data: Send + 'static,
         Req::Error: std::error::Error + Sync + Send + 'static,
         Res: Send + 'static,
