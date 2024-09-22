@@ -1,4 +1,3 @@
-use bytes::Bytes;
 use http_body::Body;
 
 use crate::{

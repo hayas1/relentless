@@ -26,7 +26,7 @@ where
     ReqB: Body + FromBodyStructure + Send + 'static,
     ReqB::Data: Send + 'static,
     ReqB::Error: std::error::Error + Sync + Send + 'static,
-    ResB: Body + From<Bytes> + Send + 'static,
+    ResB: Body + From<Bytes> + Sync + Send + 'static,
     ResB::Data: Send + 'static,
     ResB::Error: std::error::Error + Sync + Send + 'static,
 {

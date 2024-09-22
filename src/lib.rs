@@ -11,9 +11,12 @@ pub mod service;
 pub mod worker;
 
 pub type Relentless = Relentless_<
-    service::DefaultHttpClient<http_body_util::combinators::UnsyncBoxBody<Bytes, RelentlessError>, Bytes>,
+    service::DefaultHttpClient<
+        http_body_util::combinators::UnsyncBoxBody<Bytes, RelentlessError>,
+        http_body_util::combinators::BoxBody<Bytes, RelentlessError>,
+    >,
     http_body_util::combinators::UnsyncBoxBody<Bytes, RelentlessError>,
-    Bytes,
+    http_body_util::combinators::BoxBody<Bytes, RelentlessError>,
 >;
 
 #[derive(Debug, Clone)]
@@ -33,7 +36,7 @@ where
     ReqB: Body + FromBodyStructure + Send + 'static,
     ReqB::Data: Send + 'static,
     ReqB::Error: std::error::Error + Sync + Send + 'static,
-    ResB: Body + From<Bytes> + Send + 'static,
+    ResB: Body + From<Bytes> + Sync + Send + 'static,
     ResB::Data: Send + 'static,
     ResB::Error: std::error::Error + Sync + Send + 'static,
 {
