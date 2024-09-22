@@ -73,7 +73,7 @@ where
         let mut outcomes = Vec::new();
         // TODO async
         for (config, worker) in configs.into_iter().zip(workers.into_iter()) {
-            let cases = config.instance()?;
+            let cases = config.testcase.into_iter().map(worker::Case::new).collect::<Vec<_>>();
             outcomes.push(worker.assault(cases).await?);
         }
         Ok(Outcome::new(outcomes))

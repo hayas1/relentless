@@ -50,61 +50,22 @@ where
         Ok(Self { config, clients, phantom })
     }
 
-    pub async fn assault(self, cases: Vec<CaseService<S, ReqB, ResB>>) -> RelentlessResult<WorkerOutcome> {
+    pub async fn assault(self, cases: Vec<Case<S, ReqB, ResB>>) -> RelentlessResult<WorkerOutcome> {
         let mut outcome = Vec::new();
-        for c in cases {
-            match c {
-                CaseService::Default(case) => {
-                    let mut clients = self.clients.clone();
-                    let res = case.process(&mut clients, &self.config).await?;
-                    let pass =
-                        if res.len() == 1 { Status::evaluate(res).await? } else { Compare::evaluate(res).await? };
-                    outcome.push(CaseOutcome::new(case.testcase, pass));
-                }
-                CaseService::Http(case) => {
-                    todo!()
-                    // let res = case.process(&mut self.clients, &self.config).await?;
-                    // let pass =
-                    //     if res.len() == 1 { Status::evaluate(res).await? } else { Compare::evaluate(res).await? };
-                    // outcome.push(CaseOutcome::new(case.testcase, pass));
-                }
-            };
+        for case in cases {
+            let mut clients = self.clients.clone();
+            let res = case.process(&mut clients, &self.config).await?;
+            let pass = if res.len() == 1 { Status::evaluate(res).await? } else { Compare::evaluate(res).await? };
+            outcome.push(CaseOutcome::new(case.testcase, pass));
         }
         Ok(WorkerOutcome::new(self.config.clone(), outcome))
     }
-}
-
-#[derive(Debug)]
-pub enum CaseService<S, ReqB, ResB> {
-    Default(Case<S, ReqB, ResB>),
-    Http(Case<HyperClient<ReqB, Bytes>, ReqB, Bytes>),
-}
-#[derive(Debug)]
-pub enum CaseRequest<ReqB> {
-    Default(ReqB),
-    Http(http::Request<ReqB>),
-}
-#[derive(Debug)]
-pub enum CaseResponse<ResB> {
-    Default(ResB),
-    Http(http::Response<ResB>),
 }
 
 #[derive(Debug, Clone)]
 pub struct Case<S, ReqB, ResB> {
     testcase: Testcase,
     phantom: std::marker::PhantomData<(S, ReqB, ResB)>,
-}
-impl<ReqB, ResB> Case<HyperClient<ReqB, ResB>, ReqB, ResB>
-where
-    ReqB: Body + FromBodyStructure + Send + 'static,
-    ReqB::Data: Send + 'static,
-    ReqB::Error: std::error::Error + Sync + Send + 'static,
-    ResB: From<Bytes> + Send + Sync + 'static,
-{
-    pub fn new_http(testcase: Testcase) -> Self {
-        Self::new(testcase)
-    }
 }
 impl<S, ReqB, ResB> Case<S, ReqB, ResB>
 where
@@ -124,28 +85,20 @@ where
         &self,
         clients: &mut HashMap<String, S>,
         worker_config: &WorkerConfig,
-    ) -> RelentlessResult<Vec<CaseResponse<ResB>>> {
+    ) -> RelentlessResult<Vec<http::Response<ResB>>> {
         let setting = &self.testcase.setting.coalesce(&worker_config.setting);
         let mut requests = Vec::new();
         for (name, req) in Self::requests(&worker_config.origins, &self.testcase.target, setting)? {
-            let r = req;
-            match r {
-                CaseRequest::Default(r) => {
-                    todo!()
-                }
-                CaseRequest::Http(req) => {
-                    let client = clients.get_mut(&name).unwrap(); // TODO
-                    let fut = client.call(req);
-                    requests.push(fut)
-                }
-            }
+            let client = clients.get_mut(&name).unwrap(); // TODO
+            let fut = client.call(req);
+            requests.push(fut)
         }
 
         let mut responses = Vec::new();
         for fut in requests {
             let res = fut.await?;
             let (part, body) = res.into_parts();
-            responses.push(CaseResponse::Http(http::Response::from_parts(part, body)));
+            responses.push(http::Response::from_parts(part, body));
         }
         Ok(responses)
     }
@@ -154,7 +107,7 @@ where
         origins: &HashMap<String, String>,
         target: &str,
         setting: &Setting,
-    ) -> RelentlessResult<HashMap<String, CaseRequest<ReqB>>> {
+    ) -> RelentlessResult<HashMap<String, http::Request<ReqB>>> {
         let Setting { protocol, template, timeout } = setting;
         Ok(origins
             .iter()
@@ -174,7 +127,7 @@ where
                     .method(method.unwrap_or(Method::GET))
                     .body(ReqB::from_body_structure(body.unwrap_or_default()))
                     .unwrap();
-                Ok::<_, HttpError>((name.clone(), CaseRequest::Http(request)))
+                Ok::<_, HttpError>((name.clone(), request))
             })
             .collect::<Result<HashMap<_, _>, _>>()?)
     }

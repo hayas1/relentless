@@ -14,7 +14,7 @@ use tower::Service;
 
 use crate::{
     error::{FormatError, RelentlessError, RelentlessResult},
-    worker::{Case, CaseService, Worker},
+    worker::{Case, Worker},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -114,59 +114,6 @@ impl Config {
         // TODO logging read files
         // TODO filter by format
         std::fs::read_dir(path)?.map(|f| Self::read(f?.path())).filter(Result::is_ok).collect::<Result<Vec<_>, _>>()
-    }
-
-    pub fn instance<S, ReqB, ResB>(
-        self,
-        // clients: Option<HashMap<String, S>>,
-    ) -> RelentlessResult<Vec<CaseService<S, ReqB, ResB>>>
-    where
-        ReqB: Body + FromBodyStructure + Send + 'static,
-        ReqB::Data: Send + 'static,
-        ReqB::Error: std::error::Error + Sync + Send + 'static,
-        ResB: From<Bytes> + Send + 'static,
-        S: Clone + Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + Sync + 'static,
-        RelentlessError: From<S::Error>,
-    {
-        let Self { worker_config, testcase } = self;
-
-        // let worker = Self::worker(worker_config, clients)?;
-        let cases = testcase.into_iter().map(Self::case).collect::<Result<Vec<_>, _>>()?;
-        Ok(cases)
-    }
-
-    // pub fn worker<S, ReqB, ResB>(
-    //     config: WorkerConfig,
-    //     clients: Option<HashMap<String, S>>,
-    // ) -> RelentlessResult<Worker<S, ReqB, ResB>>
-    // where
-    //     ReqB: Body + FromBodyStructure + Send + 'static,
-    //     ReqB::Data: Send + 'static,
-    //     ReqB::Error: std::error::Error + Sync + Send + 'static,
-    //     ResB: From<Bytes> + Send + 'static,
-    //     S: Clone + Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + Sync + 'static,
-    //     RelentlessError: From<S::Error>,
-    // {
-    //     // TODO layer
-    //     Worker::new(config, clients)
-    // }
-
-    pub fn case<S, ReqB, ResB>(testcase: Testcase) -> RelentlessResult<CaseService<S, ReqB, ResB>>
-    where
-        ReqB: Body + FromBodyStructure + Send + 'static,
-        ReqB::Data: Send + 'static,
-        ReqB::Error: std::error::Error + Sync + Send + 'static,
-        ResB: From<Bytes> + Send + 'static,
-        S: Clone + Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + Sync + 'static,
-        RelentlessError: From<S::Error>,
-    {
-        // TODO layer
-        // TODO!!! coalesce protocol
-        let protocol = &testcase.setting.protocol;
-        match protocol {
-            None => Ok(CaseService::Http(Case::new_http(testcase))),
-            Some(Protocol::Http(_)) => Ok(CaseService::Http(Case::new_http(testcase))),
-        }
     }
 }
 impl Setting {
