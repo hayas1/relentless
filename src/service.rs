@@ -41,16 +41,6 @@ where
         Ok(Self { sender, phantom })
     }
 }
-impl<ReqB: Body + Send + 'static, ResB> Clone for HyperClient<ReqB, ResB>
-where
-    ReqB::Data: Send + 'static,
-    ReqB::Error: std::error::Error + Sync + Send + 'static,
-{
-    fn clone(&self) -> Self {
-        // TODO
-        todo!();
-    }
-}
 
 impl<ReqB: Body + 'static, ResB: From<Bytes>> Service<http::Request<ReqB>> for HyperClient<ReqB, ResB> {
     type Response = http::Response<ResB>;

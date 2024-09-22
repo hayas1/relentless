@@ -59,7 +59,7 @@ where
     ReqB::Data: Send + 'static,
     ReqB::Error: std::error::Error + Sync + Send + 'static,
     ResB: From<Bytes> + Send + 'static,
-    S: Clone + Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + Sync + 'static,
+    S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + Sync + 'static,
     RelentlessError: From<S::Error>,
 {
     /// TODO document
