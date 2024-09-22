@@ -63,12 +63,12 @@ where
     pub async fn process(&self, worker_config: &WorkerConfig) -> RelentlessResult<Vec<CaseResponse<ResB>>> {
         let setting = &self.testcase.setting.coalesce(&worker_config.setting);
         let mut clients = HashMap::new();
-        for (name, origin) in &setting.origin {
+        for (name, origin) in &worker_config.origins {
             let host = origin.parse::<http::Uri>()?.authority().unwrap().as_str().to_string(); // TODO
             clients.insert(name.clone(), HyperClient::<ReqB, ResB>::new(host).await?);
         }
         let mut requests = Vec::new();
-        for (name, req) in Self::requests(&self.testcase.target, setting)? {
+        for (name, req) in Self::requests(&worker_config.origins, &self.testcase.target, setting)? {
             let r = req;
             match r {
                 CaseRequest::Default(r) => {
@@ -91,9 +91,13 @@ where
         Ok(responses)
     }
 
-    pub fn requests(target: &str, setting: &Setting) -> RelentlessResult<HashMap<String, CaseRequest<ReqB>>> {
-        let Setting { protocol, origin, template, timeout } = setting;
-        Ok(origin
+    pub fn requests(
+        origins: &HashMap<String, String>,
+        target: &str,
+        setting: &Setting,
+    ) -> RelentlessResult<HashMap<String, CaseRequest<ReqB>>> {
+        let Setting { protocol, template, timeout } = setting;
+        Ok(origins
             .iter()
             .map(|(name, origin)| {
                 let (method, headers, body) = match protocol.clone() {

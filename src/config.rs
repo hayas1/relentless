@@ -30,6 +30,8 @@ pub struct Config {
 pub struct WorkerConfig {
     pub name: Option<String>,
     #[serde(default)]
+    pub origins: HashMap<String, String>,
+    #[serde(default)]
     pub setting: Setting,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -37,8 +39,6 @@ pub struct WorkerConfig {
 pub struct Setting {
     #[serde(flatten)]
     pub protocol: Option<Protocol>,
-    #[serde(default)]
-    pub origin: HashMap<String, String>,
     #[serde(default)]
     pub template: HashMap<String, HashMap<String, String>>,
     #[serde(default)]
@@ -166,7 +166,6 @@ impl Setting {
     pub fn coalesce(&self, other: &Self) -> Self {
         Self {
             protocol: self.protocol.clone().or(other.protocol.clone()),
-            origin: if self.origin.is_empty() { other.origin.clone() } else { self.origin.clone() },
             template: if self.template.is_empty() { other.template.clone() } else { self.template.clone() },
             timeout: self.timeout.or(other.timeout),
         }

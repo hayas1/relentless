@@ -1,8 +1,8 @@
 name: example yaml of basic compare test
+origins:
+  actual: http://localhost:3000
+  expect: http://localhost:3000
 setting:
-  origin:
-    actual: http://localhost:3000
-    expect: http://localhost:3000
   template:
     version:
       actual: v1
