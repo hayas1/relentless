@@ -9,6 +9,7 @@ use crate::{
 use hyper::body::Body;
 use tower::Service;
 
+/// TODO document
 #[derive(Debug, Clone)]
 pub struct Control<S = DefaultHttpClient<BytesBody, BytesBody>, ReqB = BytesBody, ResB = BytesBody> {
     configs: Vec<Config>,                // TODO remove this ?
@@ -75,6 +76,7 @@ where
     }
 }
 
+/// TODO document
 #[derive(Debug, Clone)]
 pub struct Worker<S, ReqB, ResB> {
     config: WorkerConfig,
@@ -130,6 +132,7 @@ where
     }
 }
 
+/// TODO document
 #[derive(Debug, Clone)]
 pub struct Case<S, ReqB, ResB> {
     testcase: Testcase,

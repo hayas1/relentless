@@ -36,6 +36,7 @@ impl<ResB> Evaluator<http::Response<ResB>> for Status {
     }
 }
 
+/// TODO document
 #[derive(Debug, Clone)]
 pub struct Outcome {
     outcome: Vec<WorkerOutcome>,
@@ -53,6 +54,7 @@ impl Outcome {
     }
 }
 
+/// TODO document
 #[derive(Debug, Clone)]
 pub struct WorkerOutcome {
     config: WorkerConfig,
@@ -70,6 +72,7 @@ impl WorkerOutcome {
     }
 }
 
+/// TODO document
 #[derive(Debug, Clone)]
 pub struct CaseOutcome {
     testcase: Testcase,
