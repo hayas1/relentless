@@ -1,16 +1,13 @@
-use std::{collections::HashMap, time::Duration};
+use std::collections::HashMap;
 
 use crate::{
-    config::{BodyStructure, FromBodyStructure, Protocol, Setting, Testcase, WorkerConfig},
+    config::{FromBodyStructure, Protocol, Setting, Testcase, WorkerConfig},
     error::{HttpError, RelentlessError, RelentlessResult},
     outcome::{CaseOutcome, Compare, Evaluator, Status, WorkerOutcome},
     service::DefaultHttpClient,
 };
 use bytes::Bytes;
-use http::{Method, Response};
-use http_body_util::Empty;
-use hyper::body::{Body, Incoming};
-use tokio::{runtime::Runtime, task::JoinSet};
+use hyper::body::Body;
 use tower::Service;
 
 #[derive(Debug, Clone)]
@@ -130,7 +127,7 @@ where
                 let uri = http::uri::Builder::from(origin).path_and_query(target).build().unwrap();
                 let mut request = http::Request::builder()
                     .uri(uri)
-                    .method(method.unwrap_or(Method::GET))
+                    .method(method.unwrap_or(http::Method::GET))
                     .body(ReqB::from_body_structure(body.unwrap_or_default()))
                     .unwrap();
                 *request.headers_mut() = headers.unwrap_or_default();

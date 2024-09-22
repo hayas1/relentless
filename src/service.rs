@@ -6,15 +6,9 @@ use std::{
 
 use bytes::Bytes;
 use http_body_util::BodyExt;
-use hyper::{
-    body::{Body, Incoming},
-    client::conn::http1,
-};
+use hyper::{body::Body, client::conn::http1};
 use hyper_util::rt::TokioIo;
-use tokio::{
-    net::{TcpStream, ToSocketAddrs},
-    runtime::Runtime,
-};
+use tokio::net::{TcpStream, ToSocketAddrs};
 use tower::Service;
 
 use crate::error::RelentlessResult;

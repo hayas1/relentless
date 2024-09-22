@@ -1,21 +1,7 @@
-use axum::{
-    body::{to_bytes, Body, Bytes, HttpBody},
-    http::{HeaderMap, Request, StatusCode},
-};
-use http_body_util::Empty;
-use hyper::body::Incoming;
-use relentless::{
-    config::{BodyStructure, Config, Testcase},
-    worker::Worker,
-    Relentless_,
-};
-use serde::de::DeserializeOwned;
-use tower::ServiceExt;
+use axum::body::Body;
+use relentless::{config::Config, worker::Worker, Relentless_};
 
-use example_http_server::{
-    route::{self, health::Health},
-    state::AppState,
-};
+use example_http_server::{route, state::AppState};
 
 #[tokio::test]
 async fn test_example_assault() {

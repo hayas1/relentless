@@ -1,11 +1,7 @@
-use std::collections::HashMap;
-
 use bytes::Bytes;
-use config::{BodyStructure, FromBodyStructure};
+use config::FromBodyStructure;
 use error::RelentlessError;
-use http_body_util::{combinators::UnsyncBoxBody, Empty};
-use hyper::body::{Body, Incoming};
-use service::DefaultHttpClient;
+use hyper::body::Body;
 use tower::Service;
 
 pub mod config;
@@ -15,19 +11,19 @@ pub mod service;
 pub mod worker;
 
 pub type Relentless = Relentless_<
-    DefaultHttpClient<UnsyncBoxBody<Bytes, RelentlessError>, Bytes>,
-    UnsyncBoxBody<Bytes, RelentlessError>,
+    service::DefaultHttpClient<http_body_util::combinators::UnsyncBoxBody<Bytes, RelentlessError>, Bytes>,
+    http_body_util::combinators::UnsyncBoxBody<Bytes, RelentlessError>,
     Bytes,
 >;
 
 #[derive(Debug, Clone)]
-pub struct Relentless_<S = DefaultHttpClient<Bytes, Bytes>, ReqB = Bytes, ResB = Bytes> {
+pub struct Relentless_<S = service::DefaultHttpClient<Bytes, Bytes>, ReqB = Bytes, ResB = Bytes> {
     configs: Vec<config::Config>,
     workers: Vec<worker::Worker<S, ReqB, ResB>>, // TODO all worker do not have same clients type ?
     cases: Vec<Vec<worker::Case<S, ReqB, ResB>>>,
     phantom: std::marker::PhantomData<(ReqB, ResB)>,
 }
-impl<ReqB> Relentless_<DefaultHttpClient<ReqB, Bytes>, ReqB, Bytes>
+impl<ReqB> Relentless_<service::DefaultHttpClient<ReqB, Bytes>, ReqB, Bytes>
 where
     ReqB: Body + FromBodyStructure + Send + 'static,
     ReqB::Data: Send + 'static,

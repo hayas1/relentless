@@ -5,17 +5,11 @@ use std::{
     time::Duration,
 };
 
-use bytes::Bytes;
 use http::{HeaderMap, Method};
-use http_body_util::{combinators::UnsyncBoxBody, Empty};
-use hyper::body::{Body, Incoming};
+use hyper::body::Body;
 use serde::{Deserialize, Serialize};
-use tower::Service;
 
-use crate::{
-    error::{FormatError, RelentlessError, RelentlessResult},
-    worker::{Case, Worker},
-};
+use crate::error::{FormatError, RelentlessResult};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
