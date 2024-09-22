@@ -36,7 +36,9 @@ where
     }
 }
 
-impl<ReqB: Body + 'static, ResB: From<Bytes>> Service<http::Request<ReqB>> for DefaultHttpClient<ReqB, ResB> {
+impl<ReqB: Body + 'static, ResB: From<Bytes> + Body + 'static> Service<http::Request<ReqB>>
+    for DefaultHttpClient<ReqB, ResB>
+{
     type Response = http::Response<ResB>;
     type Error = hyper::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
