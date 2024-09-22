@@ -1,13 +1,79 @@
 use std::collections::HashMap;
 
 use crate::{
-    config::{Protocol, Setting, Testcase, WorkerConfig},
+    config::{Config, Protocol, Setting, Testcase, WorkerConfig},
     error::{HttpError, RelentlessError, RelentlessResult},
-    outcome::{CaseOutcome, Compare, Evaluator, Status, WorkerOutcome},
+    outcome::{CaseOutcome, Compare, Evaluator, Outcome, Status, WorkerOutcome},
     service::{BytesBody, DefaultHttpClient, FromBodyStructure},
 };
 use hyper::body::Body;
 use tower::Service;
+
+#[derive(Debug, Clone)]
+pub struct Control<S = DefaultHttpClient<BytesBody, BytesBody>, ReqB = BytesBody, ResB = BytesBody> {
+    configs: Vec<Config>,                // TODO remove this ?
+    workers: Vec<Worker<S, ReqB, ResB>>, // TODO all worker do not have same clients type ?
+    cases: Vec<Vec<Case<S, ReqB, ResB>>>,
+    phantom: std::marker::PhantomData<(ReqB, ResB)>,
+}
+impl<S, ReqB, ResB> Control<S, ReqB, ResB> {
+    pub fn configs(&self) -> &Vec<Config> {
+        &self.configs
+    }
+}
+impl<ReqB> Control<DefaultHttpClient<ReqB, BytesBody>, ReqB, BytesBody>
+where
+    ReqB: Body + FromBodyStructure + Send + 'static,
+    ReqB::Data: Send + 'static,
+    ReqB::Error: std::error::Error + Sync + Send + 'static,
+{
+    /// TODO document
+    pub async fn with_default_http_client(configs: Vec<Config>) -> RelentlessResult<Self> {
+        let mut workers = Vec::new();
+        for config in &configs {
+            workers.push(Worker::with_default_http_client(config.worker_config.clone()).await?);
+        }
+        Ok(Self::new(configs, workers))
+    }
+    /// TODO document
+    pub async fn read_paths<I: IntoIterator<Item = P>, P: AsRef<std::path::Path>>(paths: I) -> RelentlessResult<Self> {
+        let configs = paths.into_iter().map(Config::read).collect::<RelentlessResult<Vec<_>>>()?;
+        Self::with_default_http_client(configs).await
+    }
+    /// TODO document
+    pub async fn read_dir<P: AsRef<std::path::Path>>(path: P) -> RelentlessResult<Self> {
+        let configs = Config::read_dir(path)?;
+        Self::with_default_http_client(configs).await
+    }
+}
+impl<S, ReqB, ResB> Control<S, ReqB, ResB>
+where
+    ReqB: Body + FromBodyStructure + Send + 'static,
+    ReqB::Data: Send + 'static,
+    ReqB::Error: std::error::Error + Sync + Send + 'static,
+    ResB: Body + Send + 'static,
+    ResB::Data: Send + 'static,
+    ResB::Error: std::error::Error + Sync + Send + 'static,
+    S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + Sync + 'static,
+    RelentlessError: From<S::Error>,
+{
+    /// TODO document
+    pub fn new(configs: Vec<Config>, workers: Vec<Worker<S, ReqB, ResB>>) -> Self {
+        let cases = configs.iter().map(|c| c.testcase.clone().into_iter().map(Case::new).collect()).collect();
+        let phantom = std::marker::PhantomData;
+        Self { configs, workers, cases, phantom }
+    }
+    /// TODO document
+    pub async fn assault(self) -> RelentlessResult<Outcome> {
+        let Self { workers, cases, .. } = self;
+        let mut outcomes = Vec::new();
+        // TODO async
+        for (worker, cases) in workers.into_iter().zip(cases.into_iter()) {
+            outcomes.push(worker.assault(cases).await?);
+        }
+        Ok(Outcome::new(outcomes))
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct Worker<S, ReqB, ResB> {

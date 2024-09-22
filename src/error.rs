@@ -40,9 +40,11 @@ pub enum FormatError {
 
 #[derive(Error, Debug)]
 pub enum HttpError {
+    #[error("cannot convert body")]
+    CannotConvertBody,
+
     #[error(transparent)]
     InvalidMethod(#[from] http::method::InvalidMethod),
-
     #[error(transparent)]
     InvalidUrl(#[from] url::ParseError),
 }
