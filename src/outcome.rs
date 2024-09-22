@@ -1,3 +1,5 @@
+use bytes::Bytes;
+
 use crate::{
     config::{Testcase, WorkerConfig},
     error::RelentlessError,
@@ -9,13 +11,14 @@ pub trait Evaluator<Res> {
     async fn evaluate<I: IntoIterator<Item = Res>>(iter: I) -> Result<bool, Self::Error>;
 }
 pub struct Compare {} // TODO enum ?
-impl<Res> Evaluator<Res> for Compare {
+impl<ResB: From<Bytes>> Evaluator<http::Response<ResB>> for Compare {
     type Error = RelentlessError;
-    async fn evaluate<I: IntoIterator<Item = Res>>(iter: I) -> Result<bool, Self::Error> {
+    async fn evaluate<I: IntoIterator<Item = http::Response<ResB>>>(iter: I) -> Result<bool, Self::Error> {
         // TODO
         // let mut v = Vec::new();
         // for res in iter {
-        //     v.push((res.status(), res.text().await?));
+        //     let body = Bytes::from(res.into_body());
+        //     v.push((res.status(), body));
         // }
         // let pass = v.windows(2).all(|w| w[0] == w[1]);
         // Ok(pass)
@@ -24,13 +27,11 @@ impl<Res> Evaluator<Res> for Compare {
 }
 
 pub struct Status {} // TODO enum ?
-impl<Res> Evaluator<Res> for Status {
+impl<ResB> Evaluator<http::Response<ResB>> for Status {
     type Error = RelentlessError;
-    async fn evaluate<I: IntoIterator<Item = Res>>(iter: I) -> Result<bool, Self::Error> {
-        // TODO
-        // let pass = iter.into_iter().all(|res| res.status().is_success());
-        // Ok(pass)
-        Ok(true)
+    async fn evaluate<I: IntoIterator<Item = http::Response<ResB>>>(iter: I) -> Result<bool, Self::Error> {
+        let pass = iter.into_iter().all(|res| res.status().is_success());
+        Ok(pass)
     }
 }
 
