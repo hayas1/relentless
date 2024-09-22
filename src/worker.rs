@@ -19,6 +19,11 @@ pub struct Worker<S, ReqB, ResB> {
     clients: HashMap<String, S>,
     phantom: std::marker::PhantomData<(ReqB, ResB)>,
 }
+impl<S, ReqB, ResB> Worker<S, ReqB, ResB> {
+    pub fn config(&self) -> &WorkerConfig {
+        &self.config
+    }
+}
 impl<ReqB, ResB> Worker<DefaultHttpClient<ReqB, ResB>, ReqB, ResB>
 where
     ReqB: Body + FromBodyStructure + Send + 'static,
@@ -30,7 +35,7 @@ where
         let mut clients = HashMap::new();
         for (name, origin) in &config.origins {
             let host = origin.parse::<http::Uri>()?.authority().unwrap().as_str().to_string(); // TODO
-            clients.insert(name.clone(), DefaultHttpClient::<ReqB, ResB>::new(host).await?);
+            clients.insert(name.to_string(), DefaultHttpClient::<ReqB, ResB>::new(host).await?);
         }
 
         Self::new(config, clients)
@@ -50,14 +55,15 @@ where
         Ok(Self { config, clients, phantom })
     }
 
-    pub async fn assault(&mut self, cases: Vec<Case<S, ReqB, ResB>>) -> RelentlessResult<WorkerOutcome> {
+    pub async fn assault(self, cases: Vec<Case<S, ReqB, ResB>>) -> RelentlessResult<WorkerOutcome> {
+        let Self { config, mut clients, .. } = self;
         let mut outcome = Vec::new();
         for case in cases {
-            let res = case.process(&mut self.clients, &self.config).await?;
+            let res = case.process(&mut clients, &config).await?;
             let pass = if res.len() == 1 { Status::evaluate(res).await? } else { Compare::evaluate(res).await? };
             outcome.push(CaseOutcome::new(case.testcase, pass));
         }
-        Ok(WorkerOutcome::new(self.config.clone(), outcome))
+        Ok(WorkerOutcome::new(config, outcome))
     }
 }
 
@@ -65,6 +71,11 @@ where
 pub struct Case<S, ReqB, ResB> {
     testcase: Testcase,
     phantom: std::marker::PhantomData<(S, ReqB, ResB)>,
+}
+impl<S, ReqB, ResB> Case<S, ReqB, ResB> {
+    pub fn testcase(&self) -> &Testcase {
+        &self.testcase
+    }
 }
 impl<S, ReqB, ResB> Case<S, ReqB, ResB>
 where
@@ -123,7 +134,7 @@ where
                     .body(ReqB::from_body_structure(body.unwrap_or_default()))
                     .unwrap();
                 *request.headers_mut() = headers.unwrap_or_default();
-                Ok::<_, HttpError>((name.clone(), request))
+                Ok::<_, HttpError>((name.to_string(), request))
             })
             .collect::<Result<HashMap<_, _>, _>>()?)
     }

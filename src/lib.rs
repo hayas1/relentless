@@ -7,7 +7,6 @@ use http_body_util::{combinators::UnsyncBoxBody, Empty};
 use hyper::body::{Body, Incoming};
 use service::DefaultHttpClient;
 use tower::Service;
-use worker::Worker;
 
 pub mod config;
 pub mod error;
@@ -24,7 +23,8 @@ pub type Relentless = Relentless_<
 #[derive(Debug, Clone)]
 pub struct Relentless_<S = DefaultHttpClient<Bytes, Bytes>, ReqB = Bytes, ResB = Bytes> {
     configs: Vec<config::Config>,
-    workers: Vec<Worker<S, ReqB, ResB>>, // TODO all worker do not have same clients type ?
+    workers: Vec<worker::Worker<S, ReqB, ResB>>, // TODO all worker do not have same clients type ?
+    cases: Vec<Vec<worker::Case<S, ReqB, ResB>>>,
     phantom: std::marker::PhantomData<(ReqB, ResB)>,
 }
 impl<ReqB> Relentless_<DefaultHttpClient<ReqB, Bytes>, ReqB, Bytes>
@@ -36,8 +36,8 @@ where
     /// TODO document
     pub async fn with_default_http_client(configs: Vec<config::Config>) -> error::RelentlessResult<Self> {
         let mut workers = Vec::new();
-        for config in configs.clone() {
-            workers.push(Worker::with_default_http_client(config.worker_config).await?);
+        for config in &configs {
+            workers.push(worker::Worker::with_default_http_client(config.worker_config.clone()).await?);
         }
         Ok(Self::new(configs, workers))
     }
@@ -64,17 +64,17 @@ where
     RelentlessError: From<S::Error>,
 {
     /// TODO document
-    pub fn new(configs: Vec<config::Config>, workers: Vec<Worker<S, ReqB, ResB>>) -> Self {
+    pub fn new(configs: Vec<config::Config>, workers: Vec<worker::Worker<S, ReqB, ResB>>) -> Self {
+        let cases = configs.iter().map(|c| c.testcase.clone().into_iter().map(worker::Case::new).collect()).collect();
         let phantom = std::marker::PhantomData;
-        Self { configs, workers, phantom }
+        Self { configs, workers, cases, phantom }
     }
     /// TODO document
     pub async fn assault(self) -> error::RelentlessResult<Outcome> {
-        let Self { configs, workers, .. } = self;
+        let Self { workers, cases, .. } = self;
         let mut outcomes = Vec::new();
         // TODO async
-        for (config, mut worker) in configs.into_iter().zip(workers.into_iter()) {
-            let cases = config.testcase.clone().into_iter().map(worker::Case::new).collect::<Vec<_>>();
+        for (worker, cases) in workers.into_iter().zip(cases.into_iter()) {
             outcomes.push(worker.assault(cases).await?);
         }
         Ok(Outcome::new(outcomes))
