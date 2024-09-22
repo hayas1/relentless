@@ -7,6 +7,7 @@ use http_body_util::{combinators::UnsyncBoxBody, Empty};
 use hyper::body::{Body, Incoming};
 use service::HyperClient;
 use tower::Service;
+use worker::Worker;
 
 pub mod config;
 pub mod error;
@@ -23,7 +24,7 @@ pub type Relentless = Relentless_<
 #[derive(Debug, Clone)]
 pub struct Relentless_<S = HyperClient<Bytes, Bytes>, ReqB = Bytes, ResB = Bytes> {
     configs: Vec<config::Config>,
-    clients: Option<HashMap<String, S>>,
+    workers: Vec<Worker<S, ReqB, ResB>>, // TODO all worker do not have same clients type ?
     phantom: std::marker::PhantomData<(ReqB, ResB)>,
 }
 impl<ReqB> Relentless_<HyperClient<ReqB, Bytes>, ReqB, Bytes>
@@ -32,15 +33,24 @@ where
     ReqB::Data: Send + 'static,
     ReqB::Error: std::error::Error + Sync + Send + 'static,
 {
-    /// TODO document
-    pub fn read_paths<I: IntoIterator<Item = P>, P: AsRef<std::path::Path>>(paths: I) -> error::RelentlessResult<Self> {
-        let configs = paths.into_iter().map(config::Config::read).collect::<error::RelentlessResult<Vec<_>>>()?;
-        Ok(Self::new(configs, None))
+    pub async fn with_hyper_client(configs: Vec<config::Config>) -> error::RelentlessResult<Self> {
+        let mut workers = Vec::new();
+        for config in configs.clone() {
+            workers.push(Worker::with_hyper_client(config.worker_config).await?);
+        }
+        Ok(Self::new(configs, workers))
     }
     /// TODO document
-    pub fn read_dir<P: AsRef<std::path::Path>>(path: P) -> error::RelentlessResult<Self> {
+    pub async fn read_paths<I: IntoIterator<Item = P>, P: AsRef<std::path::Path>>(
+        paths: I,
+    ) -> error::RelentlessResult<Self> {
+        let configs = paths.into_iter().map(config::Config::read).collect::<error::RelentlessResult<Vec<_>>>()?;
+        Self::with_hyper_client(configs).await
+    }
+    /// TODO document
+    pub async fn read_dir<P: AsRef<std::path::Path>>(path: P) -> error::RelentlessResult<Self> {
         let configs = config::Config::read_dir(path)?;
-        Ok(Self::new(configs, None))
+        Self::with_hyper_client(configs).await
     }
 }
 impl<S, ReqB, ResB> Relentless_<S, ReqB, ResB>
@@ -53,17 +63,17 @@ where
     RelentlessError: From<S::Error>,
 {
     /// TODO document
-    pub fn new(configs: Vec<config::Config>, clients: Option<HashMap<String, S>>) -> Self {
+    pub fn new(configs: Vec<config::Config>, workers: Vec<Worker<S, ReqB, ResB>>) -> Self {
         let phantom = std::marker::PhantomData;
-        Self { configs, clients, phantom }
+        Self { configs, workers, phantom }
     }
     /// TODO document
     pub async fn assault(self) -> error::RelentlessResult<Outcome> {
-        let Self { configs, clients, .. } = self;
+        let Self { configs, workers, .. } = self;
         let mut outcomes = Vec::new();
         // TODO async
-        for config in configs {
-            let (worker, cases) = config.instance(clients.clone())?;
+        for (config, worker) in configs.into_iter().zip(workers.into_iter()) {
+            let cases = config.instance()?;
             outcomes.push(worker.assault(cases).await?);
         }
         Ok(Outcome::new(outcomes))

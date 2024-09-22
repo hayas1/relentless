@@ -14,41 +14,63 @@ use tokio::{runtime::Runtime, task::JoinSet};
 use tower::Service;
 
 #[derive(Debug, Clone)]
-pub struct Worker {
+pub struct Worker<S, ReqB, ResB> {
     config: WorkerConfig,
+    clients: HashMap<String, S>,
+    phantom: std::marker::PhantomData<(ReqB, ResB)>,
 }
-impl Worker {
-    pub fn new(config: WorkerConfig) -> Self {
-        Self { config }
+impl<ReqB, ResB> Worker<HyperClient<ReqB, ResB>, ReqB, ResB>
+where
+    ReqB: Body + FromBodyStructure + Send + 'static,
+    ReqB::Data: Send + 'static,
+    ReqB::Error: std::error::Error + Sync + Send + 'static,
+    ResB: From<Bytes> + Send + Sync + 'static,
+{
+    pub async fn with_hyper_client(config: WorkerConfig) -> RelentlessResult<Self> {
+        let mut clients = HashMap::new();
+        for (name, origin) in &config.origins {
+            let host = origin.parse::<http::Uri>()?.authority().unwrap().as_str().to_string(); // TODO
+            clients.insert(name.clone(), HyperClient::<ReqB, ResB>::new(host).await?);
+        }
+
+        Self::new(config, clients)
+    }
+}
+impl<S, ReqB, ResB> Worker<S, ReqB, ResB>
+where
+    ReqB: Body + FromBodyStructure + Send + 'static,
+    ReqB::Data: Send + 'static,
+    ReqB::Error: std::error::Error + Sync + Send + 'static,
+    ResB: From<Bytes> + Send + 'static,
+    S: Clone + Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + Sync + 'static,
+    RelentlessError: From<S::Error>,
+{
+    pub fn new(config: WorkerConfig, clients: HashMap<String, S>) -> RelentlessResult<Self> {
+        let phantom = std::marker::PhantomData;
+        Ok(Self { config, clients, phantom })
     }
 
-    pub async fn assault<S, ReqB, ResB>(self, cases: Vec<CaseService<S, ReqB, ResB>>) -> RelentlessResult<WorkerOutcome>
-    where
-        ReqB: Body + FromBodyStructure + Send + 'static,
-        ReqB::Data: Send + 'static,
-        ReqB::Error: std::error::Error + Sync + Send + 'static,
-        ResB: From<Bytes> + Send + 'static,
-        S: Clone + Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + Sync + 'static,
-        RelentlessError: From<S::Error>,
-    {
+    pub async fn assault(self, cases: Vec<CaseService<S, ReqB, ResB>>) -> RelentlessResult<WorkerOutcome> {
         let mut outcome = Vec::new();
         for c in cases {
             match c {
                 CaseService::Default(case) => {
-                    let res = case.process(&self.config).await?;
+                    let mut clients = self.clients.clone();
+                    let res = case.process(&mut clients, &self.config).await?;
                     let pass =
                         if res.len() == 1 { Status::evaluate(res).await? } else { Compare::evaluate(res).await? };
                     outcome.push(CaseOutcome::new(case.testcase, pass));
                 }
                 CaseService::Http(case) => {
-                    let res = case.process(&self.config).await?;
-                    let pass =
-                        if res.len() == 1 { Status::evaluate(res).await? } else { Compare::evaluate(res).await? };
-                    outcome.push(CaseOutcome::new(case.testcase, pass));
+                    todo!()
+                    // let res = case.process(&mut self.clients, &self.config).await?;
+                    // let pass =
+                    //     if res.len() == 1 { Status::evaluate(res).await? } else { Compare::evaluate(res).await? };
+                    // outcome.push(CaseOutcome::new(case.testcase, pass));
                 }
             };
         }
-        Ok(WorkerOutcome::new(self.config, outcome))
+        Ok(WorkerOutcome::new(self.config.clone(), outcome))
     }
 }
 
@@ -71,7 +93,6 @@ pub enum CaseResponse<ResB> {
 #[derive(Debug, Clone)]
 pub struct Case<S, ReqB, ResB> {
     testcase: Testcase,
-    // clients: HashMap<String, S>,
     phantom: std::marker::PhantomData<(S, ReqB, ResB)>,
 }
 impl<ReqB, ResB> Case<HyperClient<ReqB, ResB>, ReqB, ResB>
@@ -99,13 +120,12 @@ where
         Self { testcase, phantom }
     }
 
-    pub async fn process(&self, worker_config: &WorkerConfig) -> RelentlessResult<Vec<CaseResponse<ResB>>> {
+    pub async fn process(
+        &self,
+        clients: &mut HashMap<String, S>,
+        worker_config: &WorkerConfig,
+    ) -> RelentlessResult<Vec<CaseResponse<ResB>>> {
         let setting = &self.testcase.setting.coalesce(&worker_config.setting);
-        let mut clients = HashMap::new();
-        for (name, origin) in &worker_config.origins {
-            let host = origin.parse::<http::Uri>()?.authority().unwrap().as_str().to_string(); // TODO
-            clients.insert(name.clone(), HyperClient::<ReqB, ResB>::new(host).await?);
-        }
         let mut requests = Vec::new();
         for (name, req) in Self::requests(&worker_config.origins, &self.testcase.target, setting)? {
             let r = req;

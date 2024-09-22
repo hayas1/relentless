@@ -118,8 +118,8 @@ impl Config {
 
     pub fn instance<S, ReqB, ResB>(
         self,
-        clients: Option<HashMap<String, S>>,
-    ) -> RelentlessResult<(Worker, Vec<CaseService<S, ReqB, ResB>>)>
+        // clients: Option<HashMap<String, S>>,
+    ) -> RelentlessResult<Vec<CaseService<S, ReqB, ResB>>>
     where
         ReqB: Body + FromBodyStructure + Send + 'static,
         ReqB::Data: Send + 'static,
@@ -130,20 +130,28 @@ impl Config {
     {
         let Self { worker_config, testcase } = self;
 
-        let worker = Self::worker(worker_config)?;
-        let cases = testcase.into_iter().map(|tc| Self::case(tc, clients.clone())).collect::<Result<Vec<_>, _>>()?;
-        Ok((worker, cases))
+        // let worker = Self::worker(worker_config, clients)?;
+        let cases = testcase.into_iter().map(Self::case).collect::<Result<Vec<_>, _>>()?;
+        Ok(cases)
     }
 
-    pub fn worker(config: WorkerConfig) -> RelentlessResult<Worker> {
-        // TODO layer
-        Ok(Worker::new(config))
-    }
+    // pub fn worker<S, ReqB, ResB>(
+    //     config: WorkerConfig,
+    //     clients: Option<HashMap<String, S>>,
+    // ) -> RelentlessResult<Worker<S, ReqB, ResB>>
+    // where
+    //     ReqB: Body + FromBodyStructure + Send + 'static,
+    //     ReqB::Data: Send + 'static,
+    //     ReqB::Error: std::error::Error + Sync + Send + 'static,
+    //     ResB: From<Bytes> + Send + 'static,
+    //     S: Clone + Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + Sync + 'static,
+    //     RelentlessError: From<S::Error>,
+    // {
+    //     // TODO layer
+    //     Worker::new(config, clients)
+    // }
 
-    pub fn case<S, ReqB, ResB>(
-        testcase: Testcase,
-        clients: Option<HashMap<String, S>>,
-    ) -> RelentlessResult<CaseService<S, ReqB, ResB>>
+    pub fn case<S, ReqB, ResB>(testcase: Testcase) -> RelentlessResult<CaseService<S, ReqB, ResB>>
     where
         ReqB: Body + FromBodyStructure + Send + 'static,
         ReqB::Data: Send + 'static,
@@ -155,10 +163,9 @@ impl Config {
         // TODO layer
         // TODO!!! coalesce protocol
         let protocol = &testcase.setting.protocol;
-        match (protocol, clients) {
-            (&None, None) => Ok(CaseService::Http(Case::new_http(testcase))),
-            (&None, Some(c)) => Ok(CaseService::Default(Case::new(testcase))),
-            (&Some(Protocol::Http(_)), _) => Ok(CaseService::Http(Case::new_http(testcase))),
+        match protocol {
+            None => Ok(CaseService::Http(Case::new_http(testcase))),
+            Some(Protocol::Http(_)) => Ok(CaseService::Http(Case::new_http(testcase))),
         }
     }
 }
