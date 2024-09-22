@@ -115,17 +115,14 @@ where
                     Some(Protocol::Http(http)) => (http.method, http.header, http.body),
                     None => (None, None, None),
                 };
-                let uri = http::uri::Builder::new()
-                    .scheme("http")
-                    .authority("localhost:3000")
-                    .path_and_query(target)
-                    .build()
-                    .unwrap();
-                let request = http::Request::builder()
+                let origin = origin.parse::<http::Uri>().unwrap();
+                let uri = http::uri::Builder::from(origin).path_and_query(target).build().unwrap();
+                let mut request = http::Request::builder()
                     .uri(uri)
                     .method(method.unwrap_or(Method::GET))
                     .body(ReqB::from_body_structure(body.unwrap_or_default()))
                     .unwrap();
+                *request.headers_mut() = headers.unwrap_or_default();
                 Ok::<_, HttpError>((name.clone(), request))
             })
             .collect::<Result<HashMap<_, _>, _>>()?)
