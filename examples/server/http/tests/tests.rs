@@ -36,46 +36,41 @@ pub async fn send<T: DeserializeOwned>(
 }
 
 #[tokio::test]
-async fn test_root_call() -> Result<(), Box<dyn std::error::Error>> {
+async fn test_root_call() {
     let (uri, body, headers) = ("/", Body::empty(), HeaderMap::new());
-    let (status, body) = send_bytes(uri, body, headers).await?;
+    let (status, body) = send_bytes(uri, body, headers).await.unwrap();
     assert_eq!(status, StatusCode::OK);
     assert_eq!(&body[..], b"Hello World");
-    Ok(())
 }
 
 #[tokio::test]
-async fn test_healthz_call() -> Result<(), Box<dyn std::error::Error>> {
+async fn test_healthz_call() {
     let (uri, body, headers) = ("/healthz", Body::empty(), HeaderMap::new());
-    let (status, body) = send_bytes(uri, body, headers).await?;
+    let (status, body) = send_bytes(uri, body, headers).await.unwrap();
     assert_eq!(status, StatusCode::OK);
     assert_eq!(&body[..], b"ok");
-    Ok(())
 }
 
 #[tokio::test]
-async fn test_health_call() -> Result<(), Box<dyn std::error::Error>> {
+async fn test_health_call() {
     let (uri, body, headers) = ("/health", Body::empty(), HeaderMap::new());
-    let (status, body) = send_bytes(uri, body, headers).await?;
+    let (status, body) = send_bytes(uri, body, headers).await.unwrap();
     assert_eq!(status, StatusCode::OK);
     assert_eq!(&body[..], b"ok");
-    Ok(())
 }
 
 #[tokio::test]
-async fn test_health_rich_call() -> Result<(), Box<dyn std::error::Error>> {
+async fn test_health_rich_call() {
     let (uri, body, headers) = ("/health/rich", Body::empty(), HeaderMap::new());
-    let (status, health) = send::<Health>(uri, body, headers).await?;
+    let (status, health) = send::<Health>(uri, body, headers).await.unwrap();
     assert_eq!(status, StatusCode::OK);
     assert_eq!(health, Health { status: StatusCode::OK });
-    Ok(())
 }
 
 #[tokio::test]
-async fn test_disabled_call() -> Result<(), Box<dyn std::error::Error>> {
+async fn test_disabled_call() {
     let (uri, body, headers) = ("/health/disabled", Body::empty(), HeaderMap::new());
-    let (status, health) = send::<Health>(uri, body, headers).await?;
+    let (status, health) = send::<Health>(uri, body, headers).await.unwrap();
     assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
     assert_eq!(health, Health { status: StatusCode::SERVICE_UNAVAILABLE });
-    Ok(())
 }
