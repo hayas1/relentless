@@ -1,7 +1,7 @@
 use std::{collections::HashMap, time::Duration};
 
 use crate::{
-    config::{BodyStructure, Protocol, Setting, Testcase, WorkerConfig},
+    config::{BodyStructure, FromBodyStructure, Protocol, Setting, Testcase, WorkerConfig},
     error::{HttpError, RelentlessError, RelentlessResult},
     outcome::{CaseOutcome, Compare, Evaluator, Status, WorkerOutcome},
     service::HyperClient,
@@ -37,7 +37,7 @@ pub struct Case<S, ReqB, ResB> {
 }
 impl<ReqB, ResB> Case<HyperClient<ReqB, ResB>, ReqB, ResB>
 where
-    ReqB: Body + From<BodyStructure> + Send + 'static,
+    ReqB: Body + FromBodyStructure + Send + 'static,
     ReqB::Data: Send + 'static,
     ReqB::Error: std::error::Error + Sync + Send + 'static,
     ResB: From<Bytes> + Send + Sync + 'static,
@@ -48,7 +48,7 @@ where
 }
 impl<S, ReqB, ResB> Case<S, ReqB, ResB>
 where
-    ReqB: Body + From<BodyStructure> + Send + 'static,
+    ReqB: Body + FromBodyStructure + Send + 'static,
     ReqB::Data: Send + 'static,
     ReqB::Error: std::error::Error + Sync + Send + 'static,
     ResB: From<Bytes> + Send + 'static,
@@ -117,7 +117,7 @@ where
                 let request = http::Request::builder()
                     .uri(uri)
                     .method(method.unwrap_or(Method::GET))
-                    .body(ReqB::from(body.unwrap_or_default()))
+                    .body(ReqB::from_body_structure(body.unwrap_or_default()))
                     .unwrap();
                 Ok::<_, HttpError>((name.clone(), CaseRequest::Http(request)))
             })
@@ -136,7 +136,7 @@ impl Worker {
 
     pub async fn assault<S, ReqB, ResB>(self, cases: Vec<CaseService<S, ReqB, ResB>>) -> RelentlessResult<WorkerOutcome>
     where
-        ReqB: Body + From<BodyStructure> + Send + 'static,
+        ReqB: Body + FromBodyStructure + Send + 'static,
         ReqB::Data: Send + 'static,
         ReqB::Error: std::error::Error + Sync + Send + 'static,
         ResB: From<Bytes> + Send + 'static,

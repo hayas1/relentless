@@ -566,6 +566,7 @@ dependencies = [
  "bytes",
  "example-http-server",
  "http",
+ "http-body",
  "http-body-util",
  "http-serde",
  "hyper",

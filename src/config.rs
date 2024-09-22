@@ -69,28 +69,16 @@ impl Default for BodyStructure {
         Self::Empty
     }
 }
-impl<T> From<BodyStructure> for Empty<T>
-where
-    T: Body,
-{
-    fn from(body: BodyStructure) -> Self {
-        match body {
-            BodyStructure::Empty => Empty::new(),
-        }
-    }
+pub trait FromBodyStructure {
+    fn from_body_structure(val: BodyStructure) -> Self;
 }
-impl<E> From<BodyStructure> for UnsyncBoxBody<Bytes, E> {
-    fn from(body: BodyStructure) -> Self {
+impl<T> FromBodyStructure for T
+where
+    T: Body + Default, // TODO other than Default
+{
+    fn from_body_structure(body: BodyStructure) -> Self {
         match body {
             BodyStructure::Empty => Default::default(),
-        }
-    }
-}
-// TODO!!!
-impl From<BodyStructure> for axum::body::Body {
-    fn from(val: BodyStructure) -> Self {
-        match val {
-            BodyStructure::Empty => axum::body::Body::empty(),
         }
     }
 }
@@ -133,7 +121,7 @@ impl Config {
         clients: Option<HashMap<String, S>>,
     ) -> RelentlessResult<(Worker, Vec<CaseService<S, ReqB, ResB>>)>
     where
-        ReqB: Body + From<BodyStructure> + Send + 'static,
+        ReqB: Body + FromBodyStructure + Send + 'static,
         ReqB::Data: Send + 'static,
         ReqB::Error: std::error::Error + Sync + Send + 'static,
         ResB: From<Bytes> + Send + 'static,
@@ -159,7 +147,7 @@ impl Config {
         clients: Option<HashMap<String, S>>,
     ) -> RelentlessResult<CaseService<S, ReqB, ResB>>
     where
-        ReqB: Body + From<BodyStructure> + Send + 'static,
+        ReqB: Body + FromBodyStructure + Send + 'static,
         ReqB::Data: Send + 'static,
         ReqB::Error: std::error::Error + Sync + Send + 'static,
         ResB: From<Bytes> + Send + 'static,

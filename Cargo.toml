@@ -23,11 +23,10 @@ toml = { version = "0.8.19", optional = true }
 http-serde = "2.1.1"
 hyper = "1.4.1"
 hyper-util = { version = "0.1.8", features = ["full"] }
+http-body = "1.0.1"
 http-body-util = "0.1.2"
 bytes = "1.7.2"
 
-# TODO
-axum = "0.7.5"
 
 [dev-dependencies]
 example-http-server = { path = "examples/server/http" }

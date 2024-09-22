@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use bytes::Bytes;
-use config::BodyStructure;
+use config::{BodyStructure, FromBodyStructure};
 use error::RelentlessError;
 use http_body_util::{combinators::UnsyncBoxBody, Empty};
 use hyper::body::{Body, Incoming};
@@ -28,7 +28,7 @@ pub struct Relentless_<S = HyperClient<Bytes, Bytes>, ReqB = Bytes, ResB = Bytes
 }
 impl<ReqB> Relentless_<HyperClient<ReqB, Bytes>, ReqB, Bytes>
 where
-    ReqB: Body + From<BodyStructure> + Send + 'static,
+    ReqB: Body + FromBodyStructure + Send + 'static,
     ReqB::Data: Send + 'static,
     ReqB::Error: std::error::Error + Sync + Send + 'static,
 {
@@ -45,7 +45,7 @@ where
 }
 impl<S, ReqB, ResB> Relentless_<S, ReqB, ResB>
 where
-    ReqB: Body + From<BodyStructure> + Send + 'static,
+    ReqB: Body + FromBodyStructure + Send + 'static,
     ReqB::Data: Send + 'static,
     ReqB::Error: std::error::Error + Sync + Send + 'static,
     ResB: From<Bytes> + Send + 'static,
