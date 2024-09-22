@@ -26,7 +26,9 @@ where
     ReqB: Body + FromBodyStructure + Send + 'static,
     ReqB::Data: Send + 'static,
     ReqB::Error: std::error::Error + Sync + Send + 'static,
-    ResB: From<Bytes> + Send + Sync + 'static,
+    ResB: Body + Send + 'static,
+    ResB::Data: Send + 'static,
+    ResB::Error: std::error::Error + Sync + Send + 'static,
 {
     pub async fn with_default_http_client(config: WorkerConfig) -> RelentlessResult<Self> {
         let mut clients = HashMap::new();
@@ -43,7 +45,9 @@ where
     ReqB: Body + FromBodyStructure + Send + 'static,
     ReqB::Data: Send + 'static,
     ReqB::Error: std::error::Error + Sync + Send + 'static,
-    ResB: From<Bytes> + Send + 'static,
+    ResB: Body + Send + 'static,
+    ResB::Data: Send + 'static,
+    ResB::Error: std::error::Error + Sync + Send + 'static,
     S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + Sync + 'static,
     RelentlessError: From<S::Error>,
 {
@@ -79,7 +83,9 @@ where
     ReqB: Body + FromBodyStructure + Send + 'static,
     ReqB::Data: Send + 'static,
     ReqB::Error: std::error::Error + Sync + Send + 'static,
-    ResB: From<Bytes> + Send + 'static,
+    ResB: Body + Send + 'static,
+    ResB::Data: Send + 'static,
+    ResB::Error: std::error::Error + Sync + Send + 'static,
     S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + Sync + 'static,
     RelentlessError: From<S::Error>,
 {

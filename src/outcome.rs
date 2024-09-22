@@ -1,4 +1,5 @@
 use bytes::Bytes;
+use http_body::Body;
 
 use crate::{
     config::{Testcase, WorkerConfig},
@@ -11,7 +12,7 @@ pub trait Evaluator<Res> {
     async fn evaluate<I: IntoIterator<Item = Res>>(iter: I) -> Result<bool, Self::Error>;
 }
 pub struct Compare {} // TODO enum ?
-impl<ResB: From<Bytes>> Evaluator<http::Response<ResB>> for Compare {
+impl<ResB: Body> Evaluator<http::Response<ResB>> for Compare {
     type Error = RelentlessError;
     async fn evaluate<I: IntoIterator<Item = http::Response<ResB>>>(iter: I) -> Result<bool, Self::Error> {
         // TODO

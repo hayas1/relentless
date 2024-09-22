@@ -17,7 +17,7 @@ pub type Relentless = Relentless_<
 >;
 
 #[derive(Debug, Clone)]
-pub struct Relentless_<S = service::DefaultHttpClient<Bytes, Bytes>, ReqB = Bytes, ResB = Bytes> {
+pub struct Relentless_<S, ReqB, ResB> {
     configs: Vec<config::Config>,                // TODO remove this ?
     workers: Vec<worker::Worker<S, ReqB, ResB>>, // TODO all worker do not have same clients type ?
     cases: Vec<Vec<worker::Case<S, ReqB, ResB>>>,
@@ -28,11 +28,14 @@ impl<S, ReqB, ResB> Relentless_<S, ReqB, ResB> {
         &self.configs
     }
 }
-impl<ReqB> Relentless_<service::DefaultHttpClient<ReqB, Bytes>, ReqB, Bytes>
+impl<ReqB, ResB> Relentless_<service::DefaultHttpClient<ReqB, ResB>, ReqB, ResB>
 where
     ReqB: Body + FromBodyStructure + Send + 'static,
     ReqB::Data: Send + 'static,
     ReqB::Error: std::error::Error + Sync + Send + 'static,
+    ResB: Body + Send + 'static,
+    ResB::Data: Send + 'static,
+    ResB::Error: std::error::Error + Sync + Send + 'static,
 {
     /// TODO document
     pub async fn with_default_http_client(configs: Vec<config::Config>) -> error::RelentlessResult<Self> {
@@ -60,7 +63,9 @@ where
     ReqB: Body + FromBodyStructure + Send + 'static,
     ReqB::Data: Send + 'static,
     ReqB::Error: std::error::Error + Sync + Send + 'static,
-    ResB: From<Bytes> + Send + 'static,
+    ResB: Body + Send + 'static,
+    ResB::Data: Send + 'static,
+    ResB::Error: std::error::Error + Sync + Send + 'static,
     S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + Sync + 'static,
     RelentlessError: From<S::Error>,
 {
