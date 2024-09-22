@@ -4,9 +4,11 @@ version = "0.1.0"
 edition = "2021"
 
 [features]
-default = ["json", "yaml", "toml"]
+default = ["json", "yaml", "toml", "cli"]
 json = ["serde_json"]
 yaml = ["serde_yaml"]
+cli = []                                  # TODO clap ?
+
 
 [dependencies]
 thiserror = "1.0.63"

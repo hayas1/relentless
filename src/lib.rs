@@ -33,6 +33,7 @@ where
     ReqB::Data: Send + 'static,
     ReqB::Error: std::error::Error + Sync + Send + 'static,
 {
+    /// TODO document
     pub async fn with_hyper_client(configs: Vec<config::Config>) -> error::RelentlessResult<Self> {
         let mut workers = Vec::new();
         for config in configs.clone() {
@@ -91,6 +92,7 @@ impl Outcome {
     pub fn pass(&self) -> bool {
         self.outcome.iter().all(|o| o.pass())
     }
+    #[cfg(feature = "cli")]
     pub fn exit_code(&self, strict: bool) -> std::process::ExitCode {
         (!self.outcome.iter().all(|o| o.allow(strict)) as u8).into()
     }
