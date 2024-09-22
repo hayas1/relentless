@@ -5,13 +5,16 @@ use std::{
 };
 
 use bytes::Bytes;
-use http_body_util::BodyExt;
+use http_body_util::{combinators::BoxBody, BodyExt};
 use hyper::{body::Body, client::conn::http1};
 use hyper_util::rt::TokioIo;
 use tokio::net::{TcpStream, ToSocketAddrs};
 use tower::Service;
 
-use crate::{config::BodyStructure, error::RelentlessResult};
+use crate::{
+    config::BodyStructure,
+    error::{RelentlessError, RelentlessResult},
+};
 
 #[derive(Debug)]
 pub struct DefaultHttpClient<ReqB, ResB> {
@@ -36,10 +39,8 @@ where
     }
 }
 
-impl<ReqB: Body + 'static, ResB: From<Bytes> + Body + 'static> Service<http::Request<ReqB>>
-    for DefaultHttpClient<ReqB, ResB>
-{
-    type Response = http::Response<ResB>;
+impl<ReqB: Body + 'static, ResB: Body + 'static> Service<http::Request<ReqB>> for DefaultHttpClient<ReqB, ResB> {
+    type Response = http::Response<BytesBody>;
     type Error = hyper::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
 
@@ -53,8 +54,7 @@ impl<ReqB: Body + 'static, ResB: From<Bytes> + Body + 'static> Service<http::Req
             match fut.await {
                 Ok(r) => {
                     let (parts, incoming) = r.into_parts();
-                    let body = BodyExt::collect(incoming).await.map(|buf| buf.to_bytes())?;
-                    Ok(http::Response::from_parts(parts, body.into()))
+                    Ok(http::Response::from_parts(parts, incoming.into_bytes_body()))
                 }
                 Err(e) => Err(e),
             }
@@ -62,26 +62,31 @@ impl<ReqB: Body + 'static, ResB: From<Bytes> + Body + 'static> Service<http::Req
     }
 }
 
-// TODO stream ?
-// impl<ReqB: Body + 'static, ResB: From<Incoming>> Service<http::Request<ReqB>> for DefaultHttpClient<ReqB, ResB> {
-//     type Response = http::Response<ResB>;
-//     type Error = hyper::Error;
-//     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
-//
-//     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-//         Poll::Ready(Ok(()))
-//     }
-//
-//     fn call(&mut self, req: http::Request<ReqB>) -> Self::Future {
-//         let fut = self.sender.send_request(req);
-//         Box::pin(async {
-//             fut.await.map(|r| {
-//                 let (parts, incoming) = r.into_parts();
-//                 http::Response::from_parts(parts, incoming.into())
-//             })
-//         })
-//     }
-// }
+pub struct BytesBody(BoxBody<Bytes, RelentlessError>);
+impl Body for BytesBody {
+    type Data = Bytes;
+    type Error = RelentlessError;
+
+    fn poll_frame(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<Option<Result<http_body::Frame<Self::Data>, Self::Error>>> {
+        Pin::new(&mut self.0).poll_frame(cx)
+    }
+    fn is_end_stream(&self) -> bool {
+        self.0.is_end_stream()
+    }
+    fn size_hint(&self) -> http_body::SizeHint {
+        self.0.size_hint()
+    }
+}
+impl FromBodyStructure for BytesBody {
+    fn from_body_structure(val: BodyStructure) -> Self {
+        match val {
+            BodyStructure::Empty => BytesBody(http_body_util::Empty::new().map_err(RelentlessError::from).boxed()),
+        }
+    }
+}
 
 pub trait FromBodyStructure {
     fn from_body_structure(val: BodyStructure) -> Self;
@@ -94,5 +99,18 @@ where
         match body {
             BodyStructure::Empty => Default::default(),
         }
+    }
+}
+
+pub trait IntoBytesBody {
+    fn into_bytes_body(self) -> BytesBody;
+}
+impl<T> IntoBytesBody for T
+where
+    T: Body<Data = Bytes> + Send + Sync + 'static,
+    T::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
+{
+    fn into_bytes_body(self) -> BytesBody {
+        BytesBody(self.map_err(|e| RelentlessError::from(e.into())).boxed())
     }
 }

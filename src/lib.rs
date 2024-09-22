@@ -1,7 +1,6 @@
-use bytes::Bytes;
 use error::RelentlessError;
 use hyper::body::Body;
-use service::FromBodyStructure;
+use service::{BytesBody, FromBodyStructure};
 use tower::Service;
 
 pub mod config;
@@ -11,12 +10,9 @@ pub mod service;
 pub mod worker;
 
 pub type Relentless = Relentless_<
-    service::DefaultHttpClient<
-        http_body_util::combinators::UnsyncBoxBody<Bytes, RelentlessError>,
-        http_body_util::combinators::BoxBody<Bytes, RelentlessError>,
-    >,
-    http_body_util::combinators::UnsyncBoxBody<Bytes, RelentlessError>,
-    http_body_util::combinators::BoxBody<Bytes, RelentlessError>,
+    service::DefaultHttpClient<service::BytesBody, service::BytesBody>,
+    service::BytesBody,
+    service::BytesBody,
 >;
 
 #[derive(Debug, Clone)]
@@ -31,14 +27,11 @@ impl<S, ReqB, ResB> Relentless_<S, ReqB, ResB> {
         &self.configs
     }
 }
-impl<ReqB, ResB> Relentless_<service::DefaultHttpClient<ReqB, ResB>, ReqB, ResB>
+impl<ReqB> Relentless_<service::DefaultHttpClient<ReqB, BytesBody>, ReqB, BytesBody>
 where
     ReqB: Body + FromBodyStructure + Send + 'static,
     ReqB::Data: Send + 'static,
     ReqB::Error: std::error::Error + Sync + Send + 'static,
-    ResB: Body + From<Bytes> + Sync + Send + 'static,
-    ResB::Data: Send + 'static,
-    ResB::Error: std::error::Error + Sync + Send + 'static,
 {
     /// TODO document
     pub async fn with_default_http_client(configs: Vec<config::Config>) -> error::RelentlessResult<Self> {
@@ -66,7 +59,7 @@ where
     ReqB: Body + FromBodyStructure + Send + 'static,
     ReqB::Data: Send + 'static,
     ReqB::Error: std::error::Error + Sync + Send + 'static,
-    ResB: Body + From<Bytes> + Send + 'static,
+    ResB: Body + Send + 'static,
     ResB::Data: Send + 'static,
     ResB::Error: std::error::Error + Sync + Send + 'static,
     S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + Sync + 'static,

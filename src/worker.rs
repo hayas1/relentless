@@ -4,10 +4,8 @@ use crate::{
     config::{Protocol, Setting, Testcase, WorkerConfig},
     error::{HttpError, RelentlessError, RelentlessResult},
     outcome::{CaseOutcome, Compare, Evaluator, Status, WorkerOutcome},
-    service::DefaultHttpClient,
-    service::FromBodyStructure,
+    service::{BytesBody, DefaultHttpClient, FromBodyStructure},
 };
-use bytes::Bytes;
 use hyper::body::Body;
 use tower::Service;
 
@@ -22,20 +20,17 @@ impl<S, ReqB, ResB> Worker<S, ReqB, ResB> {
         &self.config
     }
 }
-impl<ReqB, ResB> Worker<DefaultHttpClient<ReqB, ResB>, ReqB, ResB>
+impl<ReqB> Worker<DefaultHttpClient<ReqB, BytesBody>, ReqB, BytesBody>
 where
     ReqB: Body + FromBodyStructure + Send + 'static,
     ReqB::Data: Send + 'static,
     ReqB::Error: std::error::Error + Sync + Send + 'static,
-    ResB: Body + From<Bytes> + Sync + Send + 'static,
-    ResB::Data: Send + 'static,
-    ResB::Error: std::error::Error + Sync + Send + 'static,
 {
     pub async fn with_default_http_client(config: WorkerConfig) -> RelentlessResult<Self> {
         let mut clients = HashMap::new();
         for (name, origin) in &config.origins {
             let host = origin.parse::<http::Uri>()?.authority().unwrap().as_str().to_string(); // TODO
-            clients.insert(name.to_string(), DefaultHttpClient::<ReqB, ResB>::new(host).await?);
+            clients.insert(name.to_string(), DefaultHttpClient::<ReqB, BytesBody>::new(host).await?);
         }
 
         Self::new(config, clients)
@@ -46,7 +41,7 @@ where
     ReqB: Body + FromBodyStructure + Send + 'static,
     ReqB::Data: Send + 'static,
     ReqB::Error: std::error::Error + Sync + Send + 'static,
-    ResB: Body + From<Bytes> + Send + 'static,
+    ResB: Body + Send + 'static,
     ResB::Data: Send + 'static,
     ResB::Error: std::error::Error + Sync + Send + 'static,
     S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + Sync + 'static,
@@ -84,7 +79,7 @@ where
     ReqB: Body + FromBodyStructure + Send + 'static,
     ReqB::Data: Send + 'static,
     ReqB::Error: std::error::Error + Sync + Send + 'static,
-    ResB: Body + From<Bytes> + Send + 'static,
+    ResB: Body + Send + 'static,
     ResB::Data: Send + 'static,
     ResB::Error: std::error::Error + Sync + Send + 'static,
     S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + Sync + 'static,

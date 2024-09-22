@@ -15,7 +15,7 @@ pub enum RelentlessError {
     StdIoError(#[from] std::io::Error),
     Infallible(#[from] std::convert::Infallible),
 
-    BoxError(#[from] Box<dyn std::error::Error + Send + Sync + 'static>),
+    BoxError(#[from] Box<dyn std::error::Error + Send + Sync>),
 }
 
 #[derive(Error, Debug)]
