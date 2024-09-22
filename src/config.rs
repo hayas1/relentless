@@ -30,7 +30,7 @@ pub struct Config {
 pub struct WorkerConfig {
     pub name: Option<String>,
     #[serde(default)]
-    pub origins: HashMap<String, String>,
+    pub origins: HashMap<String, String>, // TODO HashMap<String, Uri>
     #[serde(default)]
     pub setting: Setting,
 }
