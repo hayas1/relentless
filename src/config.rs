@@ -6,7 +6,6 @@ use std::{
 };
 
 use http::{HeaderMap, Method};
-use hyper::body::Body;
 use serde::{Deserialize, Serialize};
 
 use crate::error::{FormatError, RelentlessResult};
