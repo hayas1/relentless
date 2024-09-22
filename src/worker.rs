@@ -4,7 +4,7 @@ use crate::{
     config::{BodyStructure, FromBodyStructure, Protocol, Setting, Testcase, WorkerConfig},
     error::{HttpError, RelentlessError, RelentlessResult},
     outcome::{CaseOutcome, Compare, Evaluator, Status, WorkerOutcome},
-    service::HyperClient,
+    service::DefaultHttpClient,
 };
 use bytes::Bytes;
 use http::{Method, Response};
@@ -19,18 +19,18 @@ pub struct Worker<S, ReqB, ResB> {
     clients: HashMap<String, S>,
     phantom: std::marker::PhantomData<(ReqB, ResB)>,
 }
-impl<ReqB, ResB> Worker<HyperClient<ReqB, ResB>, ReqB, ResB>
+impl<ReqB, ResB> Worker<DefaultHttpClient<ReqB, ResB>, ReqB, ResB>
 where
     ReqB: Body + FromBodyStructure + Send + 'static,
     ReqB::Data: Send + 'static,
     ReqB::Error: std::error::Error + Sync + Send + 'static,
     ResB: From<Bytes> + Send + Sync + 'static,
 {
-    pub async fn with_hyper_client(config: WorkerConfig) -> RelentlessResult<Self> {
+    pub async fn with_default_http_client(config: WorkerConfig) -> RelentlessResult<Self> {
         let mut clients = HashMap::new();
         for (name, origin) in &config.origins {
             let host = origin.parse::<http::Uri>()?.authority().unwrap().as_str().to_string(); // TODO
-            clients.insert(name.clone(), HyperClient::<ReqB, ResB>::new(host).await?);
+            clients.insert(name.clone(), DefaultHttpClient::<ReqB, ResB>::new(host).await?);
         }
 
         Self::new(config, clients)

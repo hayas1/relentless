@@ -20,11 +20,11 @@ use tower::Service;
 use crate::error::RelentlessResult;
 
 #[derive(Debug)]
-pub struct HyperClient<ReqB, ResB> {
+pub struct DefaultHttpClient<ReqB, ResB> {
     sender: hyper::client::conn::http1::SendRequest<ReqB>,
     phantom: std::marker::PhantomData<ResB>,
 }
-impl<ReqB: Body + Send + 'static, ResB> HyperClient<ReqB, ResB>
+impl<ReqB: Body + Send + 'static, ResB> DefaultHttpClient<ReqB, ResB>
 where
     ReqB::Data: Send + 'static,
     ReqB::Error: std::error::Error + Sync + Send + 'static,
@@ -42,7 +42,7 @@ where
     }
 }
 
-impl<ReqB: Body + 'static, ResB: From<Bytes>> Service<http::Request<ReqB>> for HyperClient<ReqB, ResB> {
+impl<ReqB: Body + 'static, ResB: From<Bytes>> Service<http::Request<ReqB>> for DefaultHttpClient<ReqB, ResB> {
     type Response = http::Response<ResB>;
     type Error = hyper::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
@@ -67,7 +67,7 @@ impl<ReqB: Body + 'static, ResB: From<Bytes>> Service<http::Request<ReqB>> for H
 }
 
 // TODO stream ?
-// impl<ReqB: Body + 'static, ResB: From<Incoming>> Service<http::Request<ReqB>> for HyperClient<ReqB, ResB> {
+// impl<ReqB: Body + 'static, ResB: From<Incoming>> Service<http::Request<ReqB>> for DefaultHttpClient<ReqB, ResB> {
 //     type Response = http::Response<ResB>;
 //     type Error = hyper::Error;
 //     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;

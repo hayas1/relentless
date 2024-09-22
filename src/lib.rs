@@ -5,7 +5,7 @@ use config::{BodyStructure, FromBodyStructure};
 use error::RelentlessError;
 use http_body_util::{combinators::UnsyncBoxBody, Empty};
 use hyper::body::{Body, Incoming};
-use service::HyperClient;
+use service::DefaultHttpClient;
 use tower::Service;
 use worker::Worker;
 
@@ -16,28 +16,28 @@ pub mod service;
 pub mod worker;
 
 pub type Relentless = Relentless_<
-    HyperClient<UnsyncBoxBody<Bytes, RelentlessError>, Bytes>,
+    DefaultHttpClient<UnsyncBoxBody<Bytes, RelentlessError>, Bytes>,
     UnsyncBoxBody<Bytes, RelentlessError>,
     Bytes,
 >;
 
 #[derive(Debug, Clone)]
-pub struct Relentless_<S = HyperClient<Bytes, Bytes>, ReqB = Bytes, ResB = Bytes> {
+pub struct Relentless_<S = DefaultHttpClient<Bytes, Bytes>, ReqB = Bytes, ResB = Bytes> {
     configs: Vec<config::Config>,
     workers: Vec<Worker<S, ReqB, ResB>>, // TODO all worker do not have same clients type ?
     phantom: std::marker::PhantomData<(ReqB, ResB)>,
 }
-impl<ReqB> Relentless_<HyperClient<ReqB, Bytes>, ReqB, Bytes>
+impl<ReqB> Relentless_<DefaultHttpClient<ReqB, Bytes>, ReqB, Bytes>
 where
     ReqB: Body + FromBodyStructure + Send + 'static,
     ReqB::Data: Send + 'static,
     ReqB::Error: std::error::Error + Sync + Send + 'static,
 {
     /// TODO document
-    pub async fn with_hyper_client(configs: Vec<config::Config>) -> error::RelentlessResult<Self> {
+    pub async fn with_default_http_client(configs: Vec<config::Config>) -> error::RelentlessResult<Self> {
         let mut workers = Vec::new();
         for config in configs.clone() {
-            workers.push(Worker::with_hyper_client(config.worker_config).await?);
+            workers.push(Worker::with_default_http_client(config.worker_config).await?);
         }
         Ok(Self::new(configs, workers))
     }
@@ -46,12 +46,12 @@ where
         paths: I,
     ) -> error::RelentlessResult<Self> {
         let configs = paths.into_iter().map(config::Config::read).collect::<error::RelentlessResult<Vec<_>>>()?;
-        Self::with_hyper_client(configs).await
+        Self::with_default_http_client(configs).await
     }
     /// TODO document
     pub async fn read_dir<P: AsRef<std::path::Path>>(path: P) -> error::RelentlessResult<Self> {
         let configs = config::Config::read_dir(path)?;
-        Self::with_hyper_client(configs).await
+        Self::with_default_http_client(configs).await
     }
 }
 impl<S, ReqB, ResB> Relentless_<S, ReqB, ResB>
