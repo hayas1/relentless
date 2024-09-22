@@ -13,6 +13,45 @@ use hyper::body::{Body, Incoming};
 use tokio::{runtime::Runtime, task::JoinSet};
 use tower::Service;
 
+#[derive(Debug, Clone)]
+pub struct Worker {
+    config: WorkerConfig,
+}
+impl Worker {
+    pub fn new(config: WorkerConfig) -> Self {
+        Self { config }
+    }
+
+    pub async fn assault<S, ReqB, ResB>(self, cases: Vec<CaseService<S, ReqB, ResB>>) -> RelentlessResult<WorkerOutcome>
+    where
+        ReqB: Body + FromBodyStructure + Send + 'static,
+        ReqB::Data: Send + 'static,
+        ReqB::Error: std::error::Error + Sync + Send + 'static,
+        ResB: From<Bytes> + Send + 'static,
+        S: Clone + Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + Sync + 'static,
+        RelentlessError: From<S::Error>,
+    {
+        let mut outcome = Vec::new();
+        for c in cases {
+            match c {
+                CaseService::Default(case) => {
+                    let res = case.process(&self.config).await?;
+                    let pass =
+                        if res.len() == 1 { Status::evaluate(res).await? } else { Compare::evaluate(res).await? };
+                    outcome.push(CaseOutcome::new(case.testcase, pass));
+                }
+                CaseService::Http(case) => {
+                    let res = case.process(&self.config).await?;
+                    let pass =
+                        if res.len() == 1 { Status::evaluate(res).await? } else { Compare::evaluate(res).await? };
+                    outcome.push(CaseOutcome::new(case.testcase, pass));
+                }
+            };
+        }
+        Ok(WorkerOutcome::new(self.config, outcome))
+    }
+}
+
 #[derive(Debug)]
 pub enum CaseService<S, ReqB, ResB> {
     Default(Case<S, ReqB, ResB>),
@@ -118,44 +157,5 @@ where
                 Ok::<_, HttpError>((name.clone(), CaseRequest::Http(request)))
             })
             .collect::<Result<HashMap<_, _>, _>>()?)
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct Worker {
-    config: WorkerConfig,
-}
-impl Worker {
-    pub fn new(config: WorkerConfig) -> Self {
-        Self { config }
-    }
-
-    pub async fn assault<S, ReqB, ResB>(self, cases: Vec<CaseService<S, ReqB, ResB>>) -> RelentlessResult<WorkerOutcome>
-    where
-        ReqB: Body + FromBodyStructure + Send + 'static,
-        ReqB::Data: Send + 'static,
-        ReqB::Error: std::error::Error + Sync + Send + 'static,
-        ResB: From<Bytes> + Send + 'static,
-        S: Clone + Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + Sync + 'static,
-        RelentlessError: From<S::Error>,
-    {
-        let mut outcome = Vec::new();
-        for c in cases {
-            match c {
-                CaseService::Default(case) => {
-                    let res = case.process(&self.config).await?;
-                    let pass =
-                        if res.len() == 1 { Status::evaluate(res).await? } else { Compare::evaluate(res).await? };
-                    outcome.push(CaseOutcome::new(case.testcase, pass));
-                }
-                CaseService::Http(case) => {
-                    let res = case.process(&self.config).await?;
-                    let pass =
-                        if res.len() == 1 { Status::evaluate(res).await? } else { Compare::evaluate(res).await? };
-                    outcome.push(CaseOutcome::new(case.testcase, pass));
-                }
-            };
-        }
-        Ok(WorkerOutcome::new(self.config, outcome))
     }
 }
