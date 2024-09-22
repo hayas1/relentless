@@ -53,8 +53,6 @@ where
     ReqB::Error: std::error::Error + Sync + Send + 'static,
     ResB: From<Bytes> + Send + 'static,
     S: Clone + Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + Sync + 'static,
-    S::Future: 'static,
-    S::Error: Send + 'static,
     RelentlessError: From<S::Error>,
 {
     pub fn new(testcase: Testcase) -> Self {
@@ -67,34 +65,28 @@ where
         let mut clients = HashMap::new();
         for (name, origin) in &setting.origin {
             let host = origin.parse::<http::Uri>()?.authority().unwrap().as_str().to_string(); // TODO
-            clients.insert(name.clone(), HyperClient::new(host).await?);
+            clients.insert(name.clone(), HyperClient::<ReqB, ResB>::new(host).await?);
         }
-        // let mut join_set = JoinSet::<RelentlessResult<CaseResponse<Res>>>::new();
-        let mut response = Vec::new();
+        let mut requests = Vec::new();
         for (name, req) in Self::requests(&self.testcase.target, setting)? {
-            // for _ in 0..self.testcase.attr.repeat.unwrap_or(1) {
-            let r = req; //.clone(); //.ok_or(CaseError::FailCloneRequest)?;
-                         // join_set.spawn(async move {
+            let r = req;
             match r {
                 CaseRequest::Default(r) => {
                     todo!()
                 }
                 CaseRequest::Http(req) => {
                     let client = clients.get_mut(&name).unwrap(); // TODO
-                    let res: Response<ResB> = client.call(req).await?;
-                    let (part, body) = res.into_parts();
-                    let res = http::Response::from_parts(part, body.into());
-                    response.push(Ok(CaseResponse::Http(res)))
+                    let fut = client.call(req);
+                    requests.push(fut)
                 }
             }
-            // });
-            // }
         }
 
         let mut responses = Vec::new();
-        // while let Some(res) = join_set.join_next().await {
-        for res in response {
-            responses.push(res?);
+        for fut in requests {
+            let res = fut.await?;
+            let (part, body) = res.into_parts();
+            responses.push(CaseResponse::Http(http::Response::from_parts(part, body)));
         }
         Ok(responses)
     }
@@ -141,8 +133,6 @@ impl Worker {
         ReqB::Error: std::error::Error + Sync + Send + 'static,
         ResB: From<Bytes> + Send + 'static,
         S: Clone + Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + Sync + 'static,
-        S::Future: 'static,
-        S::Error: Send + 'static,
         RelentlessError: From<S::Error>,
     {
         let mut outcome = Vec::new();

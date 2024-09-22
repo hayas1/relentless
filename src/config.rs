@@ -126,8 +126,6 @@ impl Config {
         ReqB::Error: std::error::Error + Sync + Send + 'static,
         ResB: From<Bytes> + Send + 'static,
         S: Clone + Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + Sync + 'static,
-        S::Future: 'static,
-        S::Error: Send + 'static,
         RelentlessError: From<S::Error>,
     {
         let Self { worker_config, testcase } = self;
@@ -152,8 +150,6 @@ impl Config {
         ReqB::Error: std::error::Error + Sync + Send + 'static,
         ResB: From<Bytes> + Send + 'static,
         S: Clone + Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + Sync + 'static,
-        S::Future: 'static,
-        S::Error: Send + 'static,
         RelentlessError: From<S::Error>,
     {
         // TODO layer
