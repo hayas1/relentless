@@ -67,10 +67,15 @@ where
     /// TODO document
     pub async fn assault(self) -> RelentlessResult<Outcome> {
         let Self { workers, cases, .. } = self;
-        let mut outcomes = Vec::new();
-        // TODO async
+
+        let mut works = Vec::new();
         for (worker, cases) in workers.into_iter().zip(cases.into_iter()) {
-            outcomes.push(worker.assault(cases).await?);
+            works.push(worker.assault(cases));
+        }
+
+        let mut outcomes = Vec::new();
+        for work in works {
+            outcomes.push(work.await?);
         }
         Ok(Outcome::new(outcomes))
     }
@@ -122,11 +127,17 @@ where
 
     pub async fn assault(self, cases: Vec<Case<S, ReqB, ResB>>) -> RelentlessResult<WorkerOutcome> {
         let Self { config, mut clients, .. } = self;
-        let mut outcome = Vec::new();
+
+        let mut processes = Vec::new();
         for case in cases {
-            let res = case.process(&mut clients, &config).await?;
+            processes.push((case.testcase.clone(), case.process(&mut clients, &config).await));
+        }
+
+        let mut outcome = Vec::new();
+        for (testcase, process) in processes {
+            let res = process?; // TODO await here
             let pass = if res.len() == 1 { Status::evaluate(res).await? } else { Compare::evaluate(res).await? };
-            outcome.push(CaseOutcome::new(case.testcase, pass));
+            outcome.push(CaseOutcome::new(testcase, pass));
         }
         Ok(WorkerOutcome::new(config, outcome))
     }
@@ -160,22 +171,23 @@ where
     }
 
     pub async fn process(
-        &self,
+        self,
         clients: &mut HashMap<String, S>,
         worker_config: &WorkerConfig,
     ) -> RelentlessResult<Vec<http::Response<ResB>>> {
         let setting = &self.testcase.setting.coalesce(&worker_config.setting);
+
         let mut requests = Vec::new();
         for (name, req) in Self::requests(&worker_config.origins, &self.testcase.target, setting)? {
             let client = clients.get_mut(&name).unwrap(); // TODO
-            let fut = client.call(req);
-            requests.push(fut)
+            let request = client.call(req);
+            requests.push(request)
         }
 
         let mut responses = Vec::new();
-        for fut in requests {
-            let res = fut.await?;
-            let (part, body) = res.into_parts();
+        for request in requests {
+            let response = request.await?;
+            let (part, body) = response.into_parts();
             responses.push(http::Response::from_parts(part, body));
         }
         Ok(responses)
