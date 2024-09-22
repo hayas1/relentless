@@ -68,11 +68,11 @@ where
         Self { configs, workers, phantom }
     }
     /// TODO document
-    pub async fn assault(&mut self) -> error::RelentlessResult<Outcome> {
+    pub async fn assault(self) -> error::RelentlessResult<Outcome> {
         let Self { configs, workers, .. } = self;
         let mut outcomes = Vec::new();
         // TODO async
-        for (config, worker) in configs.into_iter().zip(workers.into_iter()) {
+        for (config, mut worker) in configs.into_iter().zip(workers.into_iter()) {
             let cases = config.testcase.clone().into_iter().map(worker::Case::new).collect::<Vec<_>>();
             outcomes.push(worker.assault(cases).await?);
         }
