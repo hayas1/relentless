@@ -50,11 +50,10 @@ where
         Ok(Self { config, clients, phantom })
     }
 
-    pub async fn assault(self, cases: Vec<Case<S, ReqB, ResB>>) -> RelentlessResult<WorkerOutcome> {
+    pub async fn assault(&mut self, cases: Vec<Case<S, ReqB, ResB>>) -> RelentlessResult<WorkerOutcome> {
         let mut outcome = Vec::new();
         for case in cases {
-            let mut clients = self.clients.clone();
-            let res = case.process(&mut clients, &self.config).await?;
+            let res = case.process(&mut self.clients, &self.config).await?;
             let pass = if res.len() == 1 { Status::evaluate(res).await? } else { Compare::evaluate(res).await? };
             outcome.push(CaseOutcome::new(case.testcase, pass));
         }

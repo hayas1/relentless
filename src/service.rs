@@ -49,8 +49,6 @@ where
     fn clone(&self) -> Self {
         // TODO
         todo!();
-        let f = Self::new("http://localhost:3000");
-        Runtime::new().unwrap().block_on(f).unwrap()
     }
 }
 
