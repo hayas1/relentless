@@ -18,10 +18,15 @@ pub type Relentless = Relentless_<
 
 #[derive(Debug, Clone)]
 pub struct Relentless_<S = service::DefaultHttpClient<Bytes, Bytes>, ReqB = Bytes, ResB = Bytes> {
-    configs: Vec<config::Config>,
+    configs: Vec<config::Config>,                // TODO remove this ?
     workers: Vec<worker::Worker<S, ReqB, ResB>>, // TODO all worker do not have same clients type ?
     cases: Vec<Vec<worker::Case<S, ReqB, ResB>>>,
     phantom: std::marker::PhantomData<(ReqB, ResB)>,
+}
+impl<S, ReqB, ResB> Relentless_<S, ReqB, ResB> {
+    pub fn configs(&self) -> &Vec<config::Config> {
+        &self.configs
+    }
 }
 impl<ReqB> Relentless_<service::DefaultHttpClient<ReqB, Bytes>, ReqB, Bytes>
 where
