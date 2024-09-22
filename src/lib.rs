@@ -1,7 +1,7 @@
 use bytes::Bytes;
-use config::FromBodyStructure;
 use error::RelentlessError;
 use hyper::body::Body;
+use service::FromBodyStructure;
 use tower::Service;
 
 pub mod config;

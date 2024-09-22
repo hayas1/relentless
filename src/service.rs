@@ -11,7 +11,7 @@ use hyper_util::rt::TokioIo;
 use tokio::net::{TcpStream, ToSocketAddrs};
 use tower::Service;
 
-use crate::error::RelentlessResult;
+use crate::{config::BodyStructure, error::RelentlessResult};
 
 #[derive(Debug)]
 pub struct DefaultHttpClient<ReqB, ResB> {
@@ -82,3 +82,17 @@ impl<ReqB: Body + 'static, ResB: From<Bytes> + Body + 'static> Service<http::Req
 //         })
 //     }
 // }
+
+pub trait FromBodyStructure {
+    fn from_body_structure(val: BodyStructure) -> Self;
+}
+impl<T> FromBodyStructure for T
+where
+    T: Body + Default, // TODO other than Default
+{
+    fn from_body_structure(body: BodyStructure) -> Self {
+        match body {
+            BodyStructure::Empty => Default::default(),
+        }
+    }
+}

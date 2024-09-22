@@ -63,19 +63,6 @@ impl Default for BodyStructure {
         Self::Empty
     }
 }
-pub trait FromBodyStructure {
-    fn from_body_structure(val: BodyStructure) -> Self;
-}
-impl<T> FromBodyStructure for T
-where
-    T: Body + Default, // TODO other than Default
-{
-    fn from_body_structure(body: BodyStructure) -> Self {
-        match body {
-            BodyStructure::Empty => Default::default(),
-        }
-    }
-}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields)]

@@ -1,10 +1,11 @@
 use std::collections::HashMap;
 
 use crate::{
-    config::{FromBodyStructure, Protocol, Setting, Testcase, WorkerConfig},
+    config::{Protocol, Setting, Testcase, WorkerConfig},
     error::{HttpError, RelentlessError, RelentlessResult},
     outcome::{CaseOutcome, Compare, Evaluator, Status, WorkerOutcome},
     service::DefaultHttpClient,
+    service::FromBodyStructure,
 };
 use bytes::Bytes;
 use hyper::body::Body;
