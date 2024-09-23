@@ -1,8 +1,12 @@
 use std::process::ExitCode;
 
-use relentless::command::execute;
-
+#[cfg(feature = "cli")]
 #[tokio::main]
 pub async fn main() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sync>> {
-    execute().await
+    relentless::command::execute().await
+}
+
+#[cfg(not(feature = "cli"))]
+pub fn main() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sync>> {
+    Err("cli feature is not enabled".into())
 }

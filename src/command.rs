@@ -1,9 +1,11 @@
 use std::{path::PathBuf, process::ExitCode};
 
+#[cfg(feature = "cli")]
 use clap::{ArgGroup, Parser, Subcommand};
 
 use crate::Relentless;
 
+#[cfg(feature = "cli")]
 pub async fn execute() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sync>> {
     let cli = Cli::parse();
     match cli.subcommand {
@@ -19,33 +21,36 @@ pub async fn execute() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sy
     }
 }
 
-#[derive(Parser, Debug, PartialEq, Eq)]
-#[clap(version, about, arg_required_else_help = true)]
+#[derive(Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "cli", derive(Parser))]
+#[cfg_attr(feature = "cli", clap(version, about, arg_required_else_help = true))]
 pub struct Cli {
-    #[clap(subcommand)]
+    #[cfg_attr(feature = "cli", clap(subcommand))]
     subcommand: SubCommands,
 }
 
-#[derive(Debug, Subcommand, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "cli", derive(Subcommand))]
 pub enum SubCommands {
     /// run testcases
-    #[clap(arg_required_else_help = true)]
+    #[cfg_attr(feature = "cli", clap(arg_required_else_help = true))]
     Assault(Assault),
 }
 
-#[derive(Parser, Debug, PartialEq, Eq, Default)]
-#[clap(group(ArgGroup::new("config").args(&["configs"]).conflicts_with("dir_config")))]
+#[derive(Debug, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "cli", derive(Parser))]
+#[cfg_attr(feature = "cli", clap(group(ArgGroup::new("config").args(&["configs"]).conflicts_with("dir_config"))))]
 pub struct Assault {
     /// config files of testcases
-    #[arg(short, long, num_args=0..)]
+    #[cfg_attr(feature = "cli", arg(short, long, num_args=0..))]
     configs: Vec<PathBuf>,
 
     /// directory of config files
-    #[arg(short, long)]
+    #[cfg_attr(feature = "cli", arg(short, long))]
     dir_config: Option<PathBuf>,
 
     /// allow invalid testcases
-    #[arg(short, long, default_value_t = false)]
+    #[cfg_attr(feature = "cli", arg(short, long, default_value_t = false))]
     strict: bool,
 }
 
@@ -54,6 +59,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[cfg(feature = "cli")]
     fn exclude_configs_or_dir() {
         let Err(_) = Cli::try_parse_from(["relentless", "assault"]) else {
             panic!("dir config or configs must be specified");

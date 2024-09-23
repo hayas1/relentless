@@ -1,6 +1,4 @@
-#[cfg(feature = "cli")]
 pub mod command;
-
 pub mod config;
 pub mod error;
 pub mod outcome;

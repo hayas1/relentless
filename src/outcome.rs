@@ -51,7 +51,6 @@ impl Outcome {
     pub fn allow(&self, strict: bool) -> bool {
         self.outcome.iter().all(|o| o.allow(strict))
     }
-    #[cfg(feature = "cli")]
     pub fn exit_code(&self, strict: bool) -> std::process::ExitCode {
         (!self.allow(strict) as u8).into()
     }
