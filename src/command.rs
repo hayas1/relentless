@@ -7,7 +7,7 @@ use crate::Relentless;
 
 #[cfg(feature = "cli")]
 pub async fn execute() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sync>> {
-    use crate::outcome::OutcomeFormatter;
+    use crate::outcome::OutcomeWriter;
 
     let cli = Cli::parse();
     match cli.subcommand {
@@ -20,9 +20,9 @@ pub async fn execute() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sy
             };
             let outcome = relentless.assault().await?;
 
-            let mut show = OutcomeFormatter::new(0);
-            outcome.show(&mut show, &assault)?;
-            println!("{}", show);
+            let mut writer = OutcomeWriter::new(0);
+            outcome.write(&mut writer, &assault)?;
+            println!("{}", writer);
             Ok(outcome.exit_code(assault.strict))
         }
     }

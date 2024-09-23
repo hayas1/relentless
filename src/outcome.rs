@@ -61,14 +61,14 @@ impl Outcome {
         (!self.allow(strict) as u8).into()
     }
     // TODO trait ?
-    pub fn show(&self, f: &mut OutcomeFormatter, cmd: &Assault) -> std::fmt::Result {
+    pub fn write(&self, w: &mut OutcomeWriter, cmd: &Assault) -> std::fmt::Result {
         let side = console::Emoji("🔥", "");
-        writeln!(f, "{} Relentless Assault Result {}", side, side)?;
-        f.increment();
+        writeln!(w, "{} Relentless Assault Result {}", side, side)?;
+        w.increment();
         for outcome in &self.outcome {
-            outcome.show(f, cmd)?;
+            outcome.write(w, cmd)?;
         }
-        f.decrement();
+        w.decrement();
         Ok(())
     }
 }
@@ -89,14 +89,14 @@ impl WorkerOutcome {
     pub fn allow(&self, strict: bool) -> bool {
         self.outcome.iter().all(|o| o.allow(strict))
     }
-    pub fn show(&self, f: &mut OutcomeFormatter, cmd: &Assault) -> std::fmt::Result {
+    pub fn write(&self, w: &mut OutcomeWriter, cmd: &Assault) -> std::fmt::Result {
         let side = console::Emoji("📂", "");
-        writeln!(f, "{} {}", side, self.config.name.as_ref().unwrap_or(&"testcases".to_string()))?;
-        f.increment();
+        writeln!(w, "{} {}", side, self.config.name.as_ref().unwrap_or(&"testcases".to_string()))?;
+        w.increment();
         for outcome in &self.outcome {
-            outcome.show(f, cmd)?;
+            outcome.write(w, cmd)?;
         }
-        f.decrement();
+        w.decrement();
         Ok(())
     }
 }
@@ -118,28 +118,28 @@ impl CaseOutcome {
         let allowed = self.testcase.attr.allow;
         self.pass() || !strict && allowed
     }
-    pub fn show(&self, f: &mut OutcomeFormatter, cmd: &Assault) -> std::fmt::Result {
+    pub fn write(&self, w: &mut OutcomeWriter, cmd: &Assault) -> std::fmt::Result {
         let side = if self.pass() { console::Emoji("✅", "") } else { console::Emoji("❌", "") };
-        writeln!(f, "{} {}", side, self.testcase.target)?;
+        writeln!(w, "{} {}", side, self.testcase.target)?;
         if let Some(desc) = &self.testcase.description {
-            f.increment();
-            writeln!(f, "  {} {}", console::Emoji("📝", ""), desc)?;
-            f.decrement();
+            w.increment();
+            writeln!(w, "  {} {}", console::Emoji("📝", ""), desc)?;
+            w.decrement();
         }
         if !self.pass() && self.allow(cmd.strict) {
-            f.increment();
-            writeln!(f, "  {} {}", console::Emoji("👟", ""), console::style("this testcase is allowed").green())?;
-            f.decrement();
+            w.increment();
+            writeln!(w, "  {} {}", console::Emoji("👟", ""), console::style("this testcase is allowed").green())?;
+            w.decrement();
         }
         Ok(())
     }
 }
 
-pub struct OutcomeFormatter {
+pub struct OutcomeWriter {
     pub indent: usize,
     pub buf: String, // TODO String?
 }
-impl OutcomeFormatter {
+impl OutcomeWriter {
     pub fn new(indent: usize) -> Self {
         let buf = String::new();
         Self { indent, buf }
@@ -151,7 +151,7 @@ impl OutcomeFormatter {
         self.indent -= 1;
     }
 }
-impl Write for OutcomeFormatter {
+impl Write for OutcomeWriter {
     fn write_str(&mut self, s: &str) -> std::fmt::Result {
         // TODO better implementation?
         if s.contains("\n") {
@@ -164,7 +164,7 @@ impl Write for OutcomeFormatter {
         Ok(())
     }
 }
-impl Display for OutcomeFormatter {
+impl Display for OutcomeWriter {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.buf)
     }
