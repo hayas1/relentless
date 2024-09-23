@@ -1,13 +1,16 @@
 [package]
 name = "relentless"
 version = "0.1.0"
+description = "Relentless HTTP load testing / comparison testing tool"
+authors = ["hayas1 <h4ystack@gmail.com>"]
 edition = "2021"
+repository = "https://github.com/hayas1/relentless"
 
 [features]
 default = ["json", "yaml", "toml", "cli"]
 json = ["serde_json"]
 yaml = ["serde_yaml"]
-cli = []                                  # TODO clap ?
+cli = ["clap"]
 
 
 [dependencies]
@@ -28,6 +31,8 @@ hyper-util = { version = "0.1.8", features = ["full"] }
 http-body = "1.0.1"
 http-body-util = "0.1.2"
 bytes = "1.7.2"
+
+clap = { version = "4.5.18", features = ["derive"], optional = true }
 
 
 [dev-dependencies]
