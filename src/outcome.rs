@@ -43,6 +43,17 @@ impl<ResB> Evaluator<http::Response<ResB>> for Status {
     }
 }
 
+// TODO definition position
+#[doc(hidden)]
+#[macro_export(local_inner_macros)]
+macro_rules! writer_scope {
+    ($writer:expr, $($body:tt)*) => {
+        $writer.increment();
+        $($body)*;
+        $writer.decrement();
+    };
+}
+
 /// TODO document
 #[derive(Debug, Clone)]
 pub struct Outcome {
@@ -91,11 +102,12 @@ impl WorkerOutcome {
     pub fn write<T: std::io::Write>(&self, w: &mut OutcomeWriter<T>, cmd: &Assault) -> std::fmt::Result {
         let side = console::Emoji("📂", "");
         writeln!(w, "{} {}", side, self.config.name.as_ref().unwrap_or(&"testcases".to_string()))?;
-        w.increment();
-        for outcome in &self.outcome {
-            outcome.write(w, cmd)?;
-        }
-        w.decrement();
+        writer_scope!(
+            w,
+            for outcome in &self.outcome {
+                outcome.write(w, cmd)?;
+            }
+        );
         Ok(())
     }
 }
@@ -127,9 +139,10 @@ impl CaseOutcome {
             writeln!(w)?;
         }
         if !self.pass() && self.allow(cmd.strict) {
-            w.increment();
-            writeln!(w, "{} {}", console::Emoji("👟", ""), console::style("this testcase is allowed").green())?;
-            w.decrement();
+            writer_scope!(
+                w,
+                writeln!(w, "{} {}", console::Emoji("👟", ""), console::style("this testcase is allowed").green())?
+            );
         }
         Ok(())
     }
