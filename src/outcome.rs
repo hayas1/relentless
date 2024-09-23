@@ -48,9 +48,12 @@ impl Outcome {
     pub fn pass(&self) -> bool {
         self.outcome.iter().all(|o| o.pass())
     }
+    pub fn allow(&self, strict: bool) -> bool {
+        self.outcome.iter().all(|o| o.allow(strict))
+    }
     #[cfg(feature = "cli")]
     pub fn exit_code(&self, strict: bool) -> std::process::ExitCode {
-        (!self.outcome.iter().all(|o| o.allow(strict)) as u8).into()
+        (!self.allow(strict) as u8).into()
     }
 }
 
