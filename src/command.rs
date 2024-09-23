@@ -3,7 +3,7 @@ use std::{collections::HashMap, path::PathBuf, process::ExitCode};
 #[cfg(feature = "cli")]
 use clap::{ArgGroup, Parser, Subcommand};
 
-use crate::{outcome::OutcomeWriter, Relentless};
+use crate::Relentless;
 
 #[cfg(feature = "cli")]
 pub async fn execute() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sync>> {
@@ -20,10 +20,9 @@ pub async fn execute() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sy
             } else {
                 Relentless::read_paths(assault, file).await?
             };
-            let outcome = relentless.assault(assault).await?;
 
-            let mut writer = OutcomeWriter::with_stdout(0);
-            outcome.write(&mut writer, assault)?;
+            let outcome = relentless.assault(assault).await?;
+            outcome.report(assault)?;
             Ok(outcome.exit_code(assault.strict))
         }
     }

@@ -4,7 +4,7 @@ use crate::{
     command::Assault,
     config::{Config, Protocol, Setting, Testcase, WorkerConfig},
     error::{HttpError, RelentlessError, RelentlessResult},
-    outcome::{CaseOutcome, Compare, Evaluator, Outcome, Status, WorkerOutcome},
+    outcome::{CaseOutcome, Compare, Evaluator, Outcome, OutcomeWriter, Status, WorkerOutcome},
     service::{BytesBody, DefaultHttpClient, FromBodyStructure},
 };
 use hyper::body::Body;
@@ -19,6 +19,7 @@ pub struct Control<S = DefaultHttpClient<BytesBody, BytesBody>, ReqB = BytesBody
     phantom: std::marker::PhantomData<(ReqB, ResB)>,
 }
 impl<S, ReqB, ResB> Control<S, ReqB, ResB> {
+    /// TODO document
     pub fn configs(&self) -> &Vec<Config> {
         &self.configs
     }

@@ -47,6 +47,7 @@ impl<ResB> Evaluator<http::Response<ResB>> for Status {
 pub struct Outcome {
     outcome: Vec<WorkerOutcome>,
 }
+// TODO trait ?
 impl Outcome {
     pub fn new(outcome: Vec<WorkerOutcome>) -> Self {
         Self { outcome }
@@ -60,10 +61,12 @@ impl Outcome {
     pub fn exit_code(&self, strict: bool) -> ExitCode {
         (!self.allow(strict) as u8).into()
     }
-    // TODO trait ?
-    pub fn write<T: std::io::Write>(&self, w: &mut OutcomeWriter<T>, cmd: &Assault) -> std::fmt::Result {
+    pub fn report(&self, cmd: &Assault) -> std::fmt::Result {
+        self.report_to(&mut OutcomeWriter::with_stdout(0), cmd)
+    }
+    pub fn report_to<T: std::io::Write>(&self, w: &mut OutcomeWriter<T>, cmd: &Assault) -> std::fmt::Result {
         for outcome in &self.outcome {
-            outcome.write(w, cmd)?;
+            outcome.report_to(w, cmd)?;
         }
         Ok(())
     }
@@ -85,7 +88,8 @@ impl WorkerOutcome {
     pub fn allow(&self, strict: bool) -> bool {
         self.outcome.iter().all(|o| o.allow(strict))
     }
-    pub fn write<T: std::io::Write>(&self, w: &mut OutcomeWriter<T>, cmd: &Assault) -> std::fmt::Result {
+
+    pub fn report_to<T: std::io::Write>(&self, w: &mut OutcomeWriter<T>, cmd: &Assault) -> std::fmt::Result {
         let side = console::Emoji("🚀", "");
         writeln!(w, "{} {}", side, self.config.name.as_ref().unwrap_or(&"testcases".to_string()))?;
 
@@ -107,7 +111,7 @@ impl WorkerOutcome {
 
         w.scope(|w| {
             for outcome in &self.outcome {
-                outcome.write(w, cmd)?;
+                outcome.report_to(w, cmd)?;
             }
             Ok(())
         })?;
@@ -132,7 +136,7 @@ impl CaseOutcome {
         let allowed = self.testcase.attr.allow;
         self.pass() || !strict && allowed
     }
-    pub fn write<T: std::io::Write>(&self, w: &mut OutcomeWriter<T>, cmd: &Assault) -> std::fmt::Result {
+    pub fn report_to<T: std::io::Write>(&self, w: &mut OutcomeWriter<T>, cmd: &Assault) -> std::fmt::Result {
         let side = if self.pass() { console::Emoji("✅", "PASS") } else { console::Emoji("❌", "FAIL") };
         let target = console::style(&self.testcase.target);
         write!(w, "{} {} ", side, if self.pass() { target.green() } else { target.red() })?;
