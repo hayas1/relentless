@@ -15,5 +15,5 @@ async fn test_example_assault() {
         Control::<_, Body, Body>::new(vec![config.clone()], vec![Worker::new(config.worker_config, services).unwrap()]);
     let result = relentless.assault().await.unwrap();
 
-    assert!(result.pass());
+    assert!(result.allow(false));
 }
