@@ -60,6 +60,7 @@ impl Outcome {
     pub fn exit_code(&self, strict: bool) -> ExitCode {
         (!self.allow(strict) as u8).into()
     }
+    // TODO trait ?
     pub fn show(&self, f: &mut OutcomeFormatter, cmd: &Assault) -> std::fmt::Result {
         let side = console::Emoji("🔥", "");
         writeln!(f, "{} Relentless Assault Result {}", side, side)?;
