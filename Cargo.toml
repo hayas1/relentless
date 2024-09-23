@@ -7,7 +7,9 @@ edition = "2021"
 repository = "https://github.com/hayas1/relentless"
 
 [features]
-default = ["json", "yaml", "toml", "cli"]
+default = ["full"]
+full = ["json", "yaml", "toml", "cli"]
+
 json = ["serde_json"]
 yaml = ["serde_yaml"]
 cli = ["clap"]
