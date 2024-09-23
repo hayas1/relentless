@@ -1,4 +1,4 @@
-use std::{path::PathBuf, process::ExitCode};
+use std::{collections::HashMap, path::PathBuf, process::ExitCode};
 
 #[cfg(feature = "cli")]
 use clap::{ArgGroup, Parser, Subcommand};
@@ -14,13 +14,13 @@ pub async fn execute() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sy
 
     match subcommand {
         SubCommands::Assault(assault) => {
-            let Assault { configs, dir_config, .. } = &assault;
-            let relentless = if let Some(dir) = dir_config {
-                Relentless::read_dir(dir).await?
+            let Assault { file, configs_dir, .. } = &assault;
+            let relentless = if let Some(dir) = configs_dir {
+                Relentless::read_dir(assault, dir).await?
             } else {
-                Relentless::read_paths(configs).await?
+                Relentless::read_paths(assault, file).await?
             };
-            let outcome = relentless.assault().await?;
+            let outcome = relentless.assault(assault).await?;
 
             let mut writer = OutcomeWriter::with_stdout(0);
             outcome.write(&mut writer, assault)?;
@@ -51,19 +51,45 @@ pub enum SubCommands {
 
 #[derive(Debug, PartialEq, Eq, Default)]
 #[cfg_attr(feature = "cli", derive(Parser))]
-#[cfg_attr(feature = "cli", clap(group(ArgGroup::new("config").args(&["configs"]).conflicts_with("dir_config"))))]
+#[cfg_attr(feature = "cli", clap(group(ArgGroup::new("files").args(&["file"]).conflicts_with("configs_dir"))))]
 pub struct Assault {
     /// config files of testcases
     #[cfg_attr(feature = "cli", arg(short, long, num_args=0..))]
-    pub configs: Vec<PathBuf>,
+    pub file: Vec<PathBuf>,
 
     /// directory of config files
     #[cfg_attr(feature = "cli", arg(short, long))]
-    pub dir_config: Option<PathBuf>,
+    pub configs_dir: Option<PathBuf>,
+
+    /// override destinations
+    #[cfg_attr(feature = "cli", arg(short, long, num_args=0.., value_parser = Self::parse_destination::<String, String>, number_of_values=1))]
+    pub destination: Vec<(String, String)>, // TODO HashMap<String, Uri>
 
     /// allow invalid testcases
     #[cfg_attr(feature = "cli", arg(short, long))]
     pub strict: bool,
+}
+impl Assault {
+    #[cfg(feature = "cli")]
+    pub fn parse_destination<T, U>(s: &str) -> Result<(T, U), Box<dyn std::error::Error + Send + Sync + 'static>>
+    where
+        T: std::str::FromStr,
+        T::Err: std::error::Error + Send + Sync + 'static,
+        U: std::str::FromStr,
+        U::Err: std::error::Error + Send + Sync + 'static,
+    {
+        let (name, destination) =
+            s.split_once('=').ok_or_else(|| format!("invalid KEY=value: no `=` found in `{}`", s))?;
+        Ok((name.parse()?, destination.parse()?))
+    }
+
+    pub fn override_destination(&self, other: &HashMap<String, String>) -> HashMap<String, String> {
+        let mut map = other.clone();
+        for (name, dest) in &self.destination {
+            map.entry(name.to_string()).and_modify(|d| *d = dest.to_string());
+        }
+        map
+    }
 }
 
 #[cfg(test)]
@@ -72,65 +98,65 @@ mod tests {
 
     #[test]
     #[cfg(feature = "cli")]
-    fn test_exclude_configs_or_dir() {
+    fn test_exclude_file_or_dir() {
         let Err(_) = Cli::try_parse_from(["relentless", "assault"]) else {
-            panic!("dir config or configs must be specified");
+            panic!("file or directory must be specified");
         };
 
-        match Cli::try_parse_from(["relentless", "assault", "--configs", "examples/config/assault.yaml"]) {
+        match Cli::try_parse_from(["relentless", "assault", "--file", "examples/config/assault.yaml"]) {
             Ok(cli) => assert_eq!(
                 cli.subcommand,
                 SubCommands::Assault(Assault {
-                    configs: vec![PathBuf::from("examples/config/assault.yaml")],
-                    dir_config: None,
+                    file: vec![PathBuf::from("examples/config/assault.yaml")],
+                    configs_dir: None,
                     ..Default::default()
                 })
             ),
-            Err(_) => panic!("only configs is allowed"),
+            Err(_) => panic!("only file is allowed"),
         };
         match Cli::try_parse_from([
             "relentless",
             "assault",
-            "--configs",
+            "--file",
             "examples/config/assault.yaml",
-            "--configs",
+            "--file",
             "examples/config/compare.yaml",
         ]) {
             Ok(cli) => assert_eq!(
                 cli.subcommand,
                 SubCommands::Assault(Assault {
-                    configs: vec![
+                    file: vec![
                         PathBuf::from("examples/config/assault.yaml"),
                         PathBuf::from("examples/config/compare.yaml")
                     ],
-                    dir_config: None,
+                    configs_dir: None,
                     ..Default::default()
                 })
             ),
-            Err(_) => panic!("multiple configs is allowed"),
+            Err(_) => panic!("multiple file is allowed"),
         };
 
         match Cli::try_parse_from(["relentless", "assault", "--dir-config", "examples/config"]) {
             Ok(cli) => assert_eq!(
                 cli.subcommand,
                 SubCommands::Assault(Assault {
-                    configs: Vec::new(),
-                    dir_config: Some(PathBuf::from("examples/config")),
+                    file: Vec::new(),
+                    configs_dir: Some(PathBuf::from("examples/config")),
                     ..Default::default()
                 })
             ),
-            Err(_) => panic!("only dir_config is allowed"),
+            Err(_) => panic!("only configs_dir is allowed"),
         };
 
         let Err(_) = Cli::try_parse_from([
             "relentless",
             "assault",
-            "--configs",
+            "--file",
             "examples/config/assault.yaml",
             "--dir-config",
             "examples/config",
         ]) else {
-            panic!("dir config and configs are exclusive");
+            panic!("dir and file are exclusive");
         };
     }
 

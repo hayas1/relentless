@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{
+    command::Assault,
     config::{Config, Protocol, Setting, Testcase, WorkerConfig},
     error::{HttpError, RelentlessError, RelentlessResult},
     outcome::{CaseOutcome, Compare, Evaluator, Outcome, Status, WorkerOutcome},
@@ -29,22 +30,25 @@ where
     ReqB::Error: std::error::Error + Sync + Send + 'static,
 {
     /// TODO document
-    pub async fn with_default_http_client(configs: Vec<Config>) -> RelentlessResult<Self> {
+    pub async fn with_default_http_client(cmd: &Assault, configs: Vec<Config>) -> RelentlessResult<Self> {
         let mut workers = Vec::new();
         for config in &configs {
-            workers.push(Worker::with_default_http_client(config.worker_config.clone()).await?);
+            workers.push(Worker::with_default_http_client(cmd, config.worker_config.clone()).await?);
         }
         Ok(Self::new(configs, workers))
     }
     /// TODO document
-    pub async fn read_paths<I: IntoIterator<Item = P>, P: AsRef<std::path::Path>>(paths: I) -> RelentlessResult<Self> {
+    pub async fn read_paths<I: IntoIterator<Item = P>, P: AsRef<std::path::Path>>(
+        cmd: &Assault,
+        paths: I,
+    ) -> RelentlessResult<Self> {
         let configs = paths.into_iter().map(Config::read).collect::<RelentlessResult<Vec<_>>>()?;
-        Self::with_default_http_client(configs).await
+        Self::with_default_http_client(cmd, configs).await
     }
     /// TODO document
-    pub async fn read_dir<P: AsRef<std::path::Path>>(path: P) -> RelentlessResult<Self> {
+    pub async fn read_dir<P: AsRef<std::path::Path>>(cmd: &Assault, path: P) -> RelentlessResult<Self> {
         let configs = Config::read_dir(path)?;
-        Self::with_default_http_client(configs).await
+        Self::with_default_http_client(cmd, configs).await
     }
 }
 impl<S, ReqB, ResB> Control<S, ReqB, ResB>
@@ -65,12 +69,12 @@ where
         Self { configs, workers, cases, phantom }
     }
     /// TODO document
-    pub async fn assault(self) -> RelentlessResult<Outcome> {
+    pub async fn assault(self, cmd: &Assault) -> RelentlessResult<Outcome> {
         let Self { workers, cases, .. } = self;
 
         let mut works = Vec::new();
         for (worker, cases) in workers.into_iter().zip(cases.into_iter()) {
-            works.push(worker.assault(cases));
+            works.push(worker.assault(cases, cmd));
         }
 
         let mut outcomes = Vec::new();
@@ -99,11 +103,11 @@ where
     ReqB::Data: Send + 'static,
     ReqB::Error: std::error::Error + Sync + Send + 'static,
 {
-    pub async fn with_default_http_client(config: WorkerConfig) -> RelentlessResult<Self> {
+    pub async fn with_default_http_client(cmd: &Assault, config: WorkerConfig) -> RelentlessResult<Self> {
         let mut clients = HashMap::new();
-        for (name, destination) in &config.destinations {
-            let host = destination.parse::<http::Uri>()?.authority().unwrap().as_str().to_string(); // TODO
-            clients.insert(name.to_string(), DefaultHttpClient::<ReqB, BytesBody>::new(host).await?);
+        for (name, destination) in cmd.override_destination(&config.destinations) {
+            let authority = destination.parse::<http::Uri>()?.authority().unwrap().as_str().to_string(); // TODO
+            clients.insert(name.to_string(), DefaultHttpClient::<ReqB, BytesBody>::new(authority).await?);
         }
 
         Self::new(config, clients)
@@ -125,13 +129,13 @@ where
         Ok(Self { config, clients, phantom })
     }
 
-    pub async fn assault(self, cases: Vec<Case<S, ReqB, ResB>>) -> RelentlessResult<WorkerOutcome> {
+    pub async fn assault(self, cases: Vec<Case<S, ReqB, ResB>>, cmd: &Assault) -> RelentlessResult<WorkerOutcome> {
         let Self { config, mut clients, .. } = self;
 
         let mut processes = Vec::new();
         for case in cases {
             // TODO do not await here
-            processes.push((case.testcase.clone(), case.process(&mut clients, &config).await));
+            processes.push((case.testcase.clone(), case.process(&mut clients, cmd, &config).await));
         }
 
         let mut outcome = Vec::new();
@@ -174,12 +178,14 @@ where
     pub async fn process(
         self,
         clients: &mut HashMap<String, S>,
+        cmd: &Assault,
         worker_config: &WorkerConfig,
     ) -> RelentlessResult<Vec<http::Response<ResB>>> {
         let setting = &self.testcase.setting.coalesce(&worker_config.setting);
 
         let mut requests = Vec::new();
-        for (name, req) in Self::requests(&worker_config.destinations, &self.testcase.target, setting)? {
+        let destinations = cmd.override_destination(&worker_config.destinations);
+        for (name, req) in Self::requests(&destinations, &self.testcase.target, setting)? {
             let client = clients.get_mut(&name).unwrap(); // TODO
             let request = client.call(req);
             requests.push(request)

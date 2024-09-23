@@ -13,7 +13,7 @@ async fn test_example_assault() {
     let services = vec![("test-api".to_string(), service)].into_iter().collect();
     let relentless =
         Control::<_, Body, Body>::new(vec![config.clone()], vec![Worker::new(config.worker_config, services).unwrap()]);
-    let result = relentless.assault().await.unwrap();
+    let result = relentless.assault(&Default::default()).await.unwrap();
 
     assert!(result.allow(false));
 }
