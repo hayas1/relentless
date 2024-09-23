@@ -1,9 +1,12 @@
+use std::process::ExitCode;
+
 use http_body::Body;
 use http_body_util::BodyExt;
 
 use crate::{
+    command::Assault,
     config::{Testcase, WorkerConfig},
-    error::{HttpError, RelentlessError},
+    error::{HttpError, RelentlessError, RelentlessResult},
 };
 
 #[allow(async_fn_in_trait)] // TODO #[warn(async_fn_in_trait)] by default
@@ -51,8 +54,15 @@ impl Outcome {
     pub fn allow(&self, strict: bool) -> bool {
         self.outcome.iter().all(|o| o.allow(strict))
     }
-    pub fn exit_code(&self, strict: bool) -> std::process::ExitCode {
+    pub fn exit_code(&self, strict: bool) -> ExitCode {
         (!self.allow(strict) as u8).into()
+    }
+    pub fn show(&self, cmd: &Assault) {
+        let side = console::Emoji("🔥", "");
+        println!("{} Relentless Assault Result {}", side, side);
+        for outcome in &self.outcome {
+            outcome.show(cmd);
+        }
     }
 }
 
@@ -72,6 +82,13 @@ impl WorkerOutcome {
     pub fn allow(&self, strict: bool) -> bool {
         self.outcome.iter().all(|o| o.allow(strict))
     }
+    pub fn show(&self, cmd: &Assault) {
+        let side = console::Emoji("📂", "");
+        println!("{} {}", side, self.config.name.as_ref().unwrap_or(&"testcases".to_string()));
+        for outcome in &self.outcome {
+            outcome.show(cmd);
+        }
+    }
 }
 
 /// TODO document
@@ -90,5 +107,15 @@ impl CaseOutcome {
     pub fn allow(&self, strict: bool) -> bool {
         let allowed = self.testcase.attr.allow;
         self.pass() || !strict && allowed
+    }
+    pub fn show(&self, cmd: &Assault) {
+        let side = if self.pass() { console::Emoji("✅", "") } else { console::Emoji("❌", "") };
+        println!("{} {}", side, self.testcase.target);
+        if let Some(desc) = &self.testcase.description {
+            println!("  {} {}", console::Emoji("📝", ""), desc);
+        }
+        if !self.pass() && self.allow(cmd.strict) {
+            println!("  {} {}", console::Emoji("👟", ""), console::style("this testcase is allowed").green());
+        }
     }
 }

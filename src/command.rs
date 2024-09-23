@@ -9,14 +9,16 @@ use crate::Relentless;
 pub async fn execute() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sync>> {
     let cli = Cli::parse();
     match cli.subcommand {
-        SubCommands::Assault(Assault { configs, dir_config, strict }) => {
+        SubCommands::Assault(assault) => {
+            let Assault { configs, dir_config, .. } = &assault;
             let relentless = if let Some(dir) = dir_config {
                 Relentless::read_dir(dir).await?
             } else {
                 Relentless::read_paths(configs).await?
             };
             let outcome = relentless.assault().await?;
-            Ok(outcome.exit_code(strict))
+            outcome.show(&assault);
+            Ok(outcome.exit_code(assault.strict))
         }
     }
 }
@@ -26,7 +28,7 @@ pub async fn execute() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sy
 #[cfg_attr(feature = "cli", clap(version, about, arg_required_else_help = true))]
 pub struct Cli {
     #[cfg_attr(feature = "cli", clap(subcommand))]
-    subcommand: SubCommands,
+    pub subcommand: SubCommands,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -43,15 +45,15 @@ pub enum SubCommands {
 pub struct Assault {
     /// config files of testcases
     #[cfg_attr(feature = "cli", arg(short, long, num_args=0..))]
-    configs: Vec<PathBuf>,
+    pub configs: Vec<PathBuf>,
 
     /// directory of config files
     #[cfg_attr(feature = "cli", arg(short, long))]
-    dir_config: Option<PathBuf>,
+    pub dir_config: Option<PathBuf>,
 
     /// allow invalid testcases
     #[cfg_attr(feature = "cli", arg(short, long, default_value_t = false))]
-    strict: bool,
+    pub strict: bool,
 }
 
 #[cfg(test)]
