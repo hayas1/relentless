@@ -90,8 +90,8 @@ impl WorkerOutcome {
         writeln!(w, "{} {}", side, self.config.name.as_ref().unwrap_or(&"testcases".to_string()))?;
 
         w.scope(|w| {
-            for (name, target) in &self.config.origins {
-                writeln!(w, "{}{} {}", name, console::Emoji("🌐", ":"), target)?;
+            for (name, destination) in &self.config.destinations {
+                writeln!(w, "{}{} {}", name, console::Emoji("🌐", ":"), destination)?;
             }
             Ok(())
         })?;

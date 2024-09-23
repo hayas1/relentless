@@ -101,8 +101,8 @@ where
 {
     pub async fn with_default_http_client(config: WorkerConfig) -> RelentlessResult<Self> {
         let mut clients = HashMap::new();
-        for (name, origin) in &config.origins {
-            let host = origin.parse::<http::Uri>()?.authority().unwrap().as_str().to_string(); // TODO
+        for (name, destination) in &config.destinations {
+            let host = destination.parse::<http::Uri>()?.authority().unwrap().as_str().to_string(); // TODO
             clients.insert(name.to_string(), DefaultHttpClient::<ReqB, BytesBody>::new(host).await?);
         }
 
@@ -179,7 +179,7 @@ where
         let setting = &self.testcase.setting.coalesce(&worker_config.setting);
 
         let mut requests = Vec::new();
-        for (name, req) in Self::requests(&worker_config.origins, &self.testcase.target, setting)? {
+        for (name, req) in Self::requests(&worker_config.destinations, &self.testcase.target, setting)? {
             let client = clients.get_mut(&name).unwrap(); // TODO
             let request = client.call(req);
             requests.push(request)
@@ -195,20 +195,20 @@ where
     }
 
     pub fn requests(
-        origins: &HashMap<String, String>,
+        destinations: &HashMap<String, String>,
         target: &str,
         setting: &Setting,
     ) -> RelentlessResult<HashMap<String, http::Request<ReqB>>> {
         let Setting { protocol, template, timeout } = setting;
-        Ok(origins
+        Ok(destinations
             .iter()
-            .map(|(name, origin)| {
+            .map(|(name, destination)| {
                 let (method, headers, body) = match protocol.clone() {
                     Some(Protocol::Http(http)) => (http.method, http.header, http.body),
                     None => (None, None, None),
                 };
-                let origin = origin.parse::<http::Uri>().unwrap();
-                let uri = http::uri::Builder::from(origin).path_and_query(target).build().unwrap();
+                let destination = destination.parse::<http::Uri>().unwrap();
+                let uri = http::uri::Builder::from(destination).path_and_query(target).build().unwrap();
                 let mut request = http::Request::builder()
                     .uri(uri)
                     .method(method.unwrap_or(http::Method::GET))

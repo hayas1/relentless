@@ -1,5 +1,5 @@
 name: example yaml of basic compare test
-origins:
+destinations:
   actual: http://localhost:3000
   expect: http://localhost:3000
 setting:
