@@ -90,8 +90,17 @@ impl WorkerOutcome {
         writeln!(w, "{} {}", side, self.config.name.as_ref().unwrap_or(&"testcases".to_string()))?;
 
         w.scope(|w| {
+            let overrode = cmd.override_destination(&self.config.destinations);
             for (name, destination) in &self.config.destinations {
-                writeln!(w, "{}{} {}", name, console::Emoji("🌐", ":"), destination)?;
+                write!(w, "{}{} ", name, console::Emoji("🌐", ":"))?;
+                match overrode.get(name) {
+                    Some(overridden) if overridden != destination => {
+                        writeln!(w, "{} {} {}", destination, console::Emoji("👉", "->"), overridden)?;
+                    }
+                    _ => {
+                        writeln!(w, "{}", destination)?;
+                    }
+                }
             }
             Ok(())
         })?;
