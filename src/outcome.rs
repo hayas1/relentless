@@ -62,8 +62,6 @@ impl Outcome {
     }
     // TODO trait ?
     pub fn write<T: std::io::Write>(&self, w: &mut OutcomeWriter<T>, cmd: &Assault) -> std::fmt::Result {
-        let side = console::Emoji("🚀", "");
-        writeln!(w, "{} Relentless Assault Result {}", side, side)?;
         for outcome in &self.outcome {
             outcome.write(w, cmd)?;
         }
@@ -88,8 +86,16 @@ impl WorkerOutcome {
         self.outcome.iter().all(|o| o.allow(strict))
     }
     pub fn write<T: std::io::Write>(&self, w: &mut OutcomeWriter<T>, cmd: &Assault) -> std::fmt::Result {
-        let side = console::Emoji("📂", "");
+        let side = console::Emoji("🚀", "");
         writeln!(w, "{} {}", side, self.config.name.as_ref().unwrap_or(&"testcases".to_string()))?;
+
+        w.scope(|w| {
+            for (name, target) in &self.config.origins {
+                writeln!(w, "{}{} {}", name, console::Emoji("🌐", ":"), target)?;
+            }
+            Ok(())
+        })?;
+
         w.scope(|w| {
             for outcome in &self.outcome {
                 outcome.write(w, cmd)?;
