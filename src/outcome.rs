@@ -1,6 +1,6 @@
 use std::{
-    fmt::{Display, Formatter},
-    io::{BufRead, Write},
+    fmt::{Display, Formatter, Write as _},
+    io::{BufRead, Write as _},
     process::ExitCode,
 };
 
@@ -62,14 +62,12 @@ impl Outcome {
         (!self.allow(strict) as u8).into()
     }
     // TODO trait ?
-    pub fn write<T: Write>(&self, w: &mut OutcomeWriter<T>, cmd: &Assault) -> std::io::Result<()> {
+    pub fn write<T: std::io::Write>(&self, w: &mut OutcomeWriter<T>, cmd: &Assault) -> std::fmt::Result {
         let side = console::Emoji("🚀", "");
         writeln!(w, "{} Relentless Assault Result {}", side, side)?;
-        w.increment();
         for outcome in &self.outcome {
             outcome.write(w, cmd)?;
         }
-        w.decrement();
         Ok(())
     }
 }
@@ -90,7 +88,7 @@ impl WorkerOutcome {
     pub fn allow(&self, strict: bool) -> bool {
         self.outcome.iter().all(|o| o.allow(strict))
     }
-    pub fn write<T: Write>(&self, w: &mut OutcomeWriter<T>, cmd: &Assault) -> std::io::Result<()> {
+    pub fn write<T: std::io::Write>(&self, w: &mut OutcomeWriter<T>, cmd: &Assault) -> std::fmt::Result {
         let side = console::Emoji("📂", "");
         writeln!(w, "{} {}", side, self.config.name.as_ref().unwrap_or(&"testcases".to_string()))?;
         w.increment();
@@ -119,17 +117,18 @@ impl CaseOutcome {
         let allowed = self.testcase.attr.allow;
         self.pass() || !strict && allowed
     }
-    pub fn write<T: Write>(&self, w: &mut OutcomeWriter<T>, cmd: &Assault) -> std::io::Result<()> {
-        let side = if self.pass() { console::Emoji("✅", "") } else { console::Emoji("❌", "") };
-        writeln!(w, "{} {}", side, self.testcase.target)?;
-        if let Some(desc) = &self.testcase.description {
-            w.increment();
-            writeln!(w, "  {} {}", console::Emoji("📝", ""), desc)?;
-            w.decrement();
+    pub fn write<T: std::io::Write>(&self, w: &mut OutcomeWriter<T>, cmd: &Assault) -> std::fmt::Result {
+        let side = if self.pass() { console::Emoji("✅", "PASS") } else { console::Emoji("❌", "FAIL") };
+        let target = console::style(&self.testcase.target);
+        write!(w, "{} {} ", side, if self.pass() { target.green() } else { target.red() })?;
+        if let Some(ref description) = self.testcase.description {
+            writeln!(w, "{} {}", console::Emoji("📝", ""), description)?;
+        } else {
+            writeln!(w)?;
         }
         if !self.pass() && self.allow(cmd.strict) {
             w.increment();
-            writeln!(w, "  {} {}", console::Emoji("👟", ""), console::style("this testcase is allowed").green())?;
+            writeln!(w, "{} {}", console::Emoji("👟", ""), console::style("this testcase is allowed").green())?;
             w.decrement();
         }
         Ok(())
@@ -139,6 +138,7 @@ impl CaseOutcome {
 pub struct OutcomeWriter<T> {
     pub indent: usize,
     pub buf: T,
+    pub at_start_line: bool,
 }
 impl OutcomeWriter<std::io::BufWriter<std::io::Stdout>> {
     pub fn new_stdout(indent: usize) -> Self {
@@ -148,10 +148,11 @@ impl OutcomeWriter<std::io::BufWriter<std::io::Stdout>> {
 }
 impl<T> OutcomeWriter<T> {
     pub fn new(indent: usize, buf: T) -> Self {
-        Self { indent, buf }
+        let at_start_line = true;
+        Self { indent, buf, at_start_line }
     }
-    pub fn indent(&self) -> Vec<u8> {
-        b"  ".repeat(self.indent)
+    pub fn indent(&self) -> String {
+        "  ".repeat(self.indent)
     }
     pub fn increment(&mut self) {
         self.indent += 1;
@@ -160,23 +161,26 @@ impl<T> OutcomeWriter<T> {
         self.indent -= 1;
     }
 }
-impl<T: Write> Write for OutcomeWriter<T> {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        // TODO better implementation ?
-        let mut sum = 0;
-        if buf.contains(&b'\n') {
-            for line in buf.lines() {
-                let _ = self.buf.write(&self.indent())?;
-                sum += self.buf.write(line?.as_bytes())?;
-                sum += self.buf.write(b"\n")?;
+impl<T: std::io::Write> std::fmt::Write for OutcomeWriter<T> {
+    fn write_str(&mut self, s: &str) -> std::fmt::Result {
+        // TODO better indent implementation ?
+        if s.contains('\n') {
+            for line in s.lines() {
+                if self.at_start_line {
+                    write!(self.buf, "{}", self.indent()).map_err(|_| std::fmt::Error)?;
+                    self.at_start_line = false;
+                }
+                writeln!(self.buf, "{}", line).map_err(|_| std::fmt::Error)?;
+                self.at_start_line = true;
             }
         } else {
-            sum += self.buf.write(buf)?;
+            if self.at_start_line {
+                write!(self.buf, "{}", self.indent()).map_err(|_| std::fmt::Error)?;
+                self.at_start_line = false;
+            }
+            write!(self.buf, "{}", s).map_err(|_| std::fmt::Error)?;
         }
-        Ok(sum)
-    }
-    fn flush(&mut self) -> std::io::Result<()> {
-        self.buf.flush()
+        Ok(())
     }
 }
 impl<T: Display> Display for OutcomeWriter<T> {
