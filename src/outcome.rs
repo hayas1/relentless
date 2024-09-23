@@ -1,6 +1,5 @@
 use std::{
     fmt::{Display, Formatter, Write as _},
-    io::{BufRead, Write as _},
     process::ExitCode,
 };
 
@@ -10,7 +9,7 @@ use http_body_util::BodyExt;
 use crate::{
     command::Assault,
     config::{Testcase, WorkerConfig},
-    error::{HttpError, RelentlessError, RelentlessResult},
+    error::{HttpError, RelentlessError},
 };
 
 #[allow(async_fn_in_trait)] // TODO #[warn(async_fn_in_trait)] by default
@@ -142,7 +141,7 @@ pub struct OutcomeWriter<T> {
     pub at_start_line: bool,
 }
 impl OutcomeWriter<std::io::BufWriter<std::io::Stdout>> {
-    pub fn new_stdout(indent: usize) -> Self {
+    pub fn with_stdout(indent: usize) -> Self {
         let buf = std::io::BufWriter::new(std::io::stdout());
         Self::new(indent, buf)
     }

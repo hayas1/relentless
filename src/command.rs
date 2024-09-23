@@ -3,14 +3,16 @@ use std::{path::PathBuf, process::ExitCode};
 #[cfg(feature = "cli")]
 use clap::{ArgGroup, Parser, Subcommand};
 
-use crate::Relentless;
+use crate::{outcome::OutcomeWriter, Relentless};
 
 #[cfg(feature = "cli")]
 pub async fn execute() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sync>> {
-    use crate::outcome::OutcomeWriter;
-
     let cli = Cli::parse();
-    match cli.subcommand {
+    let Cli { subcommand, no_color } = &cli;
+
+    console::set_colors_enabled(!no_color);
+
+    match subcommand {
         SubCommands::Assault(assault) => {
             let Assault { configs, dir_config, .. } = &assault;
             let relentless = if let Some(dir) = dir_config {
@@ -20,9 +22,8 @@ pub async fn execute() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sy
             };
             let outcome = relentless.assault().await?;
 
-            let mut writer = OutcomeWriter::new_stdout(0);
-            outcome.write(&mut writer, &assault)?;
-            // println!("{}", writer);
+            let mut writer = OutcomeWriter::with_stdout(0);
+            outcome.write(&mut writer, assault)?;
             Ok(outcome.exit_code(assault.strict))
         }
     }
@@ -34,6 +35,10 @@ pub async fn execute() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sy
 pub struct Cli {
     #[cfg_attr(feature = "cli", clap(subcommand))]
     pub subcommand: SubCommands,
+
+    /// without colorize output
+    #[cfg_attr(feature = "cli", arg(short, long, default_value_t = false))]
+    pub no_color: bool,
 }
 
 #[derive(Debug, PartialEq, Eq)]
