@@ -20,9 +20,9 @@ pub async fn execute() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sy
             };
             let outcome = relentless.assault().await?;
 
-            let mut writer = OutcomeWriter::new(0);
+            let mut writer = OutcomeWriter::new_stdout(0);
             outcome.write(&mut writer, &assault)?;
-            println!("{}", writer);
+            // println!("{}", writer);
             Ok(outcome.exit_code(assault.strict))
         }
     }
