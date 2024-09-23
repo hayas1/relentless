@@ -5,7 +5,7 @@ pub mod state;
 
 pub async fn serve(env: env::Env) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     tracing_subscriber::fmt::init();
-    let listener = tokio::net::TcpListener::bind(&env.bind).await?;
+    let listener = tokio::net::TcpListener::bind(&env.bind()).await?;
     let state = state::AppState { env };
     let app = route::app(state.clone());
     tracing::info!("start app on {}", listener.local_addr()?);
