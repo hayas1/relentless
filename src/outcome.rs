@@ -1,4 +1,7 @@
-use std::process::ExitCode;
+use std::{
+    fmt::{Display, Formatter, Write},
+    process::ExitCode,
+};
 
 use http_body::Body;
 use http_body_util::BodyExt;
@@ -57,12 +60,15 @@ impl Outcome {
     pub fn exit_code(&self, strict: bool) -> ExitCode {
         (!self.allow(strict) as u8).into()
     }
-    pub fn show(&self, cmd: &Assault) {
+    pub fn show(&self, f: &mut OutcomeFormatter, cmd: &Assault) -> std::fmt::Result {
         let side = console::Emoji("🔥", "");
-        println!("{} Relentless Assault Result {}", side, side);
+        writeln!(f, "{} Relentless Assault Result {}", side, side)?;
+        f.increment();
         for outcome in &self.outcome {
-            outcome.show(cmd);
+            outcome.show(f, cmd)?;
         }
+        f.decrement();
+        Ok(())
     }
 }
 
@@ -82,12 +88,15 @@ impl WorkerOutcome {
     pub fn allow(&self, strict: bool) -> bool {
         self.outcome.iter().all(|o| o.allow(strict))
     }
-    pub fn show(&self, cmd: &Assault) {
+    pub fn show(&self, f: &mut OutcomeFormatter, cmd: &Assault) -> std::fmt::Result {
         let side = console::Emoji("📂", "");
-        println!("{} {}", side, self.config.name.as_ref().unwrap_or(&"testcases".to_string()));
+        writeln!(f, "{} {}", side, self.config.name.as_ref().unwrap_or(&"testcases".to_string()))?;
+        f.increment();
         for outcome in &self.outcome {
-            outcome.show(cmd);
+            outcome.show(f, cmd)?;
         }
+        f.decrement();
+        Ok(())
     }
 }
 
@@ -108,14 +117,54 @@ impl CaseOutcome {
         let allowed = self.testcase.attr.allow;
         self.pass() || !strict && allowed
     }
-    pub fn show(&self, cmd: &Assault) {
+    pub fn show(&self, f: &mut OutcomeFormatter, cmd: &Assault) -> std::fmt::Result {
         let side = if self.pass() { console::Emoji("✅", "") } else { console::Emoji("❌", "") };
-        println!("{} {}", side, self.testcase.target);
+        writeln!(f, "{} {}", side, self.testcase.target)?;
         if let Some(desc) = &self.testcase.description {
-            println!("  {} {}", console::Emoji("📝", ""), desc);
+            f.increment();
+            writeln!(f, "  {} {}", console::Emoji("📝", ""), desc)?;
+            f.decrement();
         }
         if !self.pass() && self.allow(cmd.strict) {
-            println!("  {} {}", console::Emoji("👟", ""), console::style("this testcase is allowed").green());
+            f.increment();
+            writeln!(f, "  {} {}", console::Emoji("👟", ""), console::style("this testcase is allowed").green())?;
+            f.decrement();
         }
+        Ok(())
+    }
+}
+
+pub struct OutcomeFormatter {
+    pub indent: usize,
+    pub buf: String, // TODO String?
+}
+impl OutcomeFormatter {
+    pub fn new(indent: usize) -> Self {
+        let buf = String::new();
+        Self { indent, buf }
+    }
+    pub fn increment(&mut self) {
+        self.indent += 1;
+    }
+    pub fn decrement(&mut self) {
+        self.indent -= 1;
+    }
+}
+impl Write for OutcomeFormatter {
+    fn write_str(&mut self, s: &str) -> std::fmt::Result {
+        // TODO better implementation?
+        if s.contains("\n") {
+            for line in s.lines() {
+                writeln!(self.buf, "{}{}", "  ".repeat(self.indent), line)?;
+            }
+        } else {
+            write!(self.buf, "{}", s)?;
+        }
+        Ok(())
+    }
+}
+impl Display for OutcomeFormatter {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.buf)
     }
 }
