@@ -130,6 +130,7 @@ where
 
         let mut processes = Vec::new();
         for case in cases {
+            // TODO do not await here
             processes.push((case.testcase.clone(), case.process(&mut clients, &config).await));
         }
 
