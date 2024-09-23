@@ -4,7 +4,7 @@ use clap::{ArgGroup, Parser, Subcommand};
 
 use crate::Relentless;
 
-pub async fn run() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sync>> {
+pub async fn execute() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sync>> {
     let cli = Cli::parse();
     match cli.subcommand {
         SubCommands::Assault(Assault { configs, dir_config, strict }) => {

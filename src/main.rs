@@ -1,8 +1,8 @@
 use std::process::ExitCode;
 
-use relentless::cli::run;
-#[tokio::main]
+use relentless::command::execute;
 
+#[tokio::main]
 pub async fn main() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sync>> {
-    run().await
+    execute().await
 }
