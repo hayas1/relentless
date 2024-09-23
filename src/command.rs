@@ -135,7 +135,7 @@ mod tests {
             Err(_) => panic!("multiple file is allowed"),
         };
 
-        match Cli::try_parse_from(["relentless", "assault", "--dir-config", "examples/config"]) {
+        match Cli::try_parse_from(["relentless", "assault", "--configs-dir", "examples/config"]) {
             Ok(cli) => assert_eq!(
                 cli.subcommand,
                 SubCommands::Assault(Assault {
@@ -152,7 +152,7 @@ mod tests {
             "assault",
             "--file",
             "examples/config/assault.yaml",
-            "--dir-config",
+            "--configs-dir",
             "examples/config",
         ]) else {
             panic!("dir and file are exclusive");
@@ -162,15 +162,15 @@ mod tests {
     #[test]
     #[cfg(feature = "cli")]
     fn test_no_color_arg_position() {
-        match Cli::try_parse_from(["relentless", "assault", "-d", "examples/config"]) {
+        match Cli::try_parse_from(["relentless", "assault", "-c", "examples/config"]) {
             Ok(cli) => assert!(!cli.no_color),
             Err(_) => panic!("--no-color is optional, default is false"),
         }
-        match Cli::try_parse_from(["relentless", "--no-color", "assault", "-d", "examples/config"]) {
+        match Cli::try_parse_from(["relentless", "--no-color", "assault", "-c", "examples/config"]) {
             Ok(cli) => assert!(cli.no_color),
             Err(_) => panic!("--no-color is main command option"),
         };
-        match Cli::try_parse_from(["relentless", "assault", "-d", "examples/config", "--no-color"]) {
+        match Cli::try_parse_from(["relentless", "assault", "-c", "examples/config", "--no-color"]) {
             Ok(cli) => assert!(cli.no_color),
             Err(_) => panic!("--no-color is main command option, but it is global"),
         };
