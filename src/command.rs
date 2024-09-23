@@ -37,7 +37,7 @@ pub struct Cli {
     pub subcommand: SubCommands,
 
     /// without colorize output
-    #[cfg_attr(feature = "cli", arg(short, long, default_value_t = false))]
+    #[cfg_attr(feature = "cli", arg(long, global = true))]
     pub no_color: bool,
 }
 
@@ -62,7 +62,7 @@ pub struct Assault {
     pub dir_config: Option<PathBuf>,
 
     /// allow invalid testcases
-    #[cfg_attr(feature = "cli", arg(short, long, default_value_t = false))]
+    #[cfg_attr(feature = "cli", arg(short, long))]
     pub strict: bool,
 }
 
@@ -72,7 +72,7 @@ mod tests {
 
     #[test]
     #[cfg(feature = "cli")]
-    fn exclude_configs_or_dir() {
+    fn test_exclude_configs_or_dir() {
         let Err(_) = Cli::try_parse_from(["relentless", "assault"]) else {
             panic!("dir config or configs must be specified");
         };
@@ -131,6 +131,23 @@ mod tests {
             "examples/config",
         ]) else {
             panic!("dir config and configs are exclusive");
+        };
+    }
+
+    #[test]
+    #[cfg(feature = "cli")]
+    fn test_no_color_arg_position() {
+        match Cli::try_parse_from(["relentless", "assault", "-d", "examples/config"]) {
+            Ok(cli) => assert!(!cli.no_color),
+            Err(_) => panic!("--no-color is optional, default is false"),
+        }
+        match Cli::try_parse_from(["relentless", "--no-color", "assault", "-d", "examples/config"]) {
+            Ok(cli) => assert!(cli.no_color),
+            Err(_) => panic!("--no-color is main command option"),
+        };
+        match Cli::try_parse_from(["relentless", "assault", "-d", "examples/config", "--no-color"]) {
+            Ok(cli) => assert!(cli.no_color),
+            Err(_) => panic!("--no-color is main command option, but it is global"),
         };
     }
 }
