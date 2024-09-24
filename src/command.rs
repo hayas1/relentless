@@ -39,6 +39,27 @@ pub struct Cmd {
     #[cfg_attr(feature = "cli", arg(long, global = true))]
     pub no_color: bool,
 }
+impl Cmd {
+    #[cfg(feature = "cli")]
+    pub fn parse_key_value<T, U>(s: &str) -> Result<(T, U), Box<dyn std::error::Error + Send + Sync + 'static>>
+    where
+        T: std::str::FromStr,
+        T::Err: std::error::Error + Send + Sync + 'static,
+        U: std::str::FromStr,
+        U::Err: std::error::Error + Send + Sync + 'static,
+    {
+        let (name, destination) =
+            s.split_once('=').ok_or_else(|| format!("invalid KEY=value: no `=` found in `{}`", s))?;
+        Ok((name.parse()?, destination.parse()?))
+    }
+
+    // TODO return Result
+    pub fn assault(&self) -> Option<&Assault> {
+        match &self.subcommand {
+            SubCommands::Assault(assault) => Some(assault),
+        }
+    }
+}
 
 #[derive(Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "cli", derive(Subcommand))]
@@ -61,7 +82,7 @@ pub struct Assault {
     pub configs_dir: Option<PathBuf>,
 
     /// override destinations
-    #[cfg_attr(feature = "cli", arg(short, long, num_args=0.., value_parser = Self::parse_destination::<String, String>, number_of_values=1))]
+    #[cfg_attr(feature = "cli", arg(short, long, num_args=0.., value_parser = Cmd::parse_key_value::<String, String>, number_of_values=1))]
     pub destination: Vec<(String, String)>, // TODO HashMap<String, Uri>
 
     /// allow invalid testcases
@@ -69,19 +90,6 @@ pub struct Assault {
     pub strict: bool,
 }
 impl Assault {
-    #[cfg(feature = "cli")]
-    pub fn parse_destination<T, U>(s: &str) -> Result<(T, U), Box<dyn std::error::Error + Send + Sync + 'static>>
-    where
-        T: std::str::FromStr,
-        T::Err: std::error::Error + Send + Sync + 'static,
-        U: std::str::FromStr,
-        U::Err: std::error::Error + Send + Sync + 'static,
-    {
-        let (name, destination) =
-            s.split_once('=').ok_or_else(|| format!("invalid KEY=value: no `=` found in `{}`", s))?;
-        Ok((name.parse()?, destination.parse()?))
-    }
-
     pub fn override_destination(&self, other: &HashMap<String, String>) -> HashMap<String, String> {
         let mut map = other.clone();
         for (name, dest) in &self.destination {
