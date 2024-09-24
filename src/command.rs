@@ -3,29 +3,13 @@ use std::{collections::HashMap, path::PathBuf, process::ExitCode};
 #[cfg(feature = "cli")]
 use clap::{ArgGroup, Parser, Subcommand};
 
-use crate::Relentless;
+use crate::{error::RelentlessResult, Relentless};
 
 #[cfg(feature = "cli")]
 pub async fn execute() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sync>> {
-    let cli = Cmd::parse();
-    let Cmd { subcommand, no_color } = &cli;
-
-    console::set_colors_enabled(!no_color);
-
-    match subcommand {
-        SubCommands::Assault(assault) => {
-            let Assault { file, configs_dir, .. } = &assault;
-            let relentless = if let Some(dir) = configs_dir {
-                Relentless::read_dir(assault, dir).await?
-            } else {
-                Relentless::read_paths(assault, file).await?
-            };
-
-            let outcome = relentless.assault(assault).await?;
-            outcome.report(assault)?;
-            Ok(outcome.exit_code(assault.strict))
-        }
-    }
+    let cmd = Cmd::parse();
+    let status = cmd.run().await?;
+    Ok(status)
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -51,6 +35,27 @@ impl Cmd {
         let (name, destination) =
             s.split_once('=').ok_or_else(|| format!("invalid KEY=value: no `=` found in `{}`", s))?;
         Ok((name.parse()?, destination.parse()?))
+    }
+
+    pub async fn run(&self) -> RelentlessResult<ExitCode> {
+        let Cmd { subcommand, no_color } = self;
+
+        console::set_colors_enabled(!no_color);
+
+        match subcommand {
+            SubCommands::Assault(assault) => {
+                let Assault { file, configs_dir, .. } = &assault;
+                let relentless = if let Some(dir) = configs_dir {
+                    Relentless::read_dir(assault, dir).await?
+                } else {
+                    Relentless::read_paths(assault, file).await?
+                };
+
+                let outcome = relentless.assault(assault).await?;
+                outcome.report(assault)?;
+                Ok(outcome.exit_code(assault.strict))
+            }
+        }
     }
 
     // TODO return Result

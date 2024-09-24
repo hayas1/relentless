@@ -13,6 +13,7 @@ pub enum RelentlessError {
     HttpInvalidUri(#[from] http::uri::InvalidUri),
     TokioTaskJoinError(#[from] tokio::task::JoinError),
     StdIoError(#[from] std::io::Error),
+    StdFmtError(#[from] std::fmt::Error),
     Infallible(#[from] std::convert::Infallible),
 
     BoxError(#[from] Box<dyn std::error::Error + Send + Sync>),
