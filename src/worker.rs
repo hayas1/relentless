@@ -13,16 +13,9 @@ use tower::Service;
 /// TODO document
 #[derive(Debug, Clone)]
 pub struct Control<S = DefaultHttpClient<BytesBody, BytesBody>, ReqB = BytesBody, ResB = BytesBody> {
-    configs: Vec<Config>,                // TODO remove this ?
     workers: Vec<Worker<S, ReqB, ResB>>, // TODO all worker do not have same clients type ?
     cases: Vec<Vec<Case<S, ReqB, ResB>>>,
     phantom: std::marker::PhantomData<(ReqB, ResB)>,
-}
-impl<S, ReqB, ResB> Control<S, ReqB, ResB> {
-    /// TODO document
-    pub fn configs(&self) -> &Vec<Config> {
-        &self.configs
-    }
 }
 impl<ReqB> Control<DefaultHttpClient<ReqB, BytesBody>, ReqB, BytesBody>
 where
@@ -67,7 +60,7 @@ where
     pub fn new(configs: Vec<Config>, workers: Vec<Worker<S, ReqB, ResB>>) -> Self {
         let cases = configs.iter().map(|c| c.testcase.clone().into_iter().map(Case::new).collect()).collect();
         let phantom = std::marker::PhantomData;
-        Self { configs, workers, cases, phantom }
+        Self { workers, cases, phantom }
     }
     /// TODO document
     pub async fn assault(self, cmd: &Assault) -> RelentlessResult<Outcome> {
