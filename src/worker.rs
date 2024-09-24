@@ -146,6 +146,7 @@ where
 #[derive(Debug, Clone)]
 pub struct Case<S, ReqB, ResB> {
     testcase: Testcase,
+    // request: http::Request<ReqB>, // TODO!!! this
     phantom: std::marker::PhantomData<(S, ReqB, ResB)>,
 }
 impl<S, ReqB, ResB> Case<S, ReqB, ResB> {
