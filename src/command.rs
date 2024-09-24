@@ -3,7 +3,7 @@ use std::{collections::HashMap, path::PathBuf, process::ExitCode};
 #[cfg(feature = "cli")]
 use clap::{ArgGroup, Parser, Subcommand};
 
-use crate::{error::RelentlessResult, Relentless};
+use crate::{context::Context, error::RelentlessResult, Relentless};
 
 #[cfg(feature = "cli")]
 pub async fn execute() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sync>> {
@@ -37,25 +37,11 @@ impl Cmd {
         Ok((name.parse()?, destination.parse()?))
     }
 
-    pub async fn run(&self) -> RelentlessResult<ExitCode> {
-        let Cmd { subcommand, no_color } = self;
+    pub async fn run(self) -> RelentlessResult<ExitCode> {
+        let ctx = Context::from_cmd(self);
+        let status = ctx.relentless().await?; // TODO subcommand
 
-        console::set_colors_enabled(!no_color);
-
-        match subcommand {
-            SubCommands::Assault(assault) => {
-                let Assault { file, configs_dir, .. } = &assault;
-                let relentless = if let Some(dir) = configs_dir {
-                    Relentless::read_dir(assault, dir).await?
-                } else {
-                    Relentless::read_paths(assault, file).await?
-                };
-
-                let outcome = relentless.assault(assault).await?;
-                outcome.report(assault)?;
-                Ok(outcome.exit_code(assault.strict))
-            }
-        }
+        Ok(status)
     }
 
     // TODO return Result
