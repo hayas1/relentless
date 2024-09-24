@@ -56,6 +56,13 @@ where
     S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + Sync + 'static,
     RelentlessError: From<S::Error>,
 {
+    pub fn with_service(configs: Vec<Config>, services: Vec<HashMap<String, S>>) -> RelentlessResult<Self> {
+        let mut workers = Vec::new();
+        for (config, service) in configs.iter().zip(services) {
+            workers.push(Worker::new(config.worker_config.clone(), service)?);
+        }
+        Ok(Self::new(configs, workers))
+    }
     /// TODO document
     pub fn new(configs: Vec<Config>, workers: Vec<Worker<S, ReqB, ResB>>) -> Self {
         let cases = configs.iter().map(|c| c.testcase.clone().into_iter().map(Case::new).collect()).collect();
