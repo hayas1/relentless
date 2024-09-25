@@ -3,19 +3,20 @@ use std::{collections::HashMap, path::PathBuf, process::ExitCode};
 #[cfg(feature = "cli")]
 use clap::{ArgGroup, Parser, Subcommand};
 
-use crate::{context::ContextBuilder, error::RelentlessResult, Relentless};
+use crate::{error::RelentlessResult, outcome::Outcome, Relentless};
 
 #[cfg(feature = "cli")]
 pub async fn execute() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sync>> {
     let cmd = Cmd::parse();
-    let status = cmd.run().await?;
+    let status = cmd.execute().await?;
     Ok(status)
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 #[cfg_attr(feature = "cli", derive(Parser))]
 #[cfg_attr(feature = "cli", clap(version, about, arg_required_else_help = true))]
 pub struct Cmd {
+    /// subcommand
     #[cfg_attr(feature = "cli", clap(subcommand))]
     pub subcommand: SubCommands,
 
@@ -24,9 +25,16 @@ pub struct Cmd {
     pub no_color: bool,
 }
 impl Cmd {
-    pub async fn run(self) -> RelentlessResult<ExitCode> {
-        let ctx = ContextBuilder::from_cmd(self);
-        let status = ctx.relentless().await?; // TODO subcommand
+    pub async fn execute(self) -> RelentlessResult<ExitCode> {
+        let Self { subcommand, no_color } = self;
+        console::set_colors_enabled(!no_color);
+
+        let status = match subcommand {
+            SubCommands::Assault(assault) => {
+                let strict = assault.strict;
+                assault.execute().await?.exit_code(strict)
+            }
+        };
 
         Ok(status)
     }
@@ -59,6 +67,11 @@ pub enum SubCommands {
     #[cfg_attr(feature = "cli", clap(arg_required_else_help = true))]
     Assault(Assault),
 }
+impl Default for SubCommands {
+    fn default() -> Self {
+        Self::Assault(Default::default())
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 #[cfg_attr(feature = "cli", derive(Parser))]
@@ -79,8 +92,39 @@ pub struct Assault {
     /// allow invalid testcases
     #[cfg_attr(feature = "cli", arg(short, long))]
     pub strict: bool,
+
+    /// report only failed testcases
+    #[cfg_attr(feature = "cli", arg(long))]
+    pub ng_only: bool,
+
+    /// report nothing
+    #[cfg_attr(feature = "cli", arg(long))]
+    pub no_report: bool,
+
+    /// do not save outcomes
+    #[cfg_attr(feature = "cli", arg(long))]
+    pub no_save: bool,
+
+    /// number of threads
+    #[cfg_attr(feature = "cli", arg(short, long))]
+    pub number_of_threads: Option<usize>,
 }
 impl Assault {
+    pub async fn execute(&self) -> RelentlessResult<Outcome> {
+        let Self { file, configs_dir, .. } = self;
+        let control = if let Some(dir) = configs_dir {
+            Relentless::read_dir(self, dir).await?
+        } else {
+            Relentless::read_paths(self, file).await?
+        };
+
+        let outcome = control.assault(self).await?;
+        if !self.no_report {
+            outcome.report(self)?;
+        }
+        Ok(outcome)
+    }
+
     pub fn override_destination(&self, other: &HashMap<String, String>) -> HashMap<String, String> {
         let mut map = other.clone();
         for (name, dest) in &self.destination {
