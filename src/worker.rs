@@ -56,6 +56,7 @@ where
     S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + Sync + 'static,
     RelentlessError: From<S::Error>,
 {
+    /// TODO document
     pub fn with_service(configs: Vec<Config>, services: Vec<HashMap<String, S>>) -> RelentlessResult<Self> {
         let mut workers = Vec::new();
         for (config, service) in configs.iter().zip(services) {
@@ -75,7 +76,7 @@ where
 
         let mut works = Vec::new();
         for (worker, cases) in workers.into_iter().zip(cases.into_iter()) {
-            works.push(worker.assault(cases, cmd));
+            works.push(worker.assault(cmd, cases));
         }
 
         let mut outcomes = Vec::new();
@@ -130,13 +131,13 @@ where
         Ok(Self { config, clients, phantom })
     }
 
-    pub async fn assault(self, cases: Vec<Case<S, ReqB, ResB>>, cmd: &Assault) -> RelentlessResult<WorkerOutcome> {
+    pub async fn assault(self, cmd: &Assault, cases: Vec<Case<S, ReqB, ResB>>) -> RelentlessResult<WorkerOutcome> {
         let Self { config, mut clients, .. } = self;
 
         let mut processes = Vec::new();
         for case in cases {
             // TODO do not await here
-            processes.push((case.testcase.clone(), case.process(&mut clients, cmd, &config).await));
+            processes.push((case.testcase.clone(), case.process(cmd, &config, &mut clients).await));
         }
 
         let mut outcome = Vec::new();
@@ -153,7 +154,6 @@ where
 #[derive(Debug, Clone)]
 pub struct Case<S, ReqB, ResB> {
     testcase: Testcase,
-    // request: http::Request<ReqB>, // TODO!!! this
     phantom: std::marker::PhantomData<(S, ReqB, ResB)>,
 }
 impl<S, ReqB, ResB> Case<S, ReqB, ResB> {
@@ -179,9 +179,9 @@ where
 
     pub async fn process(
         self,
-        clients: &mut HashMap<String, S>,
         cmd: &Assault,
         worker_config: &WorkerConfig,
+        clients: &mut HashMap<String, S>,
     ) -> RelentlessResult<Vec<http::Response<ResB>>> {
         let setting = &self.testcase.setting.coalesce(&worker_config.setting);
 
