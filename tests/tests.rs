@@ -1,7 +1,7 @@
 use axum::body::Body;
 use relentless::{
     config::Config,
-    context::Context,
+    context::ContextBuilder,
     worker::{Control, Worker},
 };
 
@@ -16,7 +16,7 @@ async fn test_example_assault() {
     //     Control::<_, Body, Body>::new(vec![config.clone()], vec![Worker::new(config.worker_config, services).unwrap()]);
     // let result = relentless.assault(&Default::default()).await.unwrap();
 
-    let result = Context::assault_with_config(vec![config])
+    let result = ContextBuilder::assault_with_config(vec![config])
         .relentless_with_service::<_, Body, Body>(vec![services])
         .await
         .unwrap();

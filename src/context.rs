@@ -12,14 +12,12 @@ use crate::{
     worker::Control,
     Relentless,
 };
-
-// TODO ContextBuilder
 #[derive(Debug, Clone)]
-pub struct Context<C = (), F = ()> {
+pub struct ContextBuilder<C = (), F = ()> {
     pub cmd: C,
     pub config: F,
 }
-impl<C, F> Context<C, F> {
+impl<C, F> ContextBuilder<C, F> {
     /// TODO document
     pub fn new(cmd: C, config: F) -> Self {
         Self { cmd, config }
@@ -35,13 +33,13 @@ impl<C, F> Context<C, F> {
         Self { config, ..self }
     }
 }
-impl<C> Context<C, ()> {
+impl<C> ContextBuilder<C, ()> {
     /// TODO document
     pub fn from_cmd(cmd: C) -> Self {
         Self { cmd, config: () }
     }
 }
-impl<F> Context<Cmd, F> {
+impl<F> ContextBuilder<Cmd, F> {
     /// TODO document
     pub fn no_color(mut self, no_color: bool) -> Self {
         self.cmd.no_color = no_color;
@@ -71,7 +69,7 @@ impl<F> Context<Cmd, F> {
         Ok(outcome.exit_code(false))
     }
 }
-impl Context<Cmd, Vec<Config>> {
+impl ContextBuilder<Cmd, Vec<Config>> {
     /// TODO document
     pub fn assault_with_config(config: Vec<Config>) -> Self {
         let cmd = Cmd { subcommand: SubCommands::Assault(Default::default()), no_color: false };

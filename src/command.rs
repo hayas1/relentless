@@ -3,7 +3,7 @@ use std::{collections::HashMap, path::PathBuf, process::ExitCode};
 #[cfg(feature = "cli")]
 use clap::{ArgGroup, Parser, Subcommand};
 
-use crate::{context::Context, error::RelentlessResult, Relentless};
+use crate::{context::ContextBuilder, error::RelentlessResult, Relentless};
 
 #[cfg(feature = "cli")]
 pub async fn execute() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sync>> {
@@ -24,6 +24,13 @@ pub struct Cmd {
     pub no_color: bool,
 }
 impl Cmd {
+    pub async fn run(self) -> RelentlessResult<ExitCode> {
+        let ctx = ContextBuilder::from_cmd(self);
+        let status = ctx.relentless().await?; // TODO subcommand
+
+        Ok(status)
+    }
+
     #[cfg(feature = "cli")]
     pub fn parse_key_value<T, U>(s: &str) -> Result<(T, U), Box<dyn std::error::Error + Send + Sync + 'static>>
     where
@@ -35,13 +42,6 @@ impl Cmd {
         let (name, destination) =
             s.split_once('=').ok_or_else(|| format!("invalid KEY=value: no `=` found in `{}`", s))?;
         Ok((name.parse()?, destination.parse()?))
-    }
-
-    pub async fn run(self) -> RelentlessResult<ExitCode> {
-        let ctx = Context::from_cmd(self);
-        let status = ctx.relentless().await?; // TODO subcommand
-
-        Ok(status)
     }
 
     // TODO return Result
