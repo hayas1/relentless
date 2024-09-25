@@ -12,7 +12,7 @@ pub async fn execute() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sy
     Ok(status)
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "cli", derive(Parser))]
 #[cfg_attr(feature = "cli", clap(version, about, arg_required_else_help = true))]
 pub struct Cmd {
@@ -52,7 +52,7 @@ impl Cmd {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "cli", derive(Subcommand))]
 pub enum SubCommands {
     /// run testcases
@@ -60,7 +60,7 @@ pub enum SubCommands {
     Assault(Assault),
 }
 
-#[derive(Debug, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 #[cfg_attr(feature = "cli", derive(Parser))]
 #[cfg_attr(feature = "cli", clap(group(ArgGroup::new("files").args(&["file"]).conflicts_with("configs_dir"))))]
 pub struct Assault {
