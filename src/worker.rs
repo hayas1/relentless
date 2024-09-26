@@ -20,12 +20,13 @@ pub struct Control<S = DefaultHttpClient<BytesBody, BytesBody>, ReqB = BytesBody
 }
 impl Control<DefaultHttpClient<BytesBody, BytesBody>, BytesBody, BytesBody> {
     pub async fn default_http_clients(
+        cmd: &Assault,
         configs: &Vec<Config>,
     ) -> RelentlessResult<Vec<HashMap<String, DefaultHttpClient<BytesBody, BytesBody>>>> {
         let mut clients = Vec::new();
         for c in configs {
             let mut destinations = HashMap::new();
-            for (name, destination) in &c.worker_config.destinations {
+            for (name, destination) in cmd.override_destination(&c.worker_config.destinations) {
                 let authority = destination.parse::<http::Uri>()?.authority().unwrap().as_str().to_string(); // TODO
                 let client = DefaultHttpClient::<BytesBody, BytesBody>::new(authority).await?;
                 destinations.insert(name.to_string(), client);
