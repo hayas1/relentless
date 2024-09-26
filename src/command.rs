@@ -2,8 +2,17 @@ use std::{collections::HashMap, path::PathBuf, process::ExitCode};
 
 #[cfg(feature = "cli")]
 use clap::{ArgGroup, Parser, Subcommand};
+use http_body::Body;
+use tower::Service;
 
-use crate::{error::RelentlessResult, outcome::Outcome, Relentless};
+use crate::{
+    config::Config,
+    error::{RelentlessError, RelentlessResult},
+    outcome::Outcome,
+    service::FromBodyStructure,
+    worker::Control,
+    Relentless,
+};
 
 #[cfg(feature = "cli")]
 pub async fn execute() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sync>> {
@@ -110,14 +119,33 @@ pub struct Assault {
     pub number_of_threads: Option<usize>,
 }
 impl Assault {
-    pub async fn execute(&self) -> RelentlessResult<Outcome> {
+    pub fn configs(&self) -> RelentlessResult<Vec<Config>> {
         let Self { file, configs_dir, .. } = self;
-        let control = if let Some(dir) = configs_dir {
-            Relentless::read_dir(self, dir).await?
+        let configs = if let Some(dir) = configs_dir {
+            Config::read_dir(dir)?
         } else {
-            Relentless::read_paths(self, file).await?
+            file.iter().map(Config::read).collect::<RelentlessResult<Vec<_>>>()?
         };
-
+        Ok(configs)
+    }
+    pub async fn execute(&self) -> RelentlessResult<Outcome> {
+        let configs = self.configs()?;
+        let outcome = self.execute_with(Control::default_http_clients(&configs).await?).await?;
+        Ok(outcome)
+    }
+    pub async fn execute_with<S, ReqB, ResB>(&self, services: Vec<HashMap<String, S>>) -> RelentlessResult<Outcome>
+    where
+        ReqB: Body + FromBodyStructure + Send + 'static,
+        ReqB::Data: Send + 'static,
+        ReqB::Error: std::error::Error + Sync + Send + 'static,
+        ResB: Body + Send + 'static,
+        ResB::Data: Send + 'static,
+        ResB::Error: std::error::Error + Sync + Send + 'static,
+        S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + Sync + 'static,
+        RelentlessError: From<S::Error>,
+    {
+        let configs = self.configs()?;
+        let control = Control::with_service(configs, services)?;
         let outcome = control.assault(self).await?;
         if !self.no_report {
             outcome.report(self)?;

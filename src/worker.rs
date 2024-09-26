@@ -7,6 +7,7 @@ use crate::{
     outcome::{CaseOutcome, Compare, Evaluator, Outcome, OutcomeWriter, Status, WorkerOutcome},
     service::{BytesBody, DefaultHttpClient, FromBodyStructure},
 };
+use bytes::Bytes;
 use hyper::body::Body;
 use tower::Service;
 
@@ -43,6 +44,23 @@ where
     pub async fn read_dir<P: AsRef<std::path::Path>>(cmd: &Assault, path: P) -> RelentlessResult<Self> {
         let configs = Config::read_dir(path)?;
         Self::with_default_http_client(cmd, configs).await
+    }
+}
+impl Control<DefaultHttpClient<BytesBody, BytesBody>, BytesBody, BytesBody> {
+    pub async fn default_http_clients(
+        configs: &Vec<Config>,
+    ) -> RelentlessResult<Vec<HashMap<String, DefaultHttpClient<BytesBody, BytesBody>>>> {
+        let mut clients = Vec::new();
+        for c in configs {
+            let mut destinations = HashMap::new();
+            for (name, destination) in &c.worker_config.destinations {
+                let authority = destination.parse::<http::Uri>()?.authority().unwrap().as_str().to_string(); // TODO
+                let client = DefaultHttpClient::<BytesBody, BytesBody>::new(authority).await?;
+                destinations.insert(name.to_string(), client);
+            }
+            clients.push(destinations);
+        }
+        Ok(clients)
     }
 }
 impl<S, ReqB, ResB> Control<S, ReqB, ResB>
