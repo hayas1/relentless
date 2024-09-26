@@ -16,8 +16,8 @@ use crate::{
 #[cfg(feature = "cli")]
 pub async fn execute() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sync>> {
     let cmd = Relentless::parse();
-    let status = cmd.execute().await?;
-    Ok(status)
+    let ret = cmd.execute().await?;
+    Ok(ret.exit_code())
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -33,18 +33,15 @@ pub struct Relentless {
     pub no_color: bool,
 }
 impl Relentless {
-    pub async fn execute(self) -> RelentlessResult<ExitCode> {
+    pub async fn execute(self) -> RelentlessResult<CmdRet> {
         let Self { cmd, no_color } = self;
         console::set_colors_enabled(!no_color);
 
-        let status = match cmd {
-            Cmd::Assault(assault) => {
-                let strict = assault.strict;
-                assault.execute().await?.exit_code(strict)
-            }
+        let ret = match cmd {
+            Cmd::Assault(assault) => CmdRet::Assault(assault.execute().await?),
         };
 
-        Ok(status)
+        Ok(ret)
     }
 
     pub async fn assault_with<S, ReqB, ResB>(&self, services: Vec<HashMap<String, S>>) -> RelentlessResult<Outcome>
@@ -74,6 +71,18 @@ pub enum Cmd {
 impl Default for Cmd {
     fn default() -> Self {
         Self::Assault(Default::default())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CmdRet {
+    Assault(Outcome),
+}
+impl CmdRet {
+    pub fn exit_code(&self) -> ExitCode {
+        match self {
+            CmdRet::Assault(outcome) => outcome.exit_code(false),
+        }
     }
 }
 
