@@ -18,34 +18,6 @@ pub struct Control<S = DefaultHttpClient<BytesBody, BytesBody>, ReqB = BytesBody
     cases: Vec<Vec<Case<S, ReqB, ResB>>>,
     phantom: std::marker::PhantomData<(ReqB, ResB)>,
 }
-impl<ReqB> Control<DefaultHttpClient<ReqB, BytesBody>, ReqB, BytesBody>
-where
-    ReqB: Body + FromBodyStructure + Send + 'static,
-    ReqB::Data: Send + 'static,
-    ReqB::Error: std::error::Error + Sync + Send + 'static,
-{
-    /// TODO document
-    pub async fn with_default_http_client(cmd: &Assault, configs: Vec<Config>) -> RelentlessResult<Self> {
-        let mut workers = Vec::new();
-        for config in &configs {
-            workers.push(Worker::with_default_http_client(cmd, config.worker_config.clone()).await?);
-        }
-        Ok(Self::new(configs, workers))
-    }
-    /// TODO document
-    pub async fn read_paths<I: IntoIterator<Item = P>, P: AsRef<std::path::Path>>(
-        cmd: &Assault,
-        paths: I,
-    ) -> RelentlessResult<Self> {
-        let configs = paths.into_iter().map(Config::read).collect::<RelentlessResult<Vec<_>>>()?;
-        Self::with_default_http_client(cmd, configs).await
-    }
-    /// TODO document
-    pub async fn read_dir<P: AsRef<std::path::Path>>(cmd: &Assault, path: P) -> RelentlessResult<Self> {
-        let configs = Config::read_dir(path)?;
-        Self::with_default_http_client(cmd, configs).await
-    }
-}
 impl Control<DefaultHttpClient<BytesBody, BytesBody>, BytesBody, BytesBody> {
     pub async fn default_http_clients(
         configs: &Vec<Config>,
@@ -115,22 +87,6 @@ pub struct Worker<S, ReqB, ResB> {
 impl<S, ReqB, ResB> Worker<S, ReqB, ResB> {
     pub fn config(&self) -> &WorkerConfig {
         &self.config
-    }
-}
-impl<ReqB> Worker<DefaultHttpClient<ReqB, BytesBody>, ReqB, BytesBody>
-where
-    ReqB: Body + FromBodyStructure + Send + 'static,
-    ReqB::Data: Send + 'static,
-    ReqB::Error: std::error::Error + Sync + Send + 'static,
-{
-    pub async fn with_default_http_client(cmd: &Assault, config: WorkerConfig) -> RelentlessResult<Self> {
-        let mut clients = HashMap::new();
-        for (name, destination) in cmd.override_destination(&config.destinations) {
-            let authority = destination.parse::<http::Uri>()?.authority().unwrap().as_str().to_string(); // TODO
-            clients.insert(name.to_string(), DefaultHttpClient::<ReqB, BytesBody>::new(authority).await?);
-        }
-
-        Self::new(config, clients)
     }
 }
 impl<S, ReqB, ResB> Worker<S, ReqB, ResB>

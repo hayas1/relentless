@@ -11,7 +11,6 @@ use crate::{
     outcome::Outcome,
     service::FromBodyStructure,
     worker::Control,
-    Relentless,
 };
 
 #[cfg(feature = "cli")]
@@ -96,7 +95,7 @@ pub struct Assault {
 
     /// override destinations
     #[cfg_attr(feature = "cli", arg(short, long, num_args=0.., value_parser = Cmd::parse_key_value::<String, String>, number_of_values=1))]
-    pub destination: Vec<(String, String)>, // TODO HashMap<String, Uri>
+    pub destination: Vec<(String, String)>, // TODO HashMap<String, Uri>, but clap won't parse HashMap
 
     /// allow invalid testcases
     #[cfg_attr(feature = "cli", arg(short, long))]
