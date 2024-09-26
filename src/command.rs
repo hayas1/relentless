@@ -1,7 +1,7 @@
 use std::{collections::HashMap, path::PathBuf, process::ExitCode};
 
 #[cfg(feature = "cli")]
-use clap::{ArgGroup, Parser, Subcommand};
+use clap::{Parser, Subcommand};
 use http_body::Body;
 use tower::Service;
 
