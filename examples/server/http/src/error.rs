@@ -13,6 +13,7 @@ pub const APP_DEFAULT_ERROR_CODE: StatusCode = StatusCode::BAD_REQUEST;
 pub enum AppError<R = ()> {
     Response(#[from] ResponseWithError<R>),
 
+    Anyhow(#[from] anyhow::Error),
     BoxError(#[from] Box<dyn std::error::Error + Send + Sync + 'static>),
 }
 

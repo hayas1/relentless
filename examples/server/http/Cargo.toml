@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+anyhow = "1.0.89"
 axum = "0.7.5"
 http-serde = "2.1.1"
 serde = { version = "1.0.210", features = ["derive"] }

@@ -15,7 +15,7 @@ pub async fn send_bytes(
     body: Body,
     headers: HeaderMap,
 ) -> Result<(StatusCode, Bytes), Box<dyn std::error::Error>> {
-    let state = AppState { env: Default::default() };
+    let state = AppState { ..Default::default() };
     let app = route::app(state);
     let mut req = Request::builder().uri(uri).body(body)?;
     for (key, val) in headers {

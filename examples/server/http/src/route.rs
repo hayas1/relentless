@@ -1,3 +1,4 @@
+pub mod counter;
 pub mod health;
 pub mod root;
 
@@ -17,6 +18,7 @@ pub fn app(state: AppState) -> Router<()> {
         .route("/", get(root::root))
         .nest("/health", health::route_health())
         .route("/healthz", get(health::health))
+        .nest("/counter", counter::route_counter())
         .layer(middleware::from_fn_with_state(state.clone(), logging))
         .with_state(state)
 }
