@@ -4,10 +4,9 @@ use crate::{
     command::Assault,
     config::{Config, Protocol, Setting, Testcase, WorkerConfig},
     error::{HttpError, RelentlessError, RelentlessResult},
-    outcome::{CaseOutcome, Compare, Evaluator, Outcome, OutcomeWriter, Status, WorkerOutcome},
+    outcome::{CaseOutcome, Compare, Evaluator, Outcome, Status, WorkerOutcome},
     service::{BytesBody, DefaultHttpClient, FromBodyStructure},
 };
-use bytes::Bytes;
 use hyper::body::Body;
 use tower::Service;
 
