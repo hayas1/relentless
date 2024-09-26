@@ -15,7 +15,7 @@ use crate::{
 
 #[cfg(feature = "cli")]
 pub async fn execute() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sync>> {
-    let cmd = Cmd::parse();
+    let cmd = Relentless::parse();
     let status = cmd.execute().await?;
     Ok(status)
 }
@@ -23,22 +23,22 @@ pub async fn execute() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sy
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 #[cfg_attr(feature = "cli", derive(Parser))]
 #[cfg_attr(feature = "cli", clap(version, about, arg_required_else_help = true))]
-pub struct Cmd {
+pub struct Relentless {
     /// subcommand
     #[cfg_attr(feature = "cli", clap(subcommand))]
-    pub subcommand: SubCommands,
+    pub cmd: Cmd,
 
     /// without colorize output
     #[cfg_attr(feature = "cli", arg(long, global = true))]
     pub no_color: bool,
 }
-impl Cmd {
+impl Relentless {
     pub async fn execute(self) -> RelentlessResult<ExitCode> {
-        let Self { subcommand, no_color } = self;
+        let Self { cmd, no_color } = self;
         console::set_colors_enabled(!no_color);
 
-        let status = match subcommand {
-            SubCommands::Assault(assault) => {
+        let status = match cmd {
+            Cmd::Assault(assault) => {
                 let strict = assault.strict;
                 assault.execute().await?.exit_code(strict)
             }
@@ -47,35 +47,31 @@ impl Cmd {
         Ok(status)
     }
 
-    #[cfg(feature = "cli")]
-    pub fn parse_key_value<T, U>(s: &str) -> Result<(T, U), Box<dyn std::error::Error + Send + Sync + 'static>>
+    pub async fn assault_with<S, ReqB, ResB>(&self, services: Vec<HashMap<String, S>>) -> RelentlessResult<Outcome>
     where
-        T: std::str::FromStr,
-        T::Err: std::error::Error + Send + Sync + 'static,
-        U: std::str::FromStr,
-        U::Err: std::error::Error + Send + Sync + 'static,
+        ReqB: Body + FromBodyStructure + Send + 'static,
+        ReqB::Data: Send + 'static,
+        ReqB::Error: std::error::Error + Sync + Send + 'static,
+        ResB: Body + Send + 'static,
+        ResB::Data: Send + 'static,
+        ResB::Error: std::error::Error + Sync + Send + 'static,
+        S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + Sync + 'static,
+        RelentlessError: From<S::Error>,
     {
-        let (name, destination) =
-            s.split_once('=').ok_or_else(|| format!("invalid KEY=value: no `=` found in `{}`", s))?;
-        Ok((name.parse()?, destination.parse()?))
-    }
-
-    // TODO return Result
-    pub fn assault(&self) -> Option<&Assault> {
-        match &self.subcommand {
-            SubCommands::Assault(assault) => Some(assault),
+        match &self.cmd {
+            Cmd::Assault(assault) => assault.execute_with(services).await,
         }
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "cli", derive(Subcommand))]
-pub enum SubCommands {
+pub enum Cmd {
     /// run testcases
     #[cfg_attr(feature = "cli", clap(arg_required_else_help = true))]
     Assault(Assault),
 }
-impl Default for SubCommands {
+impl Default for Cmd {
     fn default() -> Self {
         Self::Assault(Default::default())
     }
@@ -94,7 +90,7 @@ pub struct Assault {
     pub configs_dir: Option<PathBuf>,
 
     /// override destinations
-    #[cfg_attr(feature = "cli", arg(short, long, num_args=0.., value_parser = Cmd::parse_key_value::<String, String>, number_of_values=1))]
+    #[cfg_attr(feature = "cli", arg(short, long, num_args=0.., value_parser = parse_key_value::<String, String>, number_of_values=1))]
     pub destination: Vec<(String, String)>, // TODO HashMap<String, Uri>, but clap won't parse HashMap
 
     /// allow invalid testcases
@@ -117,9 +113,16 @@ pub struct Assault {
     #[cfg_attr(feature = "cli", arg(short, long))]
     pub number_of_threads: Option<usize>,
 }
+impl From<Assault> for Cmd {
+    fn from(assault: Assault) -> Self {
+        Self::Assault(assault)
+    }
+}
 impl Assault {
     pub fn configs(&self) -> RelentlessResult<Vec<Config>> {
         let Self { file, configs_dir, .. } = self;
+
+        // TODO error handling
         let configs = if let Some(dir) = configs_dir {
             Config::read_dir(dir)?
         } else {
@@ -161,6 +164,17 @@ impl Assault {
     }
 }
 
+#[cfg(feature = "cli")]
+pub fn parse_key_value<T, U>(s: &str) -> Result<(T, U), Box<dyn std::error::Error + Send + Sync + 'static>>
+where
+    T: std::str::FromStr,
+    T::Err: std::error::Error + Send + Sync + 'static,
+    U: std::str::FromStr,
+    U::Err: std::error::Error + Send + Sync + 'static,
+{
+    let (name, destination) = s.split_once('=').ok_or_else(|| format!("invalid KEY=value: no `=` found in `{}`", s))?;
+    Ok((name.parse()?, destination.parse()?))
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -168,14 +182,14 @@ mod tests {
     #[test]
     #[cfg(feature = "cli")]
     fn test_exclude_file_or_dir() {
-        let Err(_) = Cmd::try_parse_from(["relentless", "assault"]) else {
+        let Err(_) = Relentless::try_parse_from(["relentless", "assault"]) else {
             panic!("file or directory must be specified");
         };
 
-        match Cmd::try_parse_from(["relentless", "assault", "--file", "examples/config/assault.yaml"]) {
+        match Relentless::try_parse_from(["relentless", "assault", "--file", "examples/config/assault.yaml"]) {
             Ok(cli) => assert_eq!(
-                cli.subcommand,
-                SubCommands::Assault(Assault {
+                cli.cmd,
+                Cmd::Assault(Assault {
                     file: vec![PathBuf::from("examples/config/assault.yaml")],
                     configs_dir: None,
                     ..Default::default()
@@ -183,7 +197,7 @@ mod tests {
             ),
             Err(_) => panic!("only file is allowed"),
         };
-        match Cmd::try_parse_from([
+        match Relentless::try_parse_from([
             "relentless",
             "assault",
             "--file",
@@ -192,8 +206,8 @@ mod tests {
             "examples/config/compare.yaml",
         ]) {
             Ok(cli) => assert_eq!(
-                cli.subcommand,
-                SubCommands::Assault(Assault {
+                cli.cmd,
+                Cmd::Assault(Assault {
                     file: vec![
                         PathBuf::from("examples/config/assault.yaml"),
                         PathBuf::from("examples/config/compare.yaml")
@@ -205,10 +219,10 @@ mod tests {
             Err(_) => panic!("multiple file is allowed"),
         };
 
-        match Cmd::try_parse_from(["relentless", "assault", "--configs-dir", "examples/config"]) {
+        match Relentless::try_parse_from(["relentless", "assault", "--configs-dir", "examples/config"]) {
             Ok(cli) => assert_eq!(
-                cli.subcommand,
-                SubCommands::Assault(Assault {
+                cli.cmd,
+                Cmd::Assault(Assault {
                     file: Vec::new(),
                     configs_dir: Some(PathBuf::from("examples/config")),
                     ..Default::default()
@@ -217,7 +231,7 @@ mod tests {
             Err(_) => panic!("only configs_dir is allowed"),
         };
 
-        let Err(_) = Cmd::try_parse_from([
+        let Err(_) = Relentless::try_parse_from([
             "relentless",
             "assault",
             "--file",
@@ -232,15 +246,15 @@ mod tests {
     #[test]
     #[cfg(feature = "cli")]
     fn test_no_color_arg_position() {
-        match Cmd::try_parse_from(["relentless", "assault", "-c", "examples/config"]) {
+        match Relentless::try_parse_from(["relentless", "assault", "-c", "examples/config"]) {
             Ok(cli) => assert!(!cli.no_color),
             Err(_) => panic!("--no-color is optional, default is false"),
         }
-        match Cmd::try_parse_from(["relentless", "--no-color", "assault", "-c", "examples/config"]) {
+        match Relentless::try_parse_from(["relentless", "--no-color", "assault", "-c", "examples/config"]) {
             Ok(cli) => assert!(cli.no_color),
             Err(_) => panic!("--no-color is main command option"),
         };
-        match Cmd::try_parse_from(["relentless", "assault", "-c", "examples/config", "--no-color"]) {
+        match Relentless::try_parse_from(["relentless", "assault", "-c", "examples/config", "--no-color"]) {
             Ok(cli) => assert!(cli.no_color),
             Err(_) => panic!("--no-color is main command option, but it is global"),
         };
