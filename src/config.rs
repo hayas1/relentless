@@ -90,11 +90,6 @@ impl Config {
     pub fn read_str(s: &str, format: Format) -> RelentlessResult<Self> {
         Ok(format.deserialize_testcase_str(s)?)
     }
-    pub fn read_dir<P: AsRef<Path>>(path: P) -> RelentlessResult<Vec<Self>> {
-        // TODO logging read files
-        // TODO filter by format
-        std::fs::read_dir(path)?.map(|f| Self::read(f?.path())).filter(Result::is_ok).collect::<Result<Vec<_>, _>>()
-    }
 }
 impl Setting {
     pub fn coalesce(&self, other: &Self) -> Self {

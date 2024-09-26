@@ -88,15 +88,10 @@ impl CmdRet {
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 #[cfg_attr(feature = "cli", derive(Parser))]
-#[cfg_attr(feature = "cli", clap(group(ArgGroup::new("files").args(&["file"]).conflicts_with("configs_dir"))))]
 pub struct Assault {
     /// config files of testcases
     #[cfg_attr(feature = "cli", arg(short, long, num_args=0..))]
     pub file: Vec<PathBuf>,
-
-    /// directory of config files
-    #[cfg_attr(feature = "cli", arg(short, long))]
-    pub configs_dir: Option<PathBuf>,
 
     /// override destinations
     #[cfg_attr(feature = "cli", arg(short, long, num_args=0.., value_parser = parse_key_value::<String, String>, number_of_values=1))]
@@ -129,15 +124,8 @@ impl From<Assault> for Cmd {
 }
 impl Assault {
     pub fn configs(&self) -> RelentlessResult<Vec<Config>> {
-        let Self { file, configs_dir, .. } = self;
-
-        // TODO error handling
-        let configs = if let Some(dir) = configs_dir {
-            Config::read_dir(dir)?
-        } else {
-            file.iter().map(Config::read).collect::<RelentlessResult<Vec<_>>>()?
-        };
-        Ok(configs)
+        let Self { file, .. } = self;
+        file.iter().map(Config::read).collect::<RelentlessResult<Vec<_>>>()
     }
     pub async fn execute(&self) -> RelentlessResult<Outcome> {
         let configs = self.configs()?;
@@ -192,7 +180,7 @@ mod tests {
     #[cfg(feature = "cli")]
     fn test_exclude_file_or_dir() {
         let Err(_) = Relentless::try_parse_from(["relentless", "assault"]) else {
-            panic!("file or directory must be specified");
+            panic!("files must be specified");
         };
 
         match Relentless::try_parse_from(["relentless", "assault", "--file", "examples/config/assault.yaml"]) {
@@ -200,12 +188,12 @@ mod tests {
                 cli.cmd,
                 Cmd::Assault(Assault {
                     file: vec![PathBuf::from("examples/config/assault.yaml")],
-                    configs_dir: None,
                     ..Default::default()
                 })
             ),
-            Err(_) => panic!("only file is allowed"),
+            Err(_) => panic!("specify one file should be ok"),
         };
+
         match Relentless::try_parse_from([
             "relentless",
             "assault",
@@ -221,49 +209,43 @@ mod tests {
                         PathBuf::from("examples/config/assault.yaml"),
                         PathBuf::from("examples/config/compare.yaml")
                     ],
-                    configs_dir: None,
                     ..Default::default()
                 })
             ),
-            Err(_) => panic!("multiple file is allowed"),
+            Err(_) => panic!("specify multiple files should be ok"),
         };
 
-        match Relentless::try_parse_from(["relentless", "assault", "--configs-dir", "examples/config"]) {
+        match Relentless::try_parse_from(["relentless", "assault", "--file", "examples/config/*.yaml", "--file"]) {
             Ok(cli) => assert_eq!(
                 cli.cmd,
                 Cmd::Assault(Assault {
-                    file: Vec::new(),
-                    configs_dir: Some(PathBuf::from("examples/config")),
+                    file: vec![
+                        // WARN: * may be wildcard in shell, clap doesn't support it
+                        PathBuf::from("examples/config/*.yaml"),
+                        // PathBuf::from("examples/config/assault.yaml"),
+                        // PathBuf::from("examples/config/compare.yaml")
+                    ],
                     ..Default::default()
                 })
             ),
-            Err(_) => panic!("only configs_dir is allowed"),
-        };
-
-        let Err(_) = Relentless::try_parse_from([
-            "relentless",
-            "assault",
-            "--file",
-            "examples/config/assault.yaml",
-            "--configs-dir",
-            "examples/config",
-        ]) else {
-            panic!("dir and file are exclusive");
+            Err(_) => panic!("specify multiple files should be ok"),
         };
     }
 
     #[test]
     #[cfg(feature = "cli")]
     fn test_no_color_arg_position() {
-        match Relentless::try_parse_from(["relentless", "assault", "-c", "examples/config"]) {
+        match Relentless::try_parse_from(["relentless", "assault", "-f", "examples/config/assault.yaml"]) {
             Ok(cli) => assert!(!cli.no_color),
             Err(_) => panic!("--no-color is optional, default is false"),
         }
-        match Relentless::try_parse_from(["relentless", "--no-color", "assault", "-c", "examples/config"]) {
+        match Relentless::try_parse_from(["relentless", "--no-color", "assault", "-f", "examples/config/assault.yaml"])
+        {
             Ok(cli) => assert!(cli.no_color),
             Err(_) => panic!("--no-color is main command option"),
         };
-        match Relentless::try_parse_from(["relentless", "assault", "-c", "examples/config", "--no-color"]) {
+        match Relentless::try_parse_from(["relentless", "assault", "-f", "examples/config/assault.yaml", "--no-color"])
+        {
             Ok(cli) => assert!(cli.no_color),
             Err(_) => panic!("--no-color is main command option, but it is global"),
         };
