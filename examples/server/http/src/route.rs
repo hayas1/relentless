@@ -44,14 +44,6 @@ mod tests {
     use serde::de::DeserializeOwned;
     use tower::Service;
 
-    pub fn from_uri<T>(uri: T) -> Result<Request<Body>, axum::http::Error>
-    where
-        Uri: TryFrom<T>,
-        <Uri as TryFrom<T>>::Error: Into<axum::http::Error>,
-    {
-        Request::builder().uri(uri).body(Body::empty())
-    }
-
     pub async fn call<S, T>(app: &mut S, req: Request<Body>) -> (StatusCode, T)
     where
         S: Service<Request<Body>, Response = Response<Body>>,
