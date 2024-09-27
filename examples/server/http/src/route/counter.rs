@@ -152,7 +152,7 @@ mod tests {
 
     use crate::{
         error::{ErrorMessageResponse, APP_DEFAULT_ERROR_CODE},
-        route::app,
+        route::{app, tests::call_with_assert},
     };
 
     use super::*;
@@ -171,12 +171,7 @@ mod tests {
         ];
         for (uri, exp) in scenario {
             let req = Request::builder().uri(uri).body(Body::empty()).unwrap();
-            let res = app.call(req).await.unwrap();
-            assert_eq!(res.status(), StatusCode::OK);
-            let size = res.size_hint().upper().unwrap_or(res.size_hint().lower()) as usize;
-            let body = to_bytes(res.into_body(), size).await.unwrap();
-            let res = serde_json::from_slice::<CounterResponse<i64>>(&body).unwrap();
-            assert_eq!(res, exp);
+            call_with_assert(&mut app, req, StatusCode::OK, exp).await;
         }
 
         let scenario2 = [
@@ -196,12 +191,7 @@ mod tests {
         ];
         for (uri, exp) in scenario2 {
             let req = Request::builder().uri(uri).body(Body::empty()).unwrap();
-            let res = app.call(req).await.unwrap();
-            assert_eq!(res.status(), StatusCode::OK);
-            let size = res.size_hint().upper().unwrap_or(res.size_hint().lower()) as usize;
-            let body = to_bytes(res.into_body(), size).await.unwrap();
-            let res = serde_json::from_slice::<CounterResponse<BInt>>(&body).unwrap();
-            assert_eq!(res, exp);
+            call_with_assert(&mut app, req, StatusCode::OK, exp).await;
         }
     }
 
@@ -210,28 +200,14 @@ mod tests {
         let mut app = app(Default::default());
 
         let req = Request::builder().uri(format!("/counter/increment/{}", i64::MAX)).body(Body::empty()).unwrap();
-        let res = app.call(req).await.unwrap();
-        assert_eq!(res.status(), StatusCode::OK);
-        let size = res.size_hint().upper().unwrap_or(res.size_hint().lower()) as usize;
-        let body = to_bytes(res.into_body(), size).await.unwrap();
-        let res = serde_json::from_slice::<CounterResponse<i64>>(&body).unwrap();
-        assert_eq!(res, CounterResponse { count: i64::MAX });
+        call_with_assert(&mut app, req, StatusCode::OK, CounterResponse { count: i64::MAX }).await;
 
         let req = Request::builder().uri("/counter/increment").body(Body::empty()).unwrap();
-        let res = app.call(req).await.unwrap();
-        assert_eq!(res.status(), APP_DEFAULT_ERROR_CODE);
-        let size = res.size_hint().upper().unwrap_or(res.size_hint().lower()) as usize;
-        let body = to_bytes(res.into_body(), size).await.unwrap();
-        let res = serde_json::from_slice::<ErrorMessageResponse<()>>(&body).unwrap();
-        assert_eq!(res, ErrorMessageResponse::msg(CounterError::Overflow));
+        call_with_assert(&mut app, req, APP_DEFAULT_ERROR_CODE, ErrorMessageResponse::msg(CounterError::Overflow))
+            .await;
 
         let req = Request::builder().uri("/counter/decrement").body(Body::empty()).unwrap();
-        let res = app.call(req).await.unwrap();
-        assert_eq!(res.status(), StatusCode::OK);
-        let size = res.size_hint().upper().unwrap_or(res.size_hint().lower()) as usize;
-        let body = to_bytes(res.into_body(), size).await.unwrap();
-        let res = serde_json::from_slice::<CounterResponse<i64>>(&body).unwrap();
-        assert_eq!(res, CounterResponse { count: i64::MAX });
+        call_with_assert(&mut app, req, StatusCode::OK, CounterResponse { count: i64::MAX }).await;
     }
 
     #[tokio::test]
@@ -239,19 +215,15 @@ mod tests {
         let mut app = app(Default::default());
 
         let req = Request::builder().uri("/counter/increment/abc").body(Body::empty()).unwrap();
-        let res = app.call(req).await.unwrap();
-        assert_eq!(res.status(), APP_DEFAULT_ERROR_CODE);
-        let size = res.size_hint().upper().unwrap_or(res.size_hint().lower()) as usize;
-        let body = to_bytes(res.into_body(), size).await.unwrap();
-        let res = serde_json::from_slice::<ErrorMessageResponse<String>>(&body).unwrap();
-        assert_eq!(res, ErrorMessageResponse::detail(CounterError::CannotParse("abc".to_string()), "abc".to_string()));
+        call_with_assert(
+            &mut app,
+            req,
+            APP_DEFAULT_ERROR_CODE,
+            ErrorMessageResponse::detail(CounterError::CannotParse("abc".to_string()), "abc".to_string()),
+        )
+        .await;
 
         let req = Request::builder().uri("/counter/increment").body(Body::empty()).unwrap();
-        let res = app.call(req).await.unwrap();
-        assert_eq!(res.status(), StatusCode::OK);
-        let size = res.size_hint().upper().unwrap_or(res.size_hint().lower()) as usize;
-        let body = to_bytes(res.into_body(), size).await.unwrap();
-        let res = serde_json::from_slice::<CounterResponse<i64>>(&body).unwrap();
-        assert_eq!(res, CounterResponse { count: 1 });
+        call_with_assert(&mut app, req, StatusCode::OK, CounterResponse { count: 1 }).await;
     }
 }

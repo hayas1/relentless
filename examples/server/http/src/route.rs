@@ -30,3 +30,52 @@ pub async fn logging(req: Request<Body>, next: Next) -> impl IntoResponse {
     tracing::info!("{} {} {} {}", status, method, uri, bytes);
     res
 }
+
+#[cfg(test)]
+mod tests {
+
+    use std::fmt::Debug;
+
+    use axum::{
+        body::{self, Body, HttpBody},
+        http::{Request, StatusCode, Uri},
+        response::Response,
+    };
+    use serde::de::DeserializeOwned;
+    use tower::Service;
+
+    pub fn from_uri<T>(uri: T) -> Result<Request<Body>, axum::http::Error>
+    where
+        Uri: TryFrom<T>,
+        <Uri as TryFrom<T>>::Error: Into<axum::http::Error>,
+    {
+        Request::builder().uri(uri).body(Body::empty())
+    }
+
+    pub async fn call<S, T>(app: &mut S, req: Request<Body>) -> (StatusCode, T)
+    where
+        S: Service<Request<Body>, Response = Response<Body>>,
+        S::Error: Debug,
+        Box<dyn std::error::Error + Send + Sync + 'static>: From<S::Error>,
+        T: DeserializeOwned,
+    {
+        let res = app.call(req).await.unwrap();
+        let status = res.status();
+        let size = res.size_hint().upper().unwrap_or(res.size_hint().lower()) as usize;
+        let body = body::to_bytes(res.into_body(), size).await.unwrap();
+        let des = serde_json::from_slice::<T>(&body).unwrap();
+        (status, des)
+    }
+
+    pub async fn call_with_assert<S, T>(app: &mut S, req: Request<Body>, expected_status: StatusCode, expected_body: T)
+    where
+        S: Service<Request<Body>, Response = Response<Body>>,
+        S::Error: Debug,
+        Box<dyn std::error::Error + Send + Sync + 'static>: From<S::Error>,
+        T: DeserializeOwned + Eq + std::fmt::Debug,
+    {
+        let (actual_status, actual_body): (_, T) = call(app, req).await;
+        assert_eq!(actual_status, expected_status);
+        assert_eq!(actual_body, expected_body);
+    }
+}
