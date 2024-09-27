@@ -23,6 +23,7 @@ pub fn route_counter() -> axum::Router<AppState> {
         .route("/decrements", get(decrement::<BInt>))
         .route("/decrements/:value", get(decrement_with::<BInt>))
         .route("/reset", get(reset::<i64>))
+        .route("/resets", get(reset::<BInt>))
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
