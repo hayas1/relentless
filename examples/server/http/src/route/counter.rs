@@ -145,10 +145,9 @@ where
 #[cfg(test)]
 mod tests {
     use axum::{
-        body::{to_bytes, Body, HttpBody},
+        body::Body,
         http::{Request, StatusCode},
     };
-    use tower::Service;
 
     use crate::{
         error::{ErrorMessageResponse, APP_DEFAULT_ERROR_CODE},
