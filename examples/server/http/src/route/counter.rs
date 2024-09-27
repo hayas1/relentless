@@ -9,7 +9,7 @@ use num::{BigInt, One, Zero};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    error::{AppError, AppResult, ResponseWithError},
+    error::{counter::CounterError, AppResult},
     state::AppState,
 };
 
@@ -84,8 +84,8 @@ where
     T: TryFrom<BigInt> + One + Display,
     T::Error: std::error::Error + Send + Sync + 'static,
 {
-    let read = counter.read().map_err(|e| anyhow::anyhow!(e.to_string()))?;
-    let count = read.clone().count.try_into().map_err(|_| AppError::msg("counter overflow"))?;
+    let read = counter.read().map_err(|_| CounterError::Retriable)?;
+    let count = read.clone().count.try_into().map_err(|_| CounterError::Overflow)?;
     Ok(Json(CounterResponse { count }))
 }
 
@@ -104,9 +104,10 @@ where
     T: TryFrom<BigInt>,
     T::Error: std::error::Error + Send + Sync + 'static,
 {
-    let mut write = counter.write().map_err(|e| anyhow::anyhow!(e.to_string()))?;
-    write.count += &value.parse().map_err(anyhow::Error::from)?;
-    Ok(Json(CounterResponse { count: write.clone().count.try_into().map_err(anyhow::Error::from)? }))
+    let mut write = counter.write().map_err(|_| CounterError::Retriable)?;
+    write.count += &value.parse().map_err(|_| CounterError::CannotParse(value))?;
+    let count = write.clone().count.try_into().map_err(|_| CounterError::Overflow)?;
+    Ok(Json(CounterResponse { count }))
 }
 
 pub async fn decrement<T>(state: State<AppState>) -> AppResult<Json<CounterResponse<T>>>
@@ -124,9 +125,10 @@ where
     T: TryFrom<BigInt>,
     T::Error: std::error::Error + Send + Sync + 'static,
 {
-    let mut write = counter.write().map_err(|e| anyhow::anyhow!(e.to_string()))?;
-    write.count -= &value.parse().map_err(anyhow::Error::from)?;
-    Ok(Json(CounterResponse { count: write.clone().count.try_into().map_err(anyhow::Error::from)? }))
+    let mut write = counter.write().map_err(|_| CounterError::Retriable)?;
+    write.count -= &value.parse().map_err(|_| CounterError::CannotParse(value))?;
+    let count = write.clone().count.try_into().map_err(|_| CounterError::Overflow)?;
+    Ok(Json(CounterResponse { count }))
 }
 
 pub async fn reset<T>(State(AppState { counter, .. }): State<AppState>) -> AppResult<Json<CounterResponse<T>>>
@@ -134,7 +136,8 @@ where
     T: TryFrom<BigInt> + One + Display,
     T::Error: std::error::Error + Send + Sync + 'static,
 {
-    let mut write = counter.write().map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    let mut write = counter.write().map_err(|_| CounterError::Retriable)?;
     write.count = BigInt::zero();
-    Ok(Json(CounterResponse { count: write.clone().count.try_into().map_err(anyhow::Error::from)? }))
+    let count = write.clone().count.try_into().map_err(|_| CounterError::Unreachable)?;
+    Ok(Json(CounterResponse { count }))
 }

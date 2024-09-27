@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::fmt::{Debug, Display};
 
 use axum::{
     http::StatusCode,
@@ -8,42 +8,29 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-pub type AppResult<T, R = Json<crate::error::ErrorMessageResponse<()>>> = Result<T, AppError<R>>;
+pub type AppResult<T, R = Json<ErrorMessageResponse<()>>> = Result<T, AppError<R>>;
 
 pub const APP_DEFAULT_ERROR_CODE: StatusCode = StatusCode::BAD_REQUEST;
 
 #[derive(Error, Debug)]
 #[error(transparent)]
 pub enum AppError<R> {
-    Response(#[from] ResponseWithError<R>),
+    Response(#[from] ResponseWithError<R>), // TODO should be always R = Json<ErrorMessageResponse<()>> here ?
+
+    Counter(#[from] counter::CounterError),
 
     Anyhow(#[from] anyhow::Error),
     BoxError(#[from] Box<dyn std::error::Error + Send + Sync + 'static>),
 }
 
-impl<R: IntoResponse + std::fmt::Debug> IntoResponse for AppError<R> {
+impl<R: IntoResponse + Debug> IntoResponse for AppError<R> {
     fn into_response(self) -> Response {
         tracing::error!("error: {:?}", self); // TODO middleware
         match self {
             AppError::Response(response) => response.into_response(),
-            _ => ResponseWithError::default().into_response(),
+            AppError::Counter(c) => c.into_response(),
+            AppError::Anyhow(_) | AppError::BoxError(_) => ResponseWithError::default().into_response(),
         }
-    }
-}
-impl<T> AppError<Json<ErrorMessageResponse<T>>> {
-    pub fn detail<M: Display>(msg: M, detail: T) -> Self {
-        Self::Response(ResponseWithError::new(
-            APP_DEFAULT_ERROR_CODE,
-            Json(ErrorMessageResponse::new(msg.to_string(), detail)),
-        ))
-    }
-}
-impl AppError<Json<ErrorMessageResponse<()>>> {
-    pub fn msg<M: Display>(msg: M) -> Self {
-        Self::Response(ResponseWithError::new(
-            APP_DEFAULT_ERROR_CODE,
-            Json(ErrorMessageResponse::new(msg.to_string(), ())),
-        ))
     }
 }
 
@@ -103,9 +90,44 @@ impl<T> ErrorMessageResponse<T> {
         Self { msg, detail }
     }
 }
+impl<T> ErrorMessageResponse<T> {
+    pub fn detail<M: Display>(msg: M, detail: T) -> Self {
+        Self::new(msg.to_string(), detail)
+    }
+}
 impl ErrorMessageResponse<()> {
-    pub fn msg(msg: String) -> Self {
-        let detail = ();
-        Self { msg, detail }
+    pub fn msg<M: Display>(msg: M) -> Self {
+        Self::new(msg.to_string(), ())
+    }
+}
+
+pub mod counter {
+    use super::*;
+
+    #[derive(Error, Debug)]
+    pub enum CounterError {
+        #[error("overflow counter")]
+        Overflow,
+
+        #[error("cannot parse value as integer")]
+        CannotParse(String),
+
+        #[error("please try again later")]
+        Retriable, // TODO AppError
+
+        #[error("something went wrong")]
+        Unreachable, // TODO AppError
+    }
+
+    impl IntoResponse for CounterError {
+        fn into_response(self) -> Response {
+            let msg = self.to_string();
+            match self {
+                Self::CannotParse(s) => {
+                    (APP_DEFAULT_ERROR_CODE, Json(ErrorMessageResponse::detail(msg, s))).into_response()
+                }
+                _ => (APP_DEFAULT_ERROR_CODE, Json(ErrorMessageResponse::msg(msg))).into_response(),
+            }
+        }
     }
 }
