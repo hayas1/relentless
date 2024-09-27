@@ -141,3 +141,117 @@ where
     let count = write.clone().count.try_into().map_err(|_| CounterError::Unreachable)?;
     Ok(Json(CounterResponse { count }))
 }
+
+#[cfg(test)]
+mod tests {
+    use axum::{
+        body::{to_bytes, Body, HttpBody},
+        http::{Request, StatusCode},
+    };
+    use tower::Service;
+
+    use crate::{
+        error::{ErrorMessageResponse, APP_DEFAULT_ERROR_CODE},
+        route::app,
+    };
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_counter() {
+        let mut app = app(Default::default());
+
+        let scenario = [
+            ("/counter", CounterResponse { count: 0 }),
+            ("/counter/increment", CounterResponse { count: 1 }),
+            ("/counter/reset", CounterResponse { count: 0 }),
+            ("/counter/decrement", CounterResponse { count: -1 }),
+            ("/counter/increment/5", CounterResponse { count: 4 }),
+            ("/counter/decrement/13", CounterResponse { count: -9 }),
+        ];
+        for (uri, exp) in scenario {
+            let req = Request::builder().uri(uri).body(Body::empty()).unwrap();
+            let res = app.call(req).await.unwrap();
+            assert_eq!(res.status(), StatusCode::OK);
+            let size = res.size_hint().upper().unwrap_or(res.size_hint().lower()) as usize;
+            let body = to_bytes(res.into_body(), size).await.unwrap();
+            let res = serde_json::from_slice::<CounterResponse<i64>>(&body).unwrap();
+            assert_eq!(res, exp);
+        }
+
+        let scenario2 = [
+            (
+                "/counter/increments/99999999999999999999999",
+                CounterResponse { count: BInt("99999999999999999999990".parse().unwrap()) },
+            ),
+            (
+                "/counter/increments/99999999999999999999999",
+                CounterResponse { count: BInt("199999999999999999999989".parse().unwrap()) },
+            ),
+            (
+                "/counter/decrements/99999999999999999999999",
+                CounterResponse { count: BInt("99999999999999999999990".parse().unwrap()) },
+            ),
+            ("/counter/decrements", CounterResponse { count: BInt("99999999999999999999989".parse().unwrap()) }),
+        ];
+        for (uri, exp) in scenario2 {
+            let req = Request::builder().uri(uri).body(Body::empty()).unwrap();
+            let res = app.call(req).await.unwrap();
+            assert_eq!(res.status(), StatusCode::OK);
+            let size = res.size_hint().upper().unwrap_or(res.size_hint().lower()) as usize;
+            let body = to_bytes(res.into_body(), size).await.unwrap();
+            let res = serde_json::from_slice::<CounterResponse<BInt>>(&body).unwrap();
+            assert_eq!(res, exp);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_counter_overflow() {
+        let mut app = app(Default::default());
+
+        let req = Request::builder().uri(format!("/counter/increment/{}", i64::MAX)).body(Body::empty()).unwrap();
+        let res = app.call(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let size = res.size_hint().upper().unwrap_or(res.size_hint().lower()) as usize;
+        let body = to_bytes(res.into_body(), size).await.unwrap();
+        let res = serde_json::from_slice::<CounterResponse<i64>>(&body).unwrap();
+        assert_eq!(res, CounterResponse { count: i64::MAX });
+
+        let req = Request::builder().uri("/counter/increment").body(Body::empty()).unwrap();
+        let res = app.call(req).await.unwrap();
+        assert_eq!(res.status(), APP_DEFAULT_ERROR_CODE);
+        let size = res.size_hint().upper().unwrap_or(res.size_hint().lower()) as usize;
+        let body = to_bytes(res.into_body(), size).await.unwrap();
+        let res = serde_json::from_slice::<ErrorMessageResponse<()>>(&body).unwrap();
+        assert_eq!(res, ErrorMessageResponse::msg(CounterError::Overflow));
+
+        let req = Request::builder().uri("/counter/decrement").body(Body::empty()).unwrap();
+        let res = app.call(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let size = res.size_hint().upper().unwrap_or(res.size_hint().lower()) as usize;
+        let body = to_bytes(res.into_body(), size).await.unwrap();
+        let res = serde_json::from_slice::<CounterResponse<i64>>(&body).unwrap();
+        assert_eq!(res, CounterResponse { count: i64::MAX });
+    }
+
+    #[tokio::test]
+    async fn test_counter_parse_error() {
+        let mut app = app(Default::default());
+
+        let req = Request::builder().uri("/counter/increment/abc").body(Body::empty()).unwrap();
+        let res = app.call(req).await.unwrap();
+        assert_eq!(res.status(), APP_DEFAULT_ERROR_CODE);
+        let size = res.size_hint().upper().unwrap_or(res.size_hint().lower()) as usize;
+        let body = to_bytes(res.into_body(), size).await.unwrap();
+        let res = serde_json::from_slice::<ErrorMessageResponse<String>>(&body).unwrap();
+        assert_eq!(res, ErrorMessageResponse::detail(CounterError::CannotParse("abc".to_string()), "abc".to_string()));
+
+        let req = Request::builder().uri("/counter/increment").body(Body::empty()).unwrap();
+        let res = app.call(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let size = res.size_hint().upper().unwrap_or(res.size_hint().lower()) as usize;
+        let body = to_bytes(res.into_body(), size).await.unwrap();
+        let res = serde_json::from_slice::<CounterResponse<i64>>(&body).unwrap();
+        assert_eq!(res, CounterResponse { count: 1 });
+    }
+}
