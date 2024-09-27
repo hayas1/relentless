@@ -8,7 +8,10 @@ use axum::{
 use num::{BigInt, One, Zero};
 use serde::{Deserialize, Serialize};
 
-use crate::{error::AppResult, state::AppState};
+use crate::{
+    error::{AppError, AppResult, ResponseWithError},
+    state::AppState,
+};
 
 pub fn route_counter() -> axum::Router<AppState> {
     axum::Router::new()
@@ -82,7 +85,8 @@ where
     T::Error: std::error::Error + Send + Sync + 'static,
 {
     let read = counter.read().map_err(|e| anyhow::anyhow!(e.to_string()))?;
-    Ok(Json(CounterResponse { count: read.clone().count.try_into().map_err(anyhow::Error::from)? }))
+    let count = read.clone().count.try_into().map_err(|_| AppError::msg("counter overflow"))?;
+    Ok(Json(CounterResponse { count }))
 }
 
 pub async fn increment<T>(state: State<AppState>) -> AppResult<Json<CounterResponse<T>>>
