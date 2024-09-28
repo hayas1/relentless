@@ -4,12 +4,15 @@ pub mod root;
 
 use axum::{
     body::{Body, HttpBody},
-    http::{Request, StatusCode, Uri},
+    extract::Request,
+    http::{StatusCode, Uri},
     middleware::{self, Next},
     response::{IntoResponse, Result},
     routing::get,
     Router,
 };
+use tower::Layer;
+use tower_http::normalize_path::{NormalizePath, NormalizePathLayer};
 
 use crate::{
     env::Env,
@@ -17,17 +20,19 @@ use crate::{
     state::AppState,
 };
 
-pub fn app(env: Env) -> Router<()> {
+pub fn app(env: Env) -> NormalizePath<Router<()>> {
     let state = AppState { env, ..Default::default() };
 
-    Router::new()
+    let router = Router::new()
         .route("/", get(root::root))
         .nest("/health", health::route_health())
         .route("/healthz", get(health::health))
         .nest("/counter", counter::route_counter())
         .fallback(not_found)
         .layer(middleware::from_fn_with_state(state.clone(), logging))
-        .with_state(state)
+        .with_state(state);
+
+    NormalizePathLayer::trim_trailing_slash().layer(router)
 }
 
 pub async fn not_found(uri: Uri) -> Result<()> {
