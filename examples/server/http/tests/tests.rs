@@ -11,7 +11,6 @@ use example_http_server::{
         ErrorResponseInner,
     },
     route::{self, health::Health},
-    state::AppState,
 };
 
 pub async fn send_bytes(
@@ -19,8 +18,7 @@ pub async fn send_bytes(
     body: Body,
     headers: HeaderMap,
 ) -> Result<(StatusCode, Bytes), Box<dyn std::error::Error>> {
-    let state = AppState { ..Default::default() };
-    let app = route::app(state);
+    let app = route::app(Default::default());
     let mut req = Request::builder().uri(uri).body(body)?;
     for (key, val) in headers {
         req.headers_mut().insert(key.ok_or("no key")?, val);

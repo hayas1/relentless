@@ -1,7 +1,7 @@
 use axum::body::Body;
 use relentless::command::{Assault, Relentless};
 
-use example_http_server::{route, state::AppState};
+use example_http_server::route;
 
 #[tokio::test]
 async fn test_example_assault() {
@@ -10,7 +10,7 @@ async fn test_example_assault() {
             .into(),
         ..Default::default()
     };
-    let services = [("test-api".to_string(), route::app(AppState { ..Default::default() }))].into_iter().collect();
+    let services = [("test-api".to_string(), route::app(Default::default()))].into_iter().collect();
     let outcome = relentless.assault_with::<_, Body, Body>(vec![services]).await.unwrap();
 
     assert!(outcome.allow(false));

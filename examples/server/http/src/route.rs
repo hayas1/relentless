@@ -11,9 +11,11 @@ use axum::{
     Router,
 };
 
-use crate::state::AppState;
+use crate::{env::Env, state::AppState};
 
-pub fn app(state: AppState) -> Router<()> {
+pub fn app(env: Env) -> Router<()> {
+    let state = AppState { env, ..Default::default() };
+
     Router::new()
         .route("/", get(root::root))
         .nest("/health", health::route_health())
