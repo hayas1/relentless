@@ -1,0 +1,40 @@
+feature:
+   - head-branch:
+      - '^feat/'
+      - '^feature/'
+
+bugfix:
+   - head-branch:
+      - '^fix/'
+      - '^bugfix/'
+      - '^modify/'
+
+refactor:
+   - head-branch:
+      - '^refactor/'
+
+doc:
+   - changed-files:
+      - any-glob-to-any-file:
+        - '**/README.md'
+   - head-branch:
+      - '^doc/'
+      - '^docs/'
+      - '^documentation/'
+
+deps:
+   - head-branch:
+      - '^dep/'
+      - '^deps/'
+      - '^dependencies/'
+
+maintenance:
+   - changed-files:
+      - any-glob-to-any-file:
+        - '.github/**'
+   - head-branch:
+      - '^maintenance/'
+      - '^ci/'
+      - '^workflow/'
+      - '^chore/'
+

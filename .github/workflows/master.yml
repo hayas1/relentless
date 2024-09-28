@@ -1,0 +1,77 @@
+name: Master
+
+on:
+  push:
+    branches: [ "master" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      should-release: ${{ steps.detect-version.outputs.should-release }}
+      expected-git-tag: ${{ steps.detect-version.outputs.expected-git-tag }}
+    steps:
+    - uses: actions/checkout@v4
+    - uses: dtolnay/rust-toolchain@stable
+
+    - name: Release test
+      run: cargo test --release
+    - name: Release test without cli feature
+      run: cargo test --verbose --features=json --features=yaml
+    - name: Release test with cli feature
+      run: cargo test --verbose --features=json --features=yaml --features=cli
+    - name: Run doc
+      run: cargo doc --no-deps
+    - name: Coverage
+      run: >
+        cargo install cargo-tarpaulin &&
+          cargo tarpaulin --output-dir target/doc --manifest-path Cargo.toml --out Html
+    - name: Remove 600 permission files
+      run: find target/doc -perm 600 | xargs rm -rf
+    - name: Upload artifact
+      uses: actions/upload-pages-artifact@v3
+      with:
+        path: target/doc
+
+    - name: Check version in Cargo.toml and git tag
+      uses: ./.github/actions/versions
+      id: detect-version
+
+  deploy:
+    needs: build
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+  release-draft:
+    needs: build
+    if: needs.build.outputs.should-release == 'true'
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Push tag
+      run: |
+        git tag ${{ needs.build.outputs.expected-git-tag }}
+        git push origin ${{ needs.build.outputs.expected-git-tag }}
+    - name: Release draft
+      uses: actions/create-release@v1 # archived
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ needs.build.outputs.expected-git-tag }}
+        release_name: ${{ needs.build.outputs.expected-git-tag }}
+        draft: true

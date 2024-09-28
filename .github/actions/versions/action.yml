@@ -1,0 +1,46 @@
+name: "Versions"
+
+outputs:
+  crate-version:
+    description: 'Detected version in Cargo.toml, without "v" prefix such as "0.1.0" typically'
+    value: ${{ steps.crate-version.outputs.result }}
+  expected-git-tag:
+    description: 'Expected git tag, with "v" prefix such as "v0.1.0" typically'
+    value: ${{ steps.expected-git-tag.outputs.result }}
+  detected-git-tag:
+    description: 'Detected git tag, with "v" prefix such as "v0.1.0" typically'
+    value: ${{ steps.detected-git-tag.outputs.result }}
+  should-release:
+    description: 'Should release or not'
+    value: ${{ steps.should-release.outputs.result }}
+
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/checkout@v4
+      with:
+        # fetch-tags: true # do not work?
+        fetch-depth: 0 # to fetch the latest tags, but all history is fetched
+    - name: Find version in Cargo.toml
+      id: crate-version
+      uses: mikefarah/yq@v4
+      with:
+        cmd: yq -p toml '.package.version' <Cargo.toml
+    - name: Expected git tag
+      id: expected-git-tag
+      shell: bash
+      run: echo "result=v${{ steps.crate-version.outputs.result }}" >>"$GITHUB_OUTPUT"
+    - name: Detect git tag
+      id: detected-git-tag
+      shell: bash
+      run: echo "result=$(git describe --tags --abbrev=0 || echo v0.1.0)" >>"$GITHUB_OUTPUT" # TODO remove v0.1.0
+    - name: Should release
+      id: should-release
+      shell: bash
+      run: |
+        # TODO semver crate-version > git-tag (note: git-tag has "v" prefix)
+        if [ "v${{ steps.crate-version.outputs.result }}" != "${{ steps.detected-git-tag.outputs.result }}" ]; then
+          echo "result=true" >>"$GITHUB_OUTPUT"
+        else
+          echo "result=false" >>"$GITHUB_OUTPUT"
+        fi
