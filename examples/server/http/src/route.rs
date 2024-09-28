@@ -13,7 +13,7 @@ use axum::{
 
 use crate::{
     env::Env,
-    error::{kind::NotFound, AppError, AppErrorDetail, Logged},
+    error::{kind::NotFound, AppErrorDetail, Logged},
     state::AppState,
 };
 
