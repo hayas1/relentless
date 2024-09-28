@@ -9,7 +9,7 @@ use num::{BigInt, One, Zero};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    error::{counter::CounterError, AppResult},
+    error::{counter::CounterError, AppResult, ResponseMessage},
     state::AppState,
 };
 
@@ -84,7 +84,7 @@ where
     T: TryFrom<BigInt> + One + Display,
     T::Error: std::error::Error + Send + Sync + 'static,
 {
-    let read = counter.read().map_err(|_| CounterError::Retriable)?;
+    let read = counter.read().map_err(|_| ResponseMessage::Retriable)?;
     let count = read.clone().count.try_into().map_err(|_| CounterError::Overflow)?;
     Ok(Json(CounterResponse { count }))
 }
@@ -104,7 +104,7 @@ where
     T: TryFrom<BigInt>,
     T::Error: std::error::Error + Send + Sync + 'static,
 {
-    let mut write = counter.write().map_err(|_| CounterError::Retriable)?;
+    let mut write = counter.write().map_err(|_| ResponseMessage::Retriable)?;
     write.count += &value.parse().map_err(|_| CounterError::CannotParse(value))?;
     let count = write.clone().count.try_into().map_err(|_| CounterError::Overflow)?;
     Ok(Json(CounterResponse { count }))
@@ -125,7 +125,7 @@ where
     T: TryFrom<BigInt>,
     T::Error: std::error::Error + Send + Sync + 'static,
 {
-    let mut write = counter.write().map_err(|_| CounterError::Retriable)?;
+    let mut write = counter.write().map_err(|_| ResponseMessage::Retriable)?;
     write.count -= &value.parse().map_err(|_| CounterError::CannotParse(value))?;
     let count = write.clone().count.try_into().map_err(|_| CounterError::Overflow)?;
     Ok(Json(CounterResponse { count }))
@@ -136,9 +136,9 @@ where
     T: TryFrom<BigInt> + One + Display,
     T::Error: std::error::Error + Send + Sync + 'static,
 {
-    let mut write = counter.write().map_err(|_| CounterError::Retriable)?;
+    let mut write = counter.write().map_err(|_| ResponseMessage::Retriable)?;
     write.count = BigInt::zero();
-    let count = write.clone().count.try_into().map_err(|_| CounterError::Unreachable)?;
+    let count = write.clone().count.try_into().map_err(|_| ResponseMessage::Unreachable)?;
     Ok(Json(CounterResponse { count }))
 }
 

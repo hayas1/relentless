@@ -15,6 +15,7 @@ pub const APP_DEFAULT_ERROR_CODE: StatusCode = StatusCode::BAD_REQUEST;
 #[derive(Error, Debug)]
 #[error(transparent)]
 pub enum AppError<R> {
+    ResponseMessage(#[from] ResponseMessage),
     Response(#[from] ResponseWithError<R>), // TODO should be always R = Json<ErrorMessageResponse<()>> here ?
 
     Counter(#[from] counter::CounterError),
@@ -27,11 +28,23 @@ impl<R: IntoResponse + Debug> IntoResponse for AppError<R> {
     fn into_response(self) -> Response {
         tracing::error!("error: {:?}", self); // TODO middleware
         match self {
+            AppError::ResponseMessage(s) => {
+                ResponseWithError::new(APP_DEFAULT_ERROR_CODE, Json(ErrorMessageResponse::msg(s))).into_response()
+            }
             AppError::Response(response) => response.into_response(),
             AppError::Counter(c) => c.into_response(),
-            AppError::Anyhow(_) | AppError::BoxError(_) => ResponseWithError::default().into_response(),
+            _ => ResponseWithError::default().into_response(),
         }
     }
+}
+
+#[derive(Error, Debug)]
+pub enum ResponseMessage {
+    #[error("please try again later")]
+    Retriable,
+
+    #[error("something went wrong")]
+    Unreachable,
 }
 
 #[derive(Error, Debug)]
@@ -111,12 +124,6 @@ pub mod counter {
 
         #[error("cannot parse value as integer")]
         CannotParse(String),
-
-        #[error("please try again later")]
-        Retriable, // TODO AppError
-
-        #[error("something went wrong")]
-        Unreachable, // TODO AppError
     }
 
     impl IntoResponse for CounterError {
