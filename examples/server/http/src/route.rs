@@ -1,6 +1,7 @@
 pub mod counter;
 pub mod health;
 pub mod root;
+pub mod wait;
 
 use axum::{
     body::{Body, HttpBody},
@@ -30,6 +31,7 @@ pub fn app(state: AppState) -> NormalizePath<Router<()>> {
         .nest("/health", health::route_health())
         .route("/healthz", get(health::health))
         .nest("/counter", counter::route_counter())
+        .nest("/wait", wait::route_wait())
         .fallback(not_found)
         .layer(middleware::from_fn_with_state(state.clone(), logging))
         .with_state(state);
