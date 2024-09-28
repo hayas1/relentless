@@ -4,14 +4,18 @@ pub mod root;
 
 use axum::{
     body::{Body, HttpBody},
-    http::Request,
+    http::{Request, StatusCode, Uri},
     middleware::{self, Next},
-    response::IntoResponse,
+    response::{IntoResponse, Result},
     routing::get,
     Router,
 };
 
-use crate::{env::Env, state::AppState};
+use crate::{
+    env::Env,
+    error::{kind::NotFound, AppError, AppErrorDetail, Logged},
+    state::AppState,
+};
 
 pub fn app(env: Env) -> Router<()> {
     let state = AppState { env, ..Default::default() };
@@ -21,8 +25,13 @@ pub fn app(env: Env) -> Router<()> {
         .nest("/health", health::route_health())
         .route("/healthz", get(health::health))
         .nest("/counter", counter::route_counter())
+        .fallback(not_found)
         .layer(middleware::from_fn_with_state(state.clone(), logging))
         .with_state(state)
+}
+
+pub async fn not_found(uri: Uri) -> Result<()> {
+    Err(AppErrorDetail::<NotFound, _>::new(StatusCode::NOT_FOUND, Logged(""), uri.to_string()))?
 }
 
 pub async fn logging(req: Request<Body>, next: Next) -> impl IntoResponse {

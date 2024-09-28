@@ -89,6 +89,14 @@ pub mod kind {
     }
 
     #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+    pub enum NotFound {}
+    impl Kind for NotFound {
+        fn msg() -> &'static str {
+            "not found"
+        }
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
     pub enum BadRequest {}
     impl Kind for BadRequest {
         fn msg() -> &'static str {
