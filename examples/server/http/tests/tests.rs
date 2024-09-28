@@ -18,7 +18,7 @@ pub async fn send_bytes(
     body: Body,
     headers: HeaderMap,
 ) -> Result<(StatusCode, Bytes), Box<dyn std::error::Error>> {
-    let app = route::app(Default::default());
+    let app = route::app_with(Default::default());
     let mut req = Request::builder().uri(uri).body(body)?;
     for (key, val) in headers {
         req.headers_mut().insert(key.ok_or("no key")?, val);

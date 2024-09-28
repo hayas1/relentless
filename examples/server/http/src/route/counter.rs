@@ -159,14 +159,14 @@ mod tests {
             kind::{BadRequest, Kind},
             ErrorResponseInner, APP_DEFAULT_ERROR_CODE,
         },
-        route::{app, tests::call_with_assert},
+        route::{app_with, tests::call_with_assert},
     };
 
     use super::*;
 
     #[tokio::test]
     async fn test_counter() {
-        let mut app = app(Default::default());
+        let mut app = app_with(Default::default());
 
         let scenario = [
             ("/counter", CounterResponse { count: 0 }),
@@ -204,7 +204,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_counter_overflow() {
-        let mut app = app(Default::default());
+        let mut app = app_with(Default::default());
 
         let req = Request::builder().uri(format!("/counter/increment/{}", i64::MAX)).body(Body::empty()).unwrap();
         call_with_assert(&mut app, req, StatusCode::OK, CounterResponse { count: i64::MAX }).await;
@@ -224,7 +224,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_counter_parse_error() {
-        let mut app = app(Default::default());
+        let mut app = app_with(Default::default());
 
         let req = Request::builder().uri("/counter/increment/abc").body(Body::empty()).unwrap();
         call_with_assert(

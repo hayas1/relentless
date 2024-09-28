@@ -20,9 +20,11 @@ use crate::{
     state::AppState,
 };
 
-pub fn app(env: Env) -> NormalizePath<Router<()>> {
+pub fn app_with(env: Env) -> NormalizePath<Router<()>> {
     let state = AppState { env, ..Default::default() };
-
+    app(state)
+}
+pub fn app(state: AppState) -> NormalizePath<Router<()>> {
     let router = Router::new()
         .route("/", get(root::root))
         .nest("/health", health::route_health())
