@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{future::Future, pin::Pin, time::Duration};
 
 use axum::{extract::Path, response::Result, routing::get, Json, Router};
 use serde::{Deserialize, Serialize};
@@ -8,10 +8,10 @@ use crate::state::AppState;
 
 pub fn route_wait() -> Router<AppState> {
     Router::new()
-        .route("/:duration", get(|Path(d): Path<u64>| async move { DurationUnit::Seconds.handle(d).await }))
-        .route("/:duration/s", get(|Path(d): Path<u64>| async move { DurationUnit::Seconds.handle(d).await }))
-        .route("/:duration/ms", get(|Path(d): Path<u64>| async move { DurationUnit::Milliseconds.handle(d).await }))
-        .route("/:duration/ns", get(|Path(d): Path<u64>| async move { DurationUnit::Nanoseconds.handle(d).await }))
+        .route("/:duration", get(DurationUnit::Seconds.handler()))
+        .route("/:duration/s", get(DurationUnit::Seconds.handler()))
+        .route("/:duration/ms", get(DurationUnit::Milliseconds.handler()))
+        .route("/:duration/ns", get(DurationUnit::Nanoseconds.handler()))
     // .fallback() // TODO
 }
 
@@ -28,13 +28,22 @@ pub enum DurationUnit {
     Nanoseconds,
 }
 impl DurationUnit {
-    pub async fn handle(self, duration: u64) -> Result<Json<WaitResponse>> {
-        match self {
-            DurationUnit::Seconds => sleep(Duration::from_secs(duration)).await,
-            DurationUnit::Milliseconds => sleep(Duration::from_millis(duration)).await,
-            DurationUnit::Nanoseconds => sleep(Duration::from_nanos(duration)).await,
-        };
-        Ok(Json(WaitResponse { duration, unit: self }))
+    pub fn handler(
+        self,
+    ) -> impl FnOnce(Path<u64>) -> Pin<Box<dyn Future<Output = Result<Json<WaitResponse>>> + Send>> + Clone {
+        // return type ref: https://github.com/tokio-rs/axum/pull/1082/files#diff-93eb961c85da77636607a224513f085faf7876f5a9f7091c13e05939aa5de33cR61-R62
+        move |Path(duration): Path<u64>| {
+            let d = match self {
+                DurationUnit::Seconds => Duration::from_secs(duration),
+                DurationUnit::Milliseconds => Duration::from_millis(duration),
+                DurationUnit::Nanoseconds => Duration::from_nanos(duration),
+            };
+            let unit = self.clone();
+            Box::pin(async move {
+                sleep(d).await;
+                Ok(Json(WaitResponse { duration, unit }))
+            })
+        }
     }
 }
 
