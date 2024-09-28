@@ -1,6 +1,6 @@
-use std::{fmt::Display, future::Future, marker::PhantomData, pin::Pin, sync::Arc, time::Duration};
+use std::time::Duration;
 
-use axum::{extract::Path, handler::Handler, response::Result, routing::get, Json, Router};
+use axum::{extract::Path, response::Result, routing::get, Json, Router};
 use serde::{Deserialize, Serialize};
 use tokio::time::sleep;
 
