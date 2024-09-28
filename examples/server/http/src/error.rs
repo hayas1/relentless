@@ -20,7 +20,6 @@ pub enum AppError<R> {
 
     Counter(#[from] counter::CounterError),
 
-    Anyhow(#[from] anyhow::Error),
     BoxError(#[from] Box<dyn std::error::Error + Send + Sync + 'static>),
 }
 
