@@ -1,6 +1,6 @@
-use std::{fmt::Display, marker::PhantomData, time::Duration};
+use std::{fmt::Display, future::Future, marker::PhantomData, pin::Pin, sync::Arc, time::Duration};
 
-use axum::{extract::Path, response::Result, routing::get, Json, Router};
+use axum::{extract::Path, handler::Handler, response::Result, routing::get, Json, Router};
 use serde::{Deserialize, Serialize};
 use tokio::time::sleep;
 
@@ -8,65 +8,49 @@ use crate::state::AppState;
 
 pub fn route_wait() -> Router<AppState> {
     Router::new()
-        .route("/:duration", get(wait::<unit::Seconds>))
-        .route("/:duration/s", get(wait::<unit::Seconds>))
-        .route("/:duration/ms", get(wait::<unit::Milliseconds>))
-        .route("/:duration/ns", get(wait::<unit::Nanoseconds>))
+        .route("/:duration", get(|Path(d): Path<u64>| async move { DurationUnit::Seconds.handle(d).await }))
+        .route("/:duration/s", get(|Path(d): Path<u64>| async move { DurationUnit::Seconds.handle(d).await }))
+        .route("/:duration/ms", get(|Path(d): Path<u64>| async move { DurationUnit::Milliseconds.handle(d).await }))
+        .route("/:duration/ns", get(|Path(d): Path<u64>| async move { DurationUnit::Nanoseconds.handle(d).await }))
     // .fallback() // TODO
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct WaitResponse<U> {
+pub struct WaitResponse {
     pub duration: u64,
-    pub unit: PhantomData<U>,
+    pub unit: DurationUnit,
 }
 
-pub mod unit {
-    use super::*;
-
-    pub trait DurationUnit: Display {
-        fn duration(duration: u64) -> Duration;
-    }
-
-    pub enum Seconds {}
-    impl DurationUnit for Seconds {
-        fn duration(duration: u64) -> Duration {
-            Duration::from_secs(duration)
-        }
-    }
-    impl Display for Seconds {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            write!(f, "s")
-        }
-    }
-
-    pub enum Milliseconds {}
-    impl DurationUnit for Milliseconds {
-        fn duration(duration: u64) -> Duration {
-            Duration::from_millis(duration)
-        }
-    }
-    impl Display for Milliseconds {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            write!(f, "ms")
-        }
-    }
-
-    pub enum Nanoseconds {}
-    impl DurationUnit for Nanoseconds {
-        fn duration(duration: u64) -> Duration {
-            Duration::from_nanos(duration)
-        }
-    }
-    impl Display for Nanoseconds {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            write!(f, "ns")
-        }
-    }
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum DurationUnit {
+    Seconds,
+    Milliseconds,
+    Nanoseconds,
 }
+impl DurationUnit {
+    // TODO
+    // pub fn duration(self, duration: u64) -> Box<dyn Handler<(), axum::body::Body> + Clone> {
+    //     // -> impl Fn(Path<u64>) -> Pin<Box<dyn Future<Output = Result<Json<WaitResponse>>>>> {
+    //     Box::new(|Path(unit): Path<u64>| {
+    //         async {
+    //             // let unit = match &self {
+    //             //     DurationUnit::Seconds => Duration::from_secs(duration),
+    //             //     DurationUnit::Milliseconds => Duration::from_millis(duration),
+    //             //     DurationUnit::Nanoseconds => Duration::from_nanos(duration),
+    //             // };
+    //             // sleep(unit).await;
+    //             // Ok(Json(WaitResponse { duration, unit: self }))
+    //             todo!()
+    //         }
+    //     })
+    // }
 
-#[tracing::instrument]
-pub async fn wait<U: unit::DurationUnit>(Path(duration): Path<u64>) -> Result<Json<WaitResponse<U>>> {
-    sleep(U::duration(duration)).await;
-    Ok(Json(WaitResponse { duration, unit: PhantomData }))
+    pub async fn handle(self, duration: u64) -> Result<Json<WaitResponse>> {
+        match self {
+            DurationUnit::Seconds => sleep(Duration::from_secs(duration)).await,
+            DurationUnit::Milliseconds => sleep(Duration::from_millis(duration)).await,
+            DurationUnit::Nanoseconds => sleep(Duration::from_nanos(duration)).await,
+        };
+        Ok(Json(WaitResponse { duration, unit: self }))
+    }
 }
