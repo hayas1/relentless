@@ -6,6 +6,10 @@ use serde::de::DeserializeOwned;
 use tower::ServiceExt;
 
 use example_http_server::{
+    error::{
+        kind::{Kind, Retriable},
+        ErrorResponseInner,
+    },
     route::{self, health::Health},
     state::AppState,
 };
@@ -70,7 +74,13 @@ async fn test_health_rich_call() {
 #[tokio::test]
 async fn test_disabled_call() {
     let (uri, body, headers) = ("/health/disabled", Body::empty(), HeaderMap::new());
-    let (status, health) = send::<Health>(uri, body, headers).await.unwrap();
+    let (status, health) = send::<ErrorResponseInner<Health>>(uri, body, headers).await.unwrap();
     assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
-    assert_eq!(health, Health { status: StatusCode::SERVICE_UNAVAILABLE });
+    assert_eq!(
+        health,
+        ErrorResponseInner {
+            msg: Retriable::msg().to_string(),
+            detail: Health { status: StatusCode::SERVICE_UNAVAILABLE }
+        }
+    );
 }

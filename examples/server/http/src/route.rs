@@ -38,7 +38,7 @@ mod tests {
 
     use axum::{
         body::{self, Body, HttpBody},
-        http::{Request, StatusCode, Uri},
+        http::{Request, StatusCode},
         response::Response,
     };
     use serde::de::DeserializeOwned;

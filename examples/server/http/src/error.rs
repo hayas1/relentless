@@ -17,13 +17,13 @@ pub const APP_DEFAULT_ERROR_CODE: StatusCode = StatusCode::BAD_REQUEST;
 
 #[derive(Error, Debug)]
 #[error("{0}")]
-pub struct Logged(pub String);
+pub struct Logged<T>(pub T);
 #[derive(Error, Debug)]
 pub struct AppErrorDetail<K, T> {
     #[source]
     pub source: Box<dyn std::error::Error + Send + Sync + 'static>,
     pub status: StatusCode,
-    pub inner: ErrorInner<K, T>,
+    pub inner: AppErrorInner<K, T>,
 }
 impl<K: kind::Kind, T: Serialize> IntoResponse for AppErrorDetail<K, T> {
     fn into_response(self) -> Response {
@@ -37,7 +37,7 @@ impl<K, T> AppErrorDetail<K, T> {
         E: std::error::Error + Send + Sync + 'static,
     {
         let (source, msg) = (Box::new(source), PhantomData);
-        Self { status, source, inner: ErrorInner { msg, detail } }
+        Self { status, source, inner: AppErrorInner { msg, detail } }
     }
 
     pub fn detail<E>(source: E, detail: T) -> Self
@@ -46,6 +46,10 @@ impl<K, T> AppErrorDetail<K, T> {
     {
         let status = APP_DEFAULT_ERROR_CODE;
         Self::new(status, source, detail)
+    }
+
+    pub fn inner(&self) -> &AppErrorInner<K, T> {
+        &self.inner
     }
 }
 impl<K> AppErrorDetail<K, String> {
@@ -77,11 +81,14 @@ impl<K> AppErrorDetail<K, ()> {
 }
 
 pub mod kind {
+    use super::*;
+
     // TODO attribute macro
     pub trait Kind {
         fn msg() -> &'static str;
     }
 
+    #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
     pub enum BadRequest {}
     impl Kind for BadRequest {
         fn msg() -> &'static str {
@@ -89,6 +96,7 @@ pub mod kind {
         }
     }
 
+    #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
     pub enum Retriable {}
     impl Kind for Retriable {
         fn msg() -> &'static str {
@@ -96,6 +104,7 @@ pub mod kind {
         }
     }
 
+    #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
     pub enum Unreachable {}
     impl Kind for Unreachable {
         fn msg() -> &'static str {
@@ -103,23 +112,23 @@ pub mod kind {
         }
     }
 }
-#[derive(Error, Debug)]
-pub struct ErrorInner<K, T> {
+#[derive(Error, Debug, Clone, PartialEq, Eq)]
+pub struct AppErrorInner<K, T> {
     pub msg: PhantomData<K>,
     pub detail: T,
 }
-impl<K: kind::Kind, T: Serialize> IntoResponse for ErrorInner<K, T> {
+impl<K: kind::Kind, T: Serialize> IntoResponse for AppErrorInner<K, T> {
     fn into_response(self) -> Response {
-        Json(InnerResponse::from(self)).into_response()
+        Json(ErrorResponseInner::from(self)).into_response()
     }
 }
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
-pub struct InnerResponse<T> {
+#[derive(Error, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ErrorResponseInner<T> {
     pub msg: String,
     pub detail: T,
 }
-impl<K: kind::Kind, T> From<ErrorInner<K, T>> for InnerResponse<T> {
-    fn from(inner: ErrorInner<K, T>) -> Self {
+impl<K: kind::Kind, T> From<AppErrorInner<K, T>> for ErrorResponseInner<T> {
+    fn from(inner: AppErrorInner<K, T>) -> Self {
         Self { msg: K::msg().to_string(), detail: inner.detail }
     }
 }

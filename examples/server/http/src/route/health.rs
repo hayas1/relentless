@@ -70,9 +70,9 @@ pub async fn health_heavy() -> Health {
 
 #[tracing::instrument]
 pub async fn disabled() -> Result<()> {
-    Err(AppErrorDetail::<Retriable, _>::detail(
+    Err(AppErrorDetail::<Retriable, _>::new(
+        StatusCode::SERVICE_UNAVAILABLE,
         Logged("requested to disabled endpoint".to_string()),
         Health { status: StatusCode::SERVICE_UNAVAILABLE },
     ))?
-    // wrap(Logged("requested to disabled endpoint".to_string())))?
 }

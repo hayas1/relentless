@@ -155,7 +155,10 @@ mod tests {
     };
 
     use crate::{
-        error::APP_DEFAULT_ERROR_CODE,
+        error::{
+            kind::{BadRequest, Kind},
+            ErrorResponseInner, APP_DEFAULT_ERROR_CODE,
+        },
         route::{app, tests::call_with_assert},
     };
 
@@ -199,35 +202,43 @@ mod tests {
         }
     }
 
-    // #[tokio::test]
-    // async fn test_counter_overflow() {
-    //     let mut app = app(Default::default());
+    #[tokio::test]
+    async fn test_counter_overflow() {
+        let mut app = app(Default::default());
 
-    //     let req = Request::builder().uri(format!("/counter/increment/{}", i64::MAX)).body(Body::empty()).unwrap();
-    //     call_with_assert(&mut app, req, StatusCode::OK, CounterResponse { count: i64::MAX }).await;
+        let req = Request::builder().uri(format!("/counter/increment/{}", i64::MAX)).body(Body::empty()).unwrap();
+        call_with_assert(&mut app, req, StatusCode::OK, CounterResponse { count: i64::MAX }).await;
 
-    //     let req = Request::builder().uri("/counter/increment").body(Body::empty()).unwrap();
-    //     call_with_assert(&mut app, req, APP_DEFAULT_ERROR_CODE, ErrorMessageResponse::msg(CounterError::Overflow))
-    //         .await;
+        let req = Request::builder().uri("/counter/increment").body(Body::empty()).unwrap();
+        call_with_assert(
+            &mut app,
+            req,
+            APP_DEFAULT_ERROR_CODE,
+            ErrorResponseInner { msg: BadRequest::msg().to_string(), detail: CounterError::Overflow(()).to_string() },
+        )
+        .await;
 
-    //     let req = Request::builder().uri("/counter/decrement").body(Body::empty()).unwrap();
-    //     call_with_assert(&mut app, req, StatusCode::OK, CounterResponse { count: i64::MAX }).await;
-    // }
+        let req = Request::builder().uri("/counter/decrement").body(Body::empty()).unwrap();
+        call_with_assert(&mut app, req, StatusCode::OK, CounterResponse { count: i64::MAX }).await;
+    }
 
-    // #[tokio::test]
-    // async fn test_counter_parse_error() {
-    //     let mut app = app(Default::default());
+    #[tokio::test]
+    async fn test_counter_parse_error() {
+        let mut app = app(Default::default());
 
-    //     let req = Request::builder().uri("/counter/increment/abc").body(Body::empty()).unwrap();
-    //     call_with_assert(
-    //         &mut app,
-    //         req,
-    //         APP_DEFAULT_ERROR_CODE,
-    //         ErrorMessageResponse::detail(CounterError::CannotParse("abc".to_string()), "abc".to_string()),
-    //     )
-    //     .await;
+        let req = Request::builder().uri("/counter/increment/abc").body(Body::empty()).unwrap();
+        call_with_assert(
+            &mut app,
+            req,
+            APP_DEFAULT_ERROR_CODE,
+            ErrorResponseInner {
+                msg: BadRequest::msg().to_string(),
+                detail: CounterError::CannotParse((), "abc".to_string()).to_string(),
+            },
+        )
+        .await;
 
-    //     let req = Request::builder().uri("/counter/increment").body(Body::empty()).unwrap();
-    //     call_with_assert(&mut app, req, StatusCode::OK, CounterResponse { count: 1 }).await;
-    // }
+        let req = Request::builder().uri("/counter/increment").body(Body::empty()).unwrap();
+        call_with_assert(&mut app, req, StatusCode::OK, CounterResponse { count: 1 }).await;
+    }
 }
