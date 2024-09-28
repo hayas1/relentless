@@ -2,7 +2,7 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response, Result},
     routing::get,
-    Json,
+    Json, Router,
 };
 use serde::{Deserialize, Serialize};
 
@@ -11,8 +11,8 @@ use crate::{
     state::AppState,
 };
 
-pub fn route_health() -> axum::Router<AppState> {
-    axum::Router::new()
+pub fn route_health() -> Router<AppState> {
+    Router::new()
         .route("/", get(health))
         .route("/rich", get(health_rich))
         .route("/heavy", get(health_heavy))

@@ -4,7 +4,7 @@ use axum::{
     extract::{Path, State},
     response::Result,
     routing::get,
-    Json,
+    Json, Router,
 };
 use num::{BigInt, One, Zero};
 use serde::{Deserialize, Serialize};
@@ -18,8 +18,8 @@ use crate::{
     state::AppState,
 };
 
-pub fn route_counter() -> axum::Router<AppState> {
-    axum::Router::new()
+pub fn route_counter() -> Router<AppState> {
+    Router::new()
         .route("/", get(counter::<i64>))
         .route("/s", get(counter::<BInt>))
         .route("/increment", get(increment::<i64>))
