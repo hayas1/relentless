@@ -28,23 +28,6 @@ pub enum DurationUnit {
     Nanoseconds,
 }
 impl DurationUnit {
-    // TODO
-    // pub fn duration(self, duration: u64) -> Box<dyn Handler<(), axum::body::Body> + Clone> {
-    //     // -> impl Fn(Path<u64>) -> Pin<Box<dyn Future<Output = Result<Json<WaitResponse>>>>> {
-    //     Box::new(|Path(unit): Path<u64>| {
-    //         async {
-    //             // let unit = match &self {
-    //             //     DurationUnit::Seconds => Duration::from_secs(duration),
-    //             //     DurationUnit::Milliseconds => Duration::from_millis(duration),
-    //             //     DurationUnit::Nanoseconds => Duration::from_nanos(duration),
-    //             // };
-    //             // sleep(unit).await;
-    //             // Ok(Json(WaitResponse { duration, unit: self }))
-    //             todo!()
-    //         }
-    //     })
-    // }
-
     pub async fn handle(self, duration: u64) -> Result<Json<WaitResponse>> {
         match self {
             DurationUnit::Seconds => sleep(Duration::from_secs(duration)).await,
@@ -52,5 +35,34 @@ impl DurationUnit {
             DurationUnit::Nanoseconds => sleep(Duration::from_nanos(duration)).await,
         };
         Ok(Json(WaitResponse { duration, unit: self }))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Instant;
+
+    use axum::{
+        body::Body,
+        http::{Request, StatusCode},
+    };
+
+    use crate::route::{app_with, tests::call_with_assert};
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test() {
+        let mut app = app_with(Default::default());
+
+        let now = Instant::now();
+        call_with_assert(
+            &mut app,
+            Request::builder().uri("/wait/500/ms").body(Body::empty()).unwrap(),
+            StatusCode::OK,
+            WaitResponse { duration: 500, unit: DurationUnit::Milliseconds },
+        )
+        .await;
+        assert!(now.elapsed() >= Duration::from_millis(500));
     }
 }
