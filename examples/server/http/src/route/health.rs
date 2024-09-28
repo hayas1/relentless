@@ -1,13 +1,13 @@
 use axum::{
     http::StatusCode,
-    response::{IntoResponse, Response},
+    response::{IntoResponse, Response, Result},
     routing::get,
     Json,
 };
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    error::{AppResult, ResponseWithError},
+    error::{kind::Retriable, AppErrorDetail, Logged},
     state::AppState,
 };
 
@@ -69,6 +69,10 @@ pub async fn health_heavy() -> Health {
 }
 
 #[tracing::instrument]
-pub async fn disabled() -> AppResult<(), Health> {
-    Err(ResponseWithError::new(StatusCode::SERVICE_UNAVAILABLE, Health { status: StatusCode::SERVICE_UNAVAILABLE }))?
+pub async fn disabled() -> Result<()> {
+    Err(AppErrorDetail::<Retriable, _>::detail(
+        Logged("requested to disabled endpoint".to_string()),
+        Health { status: StatusCode::SERVICE_UNAVAILABLE },
+    ))?
+    // wrap(Logged("requested to disabled endpoint".to_string())))?
 }

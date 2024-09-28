@@ -1,4 +1,7 @@
-use std::fmt::{Debug, Display};
+use std::{
+    fmt::{Debug, Display},
+    marker::PhantomData,
+};
 
 use axum::{
     http::StatusCode,
@@ -8,132 +11,141 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-pub type AppResult<T, R = Json<ErrorMessageResponse<()>>> = Result<T, AppError<R>>;
+pub type AppError<K, T = ()> = AppErrorDetail<K, T>;
 
 pub const APP_DEFAULT_ERROR_CODE: StatusCode = StatusCode::BAD_REQUEST;
 
 #[derive(Error, Debug)]
-#[error(transparent)]
-pub enum AppError<R> {
-    ResponseMessage(#[from] ResponseMessage),
-    Response(#[from] ResponseWithError<R>), // TODO should be always R = Json<ErrorMessageResponse<()>> here ?
+#[error("{0}")]
+pub struct Logged(pub String);
+#[derive(Error, Debug)]
+pub struct AppErrorDetail<K, T> {
+    #[source]
+    pub source: Box<dyn std::error::Error + Send + Sync + 'static>,
+    pub status: StatusCode,
+    pub inner: ErrorInner<K, T>,
+}
+impl<K: kind::Kind, T: Serialize> IntoResponse for AppErrorDetail<K, T> {
+    fn into_response(self) -> Response {
+        tracing::error!("cause error: {}", self.source); // TODO middleware (but route return Response<Bytes> that do not contain Err information)
+        (self.status, self.inner).into_response()
+    }
+}
+impl<K, T> AppErrorDetail<K, T> {
+    pub fn new<E>(status: StatusCode, source: E, detail: T) -> Self
+    where
+        E: std::error::Error + Send + Sync + 'static,
+    {
+        let (source, msg) = (Box::new(source), PhantomData);
+        Self { status, source, inner: ErrorInner { msg, detail } }
+    }
 
-    Counter(#[from] counter::CounterError),
+    pub fn detail<E>(source: E, detail: T) -> Self
+    where
+        E: std::error::Error + Send + Sync + 'static,
+    {
+        let status = APP_DEFAULT_ERROR_CODE;
+        Self::new(status, source, detail)
+    }
+}
+impl<K> AppErrorDetail<K, String> {
+    pub fn detail_display<E>(source: E) -> Self
+    where
+        E: Display + std::error::Error + Send + Sync + 'static,
+    {
+        Self::detail_display_with_source(source, |e| e)
+    }
 
-    BoxError(#[from] Box<dyn std::error::Error + Send + Sync + 'static>),
+    pub fn detail_display_with_source<E, S, F>(source: E, f: F) -> Self
+    where
+        E: Display,
+        S: std::error::Error + Send + Sync + 'static,
+        F: FnOnce(E) -> S,
+    {
+        let (status, msg) = (APP_DEFAULT_ERROR_CODE, source.to_string());
+        Self::new(status, f(source), msg)
+    }
+}
+impl<K> AppErrorDetail<K, ()> {
+    pub fn wrap<E>(source: E) -> Self
+    where
+        E: std::error::Error + Send + Sync + 'static,
+    {
+        let status = APP_DEFAULT_ERROR_CODE;
+        Self::new(status, source, ())
+    }
 }
 
-impl<R: IntoResponse + Debug> IntoResponse for AppError<R> {
-    fn into_response(self) -> Response {
-        tracing::error!("error: {:?}", self); // TODO middleware
-        match self {
-            AppError::ResponseMessage(s) => {
-                ResponseWithError::new(APP_DEFAULT_ERROR_CODE, Json(ErrorMessageResponse::msg(s))).into_response()
-            }
-            AppError::Response(response) => response.into_response(),
-            AppError::Counter(c) => c.into_response(),
-            _ => ResponseWithError::default().into_response(),
+pub mod kind {
+    // TODO attribute macro
+    pub trait Kind {
+        fn msg() -> &'static str;
+    }
+
+    pub enum BadRequest {}
+    impl Kind for BadRequest {
+        fn msg() -> &'static str {
+            "bad request"
+        }
+    }
+
+    pub enum Retriable {}
+    impl Kind for Retriable {
+        fn msg() -> &'static str {
+            "please try again later"
+        }
+    }
+
+    pub enum Unreachable {}
+    impl Kind for Unreachable {
+        fn msg() -> &'static str {
+            "something went wrong"
         }
     }
 }
-
 #[derive(Error, Debug)]
-pub enum ResponseMessage {
-    #[error("please try again later")]
-    Retriable,
-
-    #[error("something went wrong")]
-    Unreachable,
+pub struct ErrorInner<K, T> {
+    pub msg: PhantomData<K>,
+    pub detail: T,
 }
-
-#[derive(Error, Debug)]
-pub struct ResponseWithError<R> {
-    status: StatusCode,
-    response: R,
-}
-impl Default for ResponseWithError<Json<ErrorMessageResponse<()>>> {
-    fn default() -> Self {
-        Self::new(APP_DEFAULT_ERROR_CODE, Json(ErrorMessageResponse::default()))
-    }
-}
-impl<R: IntoResponse> IntoResponse for ResponseWithError<R> {
+impl<K: kind::Kind, T: Serialize> IntoResponse for ErrorInner<K, T> {
     fn into_response(self) -> Response {
-        (self.status, self.response).into_response()
+        Json(InnerResponse::from(self)).into_response()
     }
 }
-impl<R: IntoResponse> From<(StatusCode, R)> for ResponseWithError<R> {
-    fn from((status, response): (StatusCode, R)) -> Self {
-        Self::new(status, response)
-    }
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub struct InnerResponse<T> {
+    pub msg: String,
+    pub detail: T,
 }
-impl<R: IntoResponse> From<R> for ResponseWithError<R> {
-    fn from(response: R) -> Self {
-        Self::new(APP_DEFAULT_ERROR_CODE, response)
-    }
-}
-impl<R> ResponseWithError<R> {
-    pub fn new(status: StatusCode, response: R) -> Self {
-        Self { status, response }
-    }
-}
-
-#[derive(Error, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ErrorMessageResponse<T> {
-    msg: String,
-    detail: T,
-}
-impl Default for ErrorMessageResponse<()> {
-    fn default() -> Self {
-        Self::new("bad request".to_string(), ())
-    }
-}
-impl<T: IntoResponse> From<T> for ErrorMessageResponse<()>
-where
-    T: std::error::Error + Send + Sync + 'static,
-{
-    fn from(e: T) -> Self {
-        let log = e.to_string();
-        tracing::error!("error: {:?}", log); // TODO middleware
-        Default::default()
-    }
-}
-impl<T> ErrorMessageResponse<T> {
-    pub fn new(msg: String, detail: T) -> Self {
-        Self { msg, detail }
-    }
-}
-impl<T> ErrorMessageResponse<T> {
-    pub fn detail<M: Display>(msg: M, detail: T) -> Self {
-        Self::new(msg.to_string(), detail)
-    }
-}
-impl ErrorMessageResponse<()> {
-    pub fn msg<M: Display>(msg: M) -> Self {
-        Self::new(msg.to_string(), ())
+impl<K: kind::Kind, T> From<ErrorInner<K, T>> for InnerResponse<T> {
+    fn from(inner: ErrorInner<K, T>) -> Self {
+        Self { msg: K::msg().to_string(), detail: inner.detail }
     }
 }
 
 pub mod counter {
     use super::*;
 
-    #[derive(Error, Debug)]
-    pub enum CounterError {
+    #[derive(Error, Debug, Clone, PartialEq, Eq)]
+    pub enum CounterError<E> {
         #[error("overflow counter")]
-        Overflow,
+        Overflow(E),
 
-        #[error("cannot parse value as integer")]
-        CannotParse(String),
+        #[error("cannot parse value as integer: {1}")]
+        CannotParse(E, String),
     }
 
-    impl IntoResponse for CounterError {
+    impl<E> IntoResponse for CounterError<E>
+    where
+        E: std::error::Error + Send + Sync + 'static,
+    {
         fn into_response(self) -> Response {
-            let msg = self.to_string();
-            match self {
-                Self::CannotParse(s) => {
-                    (APP_DEFAULT_ERROR_CODE, Json(ErrorMessageResponse::detail(msg, s))).into_response()
-                }
-                _ => (APP_DEFAULT_ERROR_CODE, Json(ErrorMessageResponse::msg(msg))).into_response(),
-            }
+            AppErrorDetail::<kind::BadRequest, _>::detail_display_with_source(self, |e| match e {
+                CounterError::Overflow(e) => e,
+                CounterError::CannotParse(e, _) => e,
+            })
+            .into_response()
         }
     }
 }
