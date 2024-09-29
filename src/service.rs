@@ -44,8 +44,8 @@ impl<ReqB: Body + 'static, ResB: Body + 'static> Service<http::Request<ReqB>> fo
     type Error = hyper::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
 
-    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.sender.poll_ready(cx)
     }
 
     fn call(&mut self, req: http::Request<ReqB>) -> Self::Future {

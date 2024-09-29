@@ -8,7 +8,7 @@ use crate::{
     service::{BytesBody, DefaultHttpClient, FromBodyStructure},
 };
 use hyper::body::Body;
-use tower::Service;
+use tower::{Service, ServiceExt};
 
 /// TODO document
 #[derive(Debug, Clone)]
@@ -22,6 +22,7 @@ impl Control<DefaultHttpClient<BytesBody, BytesBody>, BytesBody, BytesBody> {
         cmd: &Relentless,
         configs: &Vec<Config>,
     ) -> RelentlessResult<Vec<HashMap<String, DefaultHttpClient<BytesBody, BytesBody>>>> {
+        // TODO!!! same name and different destination cause unexpected behavior
         let mut clients = Vec::new();
         for c in configs {
             let mut destinations = HashMap::new();
@@ -161,10 +162,12 @@ where
 
         let mut requests = Vec::new();
         let destinations = cmd.override_destination(&worker_config.destinations);
-        for (name, req) in Self::requests(&destinations, &self.testcase.target, setting)? {
-            let client = clients.get_mut(&name).unwrap(); // TODO
-            let request = client.call(req);
-            requests.push(request)
+        for (name, reqs) in Self::requests(&destinations, &self.testcase.target, setting)? {
+            for req in reqs {
+                let client = clients.get_mut(&name).unwrap();
+                let request = client.ready().await?.call(req);
+                requests.push(request)
+            }
         }
 
         let mut responses = Vec::new();
@@ -180,25 +183,41 @@ where
         destinations: &HashMap<String, String>,
         target: &str,
         setting: &Setting,
-    ) -> RelentlessResult<HashMap<String, http::Request<ReqB>>> {
+    ) -> RelentlessResult<HashMap<String, Vec<http::Request<ReqB>>>> {
         let Setting { protocol, template, repeat, timeout } = setting;
         Ok(destinations
             .iter()
             .map(|(name, destination)| {
-                let (method, headers, body) = match protocol.clone() {
-                    Some(Protocol::Http(http)) => (http.method, http.header, http.body),
-                    None => (None, None, None),
-                };
-                let destination = destination.parse::<http::Uri>().unwrap();
-                let uri = http::uri::Builder::from(destination).path_and_query(target).build().unwrap();
-                let mut request = http::Request::builder()
-                    .uri(uri)
-                    .method(method.unwrap_or(http::Method::GET))
-                    .body(ReqB::from_body_structure(body.unwrap_or_default()))
-                    .unwrap();
-                *request.headers_mut() = headers.unwrap_or_default();
-                Ok::<_, HttpError>((name.to_string(), request))
+                let default_http = Default::default();
+                let http = protocol
+                    .as_ref()
+                    .map(|p| match p {
+                        Protocol::Http(http) => http,
+                    })
+                    .unwrap_or(&default_http);
+                let requests = (0..repeat.unwrap_or(1))
+                    .map(|_| Self::http_request(destination, target, http))
+                    .collect::<Result<Vec<_>, _>>()
+                    .unwrap(); // TODO
+                Ok((name.to_string(), requests))
             })
             .collect::<Result<HashMap<_, _>, _>>()?)
+    }
+
+    // TODO generics
+    pub fn http_request(
+        destination: &str,
+        target: &str,
+        http: &crate::config::Http,
+    ) -> RelentlessResult<http::Request<ReqB>> {
+        let destination = destination.parse::<http::Uri>().unwrap();
+        let uri = http::uri::Builder::from(destination).path_and_query(target).build().unwrap();
+        let mut request = http::Request::builder()
+            .uri(uri)
+            .method(http.method.clone().unwrap_or(http::Method::GET))
+            .body(ReqB::from_body_structure(http.body.clone().unwrap_or_default()))
+            .unwrap();
+        *request.headers_mut() = http.header.clone().unwrap_or_default();
+        Ok(request)
     }
 }
