@@ -18,6 +18,9 @@ jobs:
     - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@stable
 
+    - name: Release test for example server
+      run: cargo test --release --manifest-path examples/server/http/Cargo.toml
+
     - name: Release test
       run: cargo test --release
     - name: Release test without cli feature

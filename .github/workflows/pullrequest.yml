@@ -25,6 +25,10 @@ jobs:
           ${{ steps.cargo-home.outputs.path }}
         key: cargo-${{ hashFiles('**/Cargo.toml') }}
 
+    - run: cargo test --verbose --manifest-path examples/server/http/Cargo.toml
+    - run: cargo fmt --check --manifest-path examples/server/http/Cargo.toml
+    - run: cargo clippy --tests --manifest-path examples/server/http/Cargo.toml -- --deny warnings
+
     - run: cargo test --verbose
     - run: cargo test --verbose --features=json --features=yaml
     - run: cargo test --verbose --features=json --features=yaml --features=cli
