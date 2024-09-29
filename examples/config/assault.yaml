@@ -6,7 +6,7 @@ destinations:
 testcase:
   - target: /
     description: request to root
-    attr:
+    setting:
       repeat: 10
   - target: /health
   - target: /healthz

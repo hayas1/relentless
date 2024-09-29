@@ -181,7 +181,7 @@ where
         target: &str,
         setting: &Setting,
     ) -> RelentlessResult<HashMap<String, http::Request<ReqB>>> {
-        let Setting { protocol, template, timeout } = setting;
+        let Setting { protocol, template, repeat, timeout } = setting;
         Ok(destinations
             .iter()
             .map(|(name, destination)| {

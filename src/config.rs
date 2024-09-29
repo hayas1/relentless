@@ -35,6 +35,8 @@ pub struct Setting {
     #[serde(default)]
     pub template: HashMap<String, HashMap<String, String>>,
     #[serde(default)]
+    pub repeat: Option<usize>,
+    #[serde(default)]
     pub timeout: Option<Duration>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -79,8 +81,6 @@ pub struct Testcase {
 pub struct Attribute {
     #[serde(default)]
     pub allow: bool,
-    #[serde(default)]
-    pub repeat: Option<usize>,
 }
 
 impl Config {
@@ -96,6 +96,7 @@ impl Setting {
         Self {
             protocol: self.protocol.clone().or(other.protocol.clone()),
             template: if self.template.is_empty() { other.template.clone() } else { self.template.clone() },
+            repeat: self.repeat.or(other.repeat),
             timeout: self.timeout.or(other.timeout),
         }
     }
