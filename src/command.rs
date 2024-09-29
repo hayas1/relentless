@@ -15,9 +15,9 @@ use crate::{
 
 #[cfg(feature = "cli")]
 pub async fn execute() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sync>> {
-    let relentless = Relentless::parse();
-    let ret = relentless.assault().await?;
-    Ok(ret.exit_code(false))
+    let cmd = Relentless::parse();
+    let ret = cmd.assault().await?;
+    Ok(ret.exit_code(cmd))
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]

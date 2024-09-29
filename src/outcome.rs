@@ -58,8 +58,8 @@ impl Outcome {
     pub fn allow(&self, strict: bool) -> bool {
         self.outcome.iter().all(|o| o.allow(strict))
     }
-    pub fn exit_code(&self, strict: bool) -> ExitCode {
-        (!self.allow(strict) as u8).into()
+    pub fn exit_code(&self, cmd: Relentless) -> ExitCode {
+        (!self.allow(cmd.strict) as u8).into()
     }
     pub fn report(&self, cmd: &Relentless) -> std::fmt::Result {
         self.report_to(&mut OutcomeWriter::with_stdout(0), cmd)
