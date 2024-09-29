@@ -140,6 +140,9 @@ impl CaseOutcome {
         let side = if self.pass() { console::Emoji("✅", "PASS") } else { console::Emoji("❌", "FAIL") };
         let target = console::style(&self.testcase.target);
         write!(w, "{} {} ", side, if self.pass() { target.green() } else { target.red() })?;
+        if let Some(ref repeat) = self.testcase.setting.repeat {
+            write!(w, "{}{} ", console::Emoji("🔁", ""), repeat)?; // TODO overrode setting
+        }
         if let Some(ref description) = self.testcase.description {
             writeln!(w, "{} {}", console::Emoji("📝", ""), description)?;
         } else {
