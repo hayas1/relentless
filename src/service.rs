@@ -21,8 +21,9 @@ pub struct DefaultHttpClient<ReqB, ResB> {
     sender: hyper::client::conn::http1::SendRequest<ReqB>,
     phantom: std::marker::PhantomData<ResB>,
 }
-impl<ReqB: Body + Send + 'static, ResB> DefaultHttpClient<ReqB, ResB>
+impl<ReqB, ResB> DefaultHttpClient<ReqB, ResB>
 where
+    ReqB: Body + Send + 'static,
     ReqB::Data: Send + 'static,
     ReqB::Error: std::error::Error + Sync + Send + 'static,
 {
@@ -30,6 +31,7 @@ where
     where
         A: ToSocketAddrs,
     {
+        // TODO https
         let stream = TcpStream::connect(host).await?;
         let io = TokioIo::new(stream);
         let (sender, conn) = http1::handshake(io).await?;
@@ -40,6 +42,54 @@ where
 }
 
 impl<ReqB: Body + 'static, ResB: Body + 'static> Service<http::Request<ReqB>> for DefaultHttpClient<ReqB, ResB> {
+    type Response = http::Response<BytesBody>;
+    type Error = hyper::Error;
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
+
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.sender.poll_ready(cx)
+    }
+
+    fn call(&mut self, req: http::Request<ReqB>) -> Self::Future {
+        let fut = self.sender.send_request(req);
+        Box::pin(async {
+            match fut.await {
+                Ok(r) => {
+                    let (parts, incoming) = r.into_parts();
+                    Ok(http::Response::from_parts(parts, incoming.into_bytes_body()))
+                }
+                Err(e) => Err(e),
+            }
+        })
+    }
+}
+
+#[derive(Debug)]
+pub struct DefaultHttp2Client<ReqB, ResB> {
+    sender: hyper::client::conn::http2::SendRequest<ReqB>,
+    phantom: std::marker::PhantomData<ResB>,
+}
+impl<ReqB, ResB> DefaultHttp2Client<ReqB, ResB>
+where
+    ReqB: Body + Send + Unpin + 'static,
+    ReqB::Data: Send + 'static,
+    ReqB::Error: std::error::Error + Sync + Send + 'static,
+{
+    pub async fn new<A>(host: A) -> RelentlessResult<Self>
+    where
+        A: ToSocketAddrs,
+    {
+        // TODO https
+        let stream = TcpStream::connect(host).await?;
+        let io = TokioIo::new(stream);
+        let rt = hyper_util::rt::TokioExecutor::new();
+        let (sender, conn) = hyper::client::conn::http2::handshake(rt, io).await?;
+        tokio::spawn(conn);
+        let phantom = std::marker::PhantomData;
+        Ok(Self { sender, phantom })
+    }
+}
+impl<ReqB: Body + 'static, ResB: Body + 'static> Service<http::Request<ReqB>> for DefaultHttp2Client<ReqB, ResB> {
     type Response = http::Response<BytesBody>;
     type Error = hyper::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
