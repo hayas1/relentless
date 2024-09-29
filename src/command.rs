@@ -1,7 +1,7 @@
 use std::{collections::HashMap, path::PathBuf, process::ExitCode};
 
 #[cfg(feature = "cli")]
-use clap::{Parser, Subcommand};
+use clap::Parser;
 use http_body::Body;
 use tower::Service;
 
@@ -15,80 +15,15 @@ use crate::{
 
 #[cfg(feature = "cli")]
 pub async fn execute() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sync>> {
-    let cmd = Relentless::parse();
-    let ret = cmd.execute().await?;
-    Ok(ret.exit_code())
+    let relentless = Relentless::parse();
+    let ret = relentless.assault().await?;
+    Ok(ret.exit_code(false))
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 #[cfg_attr(feature = "cli", derive(Parser))]
 #[cfg_attr(feature = "cli", clap(version, about, arg_required_else_help = true))]
 pub struct Relentless {
-    /// subcommand
-    #[cfg_attr(feature = "cli", clap(subcommand))]
-    pub cmd: Cmd,
-
-    /// without colorize output
-    #[cfg_attr(feature = "cli", arg(long, global = true))]
-    pub no_color: bool,
-}
-impl Relentless {
-    pub async fn execute(self) -> RelentlessResult<CmdRet> {
-        let Self { cmd, no_color } = self;
-        console::set_colors_enabled(!no_color);
-
-        let ret = match cmd {
-            Cmd::Assault(assault) => CmdRet::Assault(assault.execute().await?),
-        };
-
-        Ok(ret)
-    }
-
-    pub async fn assault_with<S, ReqB, ResB>(&self, services: Vec<HashMap<String, S>>) -> RelentlessResult<Outcome>
-    where
-        ReqB: Body + FromBodyStructure + Send + 'static,
-        ReqB::Data: Send + 'static,
-        ReqB::Error: std::error::Error + Sync + Send + 'static,
-        ResB: Body + Send + 'static,
-        ResB::Data: Send + 'static,
-        ResB::Error: std::error::Error + Sync + Send + 'static,
-        S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + Sync + 'static,
-        RelentlessError: From<S::Error>,
-    {
-        match &self.cmd {
-            Cmd::Assault(assault) => assault.execute_with(services).await,
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "cli", derive(Subcommand))]
-pub enum Cmd {
-    /// run testcases
-    #[cfg_attr(feature = "cli", clap(arg_required_else_help = true))]
-    Assault(Assault),
-}
-impl Default for Cmd {
-    fn default() -> Self {
-        Self::Assault(Default::default())
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum CmdRet {
-    Assault(Outcome),
-}
-impl CmdRet {
-    pub fn exit_code(&self) -> ExitCode {
-        match self {
-            CmdRet::Assault(outcome) => outcome.exit_code(false),
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-#[cfg_attr(feature = "cli", derive(Parser))]
-pub struct Assault {
     /// config files of testcases
     #[cfg_attr(feature = "cli", arg(short, long, num_args=0..))]
     pub file: Vec<PathBuf>,
@@ -105,6 +40,10 @@ pub struct Assault {
     #[cfg_attr(feature = "cli", arg(long))]
     pub ng_only: bool,
 
+    /// without colorize output
+    #[cfg_attr(feature = "cli", arg(long, global = true))]
+    pub no_color: bool,
+
     /// report nothing
     #[cfg_attr(feature = "cli", arg(long))]
     pub no_report: bool,
@@ -117,22 +56,17 @@ pub struct Assault {
     #[cfg_attr(feature = "cli", arg(short, long))]
     pub number_of_threads: Option<usize>,
 }
-impl From<Assault> for Cmd {
-    fn from(assault: Assault) -> Self {
-        Self::Assault(assault)
-    }
-}
-impl Assault {
+impl Relentless {
     pub fn configs(&self) -> RelentlessResult<Vec<Config>> {
         let Self { file, .. } = self;
         file.iter().map(Config::read).collect::<RelentlessResult<Vec<_>>>()
     }
-    pub async fn execute(&self) -> RelentlessResult<Outcome> {
+    pub async fn assault(&self) -> RelentlessResult<Outcome> {
         let configs = self.configs()?;
-        let outcome = self.execute_with(Control::default_http_clients(self, &configs).await?).await?;
+        let outcome = self.assault_with(Control::default_http_clients(self, &configs).await?).await?;
         Ok(outcome)
     }
-    pub async fn execute_with<S, ReqB, ResB>(&self, services: Vec<HashMap<String, S>>) -> RelentlessResult<Outcome>
+    pub async fn assault_with<S, ReqB, ResB>(&self, services: Vec<HashMap<String, S>>) -> RelentlessResult<Outcome>
     where
         ReqB: Body + FromBodyStructure + Send + 'static,
         ReqB::Data: Send + 'static,
@@ -143,10 +77,13 @@ impl Assault {
         S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + Sync + 'static,
         RelentlessError: From<S::Error>,
     {
+        let Self { no_color, no_report, .. } = self;
+        console::set_colors_enabled(!no_color);
+
         let configs = self.configs()?;
         let control = Control::with_service(configs, services)?;
         let outcome = control.assault(self).await?;
-        if !self.no_report {
+        if !no_report {
             outcome.report(self)?;
         }
         Ok(outcome)
@@ -178,47 +115,43 @@ mod tests {
 
     #[test]
     #[cfg(feature = "cli")]
-    fn test_exclude_file_or_dir() {
-        let Err(_) = Relentless::try_parse_from(["relentless", "assault"]) else {
+    fn test_file_must_be_specified() {
+        let Err(_) = Relentless::try_parse_from(["relentless"]) else {
             panic!("files must be specified");
         };
 
-        match Relentless::try_parse_from(["relentless", "assault", "--file", "examples/config/assault.yaml"]) {
-            Ok(cli) => assert_eq!(
-                cli.cmd,
-                Cmd::Assault(Assault {
-                    file: vec![PathBuf::from("examples/config/assault.yaml")],
-                    ..Default::default()
-                })
+        match Relentless::try_parse_from(["relentless", "--file", "examples/config/assault.yaml"]) {
+            Ok(cmd) => assert_eq!(
+                cmd,
+                Relentless { file: vec![PathBuf::from("examples/config/assault.yaml")], ..Default::default() }
             ),
             Err(_) => panic!("specify one file should be ok"),
         };
 
         match Relentless::try_parse_from([
             "relentless",
-            "assault",
             "--file",
             "examples/config/assault.yaml",
             "--file",
             "examples/config/compare.yaml",
         ]) {
-            Ok(cli) => assert_eq!(
-                cli.cmd,
-                Cmd::Assault(Assault {
+            Ok(cmd) => assert_eq!(
+                cmd,
+                Relentless {
                     file: vec![
                         PathBuf::from("examples/config/assault.yaml"),
                         PathBuf::from("examples/config/compare.yaml")
                     ],
                     ..Default::default()
-                })
+                }
             ),
             Err(_) => panic!("specify multiple files should be ok"),
         };
 
-        match Relentless::try_parse_from(["relentless", "assault", "--file", "examples/config/*.yaml", "--file"]) {
-            Ok(cli) => assert_eq!(
-                cli.cmd,
-                Cmd::Assault(Assault {
+        match Relentless::try_parse_from(["relentless", "--file", "examples/config/*.yaml", "--file"]) {
+            Ok(cmd) => assert_eq!(
+                cmd,
+                Relentless {
                     file: vec![
                         // WARN: * may be wildcard in shell, clap doesn't support it
                         PathBuf::from("examples/config/*.yaml"),
@@ -226,28 +159,9 @@ mod tests {
                         // PathBuf::from("examples/config/compare.yaml")
                     ],
                     ..Default::default()
-                })
+                }
             ),
             Err(_) => panic!("specify multiple files should be ok"),
-        };
-    }
-
-    #[test]
-    #[cfg(feature = "cli")]
-    fn test_no_color_arg_position() {
-        match Relentless::try_parse_from(["relentless", "assault", "-f", "examples/config/assault.yaml"]) {
-            Ok(cli) => assert!(!cli.no_color),
-            Err(_) => panic!("--no-color is optional, default is false"),
-        }
-        match Relentless::try_parse_from(["relentless", "--no-color", "assault", "-f", "examples/config/assault.yaml"])
-        {
-            Ok(cli) => assert!(cli.no_color),
-            Err(_) => panic!("--no-color is main command option"),
-        };
-        match Relentless::try_parse_from(["relentless", "assault", "-f", "examples/config/assault.yaml", "--no-color"])
-        {
-            Ok(cli) => assert!(cli.no_color),
-            Err(_) => panic!("--no-color is main command option, but it is global"),
         };
     }
 }

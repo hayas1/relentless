@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{
-    command::Assault,
+    command::Relentless,
     config::{Config, Protocol, Setting, Testcase, WorkerConfig},
     error::{HttpError, RelentlessError, RelentlessResult},
     outcome::{CaseOutcome, Compare, Evaluator, Outcome, Status, WorkerOutcome},
@@ -19,7 +19,7 @@ pub struct Control<S = DefaultHttpClient<BytesBody, BytesBody>, ReqB = BytesBody
 }
 impl Control<DefaultHttpClient<BytesBody, BytesBody>, BytesBody, BytesBody> {
     pub async fn default_http_clients(
-        cmd: &Assault,
+        cmd: &Relentless,
         configs: &Vec<Config>,
     ) -> RelentlessResult<Vec<HashMap<String, DefaultHttpClient<BytesBody, BytesBody>>>> {
         let mut clients = Vec::new();
@@ -61,7 +61,7 @@ where
         Self { workers, cases, phantom }
     }
     /// TODO document
-    pub async fn assault(self, cmd: &Assault) -> RelentlessResult<Outcome> {
+    pub async fn assault(self, cmd: &Relentless) -> RelentlessResult<Outcome> {
         let Self { workers, cases, .. } = self;
 
         let mut works = Vec::new();
@@ -105,7 +105,7 @@ where
         Ok(Self { config, clients, phantom })
     }
 
-    pub async fn assault(self, cmd: &Assault, cases: Vec<Case<S, ReqB, ResB>>) -> RelentlessResult<WorkerOutcome> {
+    pub async fn assault(self, cmd: &Relentless, cases: Vec<Case<S, ReqB, ResB>>) -> RelentlessResult<WorkerOutcome> {
         let Self { config, mut clients, .. } = self;
 
         let mut processes = Vec::new();
@@ -153,7 +153,7 @@ where
 
     pub async fn process(
         self,
-        cmd: &Assault,
+        cmd: &Relentless,
         worker_config: &WorkerConfig,
         clients: &mut HashMap<String, S>,
     ) -> RelentlessResult<Vec<http::Response<ResB>>> {

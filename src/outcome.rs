@@ -7,7 +7,7 @@ use http_body::Body;
 use http_body_util::BodyExt;
 
 use crate::{
-    command::Assault,
+    command::Relentless,
     config::{Testcase, WorkerConfig},
     error::{HttpError, RelentlessError},
 };
@@ -61,10 +61,10 @@ impl Outcome {
     pub fn exit_code(&self, strict: bool) -> ExitCode {
         (!self.allow(strict) as u8).into()
     }
-    pub fn report(&self, cmd: &Assault) -> std::fmt::Result {
+    pub fn report(&self, cmd: &Relentless) -> std::fmt::Result {
         self.report_to(&mut OutcomeWriter::with_stdout(0), cmd)
     }
-    pub fn report_to<T: std::io::Write>(&self, w: &mut OutcomeWriter<T>, cmd: &Assault) -> std::fmt::Result {
+    pub fn report_to<T: std::io::Write>(&self, w: &mut OutcomeWriter<T>, cmd: &Relentless) -> std::fmt::Result {
         for outcome in &self.outcome {
             outcome.report_to(w, cmd)?;
         }
@@ -89,7 +89,7 @@ impl WorkerOutcome {
         self.outcome.iter().all(|o| o.allow(strict))
     }
 
-    pub fn report_to<T: std::io::Write>(&self, w: &mut OutcomeWriter<T>, cmd: &Assault) -> std::fmt::Result {
+    pub fn report_to<T: std::io::Write>(&self, w: &mut OutcomeWriter<T>, cmd: &Relentless) -> std::fmt::Result {
         let side = console::Emoji("🚀", "");
         writeln!(w, "{} {}", side, self.config.name.as_ref().unwrap_or(&"testcases".to_string()))?;
 
@@ -136,7 +136,7 @@ impl CaseOutcome {
         let allowed = self.testcase.attr.allow;
         self.pass() || !strict && allowed
     }
-    pub fn report_to<T: std::io::Write>(&self, w: &mut OutcomeWriter<T>, cmd: &Assault) -> std::fmt::Result {
+    pub fn report_to<T: std::io::Write>(&self, w: &mut OutcomeWriter<T>, cmd: &Relentless) -> std::fmt::Result {
         let side = if self.pass() { console::Emoji("✅", "PASS") } else { console::Emoji("❌", "FAIL") };
         let target = console::style(&self.testcase.target);
         write!(w, "{} {} ", side, if self.pass() { target.green() } else { target.red() })?;
