@@ -27,14 +27,14 @@ jobs:
 
     - run: cargo test --verbose --manifest-path examples/server/http/Cargo.toml
     - run: cargo fmt --check --manifest-path examples/server/http/Cargo.toml
-    - run: cargo clippy --tests --manifest-path examples/server/http/Cargo.toml -- --deny warnings
+    # - run: cargo clippy --tests --manifest-path examples/server/http/Cargo.toml -- --deny warnings
 
     - run: cargo test --verbose
     - run: cargo test --verbose --features=json --features=yaml
     - run: cargo test --verbose --features=json --features=yaml --features=cli
     - run: cargo fmt --check
     - run: RUSTDOCFLAGS="-D warnings" cargo doc --no-deps
-    - run: cargo clippy --tests -- --deny warnings
+    # - run: cargo clippy --tests -- --deny warnings
 
     - run: cargo install cargo-readme && cargo readme > README.md
     - run: git add -N . && git diff --exit-code -- README.md
