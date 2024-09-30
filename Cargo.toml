@@ -36,6 +36,7 @@ bytes = "1.7.2"
 
 clap = { version = "4.5.18", features = ["derive"], optional = true }
 console = "0.15.8"
+reqwest = "0.12.7"
 
 
 [dev-dependencies]
