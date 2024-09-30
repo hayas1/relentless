@@ -1,0 +1,7 @@
+name: https
+destinations:
+  test-api: https://google.com
+
+
+testcase:
+  - target: /
