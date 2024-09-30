@@ -8,6 +8,5 @@ updates:
   - package-ecosystem: "cargo" # See documentation for possible values
     directories: # Location of package manifests
       - "/"
-      - "examples/server/http"
     schedule:
       interval: "weekly"
