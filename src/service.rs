@@ -9,55 +9,52 @@ use http_body_util::{combinators::BoxBody, BodyExt};
 use hyper::{body::Body, client::conn::http1};
 use hyper_util::rt::TokioIo;
 use tokio::net::{TcpStream, ToSocketAddrs};
-use tower::Service;
+use tower::{Service, ServiceBuilder};
 
 use crate::{
     config::BodyStructure,
     error::{RelentlessError, RelentlessResult},
 };
 
+static APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),);
+
 #[derive(Debug)]
 pub struct DefaultHttpClient<ReqB, ResB> {
-    sender: hyper::client::conn::http1::SendRequest<ReqB>,
-    phantom: std::marker::PhantomData<ResB>,
+    client: reqwest::Client,
+    // client: HttpClientService<reqwest::Client>,
+    // sender: hyper::client::conn::http1::SendRequest<ReqB>,
+    phantom: std::marker::PhantomData<(ReqB, ResB)>,
 }
-impl<ReqB: Body + Send + 'static, ResB> DefaultHttpClient<ReqB, ResB>
-where
-    ReqB::Data: Send + 'static,
-    ReqB::Error: std::error::Error + Sync + Send + 'static,
-{
+impl<ReqB, ResB> DefaultHttpClient<ReqB, ResB> {
     pub async fn new<A>(host: A) -> RelentlessResult<Self>
     where
         A: ToSocketAddrs,
     {
-        let stream = TcpStream::connect(host).await?;
-        let io = TokioIo::new(stream);
-        let (sender, conn) = http1::handshake(io).await?;
-        tokio::spawn(conn);
-        let phantom = std::marker::PhantomData;
-        Ok(Self { sender, phantom })
+        let client = reqwest::Client::builder().user_agent(APP_USER_AGENT).build()?;
+        // let client = ServiceBuilder::new().layer(HttpClientLayer).service(inner);
+        Ok(Self { client, phantom: std::marker::PhantomData })
     }
 }
 
-impl<ReqB: Body + 'static, ResB: Body + 'static> Service<http::Request<ReqB>> for DefaultHttpClient<ReqB, ResB> {
+impl<ReqB: Into<reqwest::Body>, ResB> Service<http::Request<ReqB>> for DefaultHttpClient<ReqB, ResB> {
     type Response = http::Response<BytesBody>;
-    type Error = hyper::Error;
+    type Error = reqwest::Error;
+    // type Future = tower_reqwest::adapters::reqwest::ExecuteRequestFuture<reqwest::Client>;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.sender.poll_ready(cx)
+        self.client.poll_ready(cx)
     }
 
     fn call(&mut self, req: http::Request<ReqB>) -> Self::Future {
-        let fut = self.sender.send_request(req);
+        let req = req.try_into().unwrap(); // TODO handle error
+        let fut = self.client.call(req);
         Box::pin(async {
-            match fut.await {
-                Ok(r) => {
-                    let (parts, incoming) = r.into_parts();
-                    Ok(http::Response::from_parts(parts, incoming.into_bytes_body()))
-                }
-                Err(e) => Err(e),
-            }
+            fut.await.map(|res| {
+                let b = http::Response::<reqwest::Body>::from(res);
+                let (parts, incoming) = b.into_parts();
+                http::Response::from_parts(parts, incoming.into_bytes_body())
+            })
         })
     }
 }
