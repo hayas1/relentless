@@ -18,18 +18,18 @@ pub struct Control<S, ReqB, ResB> {
     cases: Vec<Vec<Case<S, ReqB, ResB>>>,
     phantom: std::marker::PhantomData<(ReqB, ResB)>,
 }
-impl Control<DefaultHttpClient<Bytes, Bytes>, Bytes, Bytes> {
+impl Control<DefaultHttpClient<reqwest::Body, reqwest::Body>, reqwest::Body, reqwest::Body> {
     pub async fn default_http_clients(
         cmd: &Relentless,
         configs: &Vec<Config>,
-    ) -> RelentlessResult<Vec<HashMap<String, DefaultHttpClient<Bytes, Bytes>>>> {
+    ) -> RelentlessResult<Vec<HashMap<String, DefaultHttpClient<reqwest::Body, reqwest::Body>>>> {
         // TODO!!! same name and different destination cause unexpected behavior
         let mut clients = Vec::new();
         for c in configs {
             let mut destinations = HashMap::new();
             for (name, destination) in cmd.override_destination(&c.worker_config.destinations) {
                 let authority = destination.parse::<http::Uri>()?.authority().unwrap().as_str().to_string(); // TODO
-                let client = DefaultHttpClient::<Bytes, Bytes>::new(authority).await?;
+                let client = DefaultHttpClient::<reqwest::Body, reqwest::Body>::new(authority).await?;
                 destinations.insert(name.to_string(), client);
             }
             clients.push(destinations);
