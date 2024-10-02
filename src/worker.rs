@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, marker::PhantomData};
 
 use crate::{
     command::Relentless,
@@ -15,7 +15,7 @@ use tower::{Service, ServiceExt};
 pub struct Control<S, ReqB, ResB> {
     workers: Vec<Worker<S, ReqB, ResB>>, // TODO all worker do not have same clients type ?
     cases: Vec<Vec<Case<S, ReqB, ResB>>>,
-    phantom: std::marker::PhantomData<(ReqB, ResB)>,
+    phantom: PhantomData<(ReqB, ResB)>,
 }
 impl Control<DefaultHttpClient<reqwest::Body, reqwest::Body>, reqwest::Body, reqwest::Body> {
     pub async fn default_http_clients(
@@ -63,7 +63,7 @@ where
     /// TODO document
     pub fn new(configs: Vec<Config>, workers: Vec<Worker<S, ReqB, ResB>>) -> Self {
         let cases = configs.iter().map(|c| c.testcase.clone().into_iter().map(Case::new).collect()).collect();
-        let phantom = std::marker::PhantomData;
+        let phantom = PhantomData;
         Self { workers, cases, phantom }
     }
     /// TODO document
@@ -88,7 +88,7 @@ where
 pub struct Worker<S, ReqB, ResB> {
     config: WorkerConfig,
     clients: HashMap<String, S>,
-    phantom: std::marker::PhantomData<(ReqB, ResB)>,
+    phantom: PhantomData<(ReqB, ResB)>,
 }
 impl<S, ReqB, ResB> Worker<S, ReqB, ResB> {
     pub fn config(&self) -> &WorkerConfig {
@@ -107,7 +107,7 @@ where
     RelentlessError: From<S::Error>,
 {
     pub fn new(config: WorkerConfig, clients: HashMap<String, S>) -> RelentlessResult<Self> {
-        let phantom = std::marker::PhantomData;
+        let phantom = PhantomData;
         Ok(Self { config, clients, phantom })
     }
 
@@ -134,7 +134,7 @@ where
 #[derive(Debug, Clone)]
 pub struct Case<S, ReqB, ResB> {
     testcase: Testcase,
-    phantom: std::marker::PhantomData<(S, ReqB, ResB)>,
+    phantom: PhantomData<(S, ReqB, ResB)>,
 }
 impl<S, ReqB, ResB> Case<S, ReqB, ResB> {
     pub fn testcase(&self) -> &Testcase {
@@ -153,7 +153,7 @@ where
     RelentlessError: From<S::Error>,
 {
     pub fn new(testcase: Testcase) -> Self {
-        let phantom = std::marker::PhantomData;
+        let phantom = PhantomData;
         Self { testcase, phantom }
     }
 

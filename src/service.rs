@@ -1,5 +1,6 @@
 use std::{
     future::Future,
+    marker::PhantomData,
     pin::Pin,
     task::{Context, Poll},
 };
@@ -19,13 +20,13 @@ const APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PK
 #[derive(Debug)]
 pub struct DefaultHttpClient<ReqB, ResB> {
     client: reqwest::Client,
-    phantom: std::marker::PhantomData<(ReqB, ResB)>,
+    phantom: PhantomData<(ReqB, ResB)>,
 }
 impl<ReqB, ResB> DefaultHttpClient<ReqB, ResB> {
     pub async fn new(_host: &str) -> RelentlessResult<Self> {
         // TODO use hyper ? continue to use reqwest's rich client?
         let client = reqwest::Client::builder().user_agent(APP_USER_AGENT).build()?;
-        Ok(Self { client, phantom: std::marker::PhantomData })
+        Ok(Self { client, phantom: PhantomData })
     }
 }
 
