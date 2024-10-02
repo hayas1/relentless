@@ -91,14 +91,47 @@ impl Config {
         Ok(format.deserialize_testcase_str(s)?)
     }
 }
-impl Setting {
-    pub fn coalesce(&self, other: &Self) -> Self {
+impl Coalesce for Testcase {
+    type Other = Setting;
+    fn coalesce(self, other: &Self::Other) -> Self {
+        let setting = self.setting.coalesce(other);
+        Self { setting, ..self }
+    }
+}
+impl Coalesce for Setting {
+    type Other = Self;
+    fn coalesce(self, other: &Self) -> Self {
         Self {
-            protocol: self.protocol.clone().or(other.protocol.clone()),
-            template: if self.template.is_empty() { other.template.clone() } else { self.template.clone() },
+            protocol: self.protocol.or(other.clone().protocol),
+            template: if self.template.is_empty() { other.clone().template } else { self.template },
             repeat: self.repeat.or(other.repeat),
             timeout: self.timeout.or(other.timeout),
         }
+    }
+}
+
+pub trait Coalesce {
+    type Other;
+    fn coalesce(self, other: &Self::Other) -> Self;
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct Coalesced<T, U> {
+    base: T,
+    coalesced: Vec<U>,
+}
+// TODO do not require S: Default
+impl<T: Clone + Coalesce<Other = U>, U> Coalesced<T, U> {
+    pub fn new(base: T, coalesced: Vec<U>) -> Self {
+        Self { base, coalesced }
+    }
+    pub fn tuple(base: T, other: U) -> Self {
+        Self::new(base, vec![other])
+    }
+    pub fn coalesce(&self) -> T {
+        self.coalesced.iter().fold(self.base.clone(), |acc, x| acc.coalesce(x))
+    }
+    pub fn base(&self) -> &T {
+        &self.base
     }
 }
 

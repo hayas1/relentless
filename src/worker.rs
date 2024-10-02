@@ -2,7 +2,7 @@ use std::{collections::HashMap, marker::PhantomData};
 
 use crate::{
     command::Relentless,
-    config::{Config, Protocol, Setting, Testcase, WorkerConfig},
+    config::{Coalesce, Config, Protocol, Setting, Testcase, WorkerConfig},
     error::{RelentlessError, RelentlessResult},
     outcome::{CaseOutcome, Compare, Evaluator, Outcome, Status, WorkerOutcome},
     service::{DefaultHttpClient, FromBodyStructure},
