@@ -3,11 +3,10 @@ use std::collections::HashMap;
 use crate::{
     command::Relentless,
     config::{Config, Protocol, Setting, Testcase, WorkerConfig},
-    error::{HttpError, RelentlessError, RelentlessResult},
+    error::{RelentlessError, RelentlessResult},
     outcome::{CaseOutcome, Compare, Evaluator, Outcome, Status, WorkerOutcome},
-    service::{BytesBody, DefaultHttpClient, FromBodyStructure},
+    service::{DefaultHttpClient, FromBodyStructure},
 };
-use bytes::Bytes;
 use hyper::body::Body;
 use tower::{Service, ServiceExt};
 
@@ -29,7 +28,7 @@ impl Control<DefaultHttpClient<reqwest::Body, reqwest::Body>, reqwest::Body, req
             let mut destinations = HashMap::new();
             for (name, destination) in cmd.override_destination(&c.worker_config.destinations) {
                 let authority = destination.parse::<http::Uri>()?.authority().unwrap().as_str().to_string(); // TODO
-                let client = DefaultHttpClient::<reqwest::Body, reqwest::Body>::new(authority).await?;
+                let client = DefaultHttpClient::<reqwest::Body, reqwest::Body>::new(&authority).await?;
                 destinations.insert(name.to_string(), client);
             }
             clients.push(destinations);

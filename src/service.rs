@@ -6,10 +6,8 @@ use std::{
 
 use bytes::Bytes;
 use http_body_util::{combinators::BoxBody, BodyExt};
-use hyper::{body::Body, client::conn::http1};
-use hyper_util::rt::TokioIo;
-use tokio::net::{TcpStream, ToSocketAddrs};
-use tower::{Service, ServiceBuilder};
+use hyper::body::Body;
+use tower::Service;
 
 use crate::{
     config::BodyStructure,
@@ -21,17 +19,11 @@ static APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_P
 #[derive(Debug)]
 pub struct DefaultHttpClient<ReqB, ResB> {
     client: reqwest::Client,
-    // client: HttpClientService<reqwest::Client>,
-    // sender: hyper::client::conn::http1::SendRequest<ReqB>,
     phantom: std::marker::PhantomData<(ReqB, ResB)>,
 }
 impl<ReqB, ResB> DefaultHttpClient<ReqB, ResB> {
-    pub async fn new<A>(host: A) -> RelentlessResult<Self>
-    where
-        A: ToSocketAddrs,
-    {
+    pub async fn new(_host: &str) -> RelentlessResult<Self> {
         let client = reqwest::Client::builder().user_agent(APP_USER_AGENT).build()?;
-        // let client = ServiceBuilder::new().layer(HttpClientLayer).service(inner);
         Ok(Self { client, phantom: std::marker::PhantomData })
     }
 }
@@ -39,7 +31,6 @@ impl<ReqB, ResB> DefaultHttpClient<ReqB, ResB> {
 impl<ReqB: Into<reqwest::Body>, ResB> Service<http::Request<ReqB>> for DefaultHttpClient<ReqB, ResB> {
     type Response = http::Response<BytesBody>;
     type Error = reqwest::Error;
-    // type Future = tower_reqwest::adapters::reqwest::ExecuteRequestFuture<reqwest::Client>;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
