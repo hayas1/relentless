@@ -67,6 +67,7 @@ impl Outcome {
     pub fn report_to<T: std::io::Write>(&self, w: &mut OutcomeWriter<T>, cmd: &Relentless) -> std::fmt::Result {
         for outcome in &self.outcome {
             outcome.report_to(w, cmd)?;
+            writeln!(w)?;
         }
         Ok(())
     }
@@ -93,7 +94,7 @@ impl WorkerOutcome {
         let WorkerConfig { name, destinations, .. } = self.config.coalesce();
 
         let side = console::Emoji("🚀", "");
-        writeln!(w, "{} {}", side, name.as_ref().unwrap_or(&"testcases".to_string()))?;
+        writeln!(w, "{} {} {}", side, name.as_ref().unwrap_or(&"testcases".to_string()), side)?;
 
         w.scope(|w| {
             for (name, destination) in destinations.0 {

@@ -18,5 +18,6 @@ testcase:
     setting:
       http:
         method: GET
+      repeat: 1
     attr:
       allow: true
