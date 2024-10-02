@@ -22,18 +22,23 @@ impl Control<DefaultHttpClient<reqwest::Body, reqwest::Body>, reqwest::Body, req
         cmd: &Relentless,
         configs: &Vec<Config>,
     ) -> RelentlessResult<Vec<HashMap<String, DefaultHttpClient<reqwest::Body, reqwest::Body>>>> {
-        // TODO!!! same name and different destination cause unexpected behavior
         let mut clients = Vec::new();
         for c in configs {
-            let mut destinations = HashMap::new();
-            for (name, destination) in cmd.override_destination(&c.worker_config.destinations) {
-                let authority = destination.parse::<http::Uri>()?.authority().unwrap().as_str().to_string(); // TODO
-                let client = DefaultHttpClient::<reqwest::Body, reqwest::Body>::new(&authority).await?;
-                destinations.insert(name.to_string(), client);
-            }
-            clients.push(destinations);
+            clients.push(Self::default_http_client(cmd, c).await?);
         }
         Ok(clients)
+    }
+    pub async fn default_http_client(
+        cmd: &Relentless,
+        config: &Config,
+    ) -> RelentlessResult<HashMap<String, DefaultHttpClient<reqwest::Body, reqwest::Body>>> {
+        let mut destinations = HashMap::new();
+        for (name, destination) in cmd.override_destination(&config.worker_config.destinations) {
+            let authority = destination.parse::<http::Uri>()?.authority().unwrap().as_str().to_string(); // TODO
+            let client = DefaultHttpClient::<reqwest::Body, reqwest::Body>::new(&authority).await?;
+            destinations.insert(name.to_string(), client);
+        }
+        Ok(destinations)
     }
 }
 impl<S, ReqB, ResB> Control<S, ReqB, ResB>

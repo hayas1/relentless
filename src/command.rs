@@ -63,7 +63,8 @@ impl Relentless {
     }
     pub async fn assault(&self) -> RelentlessResult<Outcome> {
         let configs = self.configs()?;
-        let outcome = self.assault_with(Control::default_http_clients(self, &configs).await?).await?;
+        let clients = Control::default_http_clients(self, &configs).await?;
+        let outcome = self.assault_with(clients).await?;
         Ok(outcome)
     }
     pub async fn assault_with<S, ReqB, ResB>(&self, services: Vec<HashMap<String, S>>) -> RelentlessResult<Outcome>
