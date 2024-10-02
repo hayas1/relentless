@@ -110,7 +110,7 @@ impl Coalesce for WorkerConfig {
 impl Coalesce for Destinations {
     type Other = Vec<(String, String)>;
     fn coalesce(self, other: &Self::Other) -> Self {
-        // TODO Coalesce trait should be renamed because override usage is inverse of coalesce
+        // TODO Coalesce trait should be renamed because override usage may be inverse of coalesce
         let mut map = self.0.clone();
         for (name, dest) in other {
             map.entry(name.to_string()).and_modify(|d| *d = dest.to_string());
