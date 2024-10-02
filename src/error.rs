@@ -46,8 +46,6 @@ pub enum HttpError {
 
     #[error(transparent)]
     InvalidMethod(#[from] http::method::InvalidMethod),
-    #[error(transparent)]
-    InvalidUrl(#[from] url::ParseError),
 }
 
 #[derive(Error, Debug)]
