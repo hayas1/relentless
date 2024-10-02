@@ -30,6 +30,11 @@ pub struct WorkerConfig {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct Destinations(pub HashMap<String, String>); // TODO HashMap<String, Uri>
+impl From<Vec<(String, String)>> for Destinations {
+    fn from(v: Vec<(String, String)>) -> Self {
+        Self(v.into_iter().collect())
+    }
+}
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct Setting {
@@ -94,6 +99,26 @@ impl Config {
         Ok(format.deserialize_testcase_str(s)?)
     }
 }
+impl Coalesce for WorkerConfig {
+    type Other = Destinations;
+    fn coalesce(self, other: &Self::Other) -> Self {
+        let destinations =
+            self.destinations.coalesce(&other.0.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect());
+        Self { destinations, ..self }
+    }
+}
+impl Coalesce for Destinations {
+    type Other = Vec<(String, String)>;
+    fn coalesce(self, other: &Self::Other) -> Self {
+        // TODO Coalesce trait should be renamed because override usage is inverse of coalesce
+        let mut map = self.0.clone();
+        for (name, dest) in other {
+            map.entry(name.to_string()).and_modify(|d| *d = dest.to_string());
+        }
+        Self(map)
+    }
+}
+
 impl Coalesce for Testcase {
     type Other = Setting;
     fn coalesce(self, other: &Self::Other) -> Self {

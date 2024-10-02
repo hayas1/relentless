@@ -82,21 +82,12 @@ impl Relentless {
         console::set_colors_enabled(!no_color);
 
         let configs = self.configs()?;
-        let control = Control::with_service(configs, services)?;
+        let control = Control::with_service(self, configs, services)?;
         let outcome = control.assault(self).await?;
         if !no_report {
             outcome.report(self)?;
         }
         Ok(outcome)
-    }
-
-    pub fn override_destination(&self, other: &HashMap<String, String>) -> HashMap<String, String> {
-        // TODO use Coalesce trait. but Coalesce trait should be renamed because override usage is inverse of coalesce
-        let mut map = other.clone();
-        for (name, dest) in &self.destination {
-            map.entry(name.to_string()).and_modify(|d| *d = dest.to_string());
-        }
-        map
     }
 }
 

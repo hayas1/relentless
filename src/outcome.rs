@@ -8,7 +8,7 @@ use http_body_util::BodyExt;
 
 use crate::{
     command::Relentless,
-    config::{Coalesced, Setting, Testcase, WorkerConfig},
+    config::{Coalesced, Destinations, Setting, Testcase, WorkerConfig},
     error::{HttpError, RelentlessError},
 };
 
@@ -75,11 +75,11 @@ impl Outcome {
 /// TODO document
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WorkerOutcome {
-    config: WorkerConfig,
+    config: Coalesced<WorkerConfig, Destinations>,
     outcome: Vec<CaseOutcome>,
 }
 impl WorkerOutcome {
-    pub fn new(config: WorkerConfig, outcome: Vec<CaseOutcome>) -> Self {
+    pub fn new(config: Coalesced<WorkerConfig, Destinations>, outcome: Vec<CaseOutcome>) -> Self {
         Self { config, outcome }
     }
     pub fn pass(&self) -> bool {
@@ -90,16 +90,17 @@ impl WorkerOutcome {
     }
 
     pub fn report_to<T: std::io::Write>(&self, w: &mut OutcomeWriter<T>, cmd: &Relentless) -> std::fmt::Result {
+        let WorkerConfig { name, destinations, .. } = self.config.coalesce();
+
         let side = console::Emoji("🚀", "");
-        writeln!(w, "{} {}", side, self.config.name.as_ref().unwrap_or(&"testcases".to_string()))?;
+        writeln!(w, "{} {}", side, name.as_ref().unwrap_or(&"testcases".to_string()))?;
 
         w.scope(|w| {
-            let overrode = cmd.override_destination(&self.config.destinations.0);
-            for (name, destination) in &self.config.destinations.0 {
+            for (name, destination) in destinations.0 {
                 write!(w, "{}{} ", name, console::Emoji("🌐", ":"))?;
-                match overrode.get(name) {
-                    Some(overridden) if overridden != destination => {
-                        writeln!(w, "{} {} {}", destination, console::Emoji("👉", "->"), overridden)?;
+                match self.config.base().destinations.0.get(&name) {
+                    Some(base) if base != &destination => {
+                        writeln!(w, "{} {} {}", base, console::Emoji("👉", "->"), destination)?;
                     }
                     _ => {
                         writeln!(w, "{}", destination)?;

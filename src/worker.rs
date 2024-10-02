@@ -2,7 +2,7 @@ use std::{collections::HashMap, marker::PhantomData};
 
 use crate::{
     command::Relentless,
-    config::{Coalesce, Coalesced, Config, Protocol, Setting, Testcase, WorkerConfig},
+    config::{Coalesce, Coalesced, Config, Destinations, Protocol, Setting, Testcase, WorkerConfig},
     error::{RelentlessError, RelentlessResult},
     outcome::{CaseOutcome, Compare, Evaluator, Outcome, Status, WorkerOutcome},
     service::{DefaultHttpClient, FromBodyStructure},
@@ -33,7 +33,7 @@ impl Control<DefaultHttpClient<reqwest::Body, reqwest::Body>, reqwest::Body, req
         config: &Config,
     ) -> RelentlessResult<HashMap<String, DefaultHttpClient<reqwest::Body, reqwest::Body>>> {
         let mut destinations = HashMap::new();
-        for (name, destination) in cmd.override_destination(&config.worker_config.destinations.0) {
+        for (name, destination) in config.worker_config.destinations.clone().coalesce(&cmd.destination).0 {
             let authority = destination.parse::<http::Uri>()?.authority().unwrap().as_str().to_string(); // TODO
             let client = DefaultHttpClient::<reqwest::Body, reqwest::Body>::new(&authority).await?;
             destinations.insert(name.to_string(), client);
@@ -53,10 +53,14 @@ where
     RelentlessError: From<S::Error>,
 {
     /// TODO document
-    pub fn with_service(configs: Vec<Config>, services: Vec<HashMap<String, S>>) -> RelentlessResult<Self> {
+    pub fn with_service(
+        cmd: &Relentless,
+        configs: Vec<Config>,
+        services: Vec<HashMap<String, S>>,
+    ) -> RelentlessResult<Self> {
         let mut workers = Vec::new();
         for (config, service) in configs.iter().zip(services) {
-            workers.push(Worker::new(config.worker_config.clone(), service)?);
+            workers.push(Worker::new(cmd, config.worker_config.clone(), service)?);
         }
         Ok(Self::new(configs, workers))
     }
@@ -89,13 +93,13 @@ where
 /// TODO document
 #[derive(Debug, Clone)]
 pub struct Worker<S, ReqB, ResB> {
-    config: WorkerConfig,
+    config: Coalesced<WorkerConfig, Destinations>,
     clients: HashMap<String, S>,
     phantom: PhantomData<(ReqB, ResB)>,
 }
 impl<S, ReqB, ResB> Worker<S, ReqB, ResB> {
-    pub fn config(&self) -> &WorkerConfig {
-        &self.config
+    pub fn config(&self) -> WorkerConfig {
+        self.config.coalesce()
     }
 }
 impl<S, ReqB, ResB> Worker<S, ReqB, ResB>
@@ -109,7 +113,8 @@ where
     S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + Sync + 'static,
     RelentlessError: From<S::Error>,
 {
-    pub fn new(config: WorkerConfig, clients: HashMap<String, S>) -> RelentlessResult<Self> {
+    pub fn new(cmd: &Relentless, config: WorkerConfig, clients: HashMap<String, S>) -> RelentlessResult<Self> {
+        let config = Coalesced::tuple(config, cmd.destination.clone().into());
         let phantom = PhantomData;
         Ok(Self { config, clients, phantom })
     }
@@ -120,7 +125,7 @@ where
         let mut processes = Vec::new();
         for case in cases {
             // TODO do not await here, use stream
-            let destinations = cmd.override_destination(&config.destinations.0);
+            let destinations = config.coalesce().destinations;
             processes.push((case.testcase.clone(), case.process(cmd, &destinations, &mut clients).await));
         }
 
@@ -165,13 +170,13 @@ where
     pub async fn process(
         self,
         _cmd: &Relentless,
-        destinations: &HashMap<String, String>,
+        destinations: &Destinations,
         clients: &mut HashMap<String, S>,
     ) -> RelentlessResult<Vec<http::Response<ResB>>> {
         let Testcase { target, setting, .. } = self.testcase.coalesce();
 
         let mut requests = Vec::new();
-        for (name, reqs) in Self::requests(destinations, &target, &setting)? {
+        for (name, reqs) in Self::requests(&destinations.0, &target, &setting)? {
             for req in reqs {
                 let client = clients.get_mut(&name).unwrap();
                 let request = client.ready().await?.call(req);
