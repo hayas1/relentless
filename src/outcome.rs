@@ -8,7 +8,7 @@ use http_body_util::BodyExt;
 
 use crate::{
     command::Relentless,
-    config::{Testcase, WorkerConfig},
+    config::{Coalesced, Setting, Testcase, WorkerConfig},
     error::{HttpError, RelentlessError},
 };
 
@@ -122,28 +122,30 @@ impl WorkerOutcome {
 /// TODO document
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CaseOutcome {
-    testcase: Testcase,
+    testcase: Coalesced<Testcase, Setting>,
     pass: bool,
 }
 impl CaseOutcome {
-    pub fn new(testcase: Testcase, pass: bool) -> Self {
+    pub fn new(testcase: Coalesced<Testcase, Setting>, pass: bool) -> Self {
         Self { testcase, pass }
     }
     pub fn pass(&self) -> bool {
         self.pass
     }
     pub fn allow(&self, strict: bool) -> bool {
-        let allowed = self.testcase.attr.allow;
+        let allowed = self.testcase.coalesce().attr.allow;
         self.pass() || !strict && allowed
     }
     pub fn report_to<T: std::io::Write>(&self, w: &mut OutcomeWriter<T>, cmd: &Relentless) -> std::fmt::Result {
+        let Testcase { description, target, setting, .. } = self.testcase.coalesce();
+
         let side = if self.pass() { console::Emoji("✅", "PASS") } else { console::Emoji("❌", "FAIL") };
-        let target = console::style(&self.testcase.target);
+        let target = console::style(&target);
         write!(w, "{} {} ", side, if self.pass() { target.green() } else { target.red() })?;
-        if let Some(ref repeat) = self.testcase.setting.repeat {
+        if let Some(ref repeat) = setting.repeat {
             write!(w, "{}{} ", console::Emoji("🔁", ""), repeat)?; // TODO overrode setting
         }
-        if let Some(ref description) = self.testcase.description {
+        if let Some(ref description) = description {
             writeln!(w, "{} {}", console::Emoji("📝", ""), description)?;
         } else {
             writeln!(w)?;

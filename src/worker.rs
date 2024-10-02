@@ -2,7 +2,7 @@ use std::{collections::HashMap, marker::PhantomData};
 
 use crate::{
     command::Relentless,
-    config::{Coalesce, Config, Protocol, Setting, Testcase, WorkerConfig},
+    config::{Coalesce, Coalesced, Config, Protocol, Setting, Testcase, WorkerConfig},
     error::{RelentlessError, RelentlessResult},
     outcome::{CaseOutcome, Compare, Evaluator, Outcome, Status, WorkerOutcome},
     service::{DefaultHttpClient, FromBodyStructure},
@@ -62,7 +62,10 @@ where
     }
     /// TODO document
     pub fn new(configs: Vec<Config>, workers: Vec<Worker<S, ReqB, ResB>>) -> Self {
-        let cases = configs.iter().map(|c| c.testcase.clone().into_iter().map(Case::new).collect()).collect();
+        let cases = configs
+            .iter()
+            .map(|c| c.testcase.clone().into_iter().map(|t| Case::new(&c.worker_config, t)).collect())
+            .collect();
         let phantom = PhantomData;
         Self { workers, cases, phantom }
     }
@@ -133,12 +136,12 @@ where
 /// TODO document
 #[derive(Debug, Clone)]
 pub struct Case<S, ReqB, ResB> {
-    testcase: Testcase,
+    testcase: Coalesced<Testcase, Setting>,
     phantom: PhantomData<(S, ReqB, ResB)>,
 }
 impl<S, ReqB, ResB> Case<S, ReqB, ResB> {
     pub fn testcase(&self) -> &Testcase {
-        &self.testcase
+        &self.testcase.base()
     }
 }
 impl<S, ReqB, ResB> Case<S, ReqB, ResB>
@@ -152,7 +155,8 @@ where
     S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + Sync + 'static,
     RelentlessError: From<S::Error>,
 {
-    pub fn new(testcase: Testcase) -> Self {
+    pub fn new(worker_config: &WorkerConfig, testcase: Testcase) -> Self {
+        let testcase = Coalesced::tuple(testcase, worker_config.setting.clone());
         let phantom = PhantomData;
         Self { testcase, phantom }
     }
@@ -160,14 +164,14 @@ where
     pub async fn process(
         self,
         cmd: &Relentless,
-        worker_config: &WorkerConfig,
+        worker_config: &WorkerConfig, // TODO!!!
         clients: &mut HashMap<String, S>,
     ) -> RelentlessResult<Vec<http::Response<ResB>>> {
-        let setting = &self.testcase.setting.coalesce(&worker_config.setting);
+        let Testcase { target, setting, .. } = self.testcase.coalesce();
 
         let mut requests = Vec::new();
         let destinations = cmd.override_destination(&worker_config.destinations);
-        for (name, reqs) in Self::requests(&destinations, &self.testcase.target, setting)? {
+        for (name, reqs) in Self::requests(&destinations, &target, &setting)? {
             for req in reqs {
                 let client = clients.get_mut(&name).unwrap();
                 let request = client.ready().await?.call(req);
