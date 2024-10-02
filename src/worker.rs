@@ -33,7 +33,7 @@ impl Control<DefaultHttpClient<reqwest::Body, reqwest::Body>, reqwest::Body, req
         config: &Config,
     ) -> RelentlessResult<HashMap<String, DefaultHttpClient<reqwest::Body, reqwest::Body>>> {
         let mut destinations = HashMap::new();
-        for (name, destination) in cmd.override_destination(&config.worker_config.destinations) {
+        for (name, destination) in cmd.override_destination(&config.worker_config.destinations.0) {
             let authority = destination.parse::<http::Uri>()?.authority().unwrap().as_str().to_string(); // TODO
             let client = DefaultHttpClient::<reqwest::Body, reqwest::Body>::new(&authority).await?;
             destinations.insert(name.to_string(), client);
@@ -120,7 +120,7 @@ where
         let mut processes = Vec::new();
         for case in cases {
             // TODO do not await here, use stream
-            let destinations = cmd.override_destination(&config.destinations);
+            let destinations = cmd.override_destination(&config.destinations.0);
             processes.push((case.testcase.clone(), case.process(cmd, &destinations, &mut clients).await));
         }
 

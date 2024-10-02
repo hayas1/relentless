@@ -23,10 +23,13 @@ pub struct Config {
 pub struct WorkerConfig {
     pub name: Option<String>,
     #[serde(default)]
-    pub destinations: HashMap<String, String>, // TODO HashMap<String, Uri>
+    pub destinations: Destinations,
     #[serde(default)]
     pub setting: Setting,
 }
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
+pub struct Destinations(pub HashMap<String, String>); // TODO HashMap<String, Uri>
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct Setting {
