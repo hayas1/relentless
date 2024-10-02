@@ -3,32 +3,32 @@ use std::collections::HashMap;
 use crate::{
     command::Relentless,
     config::{Config, Protocol, Setting, Testcase, WorkerConfig},
-    error::{HttpError, RelentlessError, RelentlessResult},
+    error::{RelentlessError, RelentlessResult},
     outcome::{CaseOutcome, Compare, Evaluator, Outcome, Status, WorkerOutcome},
-    service::{BytesBody, DefaultHttpClient, FromBodyStructure},
+    service::{DefaultHttpClient, FromBodyStructure},
 };
-use hyper::body::Body;
+use http_body::Body;
 use tower::{Service, ServiceExt};
 
 /// TODO document
 #[derive(Debug, Clone)]
-pub struct Control<S = DefaultHttpClient<BytesBody, BytesBody>, ReqB = BytesBody, ResB = BytesBody> {
+pub struct Control<S, ReqB, ResB> {
     workers: Vec<Worker<S, ReqB, ResB>>, // TODO all worker do not have same clients type ?
     cases: Vec<Vec<Case<S, ReqB, ResB>>>,
     phantom: std::marker::PhantomData<(ReqB, ResB)>,
 }
-impl Control<DefaultHttpClient<BytesBody, BytesBody>, BytesBody, BytesBody> {
+impl Control<DefaultHttpClient<reqwest::Body, reqwest::Body>, reqwest::Body, reqwest::Body> {
     pub async fn default_http_clients(
         cmd: &Relentless,
         configs: &Vec<Config>,
-    ) -> RelentlessResult<Vec<HashMap<String, DefaultHttpClient<BytesBody, BytesBody>>>> {
+    ) -> RelentlessResult<Vec<HashMap<String, DefaultHttpClient<reqwest::Body, reqwest::Body>>>> {
         // TODO!!! same name and different destination cause unexpected behavior
         let mut clients = Vec::new();
         for c in configs {
             let mut destinations = HashMap::new();
             for (name, destination) in cmd.override_destination(&c.worker_config.destinations) {
                 let authority = destination.parse::<http::Uri>()?.authority().unwrap().as_str().to_string(); // TODO
-                let client = DefaultHttpClient::<BytesBody, BytesBody>::new(authority).await?;
+                let client = DefaultHttpClient::<reqwest::Body, reqwest::Body>::new(&authority).await?;
                 destinations.insert(name.to_string(), client);
             }
             clients.push(destinations);

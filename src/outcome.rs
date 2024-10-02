@@ -106,14 +106,14 @@ impl WorkerOutcome {
                     }
                 }
             }
-            Ok(())
+            Ok::<_, std::fmt::Error>(())
         })?;
 
         w.scope(|w| {
             for outcome in &self.outcome {
                 outcome.report_to(w, cmd)?;
             }
-            Ok(())
+            Ok::<_, std::fmt::Error>(())
         })?;
         Ok(())
     }

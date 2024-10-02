@@ -9,7 +9,7 @@ pub enum RelentlessError {
     HttpError(#[from] HttpError),
     CaseError(#[from] CaseError),
 
-    HyperError(#[from] hyper::Error),
+    ReqwestError(#[from] reqwest::Error),
     HttpInvalidUri(#[from] http::uri::InvalidUri),
     TokioTaskJoinError(#[from] tokio::task::JoinError),
     StdIoError(#[from] std::io::Error),
@@ -46,8 +46,6 @@ pub enum HttpError {
 
     #[error(transparent)]
     InvalidMethod(#[from] http::method::InvalidMethod),
-    #[error(transparent)]
-    InvalidUrl(#[from] url::ParseError),
 }
 
 #[derive(Error, Debug)]
