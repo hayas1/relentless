@@ -5,8 +5,8 @@ use std::{
 };
 
 use bytes::Bytes;
+use http_body::Body;
 use http_body_util::{combinators::BoxBody, BodyExt};
-use hyper::body::Body;
 use tower::Service;
 
 use crate::{

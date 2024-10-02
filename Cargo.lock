@@ -975,8 +975,6 @@ dependencies = [
  "http-body",
  "http-body-util",
  "http-serde",
- "hyper",
- "hyper-util",
  "reqwest",
  "serde",
  "serde_json",

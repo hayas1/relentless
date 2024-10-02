@@ -7,7 +7,7 @@ use crate::{
     outcome::{CaseOutcome, Compare, Evaluator, Outcome, Status, WorkerOutcome},
     service::{DefaultHttpClient, FromBodyStructure},
 };
-use hyper::body::Body;
+use http_body::Body;
 use tower::{Service, ServiceExt};
 
 /// TODO document
