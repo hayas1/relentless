@@ -119,8 +119,9 @@ where
 
         let mut processes = Vec::new();
         for case in cases {
-            // TODO do not await here
-            processes.push((case.testcase.clone(), case.process(cmd, &config, &mut clients).await));
+            // TODO do not await here, use stream
+            let destinations = cmd.override_destination(&config.destinations);
+            processes.push((case.testcase.clone(), case.process(cmd, &destinations, &mut clients).await));
         }
 
         let mut outcome = Vec::new();
@@ -141,7 +142,7 @@ pub struct Case<S, ReqB, ResB> {
 }
 impl<S, ReqB, ResB> Case<S, ReqB, ResB> {
     pub fn testcase(&self) -> &Testcase {
-        &self.testcase.base()
+        self.testcase.base()
     }
 }
 impl<S, ReqB, ResB> Case<S, ReqB, ResB>
@@ -163,15 +164,14 @@ where
 
     pub async fn process(
         self,
-        cmd: &Relentless,
-        worker_config: &WorkerConfig, // TODO!!!
+        _cmd: &Relentless,
+        destinations: &HashMap<String, String>,
         clients: &mut HashMap<String, S>,
     ) -> RelentlessResult<Vec<http::Response<ResB>>> {
         let Testcase { target, setting, .. } = self.testcase.coalesce();
 
         let mut requests = Vec::new();
-        let destinations = cmd.override_destination(&worker_config.destinations);
-        for (name, reqs) in Self::requests(&destinations, &target, &setting)? {
+        for (name, reqs) in Self::requests(destinations, &target, &setting)? {
             for req in reqs {
                 let client = clients.get_mut(&name).unwrap();
                 let request = client.ready().await?.call(req);

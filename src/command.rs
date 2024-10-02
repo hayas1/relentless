@@ -91,6 +91,7 @@ impl Relentless {
     }
 
     pub fn override_destination(&self, other: &HashMap<String, String>) -> HashMap<String, String> {
+        // TODO use Coalesce trait. but Coalesce trait should be renamed because override usage is inverse of coalesce
         let mut map = other.clone();
         for (name, dest) in &self.destination {
             map.entry(name.to_string()).and_modify(|d| *d = dest.to_string());
