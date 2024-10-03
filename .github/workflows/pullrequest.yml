@@ -77,15 +77,20 @@ jobs:
     #   run: until (curl -i localhost:3000 | grep "200 OK") do sleep 5; done
 
     - name: Run relentless test and comment on pull request
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      id: run-test
       run: |
         set -euo pipefail
         {
-          echo '```sh'
+          echo '```'
           cargo run --features cli -- -f examples/config/*.yaml -d actual=http://localhost:3001 --no-color
           echo '```'
-        } | gh pr comment ${{ github.event.number }} --body-file -
+        } > target/outcome.txt
+    - name: Comment on pull request
+      if: always()
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        gh pr comment ${{ github.event.number }} --body-file target/outcome.txt
 
 
   version:
