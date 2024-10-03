@@ -35,7 +35,7 @@ runs:
       env:
         PORT: ${{ inputs.port }}
       run: cargo run --manifest-path ${{ inputs.manifest-path }} &
-    - name: Wait for server
-      shell: bash
-      if: inputs.async == 'false'
-      run: until (curl -i localhost:${{ inputs.port }} | grep "200 OK") do sleep 5; done
+    # - name: Wait for server
+    #   shell: bash
+    #   if: inputs.async == 'false'
+    #   run: until (curl -i localhost:${{ inputs.port }} | grep "200 OK") do sleep 5; done
