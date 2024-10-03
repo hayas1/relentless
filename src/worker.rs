@@ -74,12 +74,12 @@ where
         Self { workers, cases, phantom }
     }
     /// TODO document
-    pub async fn assault(self, cmd: &Relentless) -> RelentlessResult<Outcome> {
+    pub async fn assault(self) -> RelentlessResult<Outcome> {
         let Self { workers, cases, .. } = self;
 
         let mut works = Vec::new();
         for (worker, cases) in workers.into_iter().zip(cases.into_iter()) {
-            works.push(worker.assault(cmd, cases));
+            works.push(worker.assault(cases));
         }
 
         let mut outcomes = Vec::new();
@@ -119,14 +119,14 @@ where
         Ok(Self { config, clients, phantom })
     }
 
-    pub async fn assault(self, cmd: &Relentless, cases: Vec<Case<S, ReqB, ResB>>) -> RelentlessResult<WorkerOutcome> {
+    pub async fn assault(self, cases: Vec<Case<S, ReqB, ResB>>) -> RelentlessResult<WorkerOutcome> {
         let Self { config, mut clients, .. } = self;
 
         let mut processes = Vec::new();
         for case in cases {
             // TODO do not await here, use stream
             let destinations = config.coalesce().destinations;
-            processes.push((case.testcase.clone(), case.process(cmd, &destinations, &mut clients).await));
+            processes.push((case.testcase.clone(), case.process(&destinations, &mut clients).await));
         }
 
         let mut outcome = Vec::new();
@@ -179,7 +179,6 @@ where
 
     pub async fn process(
         self,
-        _cmd: &Relentless,
         destinations: &Destinations,
         clients: &mut HashMap<String, S>,
     ) -> RelentlessResult<HashMap<String, Vec<http::Response<ResB>>>> {

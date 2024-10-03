@@ -83,7 +83,7 @@ impl Relentless {
 
         let configs = self.configs()?;
         let control = Control::with_service(self, configs, services)?;
-        let outcome = control.assault(self).await?;
+        let outcome = control.assault().await?;
         if !no_report {
             outcome.report(self)?;
         }
