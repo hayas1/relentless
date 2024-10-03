@@ -1,4 +1,4 @@
-use std::{collections::HashMap, marker::PhantomData};
+use std::marker::PhantomData;
 
 use crate::{
     command::Relentless,
@@ -32,7 +32,7 @@ impl Control<DefaultHttpClient<reqwest::Body, reqwest::Body>, reqwest::Body, req
         cmd: &Relentless,
         config: &Config,
     ) -> RelentlessResult<Destinations<DefaultHttpClient<reqwest::Body, reqwest::Body>>> {
-        let mut destinations = HashMap::new();
+        let mut destinations = Destinations::new();
         for (name, _destination) in config.worker_config.destinations.clone().coalesce(&cmd.destination) {
             let client = DefaultHttpClient::<reqwest::Body, reqwest::Body>::new().await?;
             destinations.insert(name.to_string(), client);
@@ -132,7 +132,7 @@ where
         for (testcase, process) in processes {
             let mut passed = 0;
             let mut t =
-                (0..testcase.coalesce().setting.repeat.unwrap_or(1)).map(|_| HashMap::new()).collect::<Vec<_>>();
+                (0..testcase.coalesce().setting.repeat.unwrap_or(1)).map(|_| Destinations::new()).collect::<Vec<_>>();
             for (name, repeated) in process? {
                 for (i, res) in repeated.into_iter().enumerate() {
                     t[i].insert(name.clone(), res);
@@ -183,7 +183,7 @@ where
     ) -> RelentlessResult<Destinations<Vec<http::Response<ResB>>>> {
         let Testcase { target, setting, .. } = self.testcase.coalesce();
 
-        let mut dest = HashMap::new();
+        let mut dest = Destinations::new();
         for (name, repeated) in Self::requests(destinations, &target, &setting)? {
             let mut responses = Vec::new();
             for req in repeated {
@@ -218,7 +218,7 @@ where
                     .unwrap(); // TODO
                 Ok((name.to_string(), requests))
             })
-            .collect::<Result<HashMap<_, _>, _>>()?)
+            .collect::<Result<Destinations<_>, _>>()?)
     }
 
     // TODO generics
