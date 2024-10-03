@@ -26,6 +26,7 @@ runs:
         key: cargo-${{ hashFiles('**/Cargo.toml') }}
 
     - name: Run example http server
+      shell: bash
       env:
         PORT: ${{ inputs.port }}
       run: cargo run --manifest-path ${{ inputs.working-directory }}/Cargo.toml&
