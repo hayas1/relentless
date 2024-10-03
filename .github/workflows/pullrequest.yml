@@ -78,7 +78,7 @@ jobs:
         } >> "$GITHUB_OUTPUT"
     - name: Comment on pull request
       # TODO
-      if: always()
+      if: always() && steps.run-test.outputs.outcome != ''
       run: |
         gh pr comment ${{ github.event.number }} --body ${{ steps.run-test.outputs.outcome }}
 
