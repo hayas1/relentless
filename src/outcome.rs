@@ -125,11 +125,13 @@ impl WorkerOutcome {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CaseOutcome {
     testcase: Coalesced<Testcase, Setting>,
+    passed: usize,
     pass: bool,
 }
 impl CaseOutcome {
-    pub fn new(testcase: Coalesced<Testcase, Setting>, pass: bool) -> Self {
-        Self { testcase, pass }
+    pub fn new(testcase: Coalesced<Testcase, Setting>, passed: usize) -> Self {
+        let pass = passed == testcase.coalesce().setting.repeat.unwrap_or(1); // TODO here ?
+        Self { testcase, passed, pass }
     }
     pub fn pass(&self) -> bool {
         self.pass
@@ -145,7 +147,7 @@ impl CaseOutcome {
         let target = console::style(&target);
         write!(w, "{} {} ", side, if self.pass() { target.green() } else { target.red() })?;
         if let Some(ref repeat) = setting.repeat {
-            write!(w, "{}{} ", console::Emoji("🔁", ""), repeat)?; // TODO overrode setting
+            write!(w, "{}{}/{} ", console::Emoji("🔁", ""), self.passed, repeat)?;
         }
         if let Some(ref description) = description {
             writeln!(w, "{} {}", console::Emoji("📝", ""), description)?;

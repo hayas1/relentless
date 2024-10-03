@@ -131,9 +131,12 @@ where
 
         let mut outcome = Vec::new();
         for (testcase, process) in processes {
-            let res = process?; // TODO await here
-            let pass = if res.len() == 1 { Status::evaluate(res).await? } else { Compare::evaluate(res).await? };
-            outcome.push(CaseOutcome::new(testcase, pass));
+            let mut passed = 0;
+            for (name, res) in process? {
+                let pass = if res.len() == 1 { Status::evaluate(res).await? } else { Compare::evaluate(res).await? };
+                passed += pass as usize;
+            }
+            outcome.push(CaseOutcome::new(testcase, passed));
         }
         Ok(WorkerOutcome::new(config, outcome))
     }
@@ -172,25 +175,20 @@ where
         _cmd: &Relentless,
         destinations: &Destinations,
         clients: &mut HashMap<String, S>,
-    ) -> RelentlessResult<Vec<http::Response<ResB>>> {
+    ) -> RelentlessResult<HashMap<String, Vec<http::Response<ResB>>>> {
         let Testcase { target, setting, .. } = self.testcase.coalesce();
 
-        let mut requests = Vec::new();
-        for (name, reqs) in Self::requests(&destinations.0, &target, &setting)? {
-            for req in reqs {
+        let mut dest = HashMap::new();
+        for (name, repeated) in Self::requests(&destinations.0, &target, &setting)? {
+            let mut responses = Vec::new();
+            for req in repeated {
                 let client = clients.get_mut(&name).unwrap();
-                let request = client.ready().await?.call(req);
-                requests.push(request)
+                let res = client.ready().await?.call(req).await?;
+                responses.push(res);
             }
+            dest.insert(name, responses);
         }
-
-        let mut responses = Vec::new();
-        for request in requests {
-            let response = request.await?;
-            let (part, body) = response.into_parts();
-            responses.push(http::Response::from_parts(part, body));
-        }
-        Ok(responses)
+        Ok(dest)
     }
 
     pub fn requests(
