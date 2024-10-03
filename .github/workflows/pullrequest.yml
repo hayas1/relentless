@@ -8,7 +8,7 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  test:
+  unit-test:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -38,6 +38,50 @@ jobs:
 
     - run: cargo install cargo-readme && cargo readme > README.md
     - run: git add -N . && git diff --exit-code -- README.md
+
+  e2e-test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+    - uses: actions/checkout@v4
+    - uses: dtolnay/rust-toolchain@stable
+      with:
+        components: rustfmt, clippy
+    - name: Cargo home
+      id: cargo-home
+      run: echo "path=${CARGO_HOME:-~/.cargo}" >>"$GITHUB_OUTPUT"
+    - uses: actions/cache@v4
+      with:
+        path: |
+          target
+          ${{ steps.cargo-home.outputs.path }}
+        key: cargo-${{ hashFiles('**/Cargo.toml') }}
+
+    - name: Run example http server (actual)
+      uses: ./.github/actions/example-http-server
+      with:
+        port: 3001
+    - name: Run example http server (expect)
+      uses: ./.github/actions/example-http-server
+      with:
+        port: 3000
+    - name: Run relentless test
+      id: run-test
+      run: |
+        set -euo pipefail
+        {
+          echo 'outcome<<EOF'
+          cargo run --features cli -- -f examples/config/*.taml -d actual=http://localhost:3001 --no-color
+          echo EOF
+        } >> "$GITHUB_OUTPUT"
+    - name: Comment on pull request
+      # TODO
+      if: always()
+      run: |
+        gh pr comment ${{ github.event.number }} --body ${{ steps.run-test.outputs.outcome }}
+
 
   version:
     runs-on: ubuntu-latest
