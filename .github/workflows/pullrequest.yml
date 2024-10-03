@@ -86,7 +86,7 @@ jobs:
           echo '```'
         } > target/outcome.txt
     - name: Comment on pull request
-      if: always()
+      if: failure()
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
