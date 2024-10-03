@@ -76,22 +76,16 @@ jobs:
     # - name: wait for server (expect) to start
     #   run: until (curl -i localhost:3000 | grep "200 OK") do sleep 5; done
 
-    - name: Run relentless test
-      id: run-test
-      run: |
-        set -euo pipefail
-        {
-          echo 'outcome<<EOF'
-          cargo run --features cli -- -f examples/config/*.yaml -d actual=http://localhost:3001 --no-color
-          echo EOF
-        } >> "$GITHUB_OUTPUT"
-    - name: Comment on pull request
-      # TODO
-      if: always() && steps.run-test.outputs.outcome != ''
+    - name: Run relentless test and comment on pull request
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        gh pr comment ${{ github.event.number }} -b '${{ steps.run-test.outputs.outcome }}'
+        set -euo pipefail
+        {
+          echo '```sh'
+          cargo run --features cli -- -f examples/config/*.yaml -d actual=http://localhost:3001 --no-color
+          echo '```'
+        } | gh pr comment ${{ github.event.number }} --body-file -
 
 
   version:
