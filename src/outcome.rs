@@ -1,5 +1,4 @@
 use std::{
-    collections::HashMap,
     fmt::{Display, Formatter, Write as _},
     process::ExitCode,
 };
@@ -16,14 +15,14 @@ use crate::{
 #[allow(async_fn_in_trait)] // TODO #[warn(async_fn_in_trait)] by default
 pub trait Evaluator<Res> {
     type Error;
-    async fn evaluate(res: HashMap<String, Res>) -> Result<bool, Self::Error>;
+    async fn evaluate(res: Destinations<Res>) -> Result<bool, Self::Error>;
 }
 pub struct Compare {} // TODO enum ?
 impl<ResB: Body> Evaluator<http::Response<ResB>> for Compare {
     type Error = RelentlessError;
-    async fn evaluate(res: HashMap<String, http::Response<ResB>>) -> Result<bool, Self::Error> {
+    async fn evaluate(res: Destinations<http::Response<ResB>>) -> Result<bool, Self::Error> {
         let mut v = Vec::new();
-        for (_name, r) in res {
+        for (_name, r) in res.0 {
             let status = r.status();
             let body = BodyExt::collect(r).await.map(|buf| buf.to_bytes()).map_err(|_| HttpError::CannotConvertBody)?;
             v.push((status, body));
@@ -36,8 +35,8 @@ impl<ResB: Body> Evaluator<http::Response<ResB>> for Compare {
 pub struct Status {} // TODO enum ?
 impl<ResB> Evaluator<http::Response<ResB>> for Status {
     type Error = RelentlessError;
-    async fn evaluate(res: HashMap<String, http::Response<ResB>>) -> Result<bool, Self::Error> {
-        let pass = res.into_iter().all(|(_name, res)| res.status().is_success());
+    async fn evaluate(res: Destinations<http::Response<ResB>>) -> Result<bool, Self::Error> {
+        let pass = res.0.into_iter().all(|(_name, res)| res.status().is_success());
         Ok(pass)
     }
 }

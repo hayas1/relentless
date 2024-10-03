@@ -21,7 +21,7 @@ impl Control<DefaultHttpClient<reqwest::Body, reqwest::Body>, reqwest::Body, req
     pub async fn default_http_clients(
         cmd: &Relentless,
         configs: &Vec<Config>,
-    ) -> RelentlessResult<Vec<HashMap<String, DefaultHttpClient<reqwest::Body, reqwest::Body>>>> {
+    ) -> RelentlessResult<Vec<Destinations<DefaultHttpClient<reqwest::Body, reqwest::Body>>>> {
         let mut clients = Vec::new();
         for c in configs {
             clients.push(Self::default_http_client(cmd, c).await?);
@@ -31,13 +31,13 @@ impl Control<DefaultHttpClient<reqwest::Body, reqwest::Body>, reqwest::Body, req
     pub async fn default_http_client(
         cmd: &Relentless,
         config: &Config,
-    ) -> RelentlessResult<HashMap<String, DefaultHttpClient<reqwest::Body, reqwest::Body>>> {
+    ) -> RelentlessResult<Destinations<DefaultHttpClient<reqwest::Body, reqwest::Body>>> {
         let mut destinations = HashMap::new();
         for (name, _destination) in config.worker_config.destinations.clone().coalesce(&cmd.destination).0 {
             let client = DefaultHttpClient::<reqwest::Body, reqwest::Body>::new().await?;
             destinations.insert(name.to_string(), client);
         }
-        Ok(destinations)
+        Ok(Destinations(destinations))
     }
 }
 impl<S, ReqB, ResB> Control<S, ReqB, ResB>
@@ -55,7 +55,7 @@ where
     pub fn with_service(
         cmd: &Relentless,
         configs: Vec<Config>,
-        services: Vec<HashMap<String, S>>,
+        services: Vec<Destinations<S>>,
     ) -> RelentlessResult<Self> {
         let mut workers = Vec::new();
         for (config, service) in configs.iter().zip(services) {
@@ -93,7 +93,7 @@ where
 #[derive(Debug, Clone)]
 pub struct Worker<S, ReqB, ResB> {
     config: Coalesced<WorkerConfig, Destinations<String>>,
-    clients: HashMap<String, S>,
+    clients: Destinations<S>,
     phantom: PhantomData<(ReqB, ResB)>,
 }
 impl<S, ReqB, ResB> Worker<S, ReqB, ResB> {
@@ -112,7 +112,7 @@ where
     S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + Sync + 'static,
     RelentlessError: From<S::Error>,
 {
-    pub fn new(cmd: &Relentless, config: WorkerConfig, clients: HashMap<String, S>) -> RelentlessResult<Self> {
+    pub fn new(cmd: &Relentless, config: WorkerConfig, clients: Destinations<S>) -> RelentlessResult<Self> {
         let config = Coalesced::tuple(config, cmd.destination.clone().into());
         let phantom = PhantomData;
         Ok(Self { config, clients, phantom })
@@ -133,13 +133,14 @@ where
             let mut passed = 0;
             let mut t =
                 (0..testcase.coalesce().setting.repeat.unwrap_or(1)).map(|_| HashMap::new()).collect::<Vec<_>>();
-            for (name, repeated) in process? {
+            for (name, repeated) in process?.0 {
                 for (i, res) in repeated.into_iter().enumerate() {
                     t[i].insert(name.clone(), res);
                 }
             }
             for res in t {
-                let pass = if res.len() == 1 { Status::evaluate(res).await? } else { Compare::evaluate(res).await? };
+                let r = Destinations(res);
+                let pass = if r.0.len() == 1 { Status::evaluate(r).await? } else { Compare::evaluate(r).await? };
                 passed += pass as usize;
             }
             outcome.push(CaseOutcome::new(testcase, passed));
@@ -179,46 +180,49 @@ where
     pub async fn process(
         self,
         destinations: &Destinations<String>,
-        clients: &mut HashMap<String, S>,
-    ) -> RelentlessResult<HashMap<String, Vec<http::Response<ResB>>>> {
+        clients: &mut Destinations<S>,
+    ) -> RelentlessResult<Destinations<Vec<http::Response<ResB>>>> {
         let Testcase { target, setting, .. } = self.testcase.coalesce();
 
         let mut dest = HashMap::new();
-        for (name, repeated) in Self::requests(&destinations.0, &target, &setting)? {
+        for (name, repeated) in Self::requests(destinations, &target, &setting)?.0 {
             let mut responses = Vec::new();
             for req in repeated {
-                let client = clients.get_mut(&name).unwrap();
+                let client = clients.0.get_mut(&name).unwrap();
                 let res = client.ready().await?.call(req).await?;
                 responses.push(res);
             }
             dest.insert(name, responses);
         }
-        Ok(dest)
+        Ok(Destinations(dest))
     }
 
     pub fn requests(
-        destinations: &HashMap<String, String>,
+        destinations: &Destinations<String>,
         target: &str,
         setting: &Setting,
-    ) -> RelentlessResult<HashMap<String, Vec<http::Request<ReqB>>>> {
+    ) -> RelentlessResult<Destinations<Vec<http::Request<ReqB>>>> {
         let Setting { protocol, template, repeat, timeout } = setting;
-        Ok(destinations
-            .iter()
-            .map(|(name, destination)| {
-                let default_http = Default::default();
-                let http = protocol
-                    .as_ref()
-                    .map(|p| match p {
-                        Protocol::Http(http) => http,
-                    })
-                    .unwrap_or(&default_http);
-                let requests = (0..repeat.unwrap_or(1))
-                    .map(|_| Self::http_request(destination, target, http))
-                    .collect::<Result<Vec<_>, _>>()
-                    .unwrap(); // TODO
-                Ok((name.to_string(), requests))
-            })
-            .collect::<Result<HashMap<_, _>, _>>()?)
+        Ok(Destinations(
+            destinations
+                .0
+                .iter()
+                .map(|(name, destination)| {
+                    let default_http = Default::default();
+                    let http = protocol
+                        .as_ref()
+                        .map(|p| match p {
+                            Protocol::Http(http) => http,
+                        })
+                        .unwrap_or(&default_http);
+                    let requests = (0..repeat.unwrap_or(1))
+                        .map(|_| Self::http_request(destination, target, http))
+                        .collect::<Result<Vec<_>, _>>()
+                        .unwrap(); // TODO
+                    Ok((name.to_string(), requests))
+                })
+                .collect::<Result<HashMap<_, _>, _>>()?,
+        ))
     }
 
     // TODO generics

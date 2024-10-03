@@ -1,4 +1,4 @@
-use std::{collections::HashMap, path::PathBuf, process::ExitCode};
+use std::{path::PathBuf, process::ExitCode};
 
 #[cfg(feature = "cli")]
 use clap::Parser;
@@ -6,7 +6,7 @@ use http_body::Body;
 use tower::Service;
 
 use crate::{
-    config::Config,
+    config::{Config, Destinations},
     error::{RelentlessError, RelentlessResult},
     outcome::Outcome,
     service::FromBodyStructure,
@@ -67,7 +67,7 @@ impl Relentless {
         let outcome = self.assault_with(clients).await?;
         Ok(outcome)
     }
-    pub async fn assault_with<S, ReqB, ResB>(&self, services: Vec<HashMap<String, S>>) -> RelentlessResult<Outcome>
+    pub async fn assault_with<S, ReqB, ResB>(&self, services: Vec<Destinations<S>>) -> RelentlessResult<Outcome>
     where
         ReqB: Body + FromBodyStructure + Send + 'static,
         ReqB::Data: Send + 'static,

@@ -1,6 +1,5 @@
 use std::{
     collections::HashMap,
-    fmt::Display,
     fs::{read_to_string, File},
     path::Path,
     time::Duration,
