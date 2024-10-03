@@ -30,8 +30,12 @@ impl<ReqB, ResB> DefaultHttpClient<ReqB, ResB> {
     }
 }
 
-impl<ReqB: Into<reqwest::Body>, ResB> Service<http::Request<ReqB>> for DefaultHttpClient<ReqB, ResB> {
-    type Response = http::Response<BytesBody>;
+impl<ReqB, ResB> Service<http::Request<ReqB>> for DefaultHttpClient<ReqB, ResB>
+where
+    ReqB: Into<reqwest::Body>,
+    ResB: From<reqwest::Body>,
+{
+    type Response = http::Response<ResB>;
     type Error = reqwest::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
 
@@ -46,7 +50,7 @@ impl<ReqB: Into<reqwest::Body>, ResB> Service<http::Request<ReqB>> for DefaultHt
             fut.await.map(|res| {
                 let b = http::Response::<reqwest::Body>::from(res);
                 let (parts, incoming) = b.into_parts();
-                http::Response::from_parts(parts, incoming.into_bytes_body())
+                http::Response::from_parts(parts, incoming.into())
             })
         })
     }
