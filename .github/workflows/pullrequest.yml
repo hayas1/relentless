@@ -74,7 +74,6 @@ jobs:
       id: run-test
       run: |
         set -euo pipefail
-        curl http://localhost:3001/counter/increment
         {
           echo '```'
           cargo run --features cli -- -f examples/config/*.yaml -d actual=http://localhost:3001 --no-color

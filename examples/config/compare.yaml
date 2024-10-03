@@ -19,5 +19,5 @@ testcase:
   - target: /counter/increment
     setting:
       repeat: 10
-    # attr:
-    #   allow: true
+    attr:
+      allow: true
