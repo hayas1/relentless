@@ -65,12 +65,12 @@ jobs:
       uses: ./.github/actions/example-http-server
       with:
         port: 3001
-        async: true
+        # async: true
     - name: Run example http server (expect)
       uses: ./.github/actions/example-http-server
       with:
         port: 3000
-        async: true
+        # async: true
     - name: wait for server (actual) to start
       run: until (curl -i localhost:3001 | grep "200 OK") do sleep 5; done
     - name: wait for server (expect) to start
