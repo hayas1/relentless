@@ -76,11 +76,11 @@ impl Outcome {
 /// TODO document
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WorkerOutcome {
-    config: Coalesced<WorkerConfig, Destinations>,
+    config: Coalesced<WorkerConfig, Destinations<String>>,
     outcome: Vec<CaseOutcome>,
 }
 impl WorkerOutcome {
-    pub fn new(config: Coalesced<WorkerConfig, Destinations>, outcome: Vec<CaseOutcome>) -> Self {
+    pub fn new(config: Coalesced<WorkerConfig, Destinations<String>>, outcome: Vec<CaseOutcome>) -> Self {
         Self { config, outcome }
     }
     pub fn pass(&self) -> bool {

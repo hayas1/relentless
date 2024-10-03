@@ -92,7 +92,7 @@ where
 /// TODO document
 #[derive(Debug, Clone)]
 pub struct Worker<S, ReqB, ResB> {
-    config: Coalesced<WorkerConfig, Destinations>,
+    config: Coalesced<WorkerConfig, Destinations<String>>,
     clients: HashMap<String, S>,
     phantom: PhantomData<(ReqB, ResB)>,
 }
@@ -178,7 +178,7 @@ where
 
     pub async fn process(
         self,
-        destinations: &Destinations,
+        destinations: &Destinations<String>,
         clients: &mut HashMap<String, S>,
     ) -> RelentlessResult<HashMap<String, Vec<http::Response<ResB>>>> {
         let Testcase { target, setting, .. } = self.testcase.coalesce();

@@ -1,5 +1,6 @@
 use std::{
     collections::HashMap,
+    fmt::Display,
     fs::{read_to_string, File},
     path::Path,
     time::Duration,
@@ -16,6 +17,7 @@ pub struct Config {
     #[serde(flatten, default)]
     pub worker_config: WorkerConfig,
 
+    #[serde(default)]
     pub testcase: Vec<Testcase>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -23,15 +25,15 @@ pub struct Config {
 pub struct WorkerConfig {
     pub name: Option<String>,
     #[serde(default)]
-    pub destinations: Destinations,
+    pub destinations: Destinations<String>, // TODO Destination<Uri>, but serde_http doesn't support nested type other than Option
     #[serde(default)]
     pub setting: Setting,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
-pub struct Destinations(pub HashMap<String, String>); // TODO HashMap<String, Uri>
-impl From<Vec<(String, String)>> for Destinations {
-    fn from(v: Vec<(String, String)>) -> Self {
+pub struct Destinations<T>(pub HashMap<String, T>);
+impl<T> From<Vec<(String, T)>> for Destinations<T> {
+    fn from(v: Vec<(String, T)>) -> Self {
         Self(v.into_iter().collect())
     }
 }
@@ -100,20 +102,20 @@ impl Config {
     }
 }
 impl Coalesce for WorkerConfig {
-    type Other = Destinations;
+    type Other = Destinations<String>;
     fn coalesce(self, other: &Self::Other) -> Self {
         let destinations =
             self.destinations.coalesce(&other.0.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect());
         Self { destinations, ..self }
     }
 }
-impl Coalesce for Destinations {
-    type Other = Vec<(String, String)>;
+impl<T: Clone> Coalesce for Destinations<T> {
+    type Other = Vec<(String, T)>;
     fn coalesce(self, other: &Self::Other) -> Self {
         // TODO Coalesce trait should be renamed because override usage may be inverse of coalesce
         let mut map = self.0.clone();
         for (name, dest) in other {
-            map.entry(name.to_string()).and_modify(|d| *d = dest.to_string());
+            map.entry(name.to_string()).and_modify(|d| *d = dest.clone());
         }
         Self(map)
     }
