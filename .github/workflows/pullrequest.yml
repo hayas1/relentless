@@ -89,7 +89,7 @@ jobs:
       # TODO
       if: always() && steps.run-test.outputs.outcome != ''
       run: |
-        echo ${{ steps.run-test.outputs.outcome }} | gh pr comment ${{ github.event.number }} --body-file -
+        gh pr comment ${{ github.event.number }} -b '${{ steps.run-test.outputs.outcome }}'
 
 
   version:
