@@ -1,4 +1,4 @@
-name: "Versions"
+name: Versions
 
 outputs:
   crate-version:
@@ -15,7 +15,7 @@ outputs:
     value: ${{ steps.should-release.outputs.result }}
 
 runs:
-  using: "composite"
+  using: composite
   steps:
     - uses: actions/checkout@v4
       with:

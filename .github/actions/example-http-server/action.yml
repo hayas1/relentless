@@ -1,0 +1,46 @@
+name: Run Example Http Server
+
+inputs:
+  manifest-path:
+    description: Manifest path to Cargo.toml of the example http server
+    required: false
+    default: examples/server/http/Cargo.toml
+  port:
+    description: Port to listen on
+    required: false
+    default: 3000
+  async:
+    description: do not wait for server to start
+    required: false
+    default: false
+  cache:
+    description: use cache
+    required: false
+    default: false
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/checkout@v4
+    - uses: dtolnay/rust-toolchain@stable
+    - name: Cargo home
+      shell: bash
+      id: cargo-home
+      run: echo "path=${CARGO_HOME:-~/.cargo}" >>"$GITHUB_OUTPUT"
+    - uses: actions/cache@v4
+      if: inputs.cache != 'false'
+      with:
+        path: |
+          target
+          ${{ steps.cargo-home.outputs.path }}
+        key: cargo-${{ hashFiles('**/Cargo.toml') }}
+
+    - name: Run example http server
+      shell: bash
+      env:
+        PORT: ${{ inputs.port }}
+      run: cargo run --manifest-path ${{ inputs.manifest-path }} &
+    - name: Wait for server
+      shell: bash
+      if: inputs.async == 'false'
+      run: until (curl -i "localhost:${{ inputs.port }}" | grep "200 OK") do sleep 5; done

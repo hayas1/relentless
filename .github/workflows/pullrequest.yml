@@ -8,8 +8,9 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  test:
+  unit-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
     - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@stable
@@ -39,11 +40,59 @@ jobs:
     - run: cargo install cargo-readme && cargo readme > README.md
     - run: git add -N . && git diff --exit-code -- README.md
 
+  e2e-test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    timeout-minutes: 10
+    steps:
+    - uses: actions/checkout@v4
+    - uses: dtolnay/rust-toolchain@stable
+      with:
+        components: rustfmt, clippy
+    - name: Cargo home
+      id: cargo-home
+      run: echo "path=${CARGO_HOME:-~/.cargo}" >>"$GITHUB_OUTPUT"
+    - uses: actions/cache@v4
+      with:
+        path: |
+          target
+          ${{ steps.cargo-home.outputs.path }}
+        key: cargo-${{ hashFiles('**/Cargo.toml') }}
+
+    - name: Run example http server (actual)
+      uses: ./.github/actions/example-http-server
+      with:
+        port: 3001
+    - name: Run example http server (expect)
+      uses: ./.github/actions/example-http-server
+      with:
+        port: 3000
+
+    - name: Run relentless test and comment on pull request
+      id: run-test
+      run: |
+        set -euo pipefail
+        {
+          echo '```'
+          cargo run --features cli -- -f examples/config/*.yaml -d actual=http://localhost:3001 --no-color
+          echo '```'
+        } > target/outcome.txt
+    - name: Comment on pull request
+      if: failure()
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        gh pr comment ${{ github.event.number }} --body-file target/outcome.txt
+
+
   version:
     runs-on: ubuntu-latest
     permissions:
       contents: read
       pull-requests: write
+    timeout-minutes: 10
     steps:
     - uses: actions/checkout@v4
     - name: Check version in Cargo.toml and git tag
