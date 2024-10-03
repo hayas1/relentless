@@ -132,7 +132,14 @@ where
         let mut outcome = Vec::new();
         for (testcase, process) in processes {
             let mut passed = 0;
-            for (name, res) in process? {
+            let mut t =
+                (0..testcase.coalesce().setting.repeat.unwrap_or(1)).map(|_| HashMap::new()).collect::<Vec<_>>();
+            for (name, repeated) in process? {
+                for (i, res) in repeated.into_iter().enumerate() {
+                    t[i].insert(name.clone(), res);
+                }
+            }
+            for res in t {
                 let pass = if res.len() == 1 { Status::evaluate(res).await? } else { Compare::evaluate(res).await? };
                 passed += pass as usize;
             }
