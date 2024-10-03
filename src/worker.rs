@@ -33,9 +33,8 @@ impl Control<DefaultHttpClient<reqwest::Body, reqwest::Body>, reqwest::Body, req
         config: &Config,
     ) -> RelentlessResult<HashMap<String, DefaultHttpClient<reqwest::Body, reqwest::Body>>> {
         let mut destinations = HashMap::new();
-        for (name, destination) in config.worker_config.destinations.clone().coalesce(&cmd.destination).0 {
-            let authority = destination.parse::<http::Uri>()?.authority().unwrap().as_str().to_string(); // TODO
-            let client = DefaultHttpClient::<reqwest::Body, reqwest::Body>::new(&authority).await?;
+        for (name, _destination) in config.worker_config.destinations.clone().coalesce(&cmd.destination).0 {
+            let client = DefaultHttpClient::<reqwest::Body, reqwest::Body>::new().await?;
             destinations.insert(name.to_string(), client);
         }
         Ok(destinations)

@@ -23,7 +23,7 @@ pub struct DefaultHttpClient<ReqB, ResB> {
     phantom: PhantomData<(ReqB, ResB)>,
 }
 impl<ReqB, ResB> DefaultHttpClient<ReqB, ResB> {
-    pub async fn new(_host: &str) -> RelentlessResult<Self> {
+    pub async fn new() -> RelentlessResult<Self> {
         // TODO use hyper ? continue to use reqwest's rich client?
         let client = reqwest::Client::builder().user_agent(APP_USER_AGENT).build()?;
         Ok(Self { client, phantom: PhantomData })
