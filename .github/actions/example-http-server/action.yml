@@ -34,7 +34,7 @@ runs:
       shell: bash
       env:
         PORT: ${{ inputs.port }}
-      run: cargo run --manifest-path ${{ inputs.manifest-path }}/Cargo.toml &
+      run: cargo run --manifest-path ${{ inputs.manifest-path }} &
     - name: Wait for server
       shell: bash
       if: inputs.async == 'false'
