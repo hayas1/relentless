@@ -10,6 +10,7 @@ env:
 jobs:
   unit-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
     - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@stable
@@ -44,6 +45,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
+    timeout-minutes: 10
     steps:
     - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@stable
@@ -95,6 +97,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
+    timeout-minutes: 10
     steps:
     - uses: actions/checkout@v4
     - name: Check version in Cargo.toml and git tag

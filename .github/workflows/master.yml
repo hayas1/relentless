@@ -14,6 +14,7 @@ jobs:
     outputs:
       should-release: ${{ steps.detect-version.outputs.should-release }}
       expected-git-tag: ${{ steps.detect-version.outputs.expected-git-tag }}
+    timeout-minutes: 10
     steps:
     - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@stable
@@ -46,13 +47,14 @@ jobs:
 
   deploy:
     needs: build
+    runs-on: ubuntu-latest
     permissions:
       pages: write
       id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
@@ -60,10 +62,11 @@ jobs:
 
   release-draft:
     needs: build
+    runs-on: ubuntu-latest
     if: needs.build.outputs.should-release == 'true'
     permissions:
       contents: write
-    runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
     - uses: actions/checkout@v4
     - name: Push tag
