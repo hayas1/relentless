@@ -16,3 +16,8 @@ testcase:
     setting:
       http:
         method: GET
+  - target: /counter/increment
+    setting:
+      repeat: 10
+    attr:
+      allow: true
