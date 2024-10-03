@@ -35,7 +35,7 @@ pub struct Setting {
     #[serde(flatten)]
     pub protocol: Option<Protocol>,
     #[serde(default)]
-    pub template: HashMap<String, HashMap<String, String>>,
+    pub template: HashMap<String, Destinations<String>>,
     #[serde(default)]
     pub repeat: Option<usize>,
     #[serde(default)]
