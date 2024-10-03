@@ -73,7 +73,7 @@ jobs:
         set -euo pipefail
         {
           echo 'outcome<<EOF'
-          cargo run --features cli -- -f examples/config/*.taml -d actual=http://localhost:3001 --no-color
+          cargo run --features cli -- -f examples/config/*.yaml -d actual=http://localhost:3001 --no-color
           echo EOF
         } >> "$GITHUB_OUTPUT"
     - name: Comment on pull request
