@@ -22,7 +22,7 @@ impl<ResB: Body> Evaluator<http::Response<ResB>> for Compare {
     type Error = RelentlessError;
     async fn evaluate(res: Destinations<http::Response<ResB>>) -> Result<bool, Self::Error> {
         let mut v = Vec::new();
-        for (_name, r) in res.0 {
+        for (_name, r) in res {
             let status = r.status();
             let body = BodyExt::collect(r).await.map(|buf| buf.to_bytes()).map_err(|_| HttpError::CannotConvertBody)?;
             v.push((status, body));
@@ -36,7 +36,7 @@ pub struct Status {} // TODO enum ?
 impl<ResB> Evaluator<http::Response<ResB>> for Status {
     type Error = RelentlessError;
     async fn evaluate(res: Destinations<http::Response<ResB>>) -> Result<bool, Self::Error> {
-        let pass = res.0.into_iter().all(|(_name, res)| res.status().is_success());
+        let pass = res.into_iter().all(|(_name, res)| res.status().is_success());
         Ok(pass)
     }
 }
@@ -96,9 +96,9 @@ impl WorkerOutcome {
         writeln!(w, "{} {} {}", side, name.as_ref().unwrap_or(&"testcases".to_string()), side)?;
 
         w.scope(|w| {
-            for (name, destination) in destinations.0 {
+            for (name, destination) in destinations {
                 write!(w, "{}{} ", name, console::Emoji("🌐", ":"))?;
-                match self.config.base().destinations.0.get(&name) {
+                match self.config.base().destinations.get(&name) {
                     Some(base) if base != &destination => {
                         writeln!(w, "{} {} {}", base, console::Emoji("👉", "->"), destination)?;
                     }

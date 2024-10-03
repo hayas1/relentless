@@ -28,14 +28,7 @@ pub struct WorkerConfig {
     #[serde(default)]
     pub setting: Setting,
 }
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(deny_unknown_fields)]
-pub struct Destinations<T>(pub HashMap<String, T>);
-impl<T> From<Vec<(String, T)>> for Destinations<T> {
-    fn from(v: Vec<(String, T)>) -> Self {
-        Self(v.into_iter().collect())
-    }
-}
+pub type Destinations<T> = HashMap<String, T>;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct Setting {
@@ -104,7 +97,7 @@ impl Coalesce for WorkerConfig {
     type Other = Destinations<String>;
     fn coalesce(self, other: &Self::Other) -> Self {
         let destinations =
-            self.destinations.coalesce(&other.0.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect());
+            self.destinations.coalesce(&other.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect());
         Self { destinations, ..self }
     }
 }
@@ -112,11 +105,11 @@ impl<T: Clone> Coalesce for Destinations<T> {
     type Other = Vec<(String, T)>;
     fn coalesce(self, other: &Self::Other) -> Self {
         // TODO Coalesce trait should be renamed because override usage may be inverse of coalesce
-        let mut map = self.0.clone();
+        let mut map = self.clone();
         for (name, dest) in other {
             map.entry(name.to_string()).and_modify(|d| *d = dest.clone());
         }
-        Self(map)
+        map
     }
 }
 
