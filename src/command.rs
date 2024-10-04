@@ -64,10 +64,14 @@ impl Relentless {
     pub async fn assault(&self) -> RelentlessResult<Outcome> {
         let configs = self.configs()?;
         let clients = Control::default_http_clients(self, &configs).await?;
-        let outcome = self.assault_with(clients).await?;
+        let outcome = self.assault_with(configs, clients).await?;
         Ok(outcome)
     }
-    pub async fn assault_with<S, ReqB, ResB>(&self, services: Vec<Destinations<S>>) -> RelentlessResult<Outcome>
+    pub async fn assault_with<S, ReqB, ResB>(
+        &self,
+        configs: Vec<Config>,
+        services: Vec<Destinations<S>>,
+    ) -> RelentlessResult<Outcome>
     where
         ReqB: Body + FromBodyStructure + Send + 'static,
         ReqB::Data: Send + 'static,
@@ -81,7 +85,6 @@ impl Relentless {
         let Self { no_color, no_report, .. } = self;
         console::set_colors_enabled(!no_color);
 
-        let configs = self.configs()?;
         let control = Control::with_service(self, configs, services)?;
         let outcome = control.assault().await?;
         if !no_report {
