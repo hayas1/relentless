@@ -15,13 +15,16 @@ use crate::{
     error::{RelentlessError, RelentlessResult},
 };
 
+#[cfg(feature = "default-http-client")]
 pub const APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),);
 
 #[derive(Debug)]
+#[cfg(feature = "default-http-client")]
 pub struct DefaultHttpClient<ReqB, ResB> {
     client: reqwest::Client,
     phantom: PhantomData<(ReqB, ResB)>,
 }
+#[cfg(feature = "default-http-client")]
 impl<ReqB, ResB> DefaultHttpClient<ReqB, ResB> {
     pub async fn new() -> RelentlessResult<Self> {
         // TODO use hyper ? continue to use reqwest's rich client?
@@ -30,6 +33,7 @@ impl<ReqB, ResB> DefaultHttpClient<ReqB, ResB> {
     }
 }
 
+#[cfg(feature = "default-http-client")]
 impl<ReqB, ResB> Service<http::Request<ReqB>> for DefaultHttpClient<ReqB, ResB>
 where
     ReqB: Into<reqwest::Body>,

@@ -70,6 +70,7 @@ impl Relentless {
         let Self { file, .. } = self;
         file.iter().map(Config::read).collect::<RelentlessResult<Vec<_>>>()
     }
+    #[cfg(feature = "default-http-client")]
     pub async fn assault(&self) -> RelentlessResult<Outcome> {
         let configs = self.configs()?;
         let clients = Control::default_http_clients(self, &configs).await?;

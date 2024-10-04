@@ -8,17 +8,18 @@ repository = "https://github.com/hayas1/relentless"
 
 [features]
 default = ["full"]
-full = ["json", "yaml", "toml", "cli"]
+full = ["json", "yaml", "toml", "cli", "default-http-client"]
 
 json = ["serde_json"]
 yaml = ["serde_yaml"]
-cli = ["clap"]
+cli = ["clap", "default-http-client"]
+default-http-client = ["reqwest"]
 
 
 [dependencies]
 tokio = { version = "1.40.0", features = ["full"] }
 tower = { version = "0.5.0", features = ["timeout", "util"] }
-reqwest = "0.12.7"
+reqwest = { version = "0.12.7", optional = true }
 http = "1.1.0"
 http-serde = "2.1.1"
 http-body = "1.0.1"

@@ -1,11 +1,13 @@
 use std::marker::PhantomData;
 
+#[cfg(feature = "default-http-client")]
+use crate::service::DefaultHttpClient;
 use crate::{
     command::Relentless,
     config::{Coalesce, Coalesced, Config, Destinations, Protocol, Setting, Testcase, WorkerConfig},
     error::{RelentlessError, RelentlessResult},
     outcome::{CaseOutcome, Compare, Evaluator, Outcome, Status, WorkerOutcome},
-    service::{DefaultHttpClient, FromBodyStructure},
+    service::FromBodyStructure,
 };
 use http_body::Body;
 use tower::{Service, ServiceExt};
@@ -17,6 +19,7 @@ pub struct Control<S, ReqB, ResB> {
     cases: Vec<Vec<Case<S, ReqB, ResB>>>,
     phantom: PhantomData<(ReqB, ResB)>,
 }
+#[cfg(feature = "default-http-client")]
 impl Control<DefaultHttpClient<reqwest::Body, reqwest::Body>, reqwest::Body, reqwest::Body> {
     pub async fn default_http_clients(
         cmd: &Relentless,

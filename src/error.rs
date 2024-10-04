@@ -9,6 +9,7 @@ pub enum RelentlessError {
     HttpError(#[from] HttpError),
     CaseError(#[from] CaseError),
 
+    #[cfg(feature = "default-http-client")]
     ReqwestError(#[from] reqwest::Error),
     HttpInvalidUri(#[from] http::uri::InvalidUri),
     TokioTaskJoinError(#[from] tokio::task::JoinError),
