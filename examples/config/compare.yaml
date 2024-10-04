@@ -2,11 +2,11 @@ name: example yaml of basic compare test
 destinations:
   actual: http://localhost:3000
   expect: http://localhost:3000
-setting:
-  template:
-    version:
-      actual: v1
-      expect: v2
+# setting:
+#   template:
+#     version:
+#       actual: v1
+#       expect: v2
 
 
 testcase:
