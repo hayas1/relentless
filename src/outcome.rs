@@ -91,8 +91,8 @@ impl WorkerOutcome {
         self.outcome.iter().all(|o| o.allow(strict))
     }
     pub fn skip_report(&self, cmd: &Relentless) -> bool {
-        let Relentless { ng_only, strict, .. } = cmd;
-        *ng_only && self.allow(*strict)
+        let Relentless { strict, ng_only, no_report, .. } = cmd;
+        *no_report || *ng_only && self.allow(*strict)
     }
 
     pub fn report_to<T: std::io::Write>(&self, w: &mut OutcomeWriter<T>, cmd: &Relentless) -> std::fmt::Result {
@@ -148,8 +148,8 @@ impl CaseOutcome {
         self.pass() || !strict && allowed
     }
     pub fn skip_report(&self, cmd: &Relentless) -> bool {
-        let Relentless { ng_only, strict, .. } = cmd;
-        *ng_only && self.allow(*strict)
+        let Relentless { strict, ng_only, no_report, .. } = cmd;
+        *no_report || *ng_only && self.allow(*strict)
     }
 
     pub fn report_to<T: std::io::Write>(&self, w: &mut OutcomeWriter<T>, cmd: &Relentless) -> std::fmt::Result {
