@@ -41,7 +41,7 @@ pub struct Relentless {
     pub ng_only: bool,
 
     /// without colorize output
-    #[cfg_attr(feature = "cli", arg(long, global = true))]
+    #[cfg_attr(feature = "cli", arg(long))]
     pub no_color: bool,
 
     /// report nothing
