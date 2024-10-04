@@ -64,13 +64,11 @@ impl Outcome {
         self.report_to(&mut OutcomeWriter::with_stdout(0), cmd)
     }
     pub fn report_to<T: std::io::Write>(&self, w: &mut OutcomeWriter<T>, cmd: &Relentless) -> std::fmt::Result {
-        let Relentless { ng_only, strict, .. } = cmd;
         for outcome in &self.outcome {
-            if *ng_only && outcome.allow(*strict) {
-                continue;
+            if !outcome.skip_report(cmd) {
+                outcome.report_to(w, cmd)?;
+                writeln!(w)?;
             }
-            outcome.report_to(w, cmd)?;
-            writeln!(w)?;
         }
         Ok(())
     }
@@ -91,6 +89,10 @@ impl WorkerOutcome {
     }
     pub fn allow(&self, strict: bool) -> bool {
         self.outcome.iter().all(|o| o.allow(strict))
+    }
+    pub fn skip_report(&self, cmd: &Relentless) -> bool {
+        let Relentless { ng_only, strict, .. } = cmd;
+        *ng_only && self.allow(*strict)
     }
 
     pub fn report_to<T: std::io::Write>(&self, w: &mut OutcomeWriter<T>, cmd: &Relentless) -> std::fmt::Result {
@@ -116,7 +118,9 @@ impl WorkerOutcome {
 
         w.scope(|w| {
             for outcome in &self.outcome {
-                outcome.report_to(w, cmd)?;
+                if !outcome.skip_report(cmd) {
+                    outcome.report_to(w, cmd)?;
+                }
             }
             Ok::<_, std::fmt::Error>(())
         })?;
@@ -143,12 +147,13 @@ impl CaseOutcome {
         let allowed = self.testcase.coalesce().attr.allow;
         self.pass() || !strict && allowed
     }
+    pub fn skip_report(&self, cmd: &Relentless) -> bool {
+        let Relentless { ng_only, strict, .. } = cmd;
+        *ng_only && self.allow(*strict)
+    }
+
     pub fn report_to<T: std::io::Write>(&self, w: &mut OutcomeWriter<T>, cmd: &Relentless) -> std::fmt::Result {
         let Testcase { description, target, setting, .. } = self.testcase.coalesce();
-
-        if cmd.ng_only && self.pass() {
-            return Ok(());
-        }
 
         let side = if self.pass() { console::Emoji("✅", "PASS") } else { console::Emoji("❌", "FAIL") };
         let target = console::style(&target);
