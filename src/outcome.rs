@@ -64,7 +64,11 @@ impl Outcome {
         self.report_to(&mut OutcomeWriter::with_stdout(0), cmd)
     }
     pub fn report_to<T: std::io::Write>(&self, w: &mut OutcomeWriter<T>, cmd: &Relentless) -> std::fmt::Result {
+        let Relentless { ng_only, strict, .. } = cmd;
         for outcome in &self.outcome {
+            if *ng_only && outcome.allow(*strict) {
+                continue;
+            }
             outcome.report_to(w, cmd)?;
             writeln!(w)?;
         }
@@ -141,6 +145,10 @@ impl CaseOutcome {
     }
     pub fn report_to<T: std::io::Write>(&self, w: &mut OutcomeWriter<T>, cmd: &Relentless) -> std::fmt::Result {
         let Testcase { description, target, setting, .. } = self.testcase.coalesce();
+
+        if cmd.ng_only && self.pass() {
+            return Ok(());
+        }
 
         let side = if self.pass() { console::Emoji("✅", "PASS") } else { console::Emoji("❌", "FAIL") };
         let target = console::style(&target);
