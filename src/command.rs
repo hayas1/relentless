@@ -16,6 +16,15 @@ use crate::{
 #[cfg(feature = "cli")]
 pub async fn execute() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sync>> {
     let cmd = Relentless::parse();
+
+    let &Relentless { no_save, number_of_threads, .. } = &cmd;
+    if no_save {
+        unimplemented!("`--no-save` is not implemented yet");
+    }
+    if number_of_threads.is_some() {
+        unimplemented!("`--number-of-threads` is not implemented yet");
+    }
+
     let ret = cmd.assault().await?;
     Ok(ret.exit_code(cmd))
 }
