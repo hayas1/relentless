@@ -202,6 +202,14 @@ where
         setting: &Setting,
     ) -> RelentlessResult<Destinations<Vec<http::Request<ReqB>>>> {
         let Setting { protocol, template, repeat, timeout } = setting;
+
+        if !template.is_empty() {
+            unimplemented!("template is not implemented yet");
+        }
+        if timeout.is_some() {
+            unimplemented!("timeout is not implemented yet");
+        }
+
         Ok(destinations
             .iter()
             .map(|(name, destination)| {
