@@ -14,7 +14,7 @@ use axum::{
 };
 use chrono::{DateTime, Local, Utc};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{Map, Value};
 
 use crate::{
     error::{
@@ -45,14 +45,14 @@ pub struct InformationResponse {
     pub uri: Uri,
     #[serde(default)]
     pub path: String,
-    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
-    pub query: HashMap<String, Vec<Value>>,
+    #[serde(default, skip_serializing_if = "serde_json::Map::is_empty")]
+    pub query: Map<String, Value>,
     #[serde(default, with = "http_serde::version")]
     pub version: Version,
     #[serde(default, with = "http_serde::header_map")]
     pub headers: HeaderMap,
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub body: String, // TODO do not String
+    #[serde(default, skip_serializing_if = "Value::is_null")]
+    pub body: Value,
 }
 
 // TODO with = "http_serde::scheme" doesn't supported https://gitlab.com/kornelski/http-serde/-/issues/1
@@ -90,23 +90,38 @@ pub async fn information(
     Ok(Json(InformationResponse { datetime, scheme, hostname, method, uri, path, query, version, headers, body }))
 }
 
-pub fn parse_query(query: &str) -> Result<HashMap<String, Vec<Value>>> {
+pub fn parse_query(query: &str) -> Result<Map<String, Value>> {
     // TODO want to use serde_qs but it has the issue https://github.com/samscott89/serde_qs/issues/77
     //      serde_qs maybe can parse as HashMap or Struct only, so cannot parse as Value or Vec<(String, Value)>
     //      and serde_qs do not allow multiple values for the same key even if use multi map https://github.com/samscott89/serde_qs/blob/b7278b73c637f7c427be762082fee5938ba0c023/src/de/parse.rs#L38
-    let tuples: Vec<_> = serde_urlencoded::from_str(query).map_err(AppError::<Unreachable>::wrap)?;
+    let tuples: Vec<(_, Value)> = serde_urlencoded::from_str(query).map_err(AppError::<Unreachable>::wrap)?;
     let mut map = HashMap::new();
     for (q, s) in tuples {
         map.entry(q).or_insert(Vec::new()).push(s);
     }
-
-    Ok(map)
+    Ok(map.into_iter().map(|(k, v)| if let [ref x] = v[..] { (k, x.clone()) } else { (k, Value::Array(v)) }).collect())
 }
 
-pub async fn parse_body(b: Body) -> Result<String> {
+pub async fn parse_body(b: Body) -> Result<Value> {
     let size = b.size_hint().upper().unwrap_or(b.size_hint().lower()) as usize;
     let bytes = to_bytes(b, size).await.map_err(AppError::<BadRequest>::wrap)?;
-    Ok(String::from_utf8_lossy(&bytes).to_string())
+    let string = String::from_utf8_lossy(&bytes);
+
+    // TODO content-type based parsing
+    if string.is_empty() {
+        Ok(Value::Null)
+    } else if let Ok(json) = serde_json::from_str(&string) {
+        Ok(json)
+    } else if let Ok(urlencoded) = parse_query(&string) {
+        Ok(Value::Object(urlencoded))
+    } else {
+        let s = String::from_utf8_lossy(&bytes);
+        if s.is_empty() {
+            Ok(Value::Null)
+        } else {
+            Ok(Value::String(s.to_string()))
+        }
+    }
 }
 
 #[cfg(test)]
@@ -128,10 +143,10 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_information_get() {
+    async fn test_information_basic() {
         let mut app = app_with(Default::default());
 
-        let req = Request::builder().uri("http://localhost:3000/information?q=test").body(Body::empty()).unwrap();
+        let req = Request::builder().uri("http://localhost:3000/information").body(Body::empty()).unwrap();
         call_with_assert(
             &mut app,
             req,
@@ -139,9 +154,32 @@ mod tests {
             InformationResponse {
                 hostname: "localhost".to_string(),
                 // BUG? in test, include scheme and authority, but server response include only path and query
-                uri: Uri::from_static("http://localhost:3000/information?q=test"),
+                uri: Uri::from_static("http://localhost:3000/information"),
                 path: "/information".to_string(),
-                query: vec![("q".to_string(), vec![json!("test")])].into_iter().collect(),
+                ..Default::default()
+            },
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn test_information_get() {
+        let mut app = app_with(Default::default());
+
+        let req = Request::builder()
+            .uri("http://localhost:3000/information/path/to/query/?q=test&k=1&k=2&k=3")
+            .body(Body::empty())
+            .unwrap();
+        call_with_assert(
+            &mut app,
+            req,
+            StatusCode::OK,
+            InformationResponse {
+                hostname: "localhost".to_string(),
+                // BUG? in test, include scheme and authority, but server response include only path and query
+                uri: Uri::from_static("http://localhost:3000/information/path/to/query?q=test&k=1&k=2&k=3"),
+                path: "/information/path/to/query".to_string(),
+                query: json!({ "q": "test", "k": ["1", "2", "3"] }).as_object().unwrap().clone(),
                 ..Default::default()
             },
         )
@@ -167,10 +205,10 @@ mod tests {
                 method: Method::POST,
                 uri: Uri::from_static("http://localhost:3000/information/post/to?type=txt"),
                 path: "/information/post/to".to_string(),
-                query: vec![("type".to_string(), vec![json!("txt")])].into_iter().collect(),
+                query: json!({ "type": "txt" }).as_object().unwrap().clone(),
                 version: Version::HTTP_11,
                 headers: HeaderMap::new(),
-                body: "body".to_string(),
+                body: json!({"body": ""}), // TODO
                 ..Default::default()
             },
         )
