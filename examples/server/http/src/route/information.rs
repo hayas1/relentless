@@ -30,7 +30,7 @@ pub fn route_information() -> Router<AppState> {
         .route("/*path", any(information))
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct InformationResponse {
     #[serde(default, with = "scheme")]
     pub scheme: Option<Scheme>,
@@ -116,6 +116,7 @@ mod tests {
         body::Body,
         http::{Request, StatusCode},
     };
+    use serde_json::json;
 
     use crate::{
         error::{
@@ -128,7 +129,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_information() {
+    async fn test_information_get() {
         let mut app = app_with(Default::default());
 
         let req = Request::builder().uri("http://localhost:3000/information/").body(Body::empty()).unwrap();
@@ -137,15 +138,38 @@ mod tests {
             req,
             StatusCode::OK,
             InformationResponse {
-                scheme: None,
                 hostname: "localhost".to_string(),
-                method: Method::GET,
                 uri: Uri::from_static("http://localhost:3000/information"),
                 path: "/information".to_string(),
-                query: HashMap::new(),
+                ..Default::default()
+            },
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn test_information_post() {
+        let mut app = app_with(Default::default());
+
+        let req = Request::builder()
+            .method(Method::POST)
+            .uri("http://localhost:3000/information/post/to?type=txt")
+            .body(Body::from("body"))
+            .unwrap();
+        call_with_assert(
+            &mut app,
+            req,
+            StatusCode::OK,
+            InformationResponse {
+                scheme: None,
+                hostname: "localhost".to_string(),
+                method: Method::POST,
+                uri: Uri::from_static("http://localhost:3000/information/post/to?type=txt"),
+                path: "/information/post/to".to_string(),
+                query: vec![("type".to_string(), vec![json!("txt")])].into_iter().collect(),
                 version: Version::HTTP_11,
                 headers: HeaderMap::new(),
-                body: "".to_string(),
+                body: "body".to_string(),
             },
         )
         .await;
