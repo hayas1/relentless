@@ -76,16 +76,11 @@ mod scheme {
 pub async fn information(
     // Scheme(scheme): Scheme, // TODO cannot get scheme in axum handler now https://github.com/tokio-rs/axum/pull/2507
     Host(hostname): Host,
-    OriginalUri(original_uri): OriginalUri,
+    OriginalUri(uri): OriginalUri,
     request: Request,
 ) -> Result<Json<InformationResponse>> {
     let scheme = None;
     let (Parts { method, uri: _, version, headers, .. }, b) = request.into_parts();
-    let uri = Builder::from(original_uri)
-        .scheme(scheme.clone().unwrap_or(Scheme::HTTP))
-        // .authority(hostname.to_string())
-        .build()
-        .map_err(AppError::<Unreachable>::wrap)?;
     let path = uri.path().to_string();
     let query = parse_query(uri.query().unwrap_or_default())?;
     let body = parse_body(b).await?;
@@ -133,15 +128,17 @@ mod tests {
     async fn test_information_get() {
         let mut app = app_with(Default::default());
 
-        let req = Request::builder().uri("http://localhost:3000/information/").body(Body::empty()).unwrap();
+        let req = Request::builder().uri("http://localhost:3000/information?q=test").body(Body::empty()).unwrap();
         call_with_assert(
             &mut app,
             req,
             StatusCode::OK,
             InformationResponse {
                 hostname: "localhost".to_string(),
-                uri: Uri::from_static("http://localhost:3000/information"),
+                // BUG? in test, include scheme and authority, but server response include only path and query
+                uri: Uri::from_static("http://localhost:3000/information?q=test"),
                 path: "/information".to_string(),
+                query: vec![("q".to_string(), vec![json!("test")])].into_iter().collect(),
                 ..Default::default()
             },
         )
