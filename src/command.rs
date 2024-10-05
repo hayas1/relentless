@@ -17,10 +17,7 @@ use crate::{
 pub async fn execute() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sync>> {
     let cmd = Relentless::parse();
 
-    let &Relentless { no_save, number_of_threads, rps, .. } = &cmd;
-    if no_save {
-        unimplemented!("`--no-save` is not implemented yet");
-    }
+    let &Relentless { number_of_threads, rps, .. } = &cmd;
     if number_of_threads.is_some() {
         unimplemented!("`--number-of-threads` is not implemented yet");
     }
@@ -59,10 +56,6 @@ pub struct Relentless {
     /// report nothing
     #[cfg_attr(feature = "cli", arg(long))]
     pub no_report: bool,
-
-    /// do not save outcomes
-    #[cfg_attr(feature = "cli", arg(long))]
-    pub no_save: bool,
 
     /// number of threads
     #[cfg_attr(feature = "cli", arg(short, long))]
