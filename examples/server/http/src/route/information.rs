@@ -95,6 +95,7 @@ pub async fn information(
 pub fn parse_query(query: &str) -> Result<HashMap<String, Vec<Value>>> {
     // TODO want to use serde_qs but it has the issue https://github.com/samscott89/serde_qs/issues/77
     //      serde_qs maybe can parse as HashMap or Struct only, so cannot parse as Value or Vec<(String, Value)>
+    //      and serde_qs do not allow multiple values for the same key even if use multi map https://github.com/samscott89/serde_qs/blob/b7278b73c637f7c427be762082fee5938ba0c023/src/de/parse.rs#L38
     let tuples: Vec<_> = serde_urlencoded::from_str(query).map_err(AppError::<Unreachable>::wrap)?;
     let mut map = HashMap::new();
     for (q, s) in tuples {
