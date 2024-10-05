@@ -2,8 +2,12 @@ use std::{collections::HashMap, hash::Hash};
 
 use axum::{
     body::{to_bytes, Body, HttpBody},
-    extract::Request,
-    http::{request::Parts, HeaderMap, Method, Uri, Version},
+    extract::{ConnectInfo, Host, NestedPath, OriginalUri, Request},
+    http::{
+        request::Parts,
+        uri::{Builder, Scheme},
+        HeaderMap, Method, Uri, Version,
+    },
     response::Result,
     routing::{any, get},
     Json, Router,
@@ -22,11 +26,16 @@ use crate::{
 pub fn route_information() -> Router<AppState> {
     Router::new()
         // .route("/", any(information))
+        .route("/", any(information))
         .route("/*path", any(information))
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct InformationResponse {
+    #[serde(default, with = "scheme")]
+    pub scheme: Option<Scheme>,
+    #[serde(default)]
+    pub hostname: String,
     #[serde(default, with = "http_serde::method")]
     pub method: Method,
     #[serde(default, with = "http_serde::uri")]
@@ -40,16 +49,47 @@ pub struct InformationResponse {
     #[serde(default, with = "http_serde::header_map")]
     pub headers: HeaderMap,
     #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub body: String,
+    pub body: String, // TODO do not String
+}
+
+// TODO with = "http_serde::scheme" doesn't supported https://gitlab.com/kornelski/http-serde/-/issues/1
+mod scheme {
+    use super::*;
+    pub fn serialize<S>(value: &Option<Scheme>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        value.as_ref().map(|scheme| scheme.to_string()).serialize(serializer)
+    }
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<Scheme>, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        Option::<String>::deserialize(deserializer)?
+            .map(|scheme| scheme.parse())
+            .transpose()
+            .map_err(serde::de::Error::custom)
+    }
 }
 
 #[tracing::instrument]
-pub async fn information(request: Request) -> Result<Json<InformationResponse>> {
-    let (Parts { method, uri, version, headers, .. }, b) = request.into_parts();
+pub async fn information(
+    // Scheme(scheme): Scheme, // TODO cannot get scheme in axum handler now https://github.com/tokio-rs/axum/pull/2507
+    Host(hostname): Host,
+    OriginalUri(original_uri): OriginalUri,
+    request: Request,
+) -> Result<Json<InformationResponse>> {
+    let scheme = None;
+    let (Parts { method, uri: _, version, headers, .. }, b) = request.into_parts();
+    let uri = Builder::from(original_uri)
+        .scheme(scheme.clone().unwrap_or(Scheme::HTTP))
+        // .authority(hostname.to_string())
+        .build()
+        .map_err(AppError::<Unreachable>::wrap)?;
     let path = uri.path().to_string();
     let query = parse_query(uri.query().unwrap_or_default())?;
     let body = parse_body(b).await?;
-    Ok(Json(InformationResponse { method, uri, path, query, version, headers, body }))
+    Ok(Json(InformationResponse { scheme, hostname, method, uri, path, query, version, headers, body }))
 }
 
 pub fn parse_query(query: &str) -> Result<HashMap<String, Vec<Value>>> {
@@ -91,14 +131,16 @@ mod tests {
     async fn test_information() {
         let mut app = app_with(Default::default());
 
-        let req = Request::builder().uri("/information").body(Body::empty()).unwrap();
+        let req = Request::builder().uri("http://localhost:3000/information/").body(Body::empty()).unwrap();
         call_with_assert(
             &mut app,
             req,
             StatusCode::OK,
             InformationResponse {
+                scheme: None,
+                hostname: "localhost".to_string(),
                 method: Method::GET,
-                uri: Uri::from_static("/information"), // TODO!!!
+                uri: Uri::from_static("http://localhost:3000/information"),
                 path: "/information".to_string(),
                 query: HashMap::new(),
                 version: Version::HTTP_11,
