@@ -1,25 +1,21 @@
-use std::{collections::HashMap, hash::Hash, net::SocketAddr, time::SystemTime};
+use std::collections::HashMap;
 
 use axum::{
     body::{to_bytes, Body, HttpBody},
-    extract::{ConnectInfo, Host, NestedPath, OriginalUri, Request},
-    http::{
-        request::Parts,
-        uri::{Builder, Scheme},
-        HeaderMap, Method, Uri, Version,
-    },
+    extract::{Host, OriginalUri, Request},
+    http::{request::Parts, uri::Scheme, HeaderMap, Method, Uri, Version},
     response::Result,
-    routing::{any, get},
+    routing::any,
     Json, Router,
 };
-use chrono::{DateTime, Local, Utc};
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
 use crate::{
     error::{
-        kind::{BadRequest, Retriable, Unreachable},
-        AppError, Logged,
+        kind::{BadRequest, Unreachable},
+        AppError,
     },
     state::AppState,
 };
@@ -132,13 +128,7 @@ mod tests {
     };
     use serde_json::json;
 
-    use crate::{
-        error::{
-            kind::{BadRequest, Kind},
-            ErrorResponseInner, APP_DEFAULT_ERROR_CODE,
-        },
-        route::{app_with, tests::call_with_assert},
-    };
+    use crate::route::{app_with, tests::call_with_assert};
 
     use super::*;
 
@@ -176,7 +166,6 @@ mod tests {
             StatusCode::OK,
             InformationResponse {
                 hostname: "localhost".to_string(),
-                // BUG? in test, include scheme and authority, but server response include only path and query
                 uri: Uri::from_static("http://localhost:3000/information/path/to/query?q=test&k=1&k=2&k=3"),
                 path: "/information/path/to/query".to_string(),
                 query: json!({ "q": "test", "k": ["1", "2", "3"] }).as_object().unwrap().clone(),
