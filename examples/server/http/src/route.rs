@@ -4,9 +4,11 @@ pub mod information;
 pub mod root;
 pub mod wait;
 
+use std::net::SocketAddr;
+
 use axum::{
     body::{Body, HttpBody},
-    extract::Request,
+    extract::{connect_info::IntoMakeServiceWithConnectInfo, Request},
     http::{StatusCode, Uri},
     middleware::{self, Next},
     response::{IntoResponse, Result},
@@ -27,7 +29,10 @@ pub fn app_with(env: Env) -> NormalizePath<Router<()>> {
     app(state)
 }
 pub fn app(state: AppState) -> NormalizePath<Router<()>> {
-    let router = Router::new()
+    NormalizePathLayer::trim_trailing_slash().layer(router(state))
+}
+pub fn router(state: AppState) -> Router<()> {
+    Router::new()
         .route("/", get(root::root))
         .nest("/health", health::route_health())
         .route("/healthz", get(health::health))
@@ -36,9 +41,11 @@ pub fn app(state: AppState) -> NormalizePath<Router<()>> {
         .nest("/information", information::route_information())
         .fallback(not_found)
         .layer(middleware::from_fn_with_state(state.clone(), logging))
-        .with_state(state);
-
-    NormalizePathLayer::trim_trailing_slash().layer(router)
+        .with_state(state)
+}
+pub fn router_with_connect_info(state: AppState) -> IntoMakeServiceWithConnectInfo<Router<()>, SocketAddr> {
+    // TODO how to use this with NormalizePathLayer ?
+    router(state).into_make_service_with_connect_info()
 }
 
 pub async fn not_found(uri: Uri) -> Result<()> {

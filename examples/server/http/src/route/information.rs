@@ -1,4 +1,4 @@
-use std::{collections::HashMap, hash::Hash};
+use std::{collections::HashMap, hash::Hash, net::SocketAddr, time::SystemTime};
 
 use axum::{
     body::{to_bytes, Body, HttpBody},
@@ -32,6 +32,8 @@ pub fn route_information() -> Router<AppState> {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct InformationResponse {
+    #[serde(default)]
+    pub time: Option<SystemTime>,
     #[serde(default, with = "scheme")]
     pub scheme: Option<Scheme>,
     #[serde(default)]
@@ -79,12 +81,13 @@ pub async fn information(
     OriginalUri(uri): OriginalUri,
     request: Request,
 ) -> Result<Json<InformationResponse>> {
+    let time = if !cfg!(test) { Some(SystemTime::now()) } else { None }; // TODO should we use cfg! ?
     let scheme = None;
     let (Parts { method, uri: _, version, headers, .. }, b) = request.into_parts();
     let path = uri.path().to_string();
     let query = parse_query(uri.query().unwrap_or_default())?;
     let body = parse_body(b).await?;
-    Ok(Json(InformationResponse { scheme, hostname, method, uri, path, query, version, headers, body }))
+    Ok(Json(InformationResponse { time, scheme, hostname, method, uri, path, query, version, headers, body }))
 }
 
 pub fn parse_query(query: &str) -> Result<HashMap<String, Vec<Value>>> {
@@ -168,6 +171,7 @@ mod tests {
                 version: Version::HTTP_11,
                 headers: HeaderMap::new(),
                 body: "body".to_string(),
+                ..Default::default()
             },
         )
         .await;
