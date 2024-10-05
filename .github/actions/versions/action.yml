@@ -33,7 +33,7 @@ runs:
     - name: Detect git tag
       id: detected-git-tag
       shell: bash
-      run: echo "result=$(git describe --tags --abbrev=0 || echo v0.1.0)" >>"$GITHUB_OUTPUT" # TODO remove v0.1.0
+      run: echo "result=$(git describe --tags --abbrev=0 || echo)" >>"$GITHUB_OUTPUT"
     - name: Should release
       id: should-release
       shell: bash
