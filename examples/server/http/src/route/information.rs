@@ -124,7 +124,7 @@ pub async fn parse_body(b: Body) -> Result<Value> {
 mod tests {
     use axum::{
         body::Body,
-        http::{Request, StatusCode},
+        http::{HeaderName, HeaderValue, Request, StatusCode},
     };
     use serde_json::json;
 
@@ -181,8 +181,9 @@ mod tests {
 
         let req = Request::builder()
             .method(Method::POST)
-            .uri("http://localhost:3000/information/post/to?type=txt")
-            .body(Body::from("body"))
+            .uri("http://localhost:3000/information/post/qs/to?type=txt")
+            .header("content-type", "application/x-www-form-urlencoded")
+            .body(Body::from("body=body"))
             .unwrap();
         call_with_assert(
             &mut app,
@@ -192,12 +193,44 @@ mod tests {
                 scheme: None,
                 hostname: "localhost".to_string(),
                 method: Method::POST,
-                uri: Uri::from_static("http://localhost:3000/information/post/to?type=txt"),
-                path: "/information/post/to".to_string(),
+                uri: Uri::from_static("http://localhost:3000/information/post/qs/to?type=txt"),
+                path: "/information/post/qs/to".to_string(),
                 query: json!({ "type": "txt" }).as_object().unwrap().clone(),
                 version: Version::HTTP_11,
-                headers: HeaderMap::new(),
-                body: json!({"body": ""}), // TODO
+                headers: vec![(
+                    HeaderName::from_static("content-type"),
+                    HeaderValue::from_static("application/x-www-form-urlencoded"),
+                )]
+                .into_iter()
+                .collect(),
+                body: json!({"body": "body"}),
+                ..Default::default()
+            },
+        )
+        .await;
+
+        let req = Request::builder()
+            .method(Method::POST)
+            .uri("http://localhost:3000/information/post/json/to")
+            .header("content-type", "application/json")
+            .body(Body::from(r#"{"name": "json", "key": [1, 2, 3]}"#))
+            .unwrap();
+        call_with_assert(
+            &mut app,
+            req,
+            StatusCode::OK,
+            InformationResponse {
+                scheme: None,
+                hostname: "localhost".to_string(),
+                method: Method::POST,
+                uri: Uri::from_static("http://localhost:3000/information/post/json/to"),
+                path: "/information/post/json/to".to_string(),
+                query: json!({}).as_object().unwrap().clone(),
+                version: Version::HTTP_11,
+                headers: vec![(HeaderName::from_static("content-type"), HeaderValue::from_static("application/json"))]
+                    .into_iter()
+                    .collect(),
+                body: json!({"name": "json", "key": [1, 2, 3]}),
                 ..Default::default()
             },
         )
