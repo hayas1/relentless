@@ -1,5 +1,6 @@
 pub mod counter;
 pub mod health;
+pub mod information;
 pub mod root;
 pub mod wait;
 
@@ -32,6 +33,7 @@ pub fn app(state: AppState) -> NormalizePath<Router<()>> {
         .route("/healthz", get(health::health))
         .nest("/counter", counter::route_counter())
         .nest("/wait", wait::route_wait())
+        .nest("/information", information::route_information())
         .fallback(not_found)
         .layer(middleware::from_fn_with_state(state.clone(), logging))
         .with_state(state);
