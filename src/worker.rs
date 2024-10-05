@@ -14,13 +14,14 @@ use tower::{Service, ServiceExt};
 
 /// TODO document
 #[derive(Debug, Clone)]
-pub struct Control<S, ReqB, ResB> {
-    workers: Vec<Worker<S, ReqB, ResB>>, // TODO all worker do not have same clients type ?
+pub struct Control<'a, S, ReqB, ResB> {
+    _cmd: &'a Relentless,
+    workers: Vec<Worker<'a, S, ReqB, ResB>>, // TODO all worker do not have same clients type ?
     cases: Vec<Vec<Case<S, ReqB, ResB>>>,
     phantom: PhantomData<(ReqB, ResB)>,
 }
 #[cfg(feature = "default-http-client")]
-impl Control<DefaultHttpClient<reqwest::Body, reqwest::Body>, reqwest::Body, reqwest::Body> {
+impl Control<'_, DefaultHttpClient<reqwest::Body, reqwest::Body>, reqwest::Body, reqwest::Body> {
     pub async fn default_http_clients(
         cmd: &Relentless,
         configs: &Vec<Config>,
@@ -43,7 +44,7 @@ impl Control<DefaultHttpClient<reqwest::Body, reqwest::Body>, reqwest::Body, req
         Ok(destinations)
     }
 }
-impl<S, ReqB, ResB> Control<S, ReqB, ResB>
+impl<'a, S, ReqB, ResB> Control<'a, S, ReqB, ResB>
 where
     ReqB: Body + FromBodyStructure + Send + 'static,
     ReqB::Data: Send + 'static,
@@ -56,7 +57,7 @@ where
 {
     /// TODO document
     pub fn with_service(
-        cmd: &Relentless,
+        cmd: &'a Relentless,
         configs: Vec<Config>,
         services: Vec<Destinations<S>>,
     ) -> RelentlessResult<Self> {
@@ -64,16 +65,16 @@ where
         for (config, service) in configs.iter().zip(services) {
             workers.push(Worker::new(cmd, config.worker_config.clone(), service)?);
         }
-        Ok(Self::new(configs, workers))
+        Ok(Self::new(cmd, configs, workers))
     }
     /// TODO document
-    pub fn new(configs: Vec<Config>, workers: Vec<Worker<S, ReqB, ResB>>) -> Self {
+    pub fn new(cmd: &'a Relentless, configs: Vec<Config>, workers: Vec<Worker<'a, S, ReqB, ResB>>) -> Self {
         let cases = configs
             .iter()
             .map(|c| c.testcase.clone().into_iter().map(|t| Case::new(&c.worker_config, t)).collect())
             .collect();
         let phantom = PhantomData;
-        Self { workers, cases, phantom }
+        Self { _cmd: cmd, workers, cases, phantom }
     }
     /// TODO document
     pub async fn assault(self) -> RelentlessResult<Outcome> {
@@ -94,17 +95,18 @@ where
 
 /// TODO document
 #[derive(Debug, Clone)]
-pub struct Worker<S, ReqB, ResB> {
+pub struct Worker<'a, S, ReqB, ResB> {
+    _cmd: &'a Relentless,
     config: Coalesced<WorkerConfig, Destinations<String>>,
     clients: Destinations<S>,
     phantom: PhantomData<(ReqB, ResB)>,
 }
-impl<S, ReqB, ResB> Worker<S, ReqB, ResB> {
+impl<S, ReqB, ResB> Worker<'_, S, ReqB, ResB> {
     pub fn config(&self) -> WorkerConfig {
         self.config.coalesce()
     }
 }
-impl<S, ReqB, ResB> Worker<S, ReqB, ResB>
+impl<'a, S, ReqB, ResB> Worker<'a, S, ReqB, ResB>
 where
     ReqB: Body + FromBodyStructure + Send + 'static,
     ReqB::Data: Send + 'static,
@@ -115,10 +117,10 @@ where
     S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + Sync + 'static,
     RelentlessError: From<S::Error>,
 {
-    pub fn new(cmd: &Relentless, config: WorkerConfig, clients: Destinations<S>) -> RelentlessResult<Self> {
+    pub fn new(cmd: &'a Relentless, config: WorkerConfig, clients: Destinations<S>) -> RelentlessResult<Self> {
         let config = Coalesced::tuple(config, cmd.destination.clone().into_iter().collect());
         let phantom = PhantomData;
-        Ok(Self { config, clients, phantom })
+        Ok(Self { _cmd: cmd, config, clients, phantom })
     }
 
     pub async fn assault(self, cases: Vec<Case<S, ReqB, ResB>>) -> RelentlessResult<WorkerOutcome> {
