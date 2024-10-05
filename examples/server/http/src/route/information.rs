@@ -12,6 +12,7 @@ use axum::{
     routing::{any, get},
     Json, Router,
 };
+use chrono::{DateTime, Local, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -33,7 +34,7 @@ pub fn route_information() -> Router<AppState> {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct InformationResponse {
     #[serde(default)]
-    pub time: Option<SystemTime>,
+    pub datetime: Option<DateTime<Utc>>,
     #[serde(default, with = "scheme")]
     pub scheme: Option<Scheme>,
     #[serde(default)]
@@ -76,18 +77,17 @@ mod scheme {
 
 #[tracing::instrument]
 pub async fn information(
-    // Scheme(scheme): Scheme, // TODO cannot get scheme in axum handler now https://github.com/tokio-rs/axum/pull/2507
     Host(hostname): Host,
     OriginalUri(uri): OriginalUri,
     request: Request,
 ) -> Result<Json<InformationResponse>> {
-    let time = if !cfg!(test) { Some(SystemTime::now()) } else { None }; // TODO should we use cfg! ?
-    let scheme = None;
+    let datetime = if !cfg!(test) { Some(Utc::now()) } else { None }; // TODO should we use cfg! ?
+    let scheme = None; // TODO cannot get scheme in axum handler now https://github.com/tokio-rs/axum/pull/2507
     let (Parts { method, uri: _, version, headers, .. }, b) = request.into_parts();
     let path = uri.path().to_string();
     let query = parse_query(uri.query().unwrap_or_default())?;
     let body = parse_body(b).await?;
-    Ok(Json(InformationResponse { time, scheme, hostname, method, uri, path, query, version, headers, body }))
+    Ok(Json(InformationResponse { datetime, scheme, hostname, method, uri, path, query, version, headers, body }))
 }
 
 pub fn parse_query(query: &str) -> Result<HashMap<String, Vec<Value>>> {
