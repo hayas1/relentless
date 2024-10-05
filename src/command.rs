@@ -17,12 +17,15 @@ use crate::{
 pub async fn execute() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sync>> {
     let cmd = Relentless::parse();
 
-    let &Relentless { no_save, number_of_threads, .. } = &cmd;
+    let &Relentless { no_save, number_of_threads, rps, .. } = &cmd;
     if no_save {
         unimplemented!("`--no-save` is not implemented yet");
     }
     if number_of_threads.is_some() {
         unimplemented!("`--number-of-threads` is not implemented yet");
+    }
+    if rps.is_some() {
+        unimplemented!("`--rps` is not implemented yet");
     }
 
     let ret = cmd.assault().await?;
@@ -64,6 +67,10 @@ pub struct Relentless {
     /// number of threads
     #[cfg_attr(feature = "cli", arg(short, long))]
     pub number_of_threads: Option<usize>,
+
+    /// requests per second
+    #[cfg_attr(feature = "cli", arg(short, long))]
+    pub rps: Option<usize>,
 }
 impl Relentless {
     pub fn configs(&self) -> RelentlessResult<Vec<Config>> {
