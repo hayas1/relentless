@@ -23,3 +23,12 @@ testcase:
   #     allow: true
   - target: /health/rich
   - target: /information
+    description: ignore datetime
+    setting:
+      http:
+        evaluate:
+          json:
+            ignore:
+              - /datetime
+  - target: /information
+    description: do not ignore datetime

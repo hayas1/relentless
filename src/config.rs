@@ -46,6 +46,13 @@ pub struct Setting {
 pub enum Protocol {
     Http(Http),
 }
+impl Protocol {
+    pub fn evaluate(&self) -> Option<&Evaluate> {
+        match self {
+            Protocol::Http(http) => http.evaluate.as_ref(),
+        }
+    }
+}
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct Http {
@@ -70,7 +77,7 @@ impl Default for BodyStructure {
     }
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub enum Evaluate {
     PlainText(PlainTextEvaluate),
     #[cfg(feature = "json")]
@@ -85,7 +92,7 @@ impl Default for Evaluate {
 #[serde(deny_unknown_fields)]
 pub struct PlainTextEvaluate {}
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(deny_unknown_fields, rename_all = "snake_case")]
+#[serde(deny_unknown_fields)]
 #[cfg(feature = "json")]
 pub struct JsonEvaluate {
     #[serde(default)]

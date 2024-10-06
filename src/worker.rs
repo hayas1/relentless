@@ -135,16 +135,19 @@ where
 
         let mut outcome = Vec::new();
         for (testcase, process) in processes {
+            let Testcase { setting, .. } = testcase.coalesce();
+            let Setting { repeat, protocol, .. } = &setting;
             let mut passed = 0;
-            let mut t =
-                (0..testcase.coalesce().setting.repeat.unwrap_or(1)).map(|_| Destinations::new()).collect::<Vec<_>>();
+            let mut t = (0..repeat.unwrap_or(1)).map(|_| Destinations::new()).collect::<Vec<_>>();
             for (name, repeated) in process? {
                 for (i, res) in repeated.into_iter().enumerate() {
                     t[i].insert(name.clone(), res);
                 }
             }
             for res in t {
-                let pass = if res.len() == 1 { Status::evaluate(res).await? } else { Compare::evaluate(res).await? };
+                let ev = protocol.as_ref().map(|p| p.evaluate()).unwrap_or(None);
+                let pass =
+                    if res.len() == 1 { Status::evaluate(ev, res).await? } else { Compare::evaluate(ev, res).await? };
                 passed += pass as usize;
             }
             outcome.push(CaseOutcome::new(testcase, passed));

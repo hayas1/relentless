@@ -9,19 +9,19 @@ use http_body_util::BodyExt;
 
 use crate::{
     command::Relentless,
-    config::{Coalesced, Destinations, Setting, Testcase, WorkerConfig},
+    config::{Coalesced, Destinations, Evaluate, JsonEvaluate, Setting, Testcase, WorkerConfig},
     error::{FormatError, HttpError, RelentlessError},
 };
 
 #[allow(async_fn_in_trait)] // TODO #[warn(async_fn_in_trait)] by default
 pub trait Evaluator<Res> {
     type Error;
-    async fn evaluate(res: Destinations<Res>) -> Result<bool, Self::Error>;
+    async fn evaluate(cfg: Option<&Evaluate>, res: Destinations<Res>) -> Result<bool, Self::Error>;
 }
 pub struct Compare {} // TODO enum ?
 impl<ResB: Body> Evaluator<http::Response<ResB>> for Compare {
     type Error = RelentlessError;
-    async fn evaluate(res: Destinations<http::Response<ResB>>) -> Result<bool, Self::Error> {
+    async fn evaluate(cfg: Option<&Evaluate>, res: Destinations<http::Response<ResB>>) -> Result<bool, Self::Error> {
         let mut v = Vec::new();
         for (_name, r) in res {
             let status = r.status();
@@ -32,7 +32,17 @@ impl<ResB: Body> Evaluator<http::Response<ResB>> for Compare {
             Ok(p) if p.len() == 0 => w[0].0 == w[1].0,
             Ok(p) => {
                 eprintln!("{}", p);
-                false
+                let mut all = true;
+                for op in Self::pointers(&p) {
+                    all &= cfg
+                        .map(|c| match c {
+                            Evaluate::PlainText(_) => Vec::new(),
+                            Evaluate::Json(JsonEvaluate { ignore, .. }) => ignore.clone(),
+                        })
+                        .unwrap_or_default()
+                        .contains(&op);
+                }
+                all
             }
             Err(e) => {
                 eprintln!("{}", e);
@@ -55,12 +65,27 @@ impl Compare {
         // )
         Ok(json_patch::diff(&left, &right))
     }
+
+    pub fn pointers(p: &json_patch::Patch) -> Vec<String> {
+        // TODO implemented ?
+        p.into_iter()
+            .map(|op| match op {
+                json_patch::PatchOperation::Add(json_patch::AddOperation { path, .. }) => path,
+                json_patch::PatchOperation::Remove(json_patch::RemoveOperation { path, .. }) => path,
+                json_patch::PatchOperation::Replace(json_patch::ReplaceOperation { path, .. }) => path,
+                json_patch::PatchOperation::Move(json_patch::MoveOperation { path, .. }) => path,
+                json_patch::PatchOperation::Copy(json_patch::CopyOperation { path, .. }) => path,
+                json_patch::PatchOperation::Test(json_patch::TestOperation { path, .. }) => path,
+            })
+            .map(ToString::to_string)
+            .collect()
+    }
 }
 
 pub struct Status {} // TODO enum ?
 impl<ResB> Evaluator<http::Response<ResB>> for Status {
     type Error = RelentlessError;
-    async fn evaluate(res: Destinations<http::Response<ResB>>) -> Result<bool, Self::Error> {
+    async fn evaluate(_cfg: Option<&Evaluate>, res: Destinations<http::Response<ResB>>) -> Result<bool, Self::Error> {
         let pass = res.into_iter().all(|(_name, res)| res.status().is_success());
         Ok(pass)
     }
