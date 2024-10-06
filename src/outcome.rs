@@ -43,7 +43,7 @@ impl<ResB: Body> Evaluator<http::Response<ResB>> for Compare {
                 }
                 all
             }
-            Err(_) => false,
+            Err(_) => w[0] == w[1],
         });
         Ok(pass)
     }
