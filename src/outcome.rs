@@ -31,7 +31,6 @@ impl<ResB: Body> Evaluator<http::Response<ResB>> for Compare {
         let pass = v.windows(2).all(|w| match Compare::diff(&w[0].1, &w[1].1) {
             Ok(p) if p.len() == 0 => w[0].0 == w[1].0,
             Ok(p) => {
-                eprintln!("{}", p);
                 let mut all = true;
                 for op in Self::pointers(&p) {
                     all &= cfg
@@ -44,10 +43,7 @@ impl<ResB: Body> Evaluator<http::Response<ResB>> for Compare {
                 }
                 all
             }
-            Err(e) => {
-                eprintln!("{}", e);
-                false
-            }
+            Err(_) => false,
         });
         Ok(pass)
     }

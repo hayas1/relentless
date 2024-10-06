@@ -32,7 +32,7 @@ pub type Destinations<T> = HashMap<String, T>;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct Setting {
-    #[serde(flatten)]
+    #[serde(default, flatten)]
     pub protocol: Option<Protocol>,
     #[serde(default)]
     pub template: HashMap<String, Destinations<String>>,
@@ -40,18 +40,13 @@ pub struct Setting {
     pub repeat: Option<usize>,
     #[serde(default)]
     pub timeout: Option<Duration>,
+    #[serde(default, flatten)]
+    pub evaluate: Option<Evaluate>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub enum Protocol {
     Http(Http),
-}
-impl Protocol {
-    pub fn evaluate(&self) -> Option<&Evaluate> {
-        match self {
-            Protocol::Http(http) => http.evaluate.as_ref(),
-        }
-    }
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
@@ -62,9 +57,6 @@ pub struct Http {
     pub header: Option<HeaderMap>,
     #[serde(default)]
     pub body: Option<BodyStructure>,
-
-    #[serde(default)]
-    pub evaluate: Option<Evaluate>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
@@ -164,6 +156,7 @@ impl Coalesce for Setting {
             template: if self.template.is_empty() { other.clone().template } else { self.template },
             repeat: self.repeat.or(other.repeat),
             timeout: self.timeout.or(other.timeout),
+            evaluate: self.evaluate.or(other.clone().evaluate),
         }
     }
 }
@@ -237,5 +230,44 @@ impl Format {
             #[cfg(feature = "toml")]
             Format::Toml => Ok(toml::from_str(content)?),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_read_example() {
+        let assault = "examples/config/assault.yaml";
+        let _assault = Format::from_path(assault).unwrap().deserialize_testcase(assault).unwrap();
+        // TODO assert
+
+        let compare = "examples/config/compare.yaml";
+        let _compare = Format::from_path(compare).unwrap().deserialize_testcase(compare).unwrap();
+        // TODO assert
+    }
+
+    #[test]
+    fn test_config() {
+        let example = Config {
+            worker_config: WorkerConfig { name: Some("example".to_string()), ..Default::default() },
+            testcase: vec![Testcase {
+                description: Some("test description".to_string()),
+                target: "/information".to_string(),
+                setting: Setting {
+                    evaluate: Some(Evaluate::Json(JsonEvaluate {
+                        ignore: vec!["/datetime".to_string()],
+                        ..Default::default()
+                    })),
+                    ..Default::default()
+                },
+                attr: Attribute { allow: true },
+            }],
+        };
+        let yaml = serde_yaml::to_string(&example).unwrap();
+
+        let round_trip: Config = serde_yaml::from_str(&yaml).unwrap();
+        assert_eq!(example, round_trip);
     }
 }

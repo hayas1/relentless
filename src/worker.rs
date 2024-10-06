@@ -136,7 +136,7 @@ where
         let mut outcome = Vec::new();
         for (testcase, process) in processes {
             let Testcase { setting, .. } = testcase.coalesce();
-            let Setting { repeat, protocol, .. } = &setting;
+            let Setting { repeat, evaluate, .. } = &setting;
             let mut passed = 0;
             let mut t = (0..repeat.unwrap_or(1)).map(|_| Destinations::new()).collect::<Vec<_>>();
             for (name, repeated) in process? {
@@ -145,9 +145,11 @@ where
                 }
             }
             for res in t {
-                let ev = protocol.as_ref().map(|p| p.evaluate()).unwrap_or(None);
-                let pass =
-                    if res.len() == 1 { Status::evaluate(ev, res).await? } else { Compare::evaluate(ev, res).await? };
+                let pass = if res.len() == 1 {
+                    Status::evaluate(evaluate.as_ref(), res).await?
+                } else {
+                    Compare::evaluate(evaluate.as_ref(), res).await?
+                };
                 passed += pass as usize;
             }
             outcome.push(CaseOutcome::new(testcase, passed));
@@ -209,7 +211,7 @@ where
         target: &str,
         setting: &Setting,
     ) -> RelentlessResult<Destinations<Vec<http::Request<ReqB>>>> {
-        let Setting { protocol, template, repeat, timeout } = setting;
+        let Setting { protocol, template, repeat, timeout, .. } = setting;
 
         if !template.is_empty() {
             unimplemented!("template is not implemented yet");

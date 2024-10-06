@@ -25,10 +25,10 @@ testcase:
   - target: /information
     description: ignore datetime
     setting:
-      http:
-        evaluate:
-          json:
-            ignore:
-              - /datetime
+      json:
+        ignore:
+        - /datetime
   - target: /information
     description: do not ignore datetime
+    attr:
+      allow: true
