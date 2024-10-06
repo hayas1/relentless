@@ -55,6 +55,9 @@ pub struct Http {
     pub header: Option<HeaderMap>,
     #[serde(default)]
     pub body: Option<BodyStructure>,
+
+    #[serde(default)]
+    pub evaluate: Option<Evaluate>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
@@ -65,6 +68,32 @@ impl Default for BodyStructure {
     fn default() -> Self {
         Self::Empty
     }
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub enum Evaluate {
+    PlainText(PlainTextEvaluate),
+    #[cfg(feature = "json")]
+    Json(JsonEvaluate),
+}
+impl Default for Evaluate {
+    fn default() -> Self {
+        Self::PlainText(PlainTextEvaluate {})
+    }
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
+pub struct PlainTextEvaluate {}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields, rename_all = "snake_case")]
+#[cfg(feature = "json")]
+pub struct JsonEvaluate {
+    #[serde(default)]
+    pub ignore: Vec<String>,
+    #[serde(default)]
+    pub ident: Vec<Vec<String>>,
+    #[serde(default)]
+    pub jq: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]

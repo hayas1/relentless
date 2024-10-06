@@ -10,14 +10,16 @@ destinations:
 
 
 testcase:
-  - target: /
-  - target: /
-    description: test description
-    setting:
-      http:
-        method: GET
-  - target: /counter/increment
-    setting:
-      repeat: 10
-    attr:
-      allow: true
+  # - target: /
+  # - target: /
+  #   description: test description
+  #   setting:
+  #     http:
+  #       method: GET
+  # - target: /counter/increment
+  #   setting:
+  #     repeat: 10
+  #   attr:
+  #     allow: true
+  - target: /health/rich
+  - target: /information

@@ -3,13 +3,14 @@ use std::{
     process::ExitCode,
 };
 
+use bytes::Bytes;
 use http_body::Body;
 use http_body_util::BodyExt;
 
 use crate::{
     command::Relentless,
     config::{Coalesced, Destinations, Setting, Testcase, WorkerConfig},
-    error::{HttpError, RelentlessError},
+    error::{FormatError, HttpError, RelentlessError},
 };
 
 #[allow(async_fn_in_trait)] // TODO #[warn(async_fn_in_trait)] by default
@@ -27,8 +28,32 @@ impl<ResB: Body> Evaluator<http::Response<ResB>> for Compare {
             let body = BodyExt::collect(r).await.map(|buf| buf.to_bytes()).map_err(|_| HttpError::CannotConvertBody)?;
             v.push((status, body));
         }
-        let pass = v.windows(2).all(|w| w[0] == w[1]);
+        let pass = v.windows(2).all(|w| match Compare::diff(&w[0].1, &w[1].1) {
+            Ok(p) if p.len() == 0 => w[0].0 == w[1].0,
+            Ok(p) => {
+                eprintln!("{}", p);
+                false
+            }
+            Err(e) => {
+                eprintln!("{}", e);
+                false
+            }
+        });
         Ok(pass)
+    }
+}
+#[cfg(feature = "json")]
+impl Compare {
+    #[allow(dependency_on_unit_never_type_fallback)] // TODO???
+    pub fn diff(a: &Bytes, b: &Bytes) -> Result<json_patch::Patch, FormatError> {
+        let (left, right): (serde_json::Value, serde_json::Value) =
+            (serde_json::from_slice(a)?, serde_json::from_slice(b)?);
+        // assert_json_diff::assert_json_matches_no_panic(
+        //     &a,
+        //     &b,
+        //     assert_json_diff::Config::new(assert_json_diff::CompareMode::Strict),
+        // )
+        Ok(json_patch::diff(&left, &right))
     }
 }
 
