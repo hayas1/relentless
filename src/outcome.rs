@@ -18,7 +18,7 @@ pub trait Evaluator<Res> {
     type Error;
     async fn evaluate(cfg: Option<&Evaluate>, res: Destinations<Res>) -> Result<bool, Self::Error>;
 }
-pub struct DefaultEvaluator {} // TODO enum ?
+pub enum DefaultEvaluator {} // TODO struct ?
 impl<ResB: Body> Evaluator<http::Response<ResB>> for DefaultEvaluator {
     type Error = RelentlessError;
     async fn evaluate(cfg: Option<&Evaluate>, res: Destinations<http::Response<ResB>>) -> Result<bool, Self::Error> {
