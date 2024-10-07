@@ -72,11 +72,9 @@ impl Relentless {
     }
     #[cfg(feature = "default-http-client")]
     pub async fn assault(&self) -> RelentlessResult<Outcome> {
-        use crate::outcome::DefaultEvaluator;
-
         let configs = self.configs()?;
         let clients = Control::default_http_clients(self, &configs).await?;
-        let outcome = self.assault_with::<_, _, _, DefaultEvaluator>(configs, clients).await?;
+        let outcome = self.assault_with::<_, _, _, crate::outcome::DefaultEvaluator>(configs, clients).await?;
         Ok(outcome)
     }
     pub async fn assault_with<S, ReqB, ResB, E>(
