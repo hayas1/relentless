@@ -6,6 +6,7 @@ use std::{
 use bytes::Bytes;
 use http_body::Body;
 use http_body_util::BodyExt;
+use serde_json::Value;
 
 use crate::{
     command::Relentless,
@@ -70,20 +71,27 @@ impl DefaultEvaluator {
         res: Destinations<http::Response<ResB>>,
     ) -> Result<bool, <Self as Evaluator<http::Response<ResB>>>::Error> {
         let v: Vec<_> = Self::parts(res).await?.into_values().collect();
-        let pass = v.windows(2).all(|w| match DefaultEvaluator::diff(&w[0].2, &w[1].2) {
-            Ok(p) if p.len() == 0 => w[0].0 == w[1].0 && w[0].1 == w[1].1,
-            Ok(p) => Self::pointers(&p).into_iter().all(|op| {
-                cfg.map(|c| match c {
-                    Evaluate::PlainText(_) => Vec::new(),
-                    Evaluate::Json(JsonEvaluate { ignore, .. }) => ignore.clone(),
-                })
-                .unwrap_or_default()
-                .contains(&op) // TODO regex ?
-                && w[0].0 == w[1].0 && w[0].1 == w[1].1
-            }),
+        let pass = v.windows(2).all(|w| match Self::json_acceptable::<ResB>(cfg, (&w[0].2, &w[1].2)) {
+            Ok(accept) => w[0].0 == w[1].0 && w[0].1 == w[1].1 && accept,
             Err(_) => w[0] == w[1],
         });
         Ok(pass)
+    }
+
+    pub fn json_acceptable<ResB: Body>(
+        cfg: Option<&Evaluate>,
+        (a, b): (&Bytes, &Bytes),
+    ) -> Result<bool, <Self as Evaluator<http::Response<ResB>>>::Error> {
+        let pointers = Self::pointers(&Self::diff(a, b)?);
+        let ignored = pointers.iter().all(|op| {
+            cfg.map(|c| match c {
+                Evaluate::PlainText(_) => Vec::new(),
+                Evaluate::Json(JsonEvaluate { ignore, .. }) => ignore.clone(),
+            })
+            .unwrap_or_default()
+            .contains(op)
+        });
+        Ok(ignored)
     }
 
     pub fn diff(a: &Bytes, b: &Bytes) -> Result<json_patch::Patch, FormatError> {
