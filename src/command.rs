@@ -8,7 +8,7 @@ use tower::Service;
 use crate::{
     config::{Config, Destinations},
     error::{RelentlessError, RelentlessResult},
-    outcome::Outcome,
+    outcome::{Evaluator, Outcome},
     service::FromBodyStructure,
     worker::Control,
 };
@@ -72,12 +72,14 @@ impl Relentless {
     }
     #[cfg(feature = "default-http-client")]
     pub async fn assault(&self) -> RelentlessResult<Outcome> {
+        use crate::outcome::DefaultEvaluator;
+
         let configs = self.configs()?;
         let clients = Control::default_http_clients(self, &configs).await?;
-        let outcome = self.assault_with(configs, clients).await?;
+        let outcome = self.assault_with::<_, _, _, DefaultEvaluator>(configs, clients).await?;
         Ok(outcome)
     }
-    pub async fn assault_with<S, ReqB, ResB>(
+    pub async fn assault_with<S, ReqB, ResB, E>(
         &self,
         configs: Vec<Config>,
         services: Vec<Destinations<S>>,
@@ -90,12 +92,13 @@ impl Relentless {
         ResB::Data: Send + 'static,
         ResB::Error: std::error::Error + Sync + Send + 'static,
         S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + Sync + 'static,
-        RelentlessError: From<S::Error>,
+        E: Evaluator<http::Response<ResB>>,
+        RelentlessError: From<S::Error> + From<E::Error>,
     {
         let Self { no_color, no_report, .. } = self;
         console::set_colors_enabled(!no_color);
 
-        let control = Control::with_service(self, configs, services)?;
+        let control = Control::<_, _, _, E>::with_service(self, configs, services)?;
         let outcome = control.assault().await?;
         if !no_report {
             outcome.report(self)?;
