@@ -91,8 +91,8 @@ pub struct JsonEvaluate {
     pub ignore: Vec<String>,
     #[serde(default)]
     pub ident: Vec<Vec<String>>,
-    #[serde(default)]
-    pub jq: Option<String>,
+    // #[serde(default)]
+    // pub jq: Option<String>, // TODO jq support
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
