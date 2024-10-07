@@ -18,17 +18,54 @@ pub trait Evaluator<Res> {
     type Error;
     async fn evaluate(cfg: Option<&Evaluate>, res: Destinations<Res>) -> Result<bool, Self::Error>;
 }
-pub struct Compare {} // TODO enum ?
-impl<ResB: Body> Evaluator<http::Response<ResB>> for Compare {
+pub struct DefaultEvaluator {} // TODO enum ?
+impl<ResB: Body> Evaluator<http::Response<ResB>> for DefaultEvaluator {
     type Error = RelentlessError;
     async fn evaluate(cfg: Option<&Evaluate>, res: Destinations<http::Response<ResB>>) -> Result<bool, Self::Error> {
+        if res.len() == 1 {
+            Self::status(res).await
+        } else if !cfg!(feature = "json") {
+            Self::compare(cfg, res).await
+        } else {
+            Self::compare_json(cfg, res).await
+        }
+    }
+}
+
+impl DefaultEvaluator {
+    pub async fn status<ResB: Body>(
+        res: Destinations<http::Response<ResB>>,
+    ) -> Result<bool, <Self as Evaluator<http::Response<ResB>>>::Error> {
+        Ok(res.into_iter().all(|(_name, res)| res.status().is_success()))
+    }
+    pub async fn compare<ResB: Body>(
+        _cfg: Option<&Evaluate>,
+        res: Destinations<http::Response<ResB>>,
+    ) -> Result<bool, <Self as Evaluator<http::Response<ResB>>>::Error> {
         let mut v = Vec::new();
         for (_name, r) in res {
             let status = r.status();
             let body = BodyExt::collect(r).await.map(|buf| buf.to_bytes()).map_err(|_| HttpError::CannotConvertBody)?;
             v.push((status, body));
         }
-        let pass = v.windows(2).all(|w| match Compare::diff(&w[0].1, &w[1].1) {
+        let pass = v.windows(2).all(|w| w[0] == w[1]);
+        Ok(pass)
+    }
+}
+
+#[cfg(feature = "json")]
+impl DefaultEvaluator {
+    pub async fn compare_json<ResB: Body>(
+        cfg: Option<&Evaluate>,
+        res: Destinations<http::Response<ResB>>,
+    ) -> Result<bool, <Self as Evaluator<http::Response<ResB>>>::Error> {
+        let mut v = Vec::new();
+        for (_name, r) in res {
+            let status = r.status();
+            let body = BodyExt::collect(r).await.map(|buf| buf.to_bytes()).map_err(|_| HttpError::CannotConvertBody)?;
+            v.push((status, body));
+        }
+        let pass = v.windows(2).all(|w| match DefaultEvaluator::diff(&w[0].1, &w[1].1) {
             Ok(p) if p.len() == 0 => w[0].0 == w[1].0,
             Ok(p) => {
                 let mut all = true;
@@ -47,9 +84,7 @@ impl<ResB: Body> Evaluator<http::Response<ResB>> for Compare {
         });
         Ok(pass)
     }
-}
-#[cfg(feature = "json")]
-impl Compare {
+
     #[allow(dependency_on_unit_never_type_fallback)] // TODO???
     pub fn diff(a: &Bytes, b: &Bytes) -> Result<json_patch::Patch, FormatError> {
         let (left, right): (serde_json::Value, serde_json::Value) =
@@ -64,7 +99,7 @@ impl Compare {
 
     pub fn pointers(p: &json_patch::Patch) -> Vec<String> {
         // TODO implemented ?
-        p.into_iter()
+        p.iter()
             .map(|op| match op {
                 json_patch::PatchOperation::Add(json_patch::AddOperation { path, .. }) => path,
                 json_patch::PatchOperation::Remove(json_patch::RemoveOperation { path, .. }) => path,
@@ -75,15 +110,6 @@ impl Compare {
             })
             .map(ToString::to_string)
             .collect()
-    }
-}
-
-pub struct Status {} // TODO enum ?
-impl<ResB> Evaluator<http::Response<ResB>> for Status {
-    type Error = RelentlessError;
-    async fn evaluate(_cfg: Option<&Evaluate>, res: Destinations<http::Response<ResB>>) -> Result<bool, Self::Error> {
-        let pass = res.into_iter().all(|(_name, res)| res.status().is_success());
-        Ok(pass)
     }
 }
 

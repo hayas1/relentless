@@ -6,7 +6,7 @@ use crate::{
     command::Relentless,
     config::{Coalesce, Coalesced, Config, Destinations, Protocol, Setting, Testcase, WorkerConfig},
     error::{RelentlessError, RelentlessResult},
-    outcome::{CaseOutcome, Compare, Evaluator, Outcome, Status, WorkerOutcome},
+    outcome::{CaseOutcome, DefaultEvaluator, Evaluator, Outcome, WorkerOutcome},
     service::FromBodyStructure,
 };
 use http_body::Body;
@@ -145,11 +145,7 @@ where
                 }
             }
             for res in t {
-                let pass = if res.len() == 1 {
-                    Status::evaluate(evaluate.as_ref(), res).await?
-                } else {
-                    Compare::evaluate(evaluate.as_ref(), res).await?
-                };
+                let pass = DefaultEvaluator::evaluate(evaluate.as_ref(), res).await?;
                 passed += pass as usize;
             }
             outcome.push(CaseOutcome::new(testcase, passed));
