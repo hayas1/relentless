@@ -33,6 +33,21 @@ impl<ResB: Body> Evaluator<http::Response<ResB>> for DefaultEvaluator {
 }
 
 impl DefaultEvaluator {
+    pub async fn parts<ResB: Body>(
+        res: Destinations<http::Response<ResB>>,
+    ) -> Result<
+        Destinations<(http::StatusCode, http::HeaderMap, Bytes)>,
+        <Self as Evaluator<http::Response<ResB>>>::Error,
+    > {
+        let mut d = Destinations::new();
+        for (name, r) in res {
+            let (http::response::Parts { status, headers, .. }, body) = r.into_parts();
+            let bytes =
+                BodyExt::collect(body).await.map(|buf| buf.to_bytes()).map_err(|_| HttpError::CannotConvertBody)?;
+            d.insert(name, (status, headers, bytes));
+        }
+        Ok(d)
+    }
     pub async fn status<ResB: Body>(
         res: Destinations<http::Response<ResB>>,
     ) -> Result<bool, <Self as Evaluator<http::Response<ResB>>>::Error> {
@@ -42,12 +57,7 @@ impl DefaultEvaluator {
         _cfg: Option<&Evaluate>,
         res: Destinations<http::Response<ResB>>,
     ) -> Result<bool, <Self as Evaluator<http::Response<ResB>>>::Error> {
-        let mut v = Vec::new();
-        for (_name, r) in res {
-            let status = r.status();
-            let body = BodyExt::collect(r).await.map(|buf| buf.to_bytes()).map_err(|_| HttpError::CannotConvertBody)?;
-            v.push((status, body));
-        }
+        let v: Vec<_> = Self::parts(res).await?.into_values().collect();
         let pass = v.windows(2).all(|w| w[0] == w[1]);
         Ok(pass)
     }
@@ -59,41 +69,25 @@ impl DefaultEvaluator {
         cfg: Option<&Evaluate>,
         res: Destinations<http::Response<ResB>>,
     ) -> Result<bool, <Self as Evaluator<http::Response<ResB>>>::Error> {
-        let mut v = Vec::new();
-        for (_name, r) in res {
-            let status = r.status();
-            let body = BodyExt::collect(r).await.map(|buf| buf.to_bytes()).map_err(|_| HttpError::CannotConvertBody)?;
-            v.push((status, body));
-        }
-        let pass = v.windows(2).all(|w| match DefaultEvaluator::diff(&w[0].1, &w[1].1) {
-            Ok(p) if p.len() == 0 => w[0].0 == w[1].0,
-            Ok(p) => {
-                let mut all = true;
-                for op in Self::pointers(&p) {
-                    all &= cfg
-                        .map(|c| match c {
-                            Evaluate::PlainText(_) => Vec::new(),
-                            Evaluate::Json(JsonEvaluate { ignore, .. }) => ignore.clone(),
-                        })
-                        .unwrap_or_default()
-                        .contains(&op);
-                }
-                all
-            }
+        let v: Vec<_> = Self::parts(res).await?.into_values().collect();
+        let pass = v.windows(2).all(|w| match DefaultEvaluator::diff(&w[0].2, &w[1].2) {
+            Ok(p) if p.len() == 0 => w[0].0 == w[1].0 && w[0].1 == w[1].1,
+            Ok(p) => Self::pointers(&p).into_iter().all(|op| {
+                cfg.map(|c| match c {
+                    Evaluate::PlainText(_) => Vec::new(),
+                    Evaluate::Json(JsonEvaluate { ignore, .. }) => ignore.clone(),
+                })
+                .unwrap_or_default()
+                .contains(&op)
+            }),
             Err(_) => w[0] == w[1],
         });
         Ok(pass)
     }
 
-    #[allow(dependency_on_unit_never_type_fallback)] // TODO???
     pub fn diff(a: &Bytes, b: &Bytes) -> Result<json_patch::Patch, FormatError> {
         let (left, right): (serde_json::Value, serde_json::Value) =
             (serde_json::from_slice(a)?, serde_json::from_slice(b)?);
-        // assert_json_diff::assert_json_matches_no_panic(
-        //     &a,
-        //     &b,
-        //     assert_json_diff::Config::new(assert_json_diff::CompareMode::Strict),
-        // )
         Ok(json_patch::diff(&left, &right))
     }
 
