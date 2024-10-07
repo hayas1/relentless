@@ -239,12 +239,10 @@ mod tests {
 
     #[test]
     fn test_read_example() {
-        let assault = "examples/config/assault.yaml";
-        let _assault = Format::from_path(assault).unwrap().deserialize_testcase(assault).unwrap();
+        let _assault = Config::read("examples/config/assault.yaml");
         // TODO assert
 
-        let compare = "examples/config/compare.yaml";
-        let _compare = Format::from_path(compare).unwrap().deserialize_testcase(compare).unwrap();
+        let _compare = Config::read("examples/config/compare.yaml");
         // TODO assert
     }
 
