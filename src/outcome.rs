@@ -79,6 +79,7 @@ impl DefaultEvaluator {
                 })
                 .unwrap_or_default()
                 .contains(&op) // TODO regex ?
+                && w[0].0 == w[1].0 && w[0].1 == w[1].1
             }),
             Err(_) => w[0] == w[1],
         });
