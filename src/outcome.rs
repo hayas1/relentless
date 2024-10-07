@@ -78,7 +78,7 @@ impl DefaultEvaluator {
                     Evaluate::Json(JsonEvaluate { ignore, .. }) => ignore.clone(),
                 })
                 .unwrap_or_default()
-                .contains(&op)
+                .contains(&op) // TODO regex ?
             }),
             Err(_) => w[0] == w[1],
         });
