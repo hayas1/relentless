@@ -1,0 +1,16 @@
+name: example yaml of basic json assault test
+destinations:
+  test-api: http://localhost:3000
+setting:
+  repeat: 10
+
+
+testcase:
+  - target: /health/rich
+    description: request to root
+    setting:
+      repeat: 100
+      json:
+        patch:
+        - {"op": "test", "path": "/status", "value": "200 OK"}
+        - {"op": "test", "path": "/code", "value": "200"}

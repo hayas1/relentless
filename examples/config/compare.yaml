@@ -11,45 +11,26 @@ destinations:
 
 testcase:
   - target: /
-  - target: /
-    description: test description
-    setting:
-      http:
-        method: GET
+  - target: /health
+  - target: /healthz
+  - target: /health/rich
   - target: /counter/increment
     setting:
       repeat: 10
     attr:
       allow: true
-  - target: /health/rich
-  - target: /information
-    description: ignore datetime and hostname
+  - target: /counter/increment/10
     setting:
-      json:
-        ignore:
-        - /datetime
-        - /hostname
-        - /headers/host
-  - target: /information
-    description: do not ignore datetime and hostname (must be failed, so attr allowed)
+      repeat: 10
     attr:
       allow: true
-  - target: /information
-    description: patch datetime and hostname
+  - target: /counter/decrement
     setting:
-      json:
-        patch:
-        - {"op": "replace", "path": "/datetime", "value": "2024-10-10T00:00:00Z"}
-        - {"op": "remove", "path": "/hostname"}
-        - {"op": "replace", "path": "/headers/host", "value": "127.0.0.1:3000"}
-        - {"op": "test", "path": "/path", "value": "/information"}
-  - target: /information
-    description: remove actual datetime only (must be failed, so attr allowed)
-    setting:
-      json:
-        patch:
-          actual:
-          - op: remove
-            path: /datetime
+      repeat: 10
     attr:
       allow: true
+  - target: /counter/decrement/10
+    setting:
+      repeat: 10
+  - target: /wait/100/ms
+
