@@ -90,9 +90,14 @@ pub struct JsonEvaluate {
     #[serde(default)]
     pub ignore: Vec<String>,
     #[serde(default)]
-    pub ident: Vec<Vec<String>>,
-    // #[serde(default)]
-    // pub jq: Option<String>, // TODO jq support
+    pub patch: Option<PatchTo>,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "snake_case", untagged)]
+#[cfg(feature = "json")]
+pub enum PatchTo {
+    All(json_patch::Patch),
+    Destinations(Destinations<json_patch::Patch>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -256,7 +261,24 @@ mod tests {
                 setting: Setting {
                     evaluate: Some(Evaluate::Json(JsonEvaluate {
                         ignore: vec!["/datetime".to_string()],
-                        ..Default::default()
+                        // patch: Some(PatchTo::All(
+                        //     serde_json::from_value(
+                        //         serde_json::json!([{"op": "replace", "path": "/datetime", "value": "2021-01-01"}]),
+                        //     )
+                        //     .unwrap(),
+                        // )),
+                        patch: Some(PatchTo::Destinations(Destinations::from([
+                            (
+                                "actual".to_string(),
+                                serde_json::from_value(serde_json::json!([{"op": "remove", "path": "/datetime"}]))
+                                    .unwrap(),
+                            ),
+                            (
+                                "expect".to_string(),
+                                serde_json::from_value(serde_json::json!([{"op": "remove", "path": "/datetime"}]))
+                                    .unwrap(),
+                            ),
+                        ]))),
                     })),
                     ..Default::default()
                 },
@@ -264,8 +286,78 @@ mod tests {
             }],
         };
         let yaml = serde_yaml::to_string(&example).unwrap();
+        // println!("{}", yaml);
 
         let round_trip: Config = serde_yaml::from_str(&yaml).unwrap();
         assert_eq!(example, round_trip);
+    }
+
+    #[test]
+    #[cfg(all(feature = "yaml", feature = "json"))]
+    fn test_config_json_patch() {
+        let all_yaml = r#"
+        name: json patch to all
+        destinations:
+          actual: http://localhost:3000
+          expect: http://localhost:3000
+        testcase:
+        - description: test description
+          target: /information
+          setting:
+            json:
+              patch:
+              - op: replace
+                path: /datetime
+                value: 2021-01-01
+        "#;
+        let config = Config::read_str(all_yaml, Format::Yaml).unwrap();
+        assert_eq!(
+            config.testcase[0].setting.evaluate,
+            Some(Evaluate::Json(JsonEvaluate {
+                ignore: vec![],
+                patch: Some(PatchTo::All(
+                    serde_json::from_value(
+                        serde_json::json!([{"op": "replace", "path": "/datetime", "value": "2021-01-01"}])
+                    )
+                    .unwrap(),
+                ))
+            }))
+        );
+
+        let destinations_yaml = r#"
+        name: json patch to destinations
+        destinations:
+          actual: http://localhost:3000
+          expect: http://localhost:3000
+        testcase:
+        - description: test description
+          target: /information
+          setting:
+            json:
+              patch:
+                actual:
+                - op: remove
+                  path: /datetime
+                expect:
+                - op: remove
+                  path: /datetime
+        "#;
+        let config = Config::read_str(destinations_yaml, Format::Yaml).unwrap();
+        assert_eq!(
+            config.testcase[0].setting.evaluate,
+            Some(Evaluate::Json(JsonEvaluate {
+                ignore: vec![],
+                patch: Some(PatchTo::Destinations(Destinations::from([
+                    (
+                        "actual".to_string(),
+                        serde_json::from_value(serde_json::json!([{"op": "remove", "path": "/datetime"}])).unwrap(),
+                    ),
+                    (
+                        "expect".to_string(),
+                        serde_json::from_value(serde_json::json!([{"op": "remove", "path": "/datetime"}])).unwrap(),
+                    ),
+                ])))
+            }))
+        );
     }
 }
