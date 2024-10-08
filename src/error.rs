@@ -17,6 +17,9 @@ pub enum RelentlessError {
     StdFmtError(#[from] std::fmt::Error),
     Infallible(#[from] std::convert::Infallible),
 
+    #[cfg(feature = "json")]
+    JsonPatchError(#[from] json_patch::PatchError),
+
     BoxError(#[from] Box<dyn std::error::Error + Send + Sync>),
 }
 

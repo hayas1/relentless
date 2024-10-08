@@ -10,7 +10,7 @@ use serde_json::Value;
 
 use crate::{
     command::Relentless,
-    config::{Coalesced, Destinations, Evaluate, JsonEvaluate, Setting, Testcase, WorkerConfig},
+    config::{Coalesced, Destinations, Evaluate, JsonEvaluate, PatchTo, Setting, Testcase, WorkerConfig},
     error::{FormatError, HttpError, RelentlessError},
 };
 
@@ -70,19 +70,33 @@ impl DefaultEvaluator {
         cfg: Option<&Evaluate>,
         res: Destinations<http::Response<ResB>>,
     ) -> Result<bool, <Self as Evaluator<http::Response<ResB>>>::Error> {
-        let v: Vec<_> = Self::parts(res).await?.into_values().collect();
-        let pass = v.windows(2).all(|w| match Self::json_acceptable::<ResB>(cfg, (&w[0].2, &w[1].2)) {
-            Ok(accept) => w[0].0 == w[1].0 && w[0].1 == w[1].1 && accept,
-            Err(_) => w[0] == w[1],
+        let v: Vec<_> = Self::parts(res).await?.into_iter().collect();
+        let pass = v.windows(2).all(|w| {
+            let ((na, (sa, ha, ba)), (nb, (sb, hb, bb))) = (&w[0], &w[1]);
+            match Self::json_acceptable::<ResB>(cfg, (na, ba), (nb, bb)) {
+                Ok(accept) => sa == sb && ha == hb && accept,
+                Err(_) => sa == sb && ha == hb && ba == bb,
+            }
         });
         Ok(pass)
     }
 
     pub fn json_acceptable<ResB: Body>(
         cfg: Option<&Evaluate>,
-        (a, b): (&Bytes, &Bytes),
+        (name_a, bytes_a): (&str, &Bytes),
+        (name_b, bytes_b): (&str, &Bytes),
     ) -> Result<bool, <Self as Evaluator<http::Response<ResB>>>::Error> {
-        let pointers = Self::pointers(&Self::diff(a, b)?);
+        let (mut va, mut vb): (serde_json::Value, serde_json::Value) = (
+            serde_json::from_slice(bytes_a).map_err(FormatError::from)?,
+            serde_json::from_slice(bytes_b).map_err(FormatError::from)?,
+        );
+        let (ra, rb) = (Self::patch::<ResB>(cfg, name_a, &mut va), Self::patch::<ResB>(cfg, name_b, &mut vb));
+        match (ra, rb) {
+            (Ok(_), Ok(_)) => (),
+            _ => eprintln!("patch was failed"), // TODO warning output
+        };
+
+        let pointers = Self::pointers(&json_patch::diff(&va, &vb));
         let ignored = pointers.iter().all(|op| {
             cfg.map(|c| match c {
                 Evaluate::PlainText(_) => Vec::new(),
@@ -94,10 +108,23 @@ impl DefaultEvaluator {
         Ok(ignored)
     }
 
-    pub fn diff(a: &Bytes, b: &Bytes) -> Result<json_patch::Patch, FormatError> {
-        let (left, right): (serde_json::Value, serde_json::Value) =
-            (serde_json::from_slice(a)?, serde_json::from_slice(b)?);
-        Ok(json_patch::diff(&left, &right))
+    pub fn patch<ResB: Body>(
+        cfg: Option<&Evaluate>,
+        name: &str,
+        value: &mut Value,
+    ) -> Result<(), <Self as Evaluator<http::Response<ResB>>>::Error> {
+        let patch = cfg.map(|c| match c {
+            Evaluate::PlainText(_) => json_patch::Patch::default(),
+            Evaluate::Json(JsonEvaluate { patch, .. }) => match patch {
+                Some(PatchTo::All(p)) => p.clone(),
+                Some(PatchTo::Destinations(patch)) => patch.get(name).cloned().unwrap_or_default(),
+                None => json_patch::Patch::default(),
+            },
+        });
+        match patch {
+            Some(p) => Ok(json_patch::patch(value, &p)?),
+            None => Ok(()),
+        }
     }
 
     pub fn pointers(p: &json_patch::Patch) -> Vec<String> {

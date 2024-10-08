@@ -32,3 +32,21 @@ testcase:
     description: do not ignore datetime
     attr:
       allow: true
+  - target: /information
+    description: patch datetime
+    setting:
+      json:
+        patch:
+        - op: replace
+          path: /datetime
+          value: 2024-10-10
+  - target: /information
+    description: remove actual datetime (must be failed, so allowed attr)
+    setting:
+      json:
+        patch:
+          actual:
+          - op: remove
+            path: /datetime
+    attr:
+      allow: true
