@@ -26,8 +26,10 @@ impl<ResB: Body> Evaluator<http::Response<ResB>> for DefaultEvaluator {
         let parts = Self::parts(res).await?;
         if !cfg!(feature = "json") {
             Self::acceptable::<ResB>(cfg, &parts).await
+        } else if let Ok(is) = Self::json_acceptable::<ResB>(cfg, &parts).await {
+            Ok(is)
         } else {
-            Self::json_acceptable::<ResB>(cfg, &parts).await
+            Self::acceptable::<ResB>(cfg, &parts).await
         }
     }
 }

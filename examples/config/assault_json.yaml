@@ -7,13 +7,20 @@ setting:
 
 testcase:
   - target: /health/rich
-    description: request to root
+    description: request to json response endpoint
     setting:
       repeat: 100
       json:
         patch:
         - op: test
-          path: /
+          path: # root json pointer is not "/" but ""
           value:
             status: 200 OK
             code: 200
+  - target: /health/rich
+    setting:
+      repeat: 100
+      json:
+        patch:
+        - {"op": "test", "path": "/status", "value": "200 OK"}
+        - {"op": "test", "path": "/code", "value": 200}
