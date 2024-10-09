@@ -23,10 +23,11 @@ pub enum DefaultEvaluator {}
 impl<ResB: Body> Evaluator<http::Response<ResB>> for DefaultEvaluator {
     type Error = RelentlessError;
     async fn evaluate(cfg: Option<&Evaluate>, res: Destinations<http::Response<ResB>>) -> Result<bool, Self::Error> {
+        let parts = Self::parts(res).await?;
         if !cfg!(feature = "json") {
-            Self::acceptable(cfg, res).await
+            Self::acceptable::<ResB>(cfg, &parts).await
         } else {
-            Self::json_acceptable(cfg, res).await
+            Self::json_acceptable::<ResB>(cfg, &parts).await
         }
     }
 }
@@ -50,24 +51,24 @@ impl DefaultEvaluator {
 
     pub async fn acceptable<ResB: Body>(
         cfg: Option<&Evaluate>,
-        res: Destinations<http::Response<ResB>>,
+        parts: &Destinations<(http::StatusCode, http::HeaderMap, Bytes)>,
     ) -> Result<bool, <Self as Evaluator<http::Response<ResB>>>::Error> {
-        if res.len() == 1 {
-            Self::status(res).await
+        if parts.len() == 1 {
+            Self::status::<ResB>(parts).await
         } else {
-            Self::compare(cfg, res).await
+            Self::compare::<ResB>(cfg, parts).await
         }
     }
     pub async fn status<ResB: Body>(
-        res: Destinations<http::Response<ResB>>,
+        parts: &Destinations<(http::StatusCode, http::HeaderMap, Bytes)>,
     ) -> Result<bool, <Self as Evaluator<http::Response<ResB>>>::Error> {
-        Ok(res.into_iter().all(|(_name, res)| res.status().is_success()))
+        Ok(parts.iter().all(|(_name, (s, _h, _b))| s.is_success()))
     }
     pub async fn compare<ResB: Body>(
         _cfg: Option<&Evaluate>,
-        res: Destinations<http::Response<ResB>>,
+        parts: &Destinations<(http::StatusCode, http::HeaderMap, Bytes)>,
     ) -> Result<bool, <Self as Evaluator<http::Response<ResB>>>::Error> {
-        let v: Vec<_> = Self::parts(res).await?.into_values().collect();
+        let v: Vec<_> = parts.values().collect();
         let pass = v.windows(2).all(|w| w[0] == w[1]);
         Ok(pass)
     }
@@ -77,12 +78,11 @@ impl DefaultEvaluator {
 impl DefaultEvaluator {
     pub async fn json_acceptable<ResB: Body>(
         cfg: Option<&Evaluate>,
-        res: Destinations<http::Response<ResB>>,
+        parts: &Destinations<(http::StatusCode, http::HeaderMap, Bytes)>,
     ) -> Result<bool, <Self as Evaluator<http::Response<ResB>>>::Error> {
-        let parts = Self::parts(res).await?;
-        let values = Self::patched::<ResB>(cfg, &parts)?;
+        let values = Self::patched::<ResB>(cfg, parts)?;
 
-        let pass = parts.into_iter().zip(values.into_iter()).collect::<Vec<_>>().windows(2).all(|w| {
+        let pass = parts.iter().zip(values.into_iter()).collect::<Vec<_>>().windows(2).all(|w| {
             let (((_na, (sa, ha, _ba)), (__na, va)), ((_nb, (sb, hb, _bb)), (__nb, vb))) = (&w[0], &w[1]);
             sa == sb && ha == hb && Self::json_compare::<ResB>(cfg, (va, vb)).unwrap_or(true)
         });
@@ -91,9 +91,10 @@ impl DefaultEvaluator {
 
     pub fn patched<ResB: Body>(
         cfg: Option<&Evaluate>,
-        res: &Destinations<(http::StatusCode, http::HeaderMap, Bytes)>,
+        parts: &Destinations<(http::StatusCode, http::HeaderMap, Bytes)>,
     ) -> Result<Destinations<Value>, <Self as Evaluator<http::Response<ResB>>>::Error> {
-        res.iter()
+        parts
+            .iter()
             .map(|(name, (_, _, body))| {
                 let mut value = serde_json::from_slice(body).map_err(FormatError::from)?;
                 if let Err(json_patch::PatchError { .. }) = Self::patch::<ResB>(cfg, name, &mut value) {
@@ -126,7 +127,7 @@ impl DefaultEvaluator {
         cfg: Option<&Evaluate>,
         (va, vb): (&Value, &Value),
     ) -> Result<bool, <Self as Evaluator<http::Response<ResB>>>::Error> {
-        let pointers = Self::pointers(&json_patch::diff(&va, &vb));
+        let pointers = Self::pointers(&json_patch::diff(va, vb));
         let ignored = pointers.iter().all(|op| {
             cfg.map(|c| match c {
                 Evaluate::PlainText(_) => Vec::new(),
