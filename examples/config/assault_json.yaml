@@ -12,5 +12,8 @@ testcase:
       repeat: 100
       json:
         patch:
-        - {"op": "test", "path": "/status", "value": "200 OK"}
-        - {"op": "test", "path": "/code", "value": "200"}
+        - op: test
+          path: /
+          value:
+            status: 200 OK
+            code: 200
