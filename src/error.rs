@@ -20,6 +20,9 @@ pub enum RelentlessError {
     #[cfg(feature = "json")]
     JsonPatchError(#[from] json_patch::PatchError),
 
+    #[cfg(feature = "json")]
+    JsonError(#[from] JsonError),
+
     BoxError(#[from] Box<dyn std::error::Error + Send + Sync>),
 }
 
@@ -56,4 +59,11 @@ pub enum HttpError {
 pub enum CaseError {
     #[error("fail to clone request")]
     FailCloneRequest,
+}
+
+#[cfg(feature = "json")]
+#[derive(Error, Debug)]
+pub enum JsonError {
+    #[error("fail to patch json")]
+    FailToPatch,
 }

@@ -13,14 +13,17 @@ testcase:
       json:
         patch:
         - op: test
-          path: # root json pointer is not "/" but ""
+          path: "" # root json pointer is not "/" but ""
           value:
             status: 200 OK
             code: 200
   - target: /health/rich
+    description: 'test failed ({"status": "200 OK"} but test for {"status": "200 NG"})'
     setting:
       repeat: 100
       json:
         patch:
-        - {"op": "test", "path": "/status", "value": "200 OK"}
+        - {"op": "test", "path": "/status", "value": "200 NG"}
         - {"op": "test", "path": "/code", "value": 200}
+    attr:
+      allow: true

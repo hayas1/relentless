@@ -11,7 +11,7 @@ use serde_json::Value;
 use crate::{
     command::Relentless,
     config::{Coalesced, Destinations, Evaluate, JsonEvaluate, PatchTo, Setting, Testcase, WorkerConfig},
-    error::{FormatError, HttpError, RelentlessError},
+    error::{FormatError, HttpError, JsonError, RelentlessError},
 };
 
 #[allow(async_fn_in_trait)] // TODO #[warn(async_fn_in_trait)] by default
@@ -26,10 +26,12 @@ impl<ResB: Body> Evaluator<http::Response<ResB>> for DefaultEvaluator {
         let parts = Self::parts(res).await?;
         if !cfg!(feature = "json") {
             Self::acceptable::<ResB>(cfg, &parts).await
-        } else if let Ok(is) = Self::json_acceptable::<ResB>(cfg, &parts).await {
-            Ok(is)
         } else {
-            Self::acceptable::<ResB>(cfg, &parts).await
+            match Self::json_acceptable::<ResB>(cfg, &parts).await {
+                Ok(v) => Ok(v),
+                Err(RelentlessError::JsonError(JsonError::FailToPatch)) => Ok(false),
+                Err(_) => Self::acceptable::<ResB>(cfg, &parts).await,
+            }
         }
     }
 }
@@ -85,8 +87,8 @@ impl DefaultEvaluator {
         let values = Self::patched::<ResB>(cfg, parts)?;
 
         let pass = parts.iter().zip(values.into_iter()).collect::<Vec<_>>().windows(2).all(|w| {
-            let (((_na, (sa, ha, _ba)), (__na, va)), ((_nb, (sb, hb, _bb)), (__nb, vb))) = (&w[0], &w[1]);
-            sa == sb && ha == hb && Self::json_compare::<ResB>(cfg, (va, vb)).unwrap_or(true)
+            let (((_na, (sa, ha, ba)), (__na, va)), ((_nb, (sb, hb, bb)), (__nb, vb))) = (&w[0], &w[1]);
+            sa == sb && ha == hb && Self::json_compare::<ResB>(cfg, (va, vb)).unwrap_or(ba == bb)
         });
         Ok(pass)
     }
@@ -100,7 +102,11 @@ impl DefaultEvaluator {
             .map(|(name, (_, _, body))| {
                 let mut value = serde_json::from_slice(body).map_err(FormatError::from)?;
                 if let Err(json_patch::PatchError { .. }) = Self::patch::<ResB>(cfg, name, &mut value) {
-                    eprintln!("patch was failed"); // TODO warning output
+                    if parts.len() == 1 {
+                        Err(JsonError::FailToPatch)?;
+                    } else {
+                        eprintln!("patch was failed"); // TODO warning output
+                    }
                 }
                 Ok((name.clone(), value))
             })
