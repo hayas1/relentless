@@ -11,7 +11,7 @@ use serde_json::Value;
 use crate::{
     command::Relentless,
     config::{Coalesced, Destinations, Evaluate, JsonEvaluate, PatchTo, Setting, Testcase, WorkerConfig},
-    error::{FormatError, HttpError, JsonError, RelentlessError},
+    error::{FormatError, HttpError, JsonError, RelentlessError, RelentlessResult},
 };
 
 #[allow(async_fn_in_trait)] // TODO #[warn(async_fn_in_trait)] by default
@@ -25,12 +25,12 @@ impl<ResB: Body> Evaluator<http::Response<ResB>> for DefaultEvaluator {
     async fn evaluate(cfg: Option<&Evaluate>, res: Destinations<http::Response<ResB>>) -> Result<bool, Self::Error> {
         let parts = Self::parts(res).await?;
         if !cfg!(feature = "json") {
-            Self::acceptable::<ResB>(cfg, &parts).await
+            Self::acceptable(cfg, &parts).await
         } else {
-            match Self::json_acceptable::<ResB>(cfg, &parts).await {
+            match Self::json_acceptable(cfg, &parts).await {
                 Ok(v) => Ok(v),
                 Err(RelentlessError::JsonError(JsonError::FailToPatch)) => Ok(false),
-                Err(_) => Self::acceptable::<ResB>(cfg, &parts).await,
+                Err(_) => Self::acceptable(cfg, &parts).await,
             }
         }
     }
@@ -53,25 +53,23 @@ impl DefaultEvaluator {
         Ok(d)
     }
 
-    pub async fn acceptable<ResB: Body>(
+    pub async fn acceptable(
         cfg: Option<&Evaluate>,
         parts: &Destinations<(http::StatusCode, http::HeaderMap, Bytes)>,
-    ) -> Result<bool, <Self as Evaluator<http::Response<ResB>>>::Error> {
+    ) -> RelentlessResult<bool> {
         if parts.len() == 1 {
-            Self::status::<ResB>(parts).await
+            Self::status(parts).await
         } else {
-            Self::compare::<ResB>(cfg, parts).await
+            Self::compare(cfg, parts).await
         }
     }
-    pub async fn status<ResB: Body>(
-        parts: &Destinations<(http::StatusCode, http::HeaderMap, Bytes)>,
-    ) -> Result<bool, <Self as Evaluator<http::Response<ResB>>>::Error> {
+    pub async fn status(parts: &Destinations<(http::StatusCode, http::HeaderMap, Bytes)>) -> RelentlessResult<bool> {
         Ok(parts.iter().all(|(_name, (s, _h, _b))| s.is_success()))
     }
-    pub async fn compare<ResB: Body>(
+    pub async fn compare(
         _cfg: Option<&Evaluate>,
         parts: &Destinations<(http::StatusCode, http::HeaderMap, Bytes)>,
-    ) -> Result<bool, <Self as Evaluator<http::Response<ResB>>>::Error> {
+    ) -> RelentlessResult<bool> {
         let v: Vec<_> = parts.values().collect();
         let pass = v.windows(2).all(|w| w[0] == w[1]);
         Ok(pass)
@@ -80,28 +78,28 @@ impl DefaultEvaluator {
 
 #[cfg(feature = "json")]
 impl DefaultEvaluator {
-    pub async fn json_acceptable<ResB: Body>(
+    pub async fn json_acceptable(
         cfg: Option<&Evaluate>,
         parts: &Destinations<(http::StatusCode, http::HeaderMap, Bytes)>,
-    ) -> Result<bool, <Self as Evaluator<http::Response<ResB>>>::Error> {
-        let values = Self::patched::<ResB>(cfg, parts)?;
+    ) -> RelentlessResult<bool> {
+        let values = Self::patched(cfg, parts)?;
 
         let pass = parts.iter().zip(values.into_iter()).collect::<Vec<_>>().windows(2).all(|w| {
             let (((_na, (sa, ha, ba)), (__na, va)), ((_nb, (sb, hb, bb)), (__nb, vb))) = (&w[0], &w[1]);
-            sa == sb && ha == hb && Self::json_compare::<ResB>(cfg, (va, vb)).unwrap_or(ba == bb)
+            sa == sb && ha == hb && Self::json_compare(cfg, (va, vb)).unwrap_or(ba == bb)
         });
         Ok(pass)
     }
 
-    pub fn patched<ResB: Body>(
+    pub fn patched(
         cfg: Option<&Evaluate>,
         parts: &Destinations<(http::StatusCode, http::HeaderMap, Bytes)>,
-    ) -> Result<Destinations<Value>, <Self as Evaluator<http::Response<ResB>>>::Error> {
+    ) -> RelentlessResult<Destinations<Value>> {
         parts
             .iter()
             .map(|(name, (_, _, body))| {
                 let mut value = serde_json::from_slice(body).map_err(FormatError::from)?;
-                if let Err(json_patch::PatchError { .. }) = Self::patch::<ResB>(cfg, name, &mut value) {
+                if let Err(json_patch::PatchError { .. }) = Self::patch(cfg, name, &mut value) {
                     if parts.len() == 1 {
                         Err(JsonError::FailToPatch)?;
                     } else {
@@ -112,11 +110,7 @@ impl DefaultEvaluator {
             })
             .collect::<Result<Destinations<_>, _>>()
     }
-    pub fn patch<ResB: Body>(
-        cfg: Option<&Evaluate>,
-        name: &str,
-        value: &mut Value,
-    ) -> Result<(), json_patch::PatchError> {
+    pub fn patch(cfg: Option<&Evaluate>, name: &str, value: &mut Value) -> Result<(), json_patch::PatchError> {
         let patch = cfg.map(|c| match c {
             Evaluate::PlainText(_) => json_patch::Patch::default(),
             Evaluate::Json(JsonEvaluate { patch, .. }) => match patch {
@@ -131,10 +125,7 @@ impl DefaultEvaluator {
         }
     }
 
-    pub fn json_compare<ResB: Body>(
-        cfg: Option<&Evaluate>,
-        (va, vb): (&Value, &Value),
-    ) -> Result<bool, <Self as Evaluator<http::Response<ResB>>>::Error> {
+    pub fn json_compare(cfg: Option<&Evaluate>, (va, vb): (&Value, &Value)) -> RelentlessResult<bool> {
         let pointers = Self::pointers(&json_patch::diff(va, vb));
         let ignored = pointers.iter().all(|op| {
             cfg.map(|c| match c {
