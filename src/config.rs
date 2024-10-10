@@ -13,35 +13,35 @@ use crate::error::{FormatError, RelentlessResult};
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct Config {
-    #[serde(flatten, default)]
+    #[serde(flatten, default, skip_serializing_if = "IsDefault::is_default")]
     pub worker_config: WorkerConfig,
 
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub testcase: Vec<Testcase>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct WorkerConfig {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub name: Option<String>,
-    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub destinations: Destinations<String>, // TODO Destination<Uri>, but serde_http doesn't support nested type other than Option
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub setting: Setting,
 }
 pub type Destinations<T> = HashMap<String, T>;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct Setting {
-    #[serde(default, flatten, skip_serializing_if = "Option::is_none")]
+    #[serde(default, flatten, skip_serializing_if = "IsDefault::is_default")]
     pub protocol: Option<Protocol>,
-    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub template: HashMap<String, Destinations<String>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub repeat: Option<usize>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub timeout: Option<Duration>,
-    #[serde(default, flatten, skip_serializing_if = "Option::is_none")]
+    #[serde(default, flatten, skip_serializing_if = "IsDefault::is_default")]
     pub evaluate: Option<Evaluate>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -52,11 +52,11 @@ pub enum Protocol {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct Http {
-    #[serde(default, with = "http_serde::option::method", skip_serializing_if = "Option::is_none")]
+    #[serde(default, with = "http_serde::option::method", skip_serializing_if = "IsDefault::is_default")]
     pub method: Option<Method>,
-    #[serde(default, with = "http_serde::option::header_map", skip_serializing_if = "Option::is_none")]
+    #[serde(default, with = "http_serde::option::header_map", skip_serializing_if = "IsDefault::is_default")]
     pub header: Option<HeaderMap>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub body: Option<BodyStructure>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -88,9 +88,9 @@ pub struct PlainTextEvaluate {}
 #[serde(deny_unknown_fields)]
 #[cfg(feature = "json")]
 pub struct JsonEvaluate {
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub ignore: Vec<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub patch: Option<PatchTo>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -104,21 +104,28 @@ pub enum PatchTo {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct Testcase {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub description: Option<String>,
     pub target: String,
 
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub setting: Setting,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub attr: Attribute,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct Attribute {
-    #[serde(default, skip_serializing_if = "<&bool as std::ops::Not>::not")]
+    #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub allow: bool,
 }
+
+pub trait IsDefault: Default + PartialEq<Self> {
+    fn is_default(&self) -> bool {
+        self == &Self::default()
+    }
+}
+impl<T> IsDefault for T where T: Default + PartialEq<T> {}
 
 impl Config {
     pub fn read<P: AsRef<Path>>(path: P) -> RelentlessResult<Self> {
@@ -288,7 +295,7 @@ mod tests {
             }],
         };
         let yaml = serde_yaml::to_string(&example).unwrap();
-        println!("{}", yaml);
+        // println!("{}", yaml);
 
         let round_trip: Config = serde_yaml::from_str(&yaml).unwrap();
         assert_eq!(example, round_trip);
