@@ -22,8 +22,9 @@ pub struct Config {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct WorkerConfig {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub destinations: Destinations<String>, // TODO Destination<Uri>, but serde_http doesn't support nested type other than Option
     #[serde(default)]
     pub setting: Setting,
@@ -32,15 +33,15 @@ pub type Destinations<T> = HashMap<String, T>;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct Setting {
-    #[serde(default, flatten)]
+    #[serde(default, flatten, skip_serializing_if = "Option::is_none")]
     pub protocol: Option<Protocol>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub template: HashMap<String, Destinations<String>>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub repeat: Option<usize>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub timeout: Option<Duration>,
-    #[serde(default, flatten)]
+    #[serde(default, flatten, skip_serializing_if = "Option::is_none")]
     pub evaluate: Option<Evaluate>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -51,11 +52,11 @@ pub enum Protocol {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct Http {
-    #[serde(default, with = "http_serde::option::method")]
+    #[serde(default, with = "http_serde::option::method", skip_serializing_if = "Option::is_none")]
     pub method: Option<Method>,
-    #[serde(default, with = "http_serde::option::header_map")]
+    #[serde(default, with = "http_serde::option::header_map", skip_serializing_if = "Option::is_none")]
     pub header: Option<HeaderMap>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub body: Option<BodyStructure>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -87,9 +88,9 @@ pub struct PlainTextEvaluate {}
 #[serde(deny_unknown_fields)]
 #[cfg(feature = "json")]
 pub struct JsonEvaluate {
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub ignore: Vec<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub patch: Option<PatchTo>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -103,6 +104,7 @@ pub enum PatchTo {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct Testcase {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     pub target: String,
 
@@ -114,7 +116,7 @@ pub struct Testcase {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct Attribute {
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "<&bool as std::ops::Not>::not")]
     pub allow: bool,
 }
 
@@ -286,7 +288,7 @@ mod tests {
             }],
         };
         let yaml = serde_yaml::to_string(&example).unwrap();
-        // println!("{}", yaml);
+        println!("{}", yaml);
 
         let round_trip: Config = serde_yaml::from_str(&yaml).unwrap();
         assert_eq!(example, round_trip);
