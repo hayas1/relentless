@@ -6,7 +6,7 @@ use crate::{
     command::Relentless,
     config::{Coalesce, Coalesced, Config, Destinations, Protocol, Setting, Testcase, WorkerConfig},
     error::{RelentlessError, RelentlessResult},
-    outcome::{CaseOutcome, Compare, Evaluator, Outcome, Status, WorkerOutcome},
+    outcome::{CaseOutcome, DefaultEvaluator, Evaluator, Outcome, WorkerOutcome},
     service::FromBodyStructure,
 };
 use http_body::Body;
@@ -14,14 +14,14 @@ use tower::{Service, ServiceExt};
 
 /// TODO document
 #[derive(Debug, Clone)]
-pub struct Control<'a, S, ReqB, ResB> {
+pub struct Control<'a, S, ReqB, ResB, E> {
     _cmd: &'a Relentless,
-    workers: Vec<Worker<'a, S, ReqB, ResB>>, // TODO all worker do not have same clients type ?
+    workers: Vec<Worker<'a, S, ReqB, ResB, E>>, // TODO all worker do not have same clients type ?
     cases: Vec<Vec<Case<S, ReqB, ResB>>>,
     phantom: PhantomData<(ReqB, ResB)>,
 }
 #[cfg(feature = "default-http-client")]
-impl Control<'_, DefaultHttpClient<reqwest::Body, reqwest::Body>, reqwest::Body, reqwest::Body> {
+impl Control<'_, DefaultHttpClient<reqwest::Body, reqwest::Body>, reqwest::Body, reqwest::Body, DefaultEvaluator> {
     pub async fn default_http_clients(
         cmd: &Relentless,
         configs: &Vec<Config>,
@@ -44,7 +44,7 @@ impl Control<'_, DefaultHttpClient<reqwest::Body, reqwest::Body>, reqwest::Body,
         Ok(destinations)
     }
 }
-impl<'a, S, ReqB, ResB> Control<'a, S, ReqB, ResB>
+impl<'a, S, ReqB, ResB, E> Control<'a, S, ReqB, ResB, E>
 where
     ReqB: Body + FromBodyStructure + Send + 'static,
     ReqB::Data: Send + 'static,
@@ -53,7 +53,8 @@ where
     ResB::Data: Send + 'static,
     ResB::Error: std::error::Error + Sync + Send + 'static,
     S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + Sync + 'static,
-    RelentlessError: From<S::Error>,
+    E: Evaluator<http::Response<ResB>>,
+    RelentlessError: From<S::Error> + From<E::Error>,
 {
     /// TODO document
     pub fn with_service(
@@ -68,7 +69,7 @@ where
         Ok(Self::new(cmd, configs, workers))
     }
     /// TODO document
-    pub fn new(cmd: &'a Relentless, configs: Vec<Config>, workers: Vec<Worker<'a, S, ReqB, ResB>>) -> Self {
+    pub fn new(cmd: &'a Relentless, configs: Vec<Config>, workers: Vec<Worker<'a, S, ReqB, ResB, E>>) -> Self {
         let cases = configs
             .iter()
             .map(|c| c.testcase.clone().into_iter().map(|t| Case::new(&c.worker_config, t)).collect())
@@ -95,18 +96,18 @@ where
 
 /// TODO document
 #[derive(Debug, Clone)]
-pub struct Worker<'a, S, ReqB, ResB> {
+pub struct Worker<'a, S, ReqB, ResB, E> {
     _cmd: &'a Relentless,
     config: Coalesced<WorkerConfig, Destinations<String>>,
     clients: Destinations<S>,
-    phantom: PhantomData<(ReqB, ResB)>,
+    phantom: PhantomData<(ReqB, ResB, E)>,
 }
-impl<S, ReqB, ResB> Worker<'_, S, ReqB, ResB> {
+impl<S, ReqB, ResB, E> Worker<'_, S, ReqB, ResB, E> {
     pub fn config(&self) -> WorkerConfig {
         self.config.coalesce()
     }
 }
-impl<'a, S, ReqB, ResB> Worker<'a, S, ReqB, ResB>
+impl<'a, S, ReqB, ResB, E> Worker<'a, S, ReqB, ResB, E>
 where
     ReqB: Body + FromBodyStructure + Send + 'static,
     ReqB::Data: Send + 'static,
@@ -115,7 +116,8 @@ where
     ResB::Data: Send + 'static,
     ResB::Error: std::error::Error + Sync + Send + 'static,
     S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + Sync + 'static,
-    RelentlessError: From<S::Error>,
+    E: Evaluator<http::Response<ResB>>,
+    RelentlessError: From<S::Error> + From<E::Error>,
 {
     pub fn new(cmd: &'a Relentless, config: WorkerConfig, clients: Destinations<S>) -> RelentlessResult<Self> {
         let config = Coalesced::tuple(config, cmd.destination.clone().into_iter().collect());
@@ -135,16 +137,17 @@ where
 
         let mut outcome = Vec::new();
         for (testcase, process) in processes {
+            let Testcase { setting, .. } = testcase.coalesce();
+            let Setting { repeat, evaluate, .. } = &setting;
             let mut passed = 0;
-            let mut t =
-                (0..testcase.coalesce().setting.repeat.unwrap_or(1)).map(|_| Destinations::new()).collect::<Vec<_>>();
+            let mut t = (0..repeat.unwrap_or(1)).map(|_| Destinations::new()).collect::<Vec<_>>();
             for (name, repeated) in process? {
                 for (i, res) in repeated.into_iter().enumerate() {
                     t[i].insert(name.clone(), res);
                 }
             }
             for res in t {
-                let pass = if res.len() == 1 { Status::evaluate(res).await? } else { Compare::evaluate(res).await? };
+                let pass = E::evaluate(evaluate.as_ref(), res).await?;
                 passed += pass as usize;
             }
             outcome.push(CaseOutcome::new(testcase, passed));
@@ -206,7 +209,7 @@ where
         target: &str,
         setting: &Setting,
     ) -> RelentlessResult<Destinations<Vec<http::Request<ReqB>>>> {
-        let Setting { protocol, template, repeat, timeout } = setting;
+        let Setting { protocol, template, repeat, timeout, .. } = setting;
 
         if !template.is_empty() {
             unimplemented!("template is not implemented yet");

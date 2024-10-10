@@ -1,5 +1,5 @@
 use axum::body::Body;
-use relentless::command::Relentless;
+use relentless::{command::Relentless, outcome::DefaultEvaluator};
 
 use example_http_server::route;
 
@@ -9,7 +9,7 @@ async fn test_example_assault() {
         Relentless { file: vec!["examples/config/assault.yaml".into()], no_report: true, ..Default::default() };
     let configs = relentless.configs().unwrap();
     let services = [("test-api".to_string(), route::app_with(Default::default()))].into_iter().collect();
-    let outcome = relentless.assault_with::<_, Body, Body>(configs, vec![services]).await.unwrap();
+    let outcome = relentless.assault_with::<_, Body, Body, DefaultEvaluator>(configs, vec![services]).await.unwrap();
 
     assert!(outcome.allow(false));
 }

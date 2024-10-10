@@ -13,33 +13,36 @@ use crate::error::{FormatError, RelentlessResult};
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct Config {
-    #[serde(flatten, default)]
+    #[serde(flatten, default, skip_serializing_if = "IsDefault::is_default")]
     pub worker_config: WorkerConfig,
 
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub testcase: Vec<Testcase>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct WorkerConfig {
+    #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub name: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub destinations: Destinations<String>, // TODO Destination<Uri>, but serde_http doesn't support nested type other than Option
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub setting: Setting,
 }
 pub type Destinations<T> = HashMap<String, T>;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct Setting {
-    #[serde(flatten)]
+    #[serde(default, flatten, skip_serializing_if = "IsDefault::is_default")]
     pub protocol: Option<Protocol>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub template: HashMap<String, Destinations<String>>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub repeat: Option<usize>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub timeout: Option<Duration>,
+    #[serde(default, flatten, skip_serializing_if = "IsDefault::is_default")]
+    pub evaluate: Option<Evaluate>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
@@ -49,11 +52,11 @@ pub enum Protocol {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct Http {
-    #[serde(default, with = "http_serde::option::method")]
+    #[serde(default, with = "http_serde::option::method", skip_serializing_if = "IsDefault::is_default")]
     pub method: Option<Method>,
-    #[serde(default, with = "http_serde::option::header_map")]
+    #[serde(default, with = "http_serde::option::header_map", skip_serializing_if = "IsDefault::is_default")]
     pub header: Option<HeaderMap>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub body: Option<BodyStructure>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -66,24 +69,63 @@ impl Default for BodyStructure {
         Self::Empty
     }
 }
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "snake_case")]
+pub enum Evaluate {
+    PlainText(PlainTextEvaluate),
+    #[cfg(feature = "json")]
+    Json(JsonEvaluate),
+}
+impl Default for Evaluate {
+    fn default() -> Self {
+        Self::PlainText(PlainTextEvaluate {})
+    }
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
+pub struct PlainTextEvaluate {}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
+#[cfg(feature = "json")]
+pub struct JsonEvaluate {
+    #[serde(default, skip_serializing_if = "IsDefault::is_default")]
+    pub ignore: Vec<String>,
+    #[serde(default, skip_serializing_if = "IsDefault::is_default")]
+    pub patch: Option<PatchTo>,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "snake_case", untagged)]
+#[cfg(feature = "json")]
+pub enum PatchTo {
+    All(json_patch::Patch),
+    Destinations(Destinations<json_patch::Patch>),
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct Testcase {
+    #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub description: Option<String>,
     pub target: String,
 
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub setting: Setting,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub attr: Attribute,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct Attribute {
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub allow: bool,
 }
+
+pub trait IsDefault: Default + PartialEq<Self> {
+    fn is_default(&self) -> bool {
+        self == &Self::default()
+    }
+}
+impl<T> IsDefault for T where T: Default + PartialEq<T> {}
 
 impl Config {
     pub fn read<P: AsRef<Path>>(path: P) -> RelentlessResult<Self> {
@@ -128,6 +170,7 @@ impl Coalesce for Setting {
             template: if self.template.is_empty() { other.clone().template } else { self.template },
             repeat: self.repeat.or(other.repeat),
             timeout: self.timeout.or(other.timeout),
+            evaluate: self.evaluate.or(other.clone().evaluate),
         }
     }
 }
@@ -201,5 +244,129 @@ impl Format {
             #[cfg(feature = "toml")]
             Format::Toml => Ok(toml::from_str(content)?),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_read_example() {
+        let _assault = Config::read("examples/config/assault.yaml");
+        // TODO assert
+
+        let _compare = Config::read("examples/config/compare.yaml");
+        // TODO assert
+    }
+
+    #[test]
+    fn test_config() {
+        let example = Config {
+            worker_config: WorkerConfig { name: Some("example".to_string()), ..Default::default() },
+            testcase: vec![Testcase {
+                description: Some("test description".to_string()),
+                target: "/information".to_string(),
+                setting: Setting {
+                    evaluate: Some(Evaluate::Json(JsonEvaluate {
+                        ignore: vec!["/datetime".to_string()],
+                        // patch: Some(PatchTo::All(
+                        //     serde_json::from_value(
+                        //         serde_json::json!([{"op": "replace", "path": "/datetime", "value": "2021-01-01"}]),
+                        //     )
+                        //     .unwrap(),
+                        // )),
+                        patch: Some(PatchTo::Destinations(Destinations::from([
+                            (
+                                "actual".to_string(),
+                                serde_json::from_value(serde_json::json!([{"op": "remove", "path": "/datetime"}]))
+                                    .unwrap(),
+                            ),
+                            (
+                                "expect".to_string(),
+                                serde_json::from_value(serde_json::json!([{"op": "remove", "path": "/datetime"}]))
+                                    .unwrap(),
+                            ),
+                        ]))),
+                    })),
+                    ..Default::default()
+                },
+                attr: Attribute { allow: true },
+            }],
+        };
+        let yaml = serde_yaml::to_string(&example).unwrap();
+        // println!("{}", yaml);
+
+        let round_trip: Config = serde_yaml::from_str(&yaml).unwrap();
+        assert_eq!(example, round_trip);
+    }
+
+    #[test]
+    #[cfg(all(feature = "yaml", feature = "json"))]
+    fn test_config_json_patch() {
+        let all_yaml = r#"
+        name: json patch to all
+        destinations:
+          actual: http://localhost:3000
+          expect: http://localhost:3000
+        testcase:
+        - description: test description
+          target: /information
+          setting:
+            json:
+              patch:
+              - op: replace
+                path: /datetime
+                value: 2021-01-01
+        "#;
+        let config = Config::read_str(all_yaml, Format::Yaml).unwrap();
+        assert_eq!(
+            config.testcase[0].setting.evaluate,
+            Some(Evaluate::Json(JsonEvaluate {
+                ignore: vec![],
+                patch: Some(PatchTo::All(
+                    serde_json::from_value(
+                        serde_json::json!([{"op": "replace", "path": "/datetime", "value": "2021-01-01"}])
+                    )
+                    .unwrap(),
+                ))
+            }))
+        );
+
+        let destinations_yaml = r#"
+        name: json patch to destinations
+        destinations:
+          actual: http://localhost:3000
+          expect: http://localhost:3000
+        testcase:
+        - description: test description
+          target: /information
+          setting:
+            json:
+              patch:
+                actual:
+                - op: remove
+                  path: /datetime
+                expect:
+                - op: remove
+                  path: /datetime
+        "#;
+        let config = Config::read_str(destinations_yaml, Format::Yaml).unwrap();
+        assert_eq!(
+            config.testcase[0].setting.evaluate,
+            Some(Evaluate::Json(JsonEvaluate {
+                ignore: vec![],
+                patch: Some(PatchTo::Destinations(Destinations::from([
+                    (
+                        "actual".to_string(),
+                        serde_json::from_value(serde_json::json!([{"op": "remove", "path": "/datetime"}])).unwrap(),
+                    ),
+                    (
+                        "expect".to_string(),
+                        serde_json::from_value(serde_json::json!([{"op": "remove", "path": "/datetime"}])).unwrap(),
+                    ),
+                ])))
+            }))
+        );
     }
 }
