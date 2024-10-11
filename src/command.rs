@@ -3,6 +3,7 @@ use std::{path::PathBuf, process::ExitCode};
 #[cfg(feature = "cli")]
 use clap::Parser;
 use http_body::Body;
+use serde::{Deserialize, Serialize};
 use tower::Service;
 
 use crate::{
@@ -29,7 +30,7 @@ pub async fn execute() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sy
     Ok(ret.exit_code(cmd))
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[cfg_attr(feature = "cli", derive(Parser))]
 #[cfg_attr(feature = "cli", clap(version, about, arg_required_else_help = true))]
 pub struct Relentless {
@@ -116,6 +117,7 @@ where
     let (name, destination) = s.split_once('=').ok_or_else(|| format!("invalid KEY=value: no `=` found in `{}`", s))?;
     Ok((name.parse()?, destination.parse()?))
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;
