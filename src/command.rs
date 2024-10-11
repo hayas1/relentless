@@ -3,12 +3,13 @@ use std::{path::PathBuf, process::ExitCode};
 #[cfg(feature = "cli")]
 use clap::Parser;
 use http_body::Body;
+use serde::{Deserialize, Serialize};
 use tower::Service;
 
 use crate::{
     config::{Config, Destinations},
     error::{RelentlessError, RelentlessResult},
-    outcome::Outcome,
+    outcome::{Evaluator, Outcome},
     service::FromBodyStructure,
     worker::Control,
 };
@@ -29,7 +30,7 @@ pub async fn execute() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sy
     Ok(ret.exit_code(cmd))
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[cfg_attr(feature = "cli", derive(Parser))]
 #[cfg_attr(feature = "cli", clap(version, about, arg_required_else_help = true))]
 pub struct Relentless {
@@ -74,10 +75,10 @@ impl Relentless {
     pub async fn assault(&self) -> RelentlessResult<Outcome> {
         let configs = self.configs()?;
         let clients = Control::default_http_clients(self, &configs).await?;
-        let outcome = self.assault_with(configs, clients).await?;
+        let outcome = self.assault_with::<_, _, _, crate::outcome::DefaultEvaluator>(configs, clients).await?;
         Ok(outcome)
     }
-    pub async fn assault_with<S, ReqB, ResB>(
+    pub async fn assault_with<S, ReqB, ResB, E>(
         &self,
         configs: Vec<Config>,
         services: Vec<Destinations<S>>,
@@ -90,12 +91,13 @@ impl Relentless {
         ResB::Data: Send + 'static,
         ResB::Error: std::error::Error + Sync + Send + 'static,
         S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + Sync + 'static,
-        RelentlessError: From<S::Error>,
+        E: Evaluator<http::Response<ResB>>,
+        RelentlessError: From<S::Error> + From<E::Error>,
     {
         let Self { no_color, no_report, .. } = self;
         console::set_colors_enabled(!no_color);
 
-        let control = Control::with_service(self, configs, services)?;
+        let control = Control::<_, _, _, E>::with_service(self, configs, services)?;
         let outcome = control.assault().await?;
         if !no_report {
             outcome.report(self)?;
@@ -115,6 +117,7 @@ where
     let (name, destination) = s.split_once('=').ok_or_else(|| format!("invalid KEY=value: no `=` found in `{}`", s))?;
     Ok((name.parse()?, destination.parse()?))
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;
