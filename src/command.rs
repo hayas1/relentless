@@ -81,10 +81,15 @@ impl Relentless {
             Err(RunCommandError::CannotReadSomeConfigs(config, errors))
         }
     }
+
     /// TODO document
     #[cfg(feature = "default-http-client")]
     pub async fn assault(&self) -> RelentlessResult_<Outcome> {
-        let configs = self.configs()?;
+        let configs = match self.configs() {
+            Ok(configs) => configs,
+            Err(RunCommandError::CannotReadSomeConfigs(configs, _)) if !self.strict => configs, // TODO strict ? warning ?
+            Err(e) => return Err(e)?,
+        };
         let clients = Control::default_http_clients(self, &configs).await?;
         let outcome = self.assault_with::<_, _, _, crate::outcome::DefaultEvaluator>(configs, clients).await?;
         Ok(outcome)
