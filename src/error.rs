@@ -123,19 +123,21 @@ impl<C: Display> Display for Context<C> {
     }
 }
 
-pub trait WithContext<T> {
+pub trait WithContext<T, C> {
     type Err;
-    fn context<C>(self, context: C) -> Result<T, Context<C>>;
-    fn context_with<C, F>(self, f: F) -> Result<T, Context<C>>
+    type Context;
+    fn context(self, context: C) -> Result<T, Context<Self::Context>>;
+    fn context_with<F>(self, f: F) -> Result<T, Context<Self::Context>>
     where
         F: FnOnce(&Self::Err) -> C;
 }
-impl<T, E: IntoContext> WithContext<T> for Result<T, E> {
+impl<T, E: IntoContext, C> WithContext<T, C> for Result<T, E> {
     type Err = E;
-    fn context<C>(self, context: C) -> Result<T, Context<C>> {
+    type Context = C;
+    fn context(self, context: C) -> Result<T, Context<Self::Context>> {
         self.context_with(|_| context)
     }
-    fn context_with<C, F>(self, f: F) -> Result<T, Context<C>>
+    fn context_with<F>(self, f: F) -> Result<T, Context<Self::Context>>
     where
         F: FnOnce(&E) -> C,
     {
@@ -145,19 +147,17 @@ impl<T, E: IntoContext> WithContext<T> for Result<T, E> {
         })
     }
 }
-#[derive(Error, Debug)]
-#[error("value is missing")]
-pub struct MissingValue;
-impl<T> WithContext<T> for Option<T> {
-    type Err = MissingValue;
-    fn context<C>(self, context: C) -> Result<T, Context<C>> {
+impl<T, C: IntoContext> WithContext<T, C> for Option<T> {
+    type Err = ();
+    type Context = ();
+    fn context(self, context: C) -> Result<T, Context<Self::Context>> {
         self.context_with(|_| context)
     }
-    fn context_with<C, F>(self, f: F) -> Result<T, Context<C>>
+    fn context_with<F>(self, f: F) -> Result<T, Context<Self::Context>>
     where
         F: FnOnce(&Self::Err) -> C,
     {
-        self.ok_or_else(|| MissingValue.context(f(&MissingValue)))
+        self.ok_or_else(|| f(&()).context(()))
     }
 }
 
