@@ -114,11 +114,6 @@ pub enum RunCommandError {
     CannotReadSomeConfigs(Vec<Config>, Vec<Wrap>),
     #[error("cannot specify format")]
     CannotSpecifyFormat,
-
-    #[error(transparent)]
-    Infallible(#[from] std::convert::Infallible),
-    #[error(transparent)]
-    StdIoError(#[from] std::io::Error),
 }
 impl IntoRelentlessError for RunCommandError {}
 

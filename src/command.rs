@@ -8,7 +8,7 @@ use tower::Service;
 
 use crate::{
     config::{Config, Destinations},
-    error::{RelentlessError, RunCommandError, RunCommandResult, Wrap},
+    error::{RelentlessError, RelentlessResult_, RunCommandError, RunCommandResult, Wrap},
     outcome::{Evaluator, Outcome},
     service::FromBodyStructure,
     worker::Control,
@@ -81,7 +81,7 @@ impl Relentless {
     }
 
     /// TODO document
-    pub fn configs_filtered<W: Write>(&self, mut write: W) -> RunCommandResult<Vec<Config>> {
+    pub fn configs_filtered<W: Write>(&self, mut write: W) -> RelentlessResult_<Vec<Config>> {
         match self.configs() {
             Ok(configs) => Ok(configs),
             Err(RunCommandError::CannotReadSomeConfigs(configs, err)) if !self.strict => {
@@ -90,7 +90,7 @@ impl Relentless {
                 }
                 Ok(configs)
             }
-            Err(e) => Err(e),
+            Err(e) => Err(e)?,
         }
     }
 
@@ -132,17 +132,15 @@ impl Relentless {
 }
 
 #[cfg(feature = "cli")]
-pub fn parse_key_value<T, U>(s: &str) -> Result<(T, U), RunCommandError>
+pub fn parse_key_value<T, U>(s: &str) -> crate::Result<(T, U)>
 where
     T: std::str::FromStr,
     T::Err: std::error::Error + Send + Sync + 'static,
-    RunCommandError: From<T::Err>,
     U: std::str::FromStr,
     U::Err: std::error::Error + Send + Sync + 'static,
-    RunCommandError: From<U::Err>,
 {
     let (name, destination) = s.split_once('=').ok_or_else(|| RunCommandError::KeyValueFormat(s.to_string()))?;
-    Ok((name.parse()?, destination.parse()?))
+    Ok((name.parse().map_err(Wrap::from)?, destination.parse().map_err(Wrap::from)?))
 }
 
 #[cfg(test)]
