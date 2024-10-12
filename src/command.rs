@@ -97,7 +97,7 @@ impl Relentless {
     }
 
     /// TODO document
-    #[cfg(feature = "default-http-client")]
+    #[cfg(all(feature = "default-http-client", feature = "cli"))]
     pub async fn assault(&self) -> RelentlessResult_<Outcome> {
         let configs = self.configs_filtered(std::io::stderr())?;
         let clients = Control::default_http_clients(self, &configs).await?;
