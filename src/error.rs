@@ -7,7 +7,6 @@ use thiserror::Error;
 
 use crate::config::Config;
 
-pub type RelentlessResult<T, E = RelentlessError> = Result<T, E>;
 pub type RelentlessResult_<T, E = Wrap> = Result<T, E>;
 
 #[derive(Error, Debug)]
@@ -125,7 +124,6 @@ impl<T: Display> Display for Context<T> {
 // TODO derive macro
 pub trait IntoRelentlessError: std::error::Error + Send + Sync + 'static {}
 
-pub type RunCommandResult<T, E = RunCommandError> = RelentlessResult<T, E>;
 #[derive(Error, Debug)]
 pub enum RunCommandError {
     #[error("should be KEY=VALUE format, but `{0}` has no '='")]
@@ -139,17 +137,14 @@ pub enum RunCommandError {
 }
 impl IntoRelentlessError for RunCommandError {}
 
-pub type AssaultResult<T, E = AssaultError> = RelentlessResult<T, E>;
 #[derive(Error, Debug)]
 pub enum AssaultError {}
 impl IntoRelentlessError for AssaultError {}
 
-pub type EvaluateResult<T, E = EvaluateError> = RelentlessResult<T, E>;
 #[derive(Error, Debug)]
 pub enum EvaluateError {}
 impl IntoRelentlessError for EvaluateError {}
 
-pub type ReportResult<T, E = ReportError> = RelentlessResult<T, E>;
 #[derive(Error, Debug)]
 pub enum ReportError {}
 impl IntoRelentlessError for ReportError {}

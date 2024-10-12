@@ -8,7 +8,7 @@ use tower::Service;
 
 use crate::{
     config::{Config, Destinations},
-    error::{RelentlessResult_, RunCommandError, RunCommandResult, Wrap},
+    error::{RelentlessResult_, RunCommandError, Wrap},
     outcome::{Evaluator, Outcome},
     service::FromBodyStructure,
     worker::Control,
@@ -68,7 +68,7 @@ pub struct Relentless {
 }
 impl Relentless {
     /// TODO document
-    pub fn configs(&self) -> RunCommandResult<Vec<Config>> {
+    pub fn configs(&self) -> RelentlessResult_<Vec<Config>> {
         let Self { file, .. } = self;
         let (ok, err): (_, Vec<_>) = file.iter().map(Config::read).partition(Result::is_ok);
         let (config, errors): (_, Vec<_>) =
@@ -76,7 +76,7 @@ impl Relentless {
         if errors.is_empty() {
             Ok(config)
         } else {
-            Err(RunCommandError::CannotReadSomeConfigs(config, errors))
+            Err(RunCommandError::CannotReadSomeConfigs(config, errors))?
         }
     }
 
@@ -84,13 +84,16 @@ impl Relentless {
     pub fn configs_filtered<W: Write>(&self, mut write: W) -> RelentlessResult_<Vec<Config>> {
         match self.configs() {
             Ok(configs) => Ok(configs),
-            Err(RunCommandError::CannotReadSomeConfigs(configs, err)) if !self.strict => {
-                for e in err {
-                    writeln!(write, "{}", e)?;
+            Err(e) => {
+                if let Some(RunCommandError::CannotReadSomeConfigs(configs, err)) = e.downcast_ref() {
+                    for e in err {
+                        writeln!(write, "{}", e)?;
+                    }
+                    Ok(configs.to_vec())
+                } else {
+                    Err(e)?
                 }
-                Ok(configs)
             }
-            Err(e) => Err(e)?,
         }
     }
 
