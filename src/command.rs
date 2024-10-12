@@ -141,7 +141,7 @@ where
     U::Err: std::error::Error + Send + Sync + 'static,
 {
     let (name, destination) = s.split_once('=').ok_or_else(|| RunCommandError::KeyValueFormat(s.to_string()))?;
-    Ok((name.parse().map_err(Wrap::from)?, destination.parse().map_err(Wrap::from)?))
+    Ok((name.parse().map_err(Wrap::wrapping)?, destination.parse().map_err(Wrap::wrapping)?))
 }
 
 #[cfg(test)]

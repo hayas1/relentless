@@ -57,7 +57,7 @@ impl DefaultEvaluator {
         let mut d = Destinations::new();
         for (name, r) in res {
             let (http::response::Parts { status, headers, .. }, body) = r.into_parts();
-            let bytes = BodyExt::collect(body).await.map(|buf| buf.to_bytes()).map_err(Wrap::from)?;
+            let bytes = BodyExt::collect(body).await.map(|buf| buf.to_bytes()).map_err(Wrap::wrapping)?;
             d.insert(name, (status, headers, bytes));
         }
         Ok(d)
