@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use thiserror::Error;
 
 use crate::config::Config;
@@ -37,8 +39,6 @@ pub trait IntoRelentlessError: std::error::Error + Send + Sync + 'static {}
 pub type RunCommandResult<T, E = RunCommandError> = RelentlessResult<T, E>;
 #[derive(Error, Debug)]
 pub enum RunCommandError {
-    #[error(transparent)]
-    Infallible(#[from] std::convert::Infallible),
     #[error("should be KEY=VALUE format, but `{0}` has no '='")]
     KeyValueFormat(String),
     #[error("unknown format extension: {0}")]
@@ -47,17 +47,32 @@ pub enum RunCommandError {
     CannotReadSomeConfigs(Vec<Config>, Vec<Box<Self>>),
     #[error("cannot specify format")]
     CannotSpecifyFormat,
+
+    #[error(transparent)]
+    Infallible(#[from] std::convert::Infallible),
     #[error(transparent)]
     StdIoError(#[from] std::io::Error),
+
     #[cfg(feature = "json")]
     #[error(transparent)]
     JsonError(#[from] serde_json::Error),
+    #[cfg(feature = "json")]
+    #[error("{0}: {1}")]
+    JsonFileError(PathBuf, serde_json::Error),
+
     #[cfg(feature = "yaml")]
     #[error(transparent)]
     YamlError(#[from] serde_yaml::Error),
+    #[cfg(feature = "yaml")]
+    #[error("{0}: {1}")]
+    YamlFileError(PathBuf, serde_yaml::Error),
+
     #[cfg(feature = "toml")]
     #[error(transparent)]
     TomlError(#[from] toml::de::Error),
+    #[cfg(feature = "toml")]
+    #[error("{0}: {1}")]
+    TomlFileError(PathBuf, toml::de::Error),
 }
 impl IntoRelentlessError for RunCommandError {}
 

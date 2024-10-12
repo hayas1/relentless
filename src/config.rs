@@ -227,11 +227,14 @@ impl Format {
     pub fn deserialize_testcase<P: AsRef<Path>>(&self, path: P) -> RunCommandResult<Config> {
         match self {
             #[cfg(feature = "json")]
-            Format::Json => Ok(serde_json::from_reader(File::open(path)?)?),
+            Format::Json => Ok(serde_json::from_reader(File::open(path.as_ref())?)
+                .map_err(|e| RunCommandError::JsonFileError(path.as_ref().to_path_buf(), e))?),
             #[cfg(feature = "yaml")]
-            Format::Yaml => Ok(serde_yaml::from_reader(File::open(path)?)?),
+            Format::Yaml => Ok(serde_yaml::from_reader(File::open(path.as_ref())?)
+                .map_err(|e| RunCommandError::YamlFileError(path.as_ref().to_path_buf(), e))?),
             #[cfg(feature = "toml")]
-            Format::Toml => Ok(toml::from_str(&read_to_string(path)?)?),
+            Format::Toml => Ok(toml::from_str(&read_to_string(path.as_ref())?)
+                .map_err(|e| RunCommandError::TomlFileError(path.as_ref().to_path_buf(), e))?),
         }
     }
 

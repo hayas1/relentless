@@ -1,4 +1,4 @@
-use std::{path::PathBuf, process::ExitCode};
+use std::{io::Write, path::PathBuf, process::ExitCode};
 
 #[cfg(feature = "cli")]
 use clap::Parser;
@@ -83,13 +83,23 @@ impl Relentless {
     }
 
     /// TODO document
+    pub fn configs_filtered<W: Write>(&self, mut write: W) -> RunCommandResult<Vec<Config>> {
+        match self.configs() {
+            Ok(configs) => Ok(configs),
+            Err(RunCommandError::CannotReadSomeConfigs(configs, err)) if !self.strict => {
+                for e in err {
+                    writeln!(write, "{}", e)?;
+                }
+                Ok(configs)
+            }
+            Err(e) => Err(e),
+        }
+    }
+
+    /// TODO document
     #[cfg(feature = "default-http-client")]
     pub async fn assault(&self) -> RelentlessResult_<Outcome> {
-        let configs = match self.configs() {
-            Ok(configs) => configs,
-            Err(RunCommandError::CannotReadSomeConfigs(configs, _)) if !self.strict => configs, // TODO strict ? warning ?
-            Err(e) => return Err(e)?,
-        };
+        let configs = self.configs_filtered(std::io::stderr())?;
         let clients = Control::default_http_clients(self, &configs).await?;
         let outcome = self.assault_with::<_, _, _, crate::outcome::DefaultEvaluator>(configs, clients).await?;
         Ok(outcome)
