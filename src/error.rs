@@ -15,11 +15,6 @@ pub struct RelentlessError {
     #[from]
     source: Box<dyn std::error::Error + Send + Sync>,
 }
-impl<T: IntoRelentlessError> From<T> for RelentlessError {
-    fn from(e: T) -> Self {
-        RelentlessError { source: Box::new(e) }
-    }
-}
 impl From<Wrap> for RelentlessError {
     fn from(wrap: Wrap) -> Self {
         RelentlessError { source: wrap.0 }
@@ -111,7 +106,6 @@ pub struct Context<T> {
     context: T,
     source: Box<dyn std::error::Error + Send + Sync>,
 }
-impl<T: Display + Debug + Send + Sync + 'static> IntoRelentlessError for Context<T> {}
 impl<T: Display + Debug> std::error::Error for Context<T> {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         Some(self.source.as_ref())
@@ -122,9 +116,6 @@ impl<T: Display> Display for Context<T> {
         writeln!(f, "{}: {}", self.context, self.source)
     }
 }
-
-// TODO derive macro
-pub trait IntoRelentlessError: std::error::Error + Send + Sync + 'static {}
 
 #[derive(Error, Debug)]
 pub enum RunCommandError {
@@ -137,16 +128,12 @@ pub enum RunCommandError {
     #[error("cannot specify format")]
     CannotSpecifyFormat,
 }
-impl IntoRelentlessError for RunCommandError {}
 
 #[derive(Error, Debug)]
 pub enum AssaultError {}
-impl IntoRelentlessError for AssaultError {}
 
 #[derive(Error, Debug)]
 pub enum EvaluateError {}
-impl IntoRelentlessError for EvaluateError {}
 
 #[derive(Error, Debug)]
 pub enum ReportError {}
-impl IntoRelentlessError for ReportError {}
