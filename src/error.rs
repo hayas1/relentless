@@ -74,6 +74,18 @@ impl Wrap {
     pub fn context<T>(self, context: T) -> Context<T> {
         Context { context, source: self.0 }
     }
+    pub fn is<E: IntoRelentlessError>(&self) -> bool {
+        self.0.is::<E>()
+    }
+    pub fn downcast<E: IntoRelentlessError>(self) -> Result<Box<E>, Box<dyn std::error::Error + Send + Sync>> {
+        self.0.downcast()
+    }
+    pub fn downcast_ref<E: IntoRelentlessError>(&self) -> Option<&E> {
+        self.0.downcast_ref()
+    }
+    pub fn downcast_mut<E: IntoRelentlessError>(&mut self) -> Option<&mut E> {
+        self.0.downcast_mut()
+    }
 }
 
 pub trait IntoContext: std::error::Error + Send + Sync + 'static + Sized {
