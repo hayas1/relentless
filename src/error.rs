@@ -71,6 +71,9 @@ impl Wrap {
     pub fn error(self) -> RelentlessError_ {
         From::from(self)
     }
+    pub fn context<T>(self, context: T) -> Context<T> {
+        Context { context, source: self.0 }
+    }
 }
 
 pub trait IntoContext: std::error::Error + Send + Sync + 'static + Sized {
@@ -116,16 +119,6 @@ pub enum RunCommandError {
     Infallible(#[from] std::convert::Infallible),
     #[error(transparent)]
     StdIoError(#[from] std::io::Error),
-
-    #[cfg(feature = "json")]
-    #[error(transparent)]
-    JsonError(#[from] serde_json::Error),
-    #[cfg(feature = "yaml")]
-    #[error(transparent)]
-    YamlError(#[from] serde_yaml::Error),
-    #[cfg(feature = "toml")]
-    #[error(transparent)]
-    TomlError(#[from] toml::de::Error),
 }
 impl IntoRelentlessError for RunCommandError {}
 

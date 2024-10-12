@@ -8,7 +8,7 @@ use std::{
 use http::{HeaderMap, Method};
 use serde::{Deserialize, Serialize};
 
-use crate::error::{IntoContext, RelentlessResult_, RunCommandError, RunCommandResult};
+use crate::error::{RelentlessResult_, RunCommandError};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
@@ -133,7 +133,7 @@ impl Config {
             .deserialize_testcase(path.as_ref())
             .map_err(|e| e.context(path.as_ref().display().to_string()))?)
     }
-    pub fn read_str(s: &str, format: Format) -> RunCommandResult<Self> {
+    pub fn read_str(s: &str, format: Format) -> RelentlessResult_<Self> {
         format.deserialize_testcase_str(s)
     }
 }
@@ -212,7 +212,7 @@ pub enum Format {
     Toml,
 }
 impl Format {
-    pub fn from_path<P: AsRef<Path>>(path: P) -> RunCommandResult<Self> {
+    pub fn from_path<P: AsRef<Path>>(path: P) -> RelentlessResult_<Self> {
         let basename = path.as_ref().extension().and_then(|ext| ext.to_str());
         match basename {
             #[cfg(feature = "json")]
@@ -221,12 +221,12 @@ impl Format {
             Some("yaml" | "yml") => Ok(Format::Yaml),
             #[cfg(feature = "toml")]
             Some("toml") => Ok(Format::Toml),
-            Some(ext) => Err(RunCommandError::UnknownFormatExtension(ext.to_string())),
-            _ => Err(RunCommandError::CannotSpecifyFormat),
+            Some(ext) => Err(RunCommandError::UnknownFormatExtension(ext.to_string()))?,
+            _ => Err(RunCommandError::CannotSpecifyFormat)?,
         }
     }
 
-    pub fn deserialize_testcase<P: AsRef<Path>>(&self, path: P) -> RunCommandResult<Config> {
+    pub fn deserialize_testcase<P: AsRef<Path>>(&self, path: P) -> RelentlessResult_<Config> {
         match self {
             #[cfg(feature = "json")]
             Format::Json => Ok(serde_json::from_reader(File::open(path)?)?),
@@ -237,7 +237,7 @@ impl Format {
         }
     }
 
-    pub fn deserialize_testcase_str(&self, content: &str) -> RunCommandResult<Config> {
+    pub fn deserialize_testcase_str(&self, content: &str) -> RelentlessResult_<Config> {
         match self {
             #[cfg(feature = "json")]
             Format::Json => Ok(serde_json::from_str(content)?),
