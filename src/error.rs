@@ -1,5 +1,7 @@
 use thiserror::Error;
 
+use crate::config::Config;
+
 pub type RelentlessResult<T, E = RelentlessError> = Result<T, E>;
 pub type RelentlessResult_<T, E = RelentlessError_> = Result<T, E>;
 
@@ -39,10 +41,10 @@ pub enum RunCommandError {
     Infallible(#[from] std::convert::Infallible),
     #[error("should be KEY=VALUE format, but `{0}` has no '='")]
     KeyValueFormat(String),
-    #[error(transparent)]
-    CannotParseAsString(#[from] Box<dyn std::error::Error + Send + Sync>),
     #[error("unknown format extension: {0}")]
     UnknownFormatExtension(String),
+    #[error("cannot read some configs: {1:?}")]
+    CannotReadSomeConfigs(Vec<Config>, Vec<Box<Self>>),
     #[error("cannot specify format")]
     CannotSpecifyFormat,
     #[error(transparent)]

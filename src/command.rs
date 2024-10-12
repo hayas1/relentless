@@ -67,10 +67,21 @@ pub struct Relentless {
     pub rps: Option<usize>,
 }
 impl Relentless {
+    /// TODO document
     pub fn configs(&self) -> RunCommandResult<Vec<Config>> {
         let Self { file, .. } = self;
-        file.iter().map(Config::read).collect()
+        let (ok, err): (_, Vec<_>) = file.iter().map(Config::read).partition(Result::is_ok);
+        let (config, errors): (_, Vec<_>) = (
+            ok.into_iter().map(Result::unwrap).collect(),
+            err.into_iter().map(Result::unwrap_err).map(Box::new).collect(),
+        );
+        if errors.is_empty() {
+            Ok(config)
+        } else {
+            Err(RunCommandError::CannotReadSomeConfigs(config, errors))
+        }
     }
+    /// TODO document
     #[cfg(feature = "default-http-client")]
     pub async fn assault(&self) -> RelentlessResult_<Outcome> {
         let configs = self.configs()?;
@@ -78,6 +89,7 @@ impl Relentless {
         let outcome = self.assault_with::<_, _, _, crate::outcome::DefaultEvaluator>(configs, clients).await?;
         Ok(outcome)
     }
+    /// TODO document
     pub async fn assault_with<S, ReqB, ResB, E>(
         &self,
         configs: Vec<Config>,
