@@ -1,4 +1,7 @@
-use std::path::PathBuf;
+use std::{
+    fmt::{Debug, Display},
+    path::PathBuf,
+};
 
 use thiserror::Error;
 
@@ -30,6 +33,34 @@ impl RelentlessError_ {
     }
     pub fn downcast_mut<E: IntoRelentlessError>(&mut self) -> Option<&mut E> {
         self.source.downcast_mut()
+    }
+}
+
+#[derive(Debug)]
+pub struct Inner<T> {
+    detail: T,
+    source: Box<dyn std::error::Error + Send + Sync>,
+}
+impl<T: Display + Debug + Send + Sync + 'static> IntoRelentlessError for Inner<T> {}
+impl<T: Display + Debug> std::error::Error for Inner<T> {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(self.source.as_ref())
+    }
+}
+impl<T: Display> Display for Inner<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "{}: {}", self.detail, self.source)
+    }
+}
+impl From<Box<dyn std::error::Error + Send + Sync + 'static>> for Inner<()> {
+    fn from(source: Box<dyn std::error::Error + Send + Sync + 'static>) -> Self {
+        Inner { detail: (), source }
+    }
+}
+impl Inner<()> {
+    pub fn with<T>(self, detail: T) -> Inner<T> {
+        let source = self.source;
+        Inner { detail, source }
     }
 }
 
