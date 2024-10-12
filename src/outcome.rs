@@ -11,7 +11,7 @@ use serde_json::Value;
 use crate::{
     command::Relentless,
     config::{Coalesced, Destinations, Evaluate, JsonEvaluate, PatchTo, Setting, Testcase, WorkerConfig},
-    error::{RelentlessResult_, Wrap},
+    error::{WrappedResult, Wrap},
 };
 
 #[allow(async_fn_in_trait)] // TODO #[warn(async_fn_in_trait)] by default
@@ -66,20 +66,20 @@ impl DefaultEvaluator {
     pub async fn acceptable(
         cfg: Option<&Evaluate>,
         parts: &Destinations<(http::StatusCode, http::HeaderMap, Bytes)>,
-    ) -> RelentlessResult_<bool> {
+    ) -> WrappedResult<bool> {
         if parts.len() == 1 {
             Self::status(parts).await
         } else {
             Self::compare(cfg, parts).await
         }
     }
-    pub async fn status(parts: &Destinations<(http::StatusCode, http::HeaderMap, Bytes)>) -> RelentlessResult_<bool> {
+    pub async fn status(parts: &Destinations<(http::StatusCode, http::HeaderMap, Bytes)>) -> WrappedResult<bool> {
         Ok(parts.iter().all(|(_name, (s, _h, _b))| s.is_success()))
     }
     pub async fn compare(
         _cfg: Option<&Evaluate>,
         parts: &Destinations<(http::StatusCode, http::HeaderMap, Bytes)>,
-    ) -> RelentlessResult_<bool> {
+    ) -> WrappedResult<bool> {
         let v: Vec<_> = parts.values().collect();
         let pass = v.windows(2).all(|w| w[0] == w[1]);
         Ok(pass)
@@ -91,7 +91,7 @@ impl DefaultEvaluator {
     pub async fn json_acceptable(
         cfg: Option<&Evaluate>,
         parts: &Destinations<(http::StatusCode, http::HeaderMap, Bytes)>,
-    ) -> RelentlessResult_<bool> {
+    ) -> WrappedResult<bool> {
         let values = Self::patched(cfg, parts)?;
 
         let pass = parts.iter().zip(values.into_iter()).collect::<Vec<_>>().windows(2).all(|w| {
@@ -104,7 +104,7 @@ impl DefaultEvaluator {
     pub fn patched(
         cfg: Option<&Evaluate>,
         parts: &Destinations<(http::StatusCode, http::HeaderMap, Bytes)>,
-    ) -> RelentlessResult_<Destinations<Value>> {
+    ) -> WrappedResult<Destinations<Value>> {
         parts
             .iter()
             .map(|(name, (_, _, body))| {
@@ -135,7 +135,7 @@ impl DefaultEvaluator {
         }
     }
 
-    pub fn json_compare(cfg: Option<&Evaluate>, (va, vb): (&Value, &Value)) -> RelentlessResult_<bool> {
+    pub fn json_compare(cfg: Option<&Evaluate>, (va, vb): (&Value, &Value)) -> WrappedResult<bool> {
         let pointers = Self::pointers(&json_patch::diff(va, vb));
         let ignored = pointers.iter().all(|op| {
             cfg.map(|c| match c {
@@ -183,10 +183,10 @@ impl Outcome {
     pub fn exit_code(&self, cmd: Relentless) -> ExitCode {
         (!self.allow(cmd.strict) as u8).into()
     }
-    pub fn report(&self, cmd: &Relentless) -> RelentlessResult_<()> {
+    pub fn report(&self, cmd: &Relentless) -> WrappedResult<()> {
         self.report_to(&mut OutcomeWriter::with_stdout(0), cmd)
     }
-    pub fn report_to<T: std::io::Write>(&self, w: &mut OutcomeWriter<T>, cmd: &Relentless) -> RelentlessResult_<()> {
+    pub fn report_to<T: std::io::Write>(&self, w: &mut OutcomeWriter<T>, cmd: &Relentless) -> WrappedResult<()> {
         for outcome in &self.outcome {
             if !outcome.skip_report(cmd) {
                 outcome.report_to(w, cmd)?;
@@ -218,7 +218,7 @@ impl WorkerOutcome {
         *no_report || *ng_only && self.allow(*strict)
     }
 
-    pub fn report_to<T: std::io::Write>(&self, w: &mut OutcomeWriter<T>, cmd: &Relentless) -> RelentlessResult_<()> {
+    pub fn report_to<T: std::io::Write>(&self, w: &mut OutcomeWriter<T>, cmd: &Relentless) -> WrappedResult<()> {
         let WorkerConfig { name, destinations, .. } = self.config.coalesce();
 
         let side = console::Emoji("🚀", "");
@@ -275,7 +275,7 @@ impl CaseOutcome {
         *no_report || *ng_only && self.allow(*strict)
     }
 
-    pub fn report_to<T: std::io::Write>(&self, w: &mut OutcomeWriter<T>, cmd: &Relentless) -> RelentlessResult_<()> {
+    pub fn report_to<T: std::io::Write>(&self, w: &mut OutcomeWriter<T>, cmd: &Relentless) -> WrappedResult<()> {
         let Testcase { description, target, setting, .. } = self.testcase.coalesce();
 
         let side = if self.pass() { console::Emoji("✅", "PASS") } else { console::Emoji("❌", "FAIL") };

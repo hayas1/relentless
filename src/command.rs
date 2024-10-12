@@ -8,7 +8,7 @@ use tower::Service;
 
 use crate::{
     config::{Config, Destinations},
-    error::{RelentlessResult_, RunCommandError, Wrap},
+    error::{RunCommandError, Wrap, WrappedResult},
     outcome::{Evaluator, Outcome},
     service::FromBodyStructure,
     worker::Control,
@@ -68,7 +68,7 @@ pub struct Relentless {
 }
 impl Relentless {
     /// TODO document
-    pub fn configs(&self) -> RelentlessResult_<Vec<Config>> {
+    pub fn configs(&self) -> WrappedResult<Vec<Config>> {
         let Self { file, .. } = self;
         let (ok, err): (_, Vec<_>) = file.iter().map(Config::read).partition(Result::is_ok);
         let (config, errors): (_, Vec<_>) =
@@ -81,7 +81,7 @@ impl Relentless {
     }
 
     /// TODO document
-    pub fn configs_filtered<W: Write>(&self, mut write: W) -> RelentlessResult_<Vec<Config>> {
+    pub fn configs_filtered<W: Write>(&self, mut write: W) -> WrappedResult<Vec<Config>> {
         match self.configs() {
             Ok(configs) => Ok(configs),
             Err(e) => {

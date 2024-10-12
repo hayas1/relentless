@@ -5,7 +5,7 @@ use crate::service::DefaultHttpClient;
 use crate::{
     command::Relentless,
     config::{Coalesce, Coalesced, Config, Destinations, Protocol, Setting, Testcase, WorkerConfig},
-    error::RelentlessResult_,
+    error::WrappedResult,
     outcome::{CaseOutcome, DefaultEvaluator, Evaluator, Outcome, WorkerOutcome},
     service::FromBodyStructure,
 };
@@ -25,7 +25,7 @@ impl Control<'_, DefaultHttpClient<reqwest::Body, reqwest::Body>, reqwest::Body,
     pub async fn default_http_clients(
         cmd: &Relentless,
         configs: &Vec<Config>,
-    ) -> RelentlessResult_<Vec<Destinations<DefaultHttpClient<reqwest::Body, reqwest::Body>>>> {
+    ) -> WrappedResult<Vec<Destinations<DefaultHttpClient<reqwest::Body, reqwest::Body>>>> {
         let mut clients = Vec::new();
         for c in configs {
             clients.push(Self::default_http_client(cmd, c).await?);
@@ -35,7 +35,7 @@ impl Control<'_, DefaultHttpClient<reqwest::Body, reqwest::Body>, reqwest::Body,
     pub async fn default_http_client(
         cmd: &Relentless,
         config: &Config,
-    ) -> RelentlessResult_<Destinations<DefaultHttpClient<reqwest::Body, reqwest::Body>>> {
+    ) -> WrappedResult<Destinations<DefaultHttpClient<reqwest::Body, reqwest::Body>>> {
         let mut destinations = Destinations::new();
         for (name, _destination) in config.worker_config.destinations.clone().coalesce(&cmd.destination) {
             let client = DefaultHttpClient::<reqwest::Body, reqwest::Body>::new().await?;
@@ -62,7 +62,7 @@ where
         cmd: &'a Relentless,
         configs: Vec<Config>,
         services: Vec<Destinations<S>>,
-    ) -> RelentlessResult_<Self> {
+    ) -> WrappedResult<Self> {
         let mut workers = Vec::new();
         for (config, service) in configs.iter().zip(services) {
             workers.push(Worker::new(cmd, config.worker_config.clone(), service)?);
@@ -79,7 +79,7 @@ where
         Self { _cmd: cmd, workers, cases, phantom }
     }
     /// TODO document
-    pub async fn assault(self) -> RelentlessResult_<Outcome> {
+    pub async fn assault(self) -> WrappedResult<Outcome> {
         let Self { workers, cases, .. } = self;
 
         let mut works = Vec::new();
@@ -121,13 +121,13 @@ where
     E: Evaluator<http::Response<ResB>>,
     E::Error: std::error::Error + Sync + Send + 'static,
 {
-    pub fn new(cmd: &'a Relentless, config: WorkerConfig, clients: Destinations<S>) -> RelentlessResult_<Self> {
+    pub fn new(cmd: &'a Relentless, config: WorkerConfig, clients: Destinations<S>) -> WrappedResult<Self> {
         let config = Coalesced::tuple(config, cmd.destination.clone().into_iter().collect());
         let phantom = PhantomData;
         Ok(Self { _cmd: cmd, config, clients, phantom })
     }
 
-    pub async fn assault(self, cases: Vec<Case<S, ReqB, ResB>>) -> RelentlessResult_<WorkerOutcome> {
+    pub async fn assault(self, cases: Vec<Case<S, ReqB, ResB>>) -> WrappedResult<WorkerOutcome> {
         let Self { config, mut clients, .. } = self;
 
         let mut processes = Vec::new();
@@ -190,7 +190,7 @@ where
         self,
         destinations: &Destinations<String>,
         clients: &mut Destinations<S>,
-    ) -> RelentlessResult_<Destinations<Vec<http::Response<ResB>>>> {
+    ) -> WrappedResult<Destinations<Vec<http::Response<ResB>>>> {
         let Testcase { target, setting, .. } = self.testcase.coalesce();
 
         let mut dest = Destinations::new();
@@ -210,7 +210,7 @@ where
         destinations: &Destinations<String>,
         target: &str,
         setting: &Setting,
-    ) -> RelentlessResult_<Destinations<Vec<http::Request<ReqB>>>> {
+    ) -> WrappedResult<Destinations<Vec<http::Request<ReqB>>>> {
         let Setting { protocol, template, repeat, timeout, .. } = setting;
 
         if !template.is_empty() {
@@ -244,7 +244,7 @@ where
         destination: &str,
         target: &str,
         http: &crate::config::Http,
-    ) -> RelentlessResult_<http::Request<ReqB>> {
+    ) -> WrappedResult<http::Request<ReqB>> {
         let destination = destination.parse::<http::Uri>().unwrap();
         let uri = http::uri::Builder::from(destination).path_and_query(target).build().unwrap();
         let mut request = http::Request::builder()

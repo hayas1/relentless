@@ -7,7 +7,7 @@ use thiserror::Error;
 
 use crate::config::Config;
 
-pub type RelentlessResult_<T, E = Wrap> = Result<T, E>;
+pub type WrappedResult<T, E = Wrap> = Result<T, E>;
 
 #[derive(Error, Debug)]
 #[error(transparent)]

@@ -8,7 +8,7 @@ use std::{
 use http::{HeaderMap, Method};
 use serde::{Deserialize, Serialize};
 
-use crate::error::{RelentlessResult_, RunCommandError};
+use crate::error::{RunCommandError, WrappedResult};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
@@ -128,12 +128,12 @@ pub trait IsDefault: Default + PartialEq<Self> {
 impl<T> IsDefault for T where T: Default + PartialEq<T> {}
 
 impl Config {
-    pub fn read<P: AsRef<Path>>(path: P) -> RelentlessResult_<Self> {
+    pub fn read<P: AsRef<Path>>(path: P) -> WrappedResult<Self> {
         Ok(Format::from_path(path.as_ref())?
             .deserialize_testcase(path.as_ref())
             .map_err(|e| e.context(path.as_ref().display().to_string()))?)
     }
-    pub fn read_str(s: &str, format: Format) -> RelentlessResult_<Self> {
+    pub fn read_str(s: &str, format: Format) -> WrappedResult<Self> {
         format.deserialize_testcase_str(s)
     }
 }
@@ -212,7 +212,7 @@ pub enum Format {
     Toml,
 }
 impl Format {
-    pub fn from_path<P: AsRef<Path>>(path: P) -> RelentlessResult_<Self> {
+    pub fn from_path<P: AsRef<Path>>(path: P) -> WrappedResult<Self> {
         let basename = path.as_ref().extension().and_then(|ext| ext.to_str());
         match basename {
             #[cfg(feature = "json")]
@@ -226,7 +226,7 @@ impl Format {
         }
     }
 
-    pub fn deserialize_testcase<P: AsRef<Path>>(&self, path: P) -> RelentlessResult_<Config> {
+    pub fn deserialize_testcase<P: AsRef<Path>>(&self, path: P) -> WrappedResult<Config> {
         match self {
             #[cfg(feature = "json")]
             Format::Json => Ok(serde_json::from_reader(File::open(path)?)?),
@@ -237,7 +237,7 @@ impl Format {
         }
     }
 
-    pub fn deserialize_testcase_str(&self, content: &str) -> RelentlessResult_<Config> {
+    pub fn deserialize_testcase_str(&self, content: &str) -> WrappedResult<Config> {
         match self {
             #[cfg(feature = "json")]
             Format::Json => Ok(serde_json::from_str(content)?),

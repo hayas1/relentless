@@ -12,7 +12,7 @@ use tower::Service;
 
 use crate::{
     config::BodyStructure,
-    error::{RelentlessResult_, Wrap},
+    error::{WrappedResult, Wrap},
 };
 
 #[cfg(feature = "default-http-client")]
@@ -26,7 +26,7 @@ pub struct DefaultHttpClient<ReqB, ResB> {
 }
 #[cfg(feature = "default-http-client")]
 impl<ReqB, ResB> DefaultHttpClient<ReqB, ResB> {
-    pub async fn new() -> RelentlessResult_<Self> {
+    pub async fn new() -> WrappedResult<Self> {
         // TODO use hyper ? continue to use reqwest's rich client?
         let client = reqwest::Client::builder().user_agent(APP_USER_AGENT).build()?;
         Ok(Self { client, phantom: PhantomData })
