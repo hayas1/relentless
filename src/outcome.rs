@@ -11,7 +11,7 @@ use serde_json::Value;
 use crate::{
     command::Relentless,
     config::{Coalesced, Destinations, Evaluate, JsonEvaluate, PatchTo, Setting, Testcase, WorkerConfig},
-    error::{FormatError, HttpError, JsonError, RelentlessError, RelentlessResult},
+    error::{Wrap, WrappedResult},
 };
 
 #[allow(async_fn_in_trait)] // TODO #[warn(async_fn_in_trait)] by default
@@ -20,17 +20,25 @@ pub trait Evaluator<Res> {
     async fn evaluate(cfg: Option<&Evaluate>, res: Destinations<Res>) -> Result<bool, Self::Error>;
 }
 pub enum DefaultEvaluator {}
-impl<ResB: Body> Evaluator<http::Response<ResB>> for DefaultEvaluator {
-    type Error = RelentlessError;
+impl<ResB: Body> Evaluator<http::Response<ResB>> for DefaultEvaluator
+where
+    ResB::Error: std::error::Error + Sync + Send + 'static,
+{
+    type Error = crate::Error;
     async fn evaluate(cfg: Option<&Evaluate>, res: Destinations<http::Response<ResB>>) -> Result<bool, Self::Error> {
         let parts = Self::parts(res).await?;
         if !cfg!(feature = "json") {
-            Self::acceptable(cfg, &parts).await
+            Ok(Self::acceptable(cfg, &parts).await?)
         } else {
             match Self::json_acceptable(cfg, &parts).await {
                 Ok(v) => Ok(v),
-                Err(RelentlessError::JsonError(JsonError::FailToPatch)) => Ok(false),
-                Err(_) => Self::acceptable(cfg, &parts).await,
+                Err(err) => {
+                    if err.is::<json_patch::PatchError>() {
+                        Ok(false)
+                    } else {
+                        Ok(Self::acceptable(cfg, &parts).await?)
+                    }
+                }
             }
         }
     }
@@ -42,12 +50,14 @@ impl DefaultEvaluator {
     ) -> Result<
         Destinations<(http::StatusCode, http::HeaderMap, Bytes)>,
         <Self as Evaluator<http::Response<ResB>>>::Error,
-    > {
+    >
+    where
+        ResB::Error: std::error::Error + Sync + Send + 'static,
+    {
         let mut d = Destinations::new();
         for (name, r) in res {
             let (http::response::Parts { status, headers, .. }, body) = r.into_parts();
-            let bytes =
-                BodyExt::collect(body).await.map(|buf| buf.to_bytes()).map_err(|_| HttpError::CannotConvertBody)?;
+            let bytes = BodyExt::collect(body).await.map(|buf| buf.to_bytes()).map_err(Wrap::wrapping)?;
             d.insert(name, (status, headers, bytes));
         }
         Ok(d)
@@ -56,20 +66,20 @@ impl DefaultEvaluator {
     pub async fn acceptable(
         cfg: Option<&Evaluate>,
         parts: &Destinations<(http::StatusCode, http::HeaderMap, Bytes)>,
-    ) -> RelentlessResult<bool> {
+    ) -> WrappedResult<bool> {
         if parts.len() == 1 {
             Self::status(parts).await
         } else {
             Self::compare(cfg, parts).await
         }
     }
-    pub async fn status(parts: &Destinations<(http::StatusCode, http::HeaderMap, Bytes)>) -> RelentlessResult<bool> {
+    pub async fn status(parts: &Destinations<(http::StatusCode, http::HeaderMap, Bytes)>) -> WrappedResult<bool> {
         Ok(parts.iter().all(|(_name, (s, _h, _b))| s.is_success()))
     }
     pub async fn compare(
         _cfg: Option<&Evaluate>,
         parts: &Destinations<(http::StatusCode, http::HeaderMap, Bytes)>,
-    ) -> RelentlessResult<bool> {
+    ) -> WrappedResult<bool> {
         let v: Vec<_> = parts.values().collect();
         let pass = v.windows(2).all(|w| w[0] == w[1]);
         Ok(pass)
@@ -81,7 +91,7 @@ impl DefaultEvaluator {
     pub async fn json_acceptable(
         cfg: Option<&Evaluate>,
         parts: &Destinations<(http::StatusCode, http::HeaderMap, Bytes)>,
-    ) -> RelentlessResult<bool> {
+    ) -> WrappedResult<bool> {
         let values = Self::patched(cfg, parts)?;
 
         let pass = parts.iter().zip(values.into_iter()).collect::<Vec<_>>().windows(2).all(|w| {
@@ -94,14 +104,14 @@ impl DefaultEvaluator {
     pub fn patched(
         cfg: Option<&Evaluate>,
         parts: &Destinations<(http::StatusCode, http::HeaderMap, Bytes)>,
-    ) -> RelentlessResult<Destinations<Value>> {
+    ) -> WrappedResult<Destinations<Value>> {
         parts
             .iter()
             .map(|(name, (_, _, body))| {
-                let mut value = serde_json::from_slice(body).map_err(FormatError::from)?;
-                if let Err(json_patch::PatchError { .. }) = Self::patch(cfg, name, &mut value) {
+                let mut value = serde_json::from_slice(body)?;
+                if let Err(e) = Self::patch(cfg, name, &mut value) {
                     if parts.len() == 1 {
-                        Err(JsonError::FailToPatch)?;
+                        Err(e)?;
                     } else {
                         eprintln!("patch was failed"); // TODO warning output
                     }
@@ -125,7 +135,7 @@ impl DefaultEvaluator {
         }
     }
 
-    pub fn json_compare(cfg: Option<&Evaluate>, (va, vb): (&Value, &Value)) -> RelentlessResult<bool> {
+    pub fn json_compare(cfg: Option<&Evaluate>, (va, vb): (&Value, &Value)) -> WrappedResult<bool> {
         let pointers = Self::pointers(&json_patch::diff(va, vb));
         let ignored = pointers.iter().all(|op| {
             cfg.map(|c| match c {
@@ -173,10 +183,10 @@ impl Outcome {
     pub fn exit_code(&self, cmd: Relentless) -> ExitCode {
         (!self.allow(cmd.strict) as u8).into()
     }
-    pub fn report(&self, cmd: &Relentless) -> std::fmt::Result {
+    pub fn report(&self, cmd: &Relentless) -> WrappedResult<()> {
         self.report_to(&mut OutcomeWriter::with_stdout(0), cmd)
     }
-    pub fn report_to<T: std::io::Write>(&self, w: &mut OutcomeWriter<T>, cmd: &Relentless) -> std::fmt::Result {
+    pub fn report_to<T: std::io::Write>(&self, w: &mut OutcomeWriter<T>, cmd: &Relentless) -> WrappedResult<()> {
         for outcome in &self.outcome {
             if !outcome.skip_report(cmd) {
                 outcome.report_to(w, cmd)?;
@@ -208,7 +218,7 @@ impl WorkerOutcome {
         *no_report || *ng_only && self.allow(*strict)
     }
 
-    pub fn report_to<T: std::io::Write>(&self, w: &mut OutcomeWriter<T>, cmd: &Relentless) -> std::fmt::Result {
+    pub fn report_to<T: std::io::Write>(&self, w: &mut OutcomeWriter<T>, cmd: &Relentless) -> WrappedResult<()> {
         let WorkerConfig { name, destinations, .. } = self.config.coalesce();
 
         let side = console::Emoji("🚀", "");
@@ -226,7 +236,7 @@ impl WorkerOutcome {
                     }
                 }
             }
-            Ok::<_, std::fmt::Error>(())
+            Ok::<_, Wrap>(())
         })?;
 
         w.scope(|w| {
@@ -235,7 +245,7 @@ impl WorkerOutcome {
                     outcome.report_to(w, cmd)?;
                 }
             }
-            Ok::<_, std::fmt::Error>(())
+            Ok::<_, Wrap>(())
         })?;
         Ok(())
     }
@@ -265,7 +275,7 @@ impl CaseOutcome {
         *no_report || *ng_only && self.allow(*strict)
     }
 
-    pub fn report_to<T: std::io::Write>(&self, w: &mut OutcomeWriter<T>, cmd: &Relentless) -> std::fmt::Result {
+    pub fn report_to<T: std::io::Write>(&self, w: &mut OutcomeWriter<T>, cmd: &Relentless) -> WrappedResult<()> {
         let Testcase { description, target, setting, .. } = self.testcase.coalesce();
 
         let side = if self.pass() { console::Emoji("✅", "PASS") } else { console::Emoji("❌", "FAIL") };
@@ -316,7 +326,7 @@ impl<T> OutcomeWriter<T> {
     pub fn scope<F, R, E>(&mut self, f: F) -> Result<R, E>
     where
         F: FnOnce(&mut Self) -> Result<R, E>,
-        std::fmt::Error: From<E>,
+        Wrap: From<E>, // TODO remove wrap constraints
     {
         self.increment();
         let ret = f(self)?;

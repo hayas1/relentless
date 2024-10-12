@@ -49,3 +49,4 @@ members = ["examples/server/*"]
 
 [badges]
 github = { repository = "hayas1/relentless", workflow = "Master" }
+maintenance = { status = "experimental" }

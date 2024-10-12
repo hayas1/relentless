@@ -1,4 +1,4 @@
-use std::{path::PathBuf, process::ExitCode};
+use std::{io::Write, path::PathBuf, process::ExitCode};
 
 #[cfg(feature = "cli")]
 use clap::Parser;
@@ -8,7 +8,7 @@ use tower::Service;
 
 use crate::{
     config::{Config, Destinations},
-    error::{RelentlessError, RelentlessResult},
+    error::{RunCommandError, Wrap, WrappedResult},
     outcome::{Evaluator, Outcome},
     service::FromBodyStructure,
     worker::Control,
@@ -67,22 +67,50 @@ pub struct Relentless {
     pub rps: Option<usize>,
 }
 impl Relentless {
-    pub fn configs(&self) -> RelentlessResult<Vec<Config>> {
+    /// TODO document
+    pub fn configs(&self) -> WrappedResult<Vec<Config>> {
         let Self { file, .. } = self;
-        file.iter().map(Config::read).collect::<RelentlessResult<Vec<_>>>()
+        let (ok, err): (_, Vec<_>) = file.iter().map(Config::read).partition(Result::is_ok);
+        let (config, errors): (_, Vec<_>) =
+            (ok.into_iter().map(Result::unwrap).collect(), err.into_iter().map(Result::unwrap_err).collect());
+        if errors.is_empty() {
+            Ok(config)
+        } else {
+            Err(RunCommandError::CannotReadSomeConfigs(config, errors))?
+        }
     }
-    #[cfg(feature = "default-http-client")]
-    pub async fn assault(&self) -> RelentlessResult<Outcome> {
-        let configs = self.configs()?;
+
+    /// TODO document
+    pub fn configs_filtered<W: Write>(&self, mut write: W) -> WrappedResult<Vec<Config>> {
+        match self.configs() {
+            Ok(configs) => Ok(configs),
+            Err(e) => {
+                if let Some(RunCommandError::CannotReadSomeConfigs(configs, err)) = e.downcast_ref() {
+                    for e in err {
+                        writeln!(write, "{}", e)?;
+                    }
+                    Ok(configs.to_vec())
+                } else {
+                    Err(e)?
+                }
+            }
+        }
+    }
+
+    /// TODO document
+    #[cfg(all(feature = "default-http-client", feature = "cli"))]
+    pub async fn assault(&self) -> crate::Result<Outcome> {
+        let configs = self.configs_filtered(std::io::stderr())?;
         let clients = Control::default_http_clients(self, &configs).await?;
         let outcome = self.assault_with::<_, _, _, crate::outcome::DefaultEvaluator>(configs, clients).await?;
         Ok(outcome)
     }
+    /// TODO document
     pub async fn assault_with<S, ReqB, ResB, E>(
         &self,
         configs: Vec<Config>,
         services: Vec<Destinations<S>>,
-    ) -> RelentlessResult<Outcome>
+    ) -> crate::Result<Outcome>
     where
         ReqB: Body + FromBodyStructure + Send + 'static,
         ReqB::Data: Send + 'static,
@@ -91,8 +119,9 @@ impl Relentless {
         ResB::Data: Send + 'static,
         ResB::Error: std::error::Error + Sync + Send + 'static,
         S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + Sync + 'static,
+        S::Error: std::error::Error + Sync + Send + 'static,
         E: Evaluator<http::Response<ResB>>,
-        RelentlessError: From<S::Error> + From<E::Error>,
+        E::Error: std::error::Error + Sync + Send + 'static,
     {
         let Self { no_color, no_report, .. } = self;
         console::set_colors_enabled(!no_color);
@@ -107,15 +136,15 @@ impl Relentless {
 }
 
 #[cfg(feature = "cli")]
-pub fn parse_key_value<T, U>(s: &str) -> Result<(T, U), Box<dyn std::error::Error + Send + Sync + 'static>>
+pub fn parse_key_value<T, U>(s: &str) -> crate::Result<(T, U)>
 where
     T: std::str::FromStr,
     T::Err: std::error::Error + Send + Sync + 'static,
     U: std::str::FromStr,
     U::Err: std::error::Error + Send + Sync + 'static,
 {
-    let (name, destination) = s.split_once('=').ok_or_else(|| format!("invalid KEY=value: no `=` found in `{}`", s))?;
-    Ok((name.parse()?, destination.parse()?))
+    let (name, destination) = s.split_once('=').ok_or_else(|| RunCommandError::KeyValueFormat(s.to_string()))?;
+    Ok((name.parse().map_err(Wrap::wrapping)?, destination.parse().map_err(Wrap::wrapping)?))
 }
 
 #[cfg(test)]

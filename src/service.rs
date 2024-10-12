@@ -12,7 +12,7 @@ use tower::Service;
 
 use crate::{
     config::BodyStructure,
-    error::{RelentlessError, RelentlessResult},
+    error::{Wrap, WrappedResult},
 };
 
 #[cfg(feature = "default-http-client")]
@@ -26,7 +26,7 @@ pub struct DefaultHttpClient<ReqB, ResB> {
 }
 #[cfg(feature = "default-http-client")]
 impl<ReqB, ResB> DefaultHttpClient<ReqB, ResB> {
-    pub async fn new() -> RelentlessResult<Self> {
+    pub async fn new() -> WrappedResult<Self> {
         // TODO use hyper ? continue to use reqwest's rich client?
         let client = reqwest::Client::builder().user_agent(APP_USER_AGENT).build()?;
         Ok(Self { client, phantom: PhantomData })
@@ -60,10 +60,10 @@ where
     }
 }
 
-pub struct BytesBody(BoxBody<Bytes, RelentlessError>);
+pub struct BytesBody(BoxBody<Bytes, crate::Error>);
 impl Body for BytesBody {
     type Data = Bytes;
-    type Error = RelentlessError;
+    type Error = crate::Error;
 
     fn poll_frame(
         mut self: Pin<&mut Self>,
@@ -81,7 +81,7 @@ impl Body for BytesBody {
 impl FromBodyStructure for BytesBody {
     fn from_body_structure(val: BodyStructure) -> Self {
         match val {
-            BodyStructure::Empty => BytesBody(http_body_util::Empty::new().map_err(RelentlessError::from).boxed()),
+            BodyStructure::Empty => BytesBody(http_body_util::Empty::new().map_err(Wrap::error).boxed()),
         }
     }
 }
@@ -106,9 +106,9 @@ pub trait IntoBytesBody {
 impl<T> IntoBytesBody for T
 where
     T: Body<Data = Bytes> + Send + Sync + 'static,
-    T::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
+    T::Error: std::error::Error + Send + Sync,
 {
     fn into_bytes_body(self) -> BytesBody {
-        BytesBody(self.map_err(|e| RelentlessError::from(e.into())).boxed())
+        BytesBody(self.map_err(Wrap::error).boxed())
     }
 }
