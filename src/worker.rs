@@ -5,7 +5,7 @@ use crate::service::DefaultHttpClient;
 use crate::{
     command::Relentless,
     config::{Coalesce, Coalesced, Config, Destinations, Protocol, Setting, Testcase, WorkerConfig},
-    error::{RelentlessError, RelentlessResult},
+    error::RelentlessResult_,
     outcome::{CaseOutcome, DefaultEvaluator, Evaluator, Outcome, WorkerOutcome},
     service::FromBodyStructure,
 };
@@ -25,7 +25,7 @@ impl Control<'_, DefaultHttpClient<reqwest::Body, reqwest::Body>, reqwest::Body,
     pub async fn default_http_clients(
         cmd: &Relentless,
         configs: &Vec<Config>,
-    ) -> RelentlessResult<Vec<Destinations<DefaultHttpClient<reqwest::Body, reqwest::Body>>>> {
+    ) -> RelentlessResult_<Vec<Destinations<DefaultHttpClient<reqwest::Body, reqwest::Body>>>> {
         let mut clients = Vec::new();
         for c in configs {
             clients.push(Self::default_http_client(cmd, c).await?);
@@ -35,7 +35,7 @@ impl Control<'_, DefaultHttpClient<reqwest::Body, reqwest::Body>, reqwest::Body,
     pub async fn default_http_client(
         cmd: &Relentless,
         config: &Config,
-    ) -> RelentlessResult<Destinations<DefaultHttpClient<reqwest::Body, reqwest::Body>>> {
+    ) -> RelentlessResult_<Destinations<DefaultHttpClient<reqwest::Body, reqwest::Body>>> {
         let mut destinations = Destinations::new();
         for (name, _destination) in config.worker_config.destinations.clone().coalesce(&cmd.destination) {
             let client = DefaultHttpClient::<reqwest::Body, reqwest::Body>::new().await?;
@@ -53,15 +53,16 @@ where
     ResB::Data: Send + 'static,
     ResB::Error: std::error::Error + Sync + Send + 'static,
     S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + Sync + 'static,
+    S::Error: std::error::Error + Sync + Send + 'static,
     E: Evaluator<http::Response<ResB>>,
-    RelentlessError: From<S::Error> + From<E::Error>,
+    E::Error: std::error::Error + Sync + Send + 'static,
 {
     /// TODO document
     pub fn with_service(
         cmd: &'a Relentless,
         configs: Vec<Config>,
         services: Vec<Destinations<S>>,
-    ) -> RelentlessResult<Self> {
+    ) -> RelentlessResult_<Self> {
         let mut workers = Vec::new();
         for (config, service) in configs.iter().zip(services) {
             workers.push(Worker::new(cmd, config.worker_config.clone(), service)?);
@@ -78,7 +79,7 @@ where
         Self { _cmd: cmd, workers, cases, phantom }
     }
     /// TODO document
-    pub async fn assault(self) -> RelentlessResult<Outcome> {
+    pub async fn assault(self) -> RelentlessResult_<Outcome> {
         let Self { workers, cases, .. } = self;
 
         let mut works = Vec::new();
@@ -116,16 +117,17 @@ where
     ResB::Data: Send + 'static,
     ResB::Error: std::error::Error + Sync + Send + 'static,
     S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + Sync + 'static,
+    S::Error: std::error::Error + Sync + Send + 'static,
     E: Evaluator<http::Response<ResB>>,
-    RelentlessError: From<S::Error> + From<E::Error>,
+    E::Error: std::error::Error + Sync + Send + 'static,
 {
-    pub fn new(cmd: &'a Relentless, config: WorkerConfig, clients: Destinations<S>) -> RelentlessResult<Self> {
+    pub fn new(cmd: &'a Relentless, config: WorkerConfig, clients: Destinations<S>) -> RelentlessResult_<Self> {
         let config = Coalesced::tuple(config, cmd.destination.clone().into_iter().collect());
         let phantom = PhantomData;
         Ok(Self { _cmd: cmd, config, clients, phantom })
     }
 
-    pub async fn assault(self, cases: Vec<Case<S, ReqB, ResB>>) -> RelentlessResult<WorkerOutcome> {
+    pub async fn assault(self, cases: Vec<Case<S, ReqB, ResB>>) -> RelentlessResult_<WorkerOutcome> {
         let Self { config, mut clients, .. } = self;
 
         let mut processes = Vec::new();
@@ -176,7 +178,7 @@ where
     ResB::Data: Send + 'static,
     ResB::Error: std::error::Error + Sync + Send + 'static,
     S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + Sync + 'static,
-    RelentlessError: From<S::Error>,
+    S::Error: std::error::Error + Sync + Send + 'static,
 {
     pub fn new(worker_config: &WorkerConfig, testcase: Testcase) -> Self {
         let testcase = Coalesced::tuple(testcase, worker_config.setting.clone());
@@ -188,7 +190,7 @@ where
         self,
         destinations: &Destinations<String>,
         clients: &mut Destinations<S>,
-    ) -> RelentlessResult<Destinations<Vec<http::Response<ResB>>>> {
+    ) -> RelentlessResult_<Destinations<Vec<http::Response<ResB>>>> {
         let Testcase { target, setting, .. } = self.testcase.coalesce();
 
         let mut dest = Destinations::new();
@@ -208,7 +210,7 @@ where
         destinations: &Destinations<String>,
         target: &str,
         setting: &Setting,
-    ) -> RelentlessResult<Destinations<Vec<http::Request<ReqB>>>> {
+    ) -> RelentlessResult_<Destinations<Vec<http::Request<ReqB>>>> {
         let Setting { protocol, template, repeat, timeout, .. } = setting;
 
         if !template.is_empty() {
@@ -218,7 +220,7 @@ where
             unimplemented!("timeout is not implemented yet");
         }
 
-        Ok(destinations
+        destinations
             .iter()
             .map(|(name, destination)| {
                 let default_http = Default::default();
@@ -234,7 +236,7 @@ where
                     .unwrap(); // TODO
                 Ok((name.to_string(), requests))
             })
-            .collect::<Result<Destinations<_>, _>>()?)
+            .collect()
     }
 
     // TODO generics
@@ -242,7 +244,7 @@ where
         destination: &str,
         target: &str,
         http: &crate::config::Http,
-    ) -> RelentlessResult<http::Request<ReqB>> {
+    ) -> RelentlessResult_<http::Request<ReqB>> {
         let destination = destination.parse::<http::Uri>().unwrap();
         let uri = http::uri::Builder::from(destination).path_and_query(target).build().unwrap();
         let mut request = http::Request::builder()

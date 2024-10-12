@@ -8,7 +8,7 @@ use tower::Service;
 
 use crate::{
     config::{Config, Destinations},
-    error::{RelentlessError, RelentlessResult_, RunCommandError, RunCommandResult, Wrap},
+    error::{RelentlessResult_, RunCommandError, RunCommandResult, Wrap},
     outcome::{Evaluator, Outcome},
     service::FromBodyStructure,
     worker::Control,
@@ -116,8 +116,9 @@ impl Relentless {
         ResB::Data: Send + 'static,
         ResB::Error: std::error::Error + Sync + Send + 'static,
         S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + Sync + 'static,
+        S::Error: std::error::Error + Sync + Send + 'static,
         E: Evaluator<http::Response<ResB>>,
-        RelentlessError: From<S::Error> + From<E::Error>,
+        E::Error: std::error::Error + Sync + Send + 'static,
     {
         let Self { no_color, no_report, .. } = self;
         console::set_colors_enabled(!no_color);
