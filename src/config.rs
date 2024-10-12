@@ -8,7 +8,7 @@ use std::{
 use http::{HeaderMap, Method};
 use serde::{Deserialize, Serialize};
 
-use crate::error::{FormatError, RelentlessResult};
+use crate::error::{RunCommandError, RunCommandResult};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
@@ -128,11 +128,11 @@ pub trait IsDefault: Default + PartialEq<Self> {
 impl<T> IsDefault for T where T: Default + PartialEq<T> {}
 
 impl Config {
-    pub fn read<P: AsRef<Path>>(path: P) -> RelentlessResult<Self> {
-        Ok(Format::from_path(path.as_ref())?.deserialize_testcase(path.as_ref())?)
+    pub fn read<P: AsRef<Path>>(path: P) -> RunCommandResult<Self> {
+        Format::from_path(path.as_ref())?.deserialize_testcase(path.as_ref())
     }
-    pub fn read_str(s: &str, format: Format) -> RelentlessResult<Self> {
-        Ok(format.deserialize_testcase_str(s)?)
+    pub fn read_str(s: &str, format: Format) -> RunCommandResult<Self> {
+        format.deserialize_testcase_str(s)
     }
 }
 impl Coalesce for WorkerConfig {
@@ -210,7 +210,7 @@ pub enum Format {
     Toml,
 }
 impl Format {
-    pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Self, FormatError> {
+    pub fn from_path<P: AsRef<Path>>(path: P) -> RunCommandResult<Self> {
         let basename = path.as_ref().extension().and_then(|ext| ext.to_str());
         match basename {
             #[cfg(feature = "json")]
@@ -219,12 +219,12 @@ impl Format {
             Some("yaml" | "yml") => Ok(Format::Yaml),
             #[cfg(feature = "toml")]
             Some("toml") => Ok(Format::Toml),
-            Some(ext) => Err(FormatError::UnknownFormatExtension(ext.to_string())),
-            _ => Err(FormatError::CannotSpecifyFormat),
+            Some(ext) => Err(RunCommandError::UnknownFormatExtension(ext.to_string())),
+            _ => Err(RunCommandError::CannotSpecifyFormat),
         }
     }
 
-    pub fn deserialize_testcase<P: AsRef<Path>>(&self, path: P) -> Result<Config, FormatError> {
+    pub fn deserialize_testcase<P: AsRef<Path>>(&self, path: P) -> RunCommandResult<Config> {
         match self {
             #[cfg(feature = "json")]
             Format::Json => Ok(serde_json::from_reader(File::open(path)?)?),
@@ -235,7 +235,7 @@ impl Format {
         }
     }
 
-    pub fn deserialize_testcase_str(&self, content: &str) -> Result<Config, FormatError> {
+    pub fn deserialize_testcase_str(&self, content: &str) -> RunCommandResult<Config> {
         match self {
             #[cfg(feature = "json")]
             Format::Json => Ok(serde_json::from_str(content)?),

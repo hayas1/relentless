@@ -8,7 +8,7 @@ use tower::Service;
 
 use crate::{
     config::{Config, Destinations},
-    error::{RelentlessError, RelentlessResult},
+    error::{RelentlessError, RelentlessResult, RelentlessResult_, RunCommandError, RunCommandResult},
     outcome::{Evaluator, Outcome},
     service::FromBodyStructure,
     worker::Control,
@@ -67,12 +67,12 @@ pub struct Relentless {
     pub rps: Option<usize>,
 }
 impl Relentless {
-    pub fn configs(&self) -> RelentlessResult<Vec<Config>> {
+    pub fn configs(&self) -> RunCommandResult<Vec<Config>> {
         let Self { file, .. } = self;
-        file.iter().map(Config::read).collect::<RelentlessResult<Vec<_>>>()
+        file.iter().map(Config::read).collect()
     }
     #[cfg(feature = "default-http-client")]
-    pub async fn assault(&self) -> RelentlessResult<Outcome> {
+    pub async fn assault(&self) -> RelentlessResult_<Outcome> {
         let configs = self.configs()?;
         let clients = Control::default_http_clients(self, &configs).await?;
         let outcome = self.assault_with::<_, _, _, crate::outcome::DefaultEvaluator>(configs, clients).await?;
@@ -107,14 +107,16 @@ impl Relentless {
 }
 
 #[cfg(feature = "cli")]
-pub fn parse_key_value<T, U>(s: &str) -> Result<(T, U), Box<dyn std::error::Error + Send + Sync + 'static>>
+pub fn parse_key_value<T, U>(s: &str) -> Result<(T, U), RunCommandError>
 where
     T: std::str::FromStr,
     T::Err: std::error::Error + Send + Sync + 'static,
+    RunCommandError: From<T::Err>,
     U: std::str::FromStr,
     U::Err: std::error::Error + Send + Sync + 'static,
+    RunCommandError: From<U::Err>,
 {
-    let (name, destination) = s.split_once('=').ok_or_else(|| format!("invalid KEY=value: no `=` found in `{}`", s))?;
+    let (name, destination) = s.split_once('=').ok_or_else(|| RunCommandError::KeyValueFormat(s.to_string()))?;
     Ok((name.parse()?, destination.parse()?))
 }
 
