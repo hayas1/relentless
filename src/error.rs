@@ -96,22 +96,22 @@ impl Wrap {
 }
 
 pub trait IntoContext: std::error::Error + Send + Sync + 'static + Sized {
-    fn context<T>(self, context: T) -> Context<T> {
+    fn context<C>(self, context: C) -> Context<C> {
         Context { context, source: Box::new(self) }
     }
 }
 impl<E: std::error::Error + Send + Sync + 'static> IntoContext for E {}
 #[derive(Debug)]
-pub struct Context<T> {
-    context: T,
+pub struct Context<C> {
+    context: C,
     source: Box<dyn std::error::Error + Send + Sync>,
 }
-impl<T: Display + Debug> std::error::Error for Context<T> {
+impl<C: Display + Debug> std::error::Error for Context<C> {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         Some(self.source.as_ref())
     }
 }
-impl<T: Display> Display for Context<T> {
+impl<C: Display> Display for Context<C> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "{}: {}", self.context, self.source)
     }
