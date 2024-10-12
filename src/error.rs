@@ -64,6 +64,14 @@ impl DerefMut for Wrap {
         &mut self.0
     }
 }
+impl Wrap {
+    pub fn inner_box(self) -> Box<dyn std::error::Error + Send + Sync> {
+        self.0
+    }
+    pub fn error(self) -> RelentlessError_ {
+        From::from(self)
+    }
+}
 
 pub trait IntoContext: std::error::Error + Send + Sync + 'static + Sized {
     fn context<T>(self, context: T) -> Context<T> {

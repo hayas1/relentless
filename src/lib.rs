@@ -6,3 +6,4 @@ pub mod service;
 pub mod worker;
 
 pub use error::RelentlessError_ as Error;
+pub type Result<T> = error::RelentlessResult_<T, Error>;

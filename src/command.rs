@@ -8,7 +8,7 @@ use tower::Service;
 
 use crate::{
     config::{Config, Destinations},
-    error::{RelentlessError, RelentlessResult, RelentlessResult_, RunCommandError, RunCommandResult},
+    error::{RelentlessError, RunCommandError, RunCommandResult, Wrap},
     outcome::{Evaluator, Outcome},
     service::FromBodyStructure,
     worker::Control,
@@ -96,7 +96,7 @@ impl Relentless {
 
     /// TODO document
     #[cfg(all(feature = "default-http-client", feature = "cli"))]
-    pub async fn assault(&self) -> RelentlessResult_<Outcome> {
+    pub async fn assault(&self) -> crate::Result<Outcome> {
         let configs = self.configs_filtered(std::io::stderr())?;
         let clients = Control::default_http_clients(self, &configs).await?;
         let outcome = self.assault_with::<_, _, _, crate::outcome::DefaultEvaluator>(configs, clients).await?;
@@ -107,7 +107,7 @@ impl Relentless {
         &self,
         configs: Vec<Config>,
         services: Vec<Destinations<S>>,
-    ) -> RelentlessResult<Outcome>
+    ) -> crate::Result<Outcome>
     where
         ReqB: Body + FromBodyStructure + Send + 'static,
         ReqB::Data: Send + 'static,
@@ -125,7 +125,7 @@ impl Relentless {
         let control = Control::<_, _, _, E>::with_service(self, configs, services)?;
         let outcome = control.assault().await?;
         if !no_report {
-            outcome.report(self)?;
+            outcome.report(self).map_err(Wrap::from)?; // TODO!!! report return crate::error::RelentlessResult_
         }
         Ok(outcome)
     }
