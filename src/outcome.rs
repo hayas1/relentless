@@ -11,7 +11,7 @@ use serde_json::Value;
 use crate::{
     command::Relentless,
     config::{Coalesced, Destinations, Evaluate, JsonEvaluate, PatchTo, Setting, Testcase, WorkerConfig},
-    error::{WrappedResult, Wrap},
+    error::{Wrap, WrappedResult},
 };
 
 #[allow(async_fn_in_trait)] // TODO #[warn(async_fn_in_trait)] by default

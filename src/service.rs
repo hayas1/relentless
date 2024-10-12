@@ -12,7 +12,7 @@ use tower::Service;
 
 use crate::{
     config::BodyStructure,
-    error::{WrappedResult, Wrap},
+    error::{Wrap, WrappedResult},
 };
 
 #[cfg(feature = "default-http-client")]
