@@ -183,10 +183,10 @@ impl Outcome {
     pub fn exit_code(&self, cmd: Relentless) -> ExitCode {
         (!self.allow(cmd.strict) as u8).into()
     }
-    pub fn report(&self, cmd: &Relentless) -> std::fmt::Result {
+    pub fn report(&self, cmd: &Relentless) -> RelentlessResult_<()> {
         self.report_to(&mut OutcomeWriter::with_stdout(0), cmd)
     }
-    pub fn report_to<T: std::io::Write>(&self, w: &mut OutcomeWriter<T>, cmd: &Relentless) -> std::fmt::Result {
+    pub fn report_to<T: std::io::Write>(&self, w: &mut OutcomeWriter<T>, cmd: &Relentless) -> RelentlessResult_<()> {
         for outcome in &self.outcome {
             if !outcome.skip_report(cmd) {
                 outcome.report_to(w, cmd)?;
@@ -218,7 +218,7 @@ impl WorkerOutcome {
         *no_report || *ng_only && self.allow(*strict)
     }
 
-    pub fn report_to<T: std::io::Write>(&self, w: &mut OutcomeWriter<T>, cmd: &Relentless) -> std::fmt::Result {
+    pub fn report_to<T: std::io::Write>(&self, w: &mut OutcomeWriter<T>, cmd: &Relentless) -> RelentlessResult_<()> {
         let WorkerConfig { name, destinations, .. } = self.config.coalesce();
 
         let side = console::Emoji("🚀", "");
@@ -236,7 +236,7 @@ impl WorkerOutcome {
                     }
                 }
             }
-            Ok::<_, std::fmt::Error>(())
+            Ok::<_, Wrap>(())
         })?;
 
         w.scope(|w| {
@@ -245,7 +245,7 @@ impl WorkerOutcome {
                     outcome.report_to(w, cmd)?;
                 }
             }
-            Ok::<_, std::fmt::Error>(())
+            Ok::<_, Wrap>(())
         })?;
         Ok(())
     }
@@ -275,7 +275,7 @@ impl CaseOutcome {
         *no_report || *ng_only && self.allow(*strict)
     }
 
-    pub fn report_to<T: std::io::Write>(&self, w: &mut OutcomeWriter<T>, cmd: &Relentless) -> std::fmt::Result {
+    pub fn report_to<T: std::io::Write>(&self, w: &mut OutcomeWriter<T>, cmd: &Relentless) -> RelentlessResult_<()> {
         let Testcase { description, target, setting, .. } = self.testcase.coalesce();
 
         let side = if self.pass() { console::Emoji("✅", "PASS") } else { console::Emoji("❌", "FAIL") };
@@ -326,7 +326,7 @@ impl<T> OutcomeWriter<T> {
     pub fn scope<F, R, E>(&mut self, f: F) -> Result<R, E>
     where
         F: FnOnce(&mut Self) -> Result<R, E>,
-        std::fmt::Error: From<E>,
+        Wrap: From<E>, // TODO remove wrap constraints
     {
         self.increment();
         let ret = f(self)?;

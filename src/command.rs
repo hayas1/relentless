@@ -126,7 +126,7 @@ impl Relentless {
         let control = Control::<_, _, _, E>::with_service(self, configs, services)?;
         let outcome = control.assault().await?;
         if !no_report {
-            outcome.report(self).map_err(Wrap::from)?; // TODO!!! report return crate::error::RelentlessResult_
+            outcome.report(self)?;
         }
         Ok(outcome)
     }
