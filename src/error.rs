@@ -65,11 +65,11 @@ impl DerefMut for Wrap {
     }
 }
 impl Wrap {
-    pub fn inner_box(self) -> Box<dyn std::error::Error + Send + Sync> {
-        self.0
+    pub fn new(e: Box<dyn std::error::Error + Send + Sync>) -> Self {
+        Self(e)
     }
-    pub fn error(self) -> RelentlessError_ {
-        From::from(self)
+    pub fn source(self) -> Box<dyn std::error::Error + Send + Sync> {
+        self.0
     }
     pub fn context<T>(self, context: T) -> Context<T> {
         Context { context, source: self.0 }
