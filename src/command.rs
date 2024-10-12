@@ -102,7 +102,7 @@ impl Relentless {
     pub async fn assault(&self) -> crate::Result<Outcome> {
         let configs = self.configs_filtered(std::io::stderr())?;
         let clients = Control::default_http_clients(self, &configs).await?;
-        let outcome = self.assault_with::<_, _, _, crate::outcome::DefaultEvaluator>(configs, clients).await?;
+        let outcome = self.assault_with(configs, clients, &crate::outcome::DefaultEvaluator).await?;
         Ok(outcome)
     }
     /// TODO document
@@ -110,6 +110,7 @@ impl Relentless {
         &self,
         configs: Vec<Config>,
         services: Vec<Destinations<S>>,
+        evaluator: &E,
     ) -> crate::Result<Outcome>
     where
         ReqB: Body + FromBodyStructure + Send + 'static,
@@ -126,8 +127,8 @@ impl Relentless {
         let Self { no_color, no_report, .. } = self;
         console::set_colors_enabled(!no_color);
 
-        let control = Control::<_, _, _, E>::with_service(self, configs, services)?;
-        let outcome = control.assault().await?;
+        let control = Control::with_service(self, configs, services)?;
+        let outcome = control.assault(evaluator).await?;
         if !no_report {
             outcome.report(self)?;
         }
