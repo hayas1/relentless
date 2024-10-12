@@ -70,6 +70,13 @@ impl Wrap {
     pub fn new(e: Box<dyn std::error::Error + Send + Sync>) -> Self {
         Self(e)
     }
+    pub fn wrapping<E: std::error::Error + Send + Sync + 'static>(e: E) -> Self {
+        Self::from(e)
+    }
+    pub fn error<E: std::error::Error + Send + Sync + 'static>(e: E) -> crate::Error {
+        Self::from(e).into()
+    }
+
     pub fn source(self) -> Box<dyn std::error::Error + Send + Sync> {
         self.0
     }
@@ -98,7 +105,6 @@ pub trait IntoContext: std::error::Error + Send + Sync + 'static + Sized {
     }
 }
 impl<E: std::error::Error + Send + Sync + 'static> IntoContext for E {}
-
 #[derive(Debug)]
 pub struct Context<T> {
     context: T,

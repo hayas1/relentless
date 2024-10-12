@@ -12,7 +12,7 @@ use tower::Service;
 
 use crate::{
     config::BodyStructure,
-    error::{RelentlessError, RelentlessResult_, Wrap},
+    error::{RelentlessResult_, Wrap},
 };
 
 #[cfg(feature = "default-http-client")]
@@ -81,9 +81,7 @@ impl Body for BytesBody {
 impl FromBodyStructure for BytesBody {
     fn from_body_structure(val: BodyStructure) -> Self {
         match val {
-            BodyStructure::Empty => {
-                BytesBody(http_body_util::Empty::new().map_err(Wrap::from).map_err(crate::Error::from).boxed())
-            }
+            BodyStructure::Empty => BytesBody(http_body_util::Empty::new().map_err(Wrap::error).boxed()),
         }
     }
 }
@@ -108,9 +106,9 @@ pub trait IntoBytesBody {
 impl<T> IntoBytesBody for T
 where
     T: Body<Data = Bytes> + Send + Sync + 'static,
-    T::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
+    T::Error: std::error::Error + Send + Sync,
 {
     fn into_bytes_body(self) -> BytesBody {
-        BytesBody(self.map_err(|e| Wrap::new(e.into())).map_err(crate::Error::from).boxed())
+        BytesBody(self.map_err(Wrap::error).boxed())
     }
 }
