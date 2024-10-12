@@ -4,7 +4,54 @@ pub type RelentlessResult<T, E = RelentlessError> = Result<T, E>;
 
 #[derive(Error, Debug)]
 #[error(transparent)]
+pub struct RelentlessError_ {
+    #[from]
+    source: Box<dyn std::error::Error + Send + Sync>,
+}
+impl<T: IntoRelentlessError> From<T> for RelentlessError_ {
+    fn from(e: T) -> Self {
+        RelentlessError_ { source: Box::new(e) }
+    }
+}
+impl RelentlessError_ {
+    pub fn is<E: IntoRelentlessError>(&self) -> bool {
+        self.source.is::<E>()
+    }
+    pub fn downcast<E: IntoRelentlessError>(self) -> Result<Box<E>, Box<dyn std::error::Error + Send + Sync>> {
+        self.source.downcast()
+    }
+    pub fn downcast_ref<E: IntoRelentlessError>(&self) -> Option<&E> {
+        self.source.downcast_ref()
+    }
+    pub fn downcast_mut<E: IntoRelentlessError>(&mut self) -> Option<&mut E> {
+        self.source.downcast_mut()
+    }
+}
+
+// TODO derive macro
+pub trait IntoRelentlessError: std::error::Error + Send + Sync + 'static {}
+
+#[derive(Error, Debug)]
+pub enum RunCommandError {}
+impl IntoRelentlessError for RunCommandError {}
+
+#[derive(Error, Debug)]
+pub enum AssaultError {}
+impl IntoRelentlessError for AssaultError {}
+
+#[derive(Error, Debug)]
+pub enum EvaluateError {}
+impl IntoRelentlessError for EvaluateError {}
+
+#[derive(Error, Debug)]
+pub enum ReportError {}
+impl IntoRelentlessError for ReportError {}
+
+#[derive(Error, Debug)]
+#[error(transparent)]
 pub enum RelentlessError {
+    RelentlessError_(#[from] RelentlessError_),
+
     FormatError(#[from] FormatError),
     HttpError(#[from] HttpError),
     CaseError(#[from] CaseError),
@@ -13,7 +60,6 @@ pub enum RelentlessError {
     ReqwestError(#[from] reqwest::Error),
     HttpInvalidUri(#[from] http::uri::InvalidUri),
     TokioTaskJoinError(#[from] tokio::task::JoinError),
-    StdIoError(#[from] std::io::Error),
     StdFmtError(#[from] std::fmt::Error),
     Infallible(#[from] std::convert::Infallible),
 
