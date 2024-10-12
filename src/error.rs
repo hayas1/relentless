@@ -15,14 +15,15 @@ pub struct RelentlessError {
     #[from]
     source: Box<dyn std::error::Error + Send + Sync>,
 }
-impl<T: IntoRelentlessError> From<T> for RelentlessError {
-    fn from(e: T) -> Self {
-        RelentlessError { source: Box::new(e) }
-    }
-}
 impl From<Wrap> for RelentlessError {
     fn from(wrap: Wrap) -> Self {
         RelentlessError { source: wrap.0 }
+    }
+}
+impl<T> From<Context<T>> for RelentlessError {
+    fn from(context: Context<T>) -> Self {
+        let source = context.source;
+        RelentlessError { source }
     }
 }
 impl RelentlessError {
@@ -101,30 +102,61 @@ impl Wrap {
 }
 
 pub trait IntoContext: std::error::Error + Send + Sync + 'static + Sized {
-    fn context<T>(self, context: T) -> Context<T> {
+    fn context<C>(self, context: C) -> Context<C> {
         Context { context, source: Box::new(self) }
     }
 }
 impl<E: std::error::Error + Send + Sync + 'static> IntoContext for E {}
 #[derive(Debug)]
-pub struct Context<T> {
-    context: T,
+pub struct Context<C> {
+    context: C,
     source: Box<dyn std::error::Error + Send + Sync>,
 }
-impl<T: Display + Debug + Send + Sync + 'static> IntoRelentlessError for Context<T> {}
-impl<T: Display + Debug> std::error::Error for Context<T> {
+impl<C: Display + Debug> std::error::Error for Context<C> {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         Some(self.source.as_ref())
     }
 }
-impl<T: Display> Display for Context<T> {
+impl<C: Display> Display for Context<C> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "{}: {}", self.context, self.source)
     }
 }
 
-// TODO derive macro
-pub trait IntoRelentlessError: std::error::Error + Send + Sync + 'static {}
+pub trait WithContext<T, E, C> {
+    type Err;
+    fn context(self, context: C) -> Result<T, Self::Err>;
+    fn context_with<F>(self, f: F) -> Result<T, Self::Err>
+    where
+        F: FnOnce(&E) -> C;
+}
+impl<T, E: IntoContext, C> WithContext<T, E, C> for Result<T, E> {
+    type Err = Context<C>;
+    fn context(self, context: C) -> Result<T, <Self as WithContext<T, E, C>>::Err> {
+        self.context_with(|_| context)
+    }
+    fn context_with<F>(self, f: F) -> Result<T, <Self as WithContext<T, E, C>>::Err>
+    where
+        F: FnOnce(&E) -> C,
+    {
+        self.map_err(|e| {
+            let context = f(&e);
+            e.context(context)
+        })
+    }
+}
+impl<T, C: std::error::Error + Send + Sync + 'static> WithContext<T, (), C> for Option<T> {
+    type Err = Wrap;
+    fn context(self, context: C) -> Result<T, <Self as WithContext<T, (), C>>::Err> {
+        self.context_with(|_| context)
+    }
+    fn context_with<F>(self, f: F) -> Result<T, <Self as WithContext<T, (), C>>::Err>
+    where
+        F: FnOnce(&()) -> C,
+    {
+        self.ok_or_else(|| f(&()).into())
+    }
+}
 
 #[derive(Error, Debug)]
 pub enum RunCommandError {
@@ -137,16 +169,12 @@ pub enum RunCommandError {
     #[error("cannot specify format")]
     CannotSpecifyFormat,
 }
-impl IntoRelentlessError for RunCommandError {}
 
 #[derive(Error, Debug)]
 pub enum AssaultError {}
-impl IntoRelentlessError for AssaultError {}
 
 #[derive(Error, Debug)]
 pub enum EvaluateError {}
-impl IntoRelentlessError for EvaluateError {}
 
 #[derive(Error, Debug)]
 pub enum ReportError {}
-impl IntoRelentlessError for ReportError {}

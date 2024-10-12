@@ -79,12 +79,12 @@ where
         Self { _cmd: cmd, workers, cases, phantom }
     }
     /// TODO document
-    pub async fn assault(self) -> WrappedResult<Outcome> {
+    pub async fn assault(self, evaluator: &E) -> WrappedResult<Outcome> {
         let Self { workers, cases, .. } = self;
 
         let mut works = Vec::new();
         for (worker, cases) in workers.into_iter().zip(cases.into_iter()) {
-            works.push(worker.assault(cases));
+            works.push(worker.assault(cases, evaluator));
         }
 
         let mut outcomes = Vec::new();
@@ -127,7 +127,7 @@ where
         Ok(Self { _cmd: cmd, config, clients, phantom })
     }
 
-    pub async fn assault(self, cases: Vec<Case<S, ReqB, ResB>>) -> WrappedResult<WorkerOutcome> {
+    pub async fn assault(self, cases: Vec<Case<S, ReqB, ResB>>, evaluator: &E) -> WrappedResult<WorkerOutcome> {
         let Self { config, mut clients, .. } = self;
 
         let mut processes = Vec::new();
@@ -149,7 +149,7 @@ where
                 }
             }
             for res in t {
-                let pass = E::evaluate(evaluate.as_ref(), res).await?;
+                let pass = evaluator.evaluate(evaluate.as_ref(), res).await?;
                 passed += pass as usize;
             }
             outcome.push(CaseOutcome::new(testcase, passed));

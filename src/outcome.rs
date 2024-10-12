@@ -17,15 +17,19 @@ use crate::{
 #[allow(async_fn_in_trait)] // TODO #[warn(async_fn_in_trait)] by default
 pub trait Evaluator<Res> {
     type Error;
-    async fn evaluate(cfg: Option<&Evaluate>, res: Destinations<Res>) -> Result<bool, Self::Error>;
+    async fn evaluate(&self, cfg: Option<&Evaluate>, res: Destinations<Res>) -> Result<bool, Self::Error>;
 }
-pub enum DefaultEvaluator {}
+pub struct DefaultEvaluator;
 impl<ResB: Body> Evaluator<http::Response<ResB>> for DefaultEvaluator
 where
     ResB::Error: std::error::Error + Sync + Send + 'static,
 {
     type Error = crate::Error;
-    async fn evaluate(cfg: Option<&Evaluate>, res: Destinations<http::Response<ResB>>) -> Result<bool, Self::Error> {
+    async fn evaluate(
+        &self,
+        cfg: Option<&Evaluate>,
+        res: Destinations<http::Response<ResB>>,
+    ) -> Result<bool, Self::Error> {
         let parts = Self::parts(res).await?;
         if !cfg!(feature = "json") {
             Ok(Self::acceptable(cfg, &parts).await?)

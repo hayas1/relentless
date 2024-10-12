@@ -254,16 +254,24 @@ mod tests {
     use super::*;
 
     #[test]
+    #[cfg(feature = "yaml")]
     fn test_read_example() {
-        let _assault = Config::read("examples/config/assault.yaml");
         // TODO assert
-
-        let _compare = Config::read("examples/config/compare.yaml");
-        // TODO assert
+        let _assault = Config::read("examples/config/assault.yaml").unwrap();
+        let _compare = Config::read("examples/config/compare.yaml").unwrap();
     }
 
     #[test]
-    fn test_config() {
+    #[cfg(all(feature = "yaml", feature = "json"))]
+    fn test_read_json_example() {
+        // TODO assert
+        let _assault = Config::read("examples/config/assault_json.yaml").unwrap();
+        let _compare = Config::read("examples/config/compare_json.yaml").unwrap();
+    }
+
+    #[test]
+    #[cfg(feature = "yaml")]
+    fn test_config_roundtrip() {
         let example = Config {
             worker_config: WorkerConfig { name: Some("example".to_string()), ..Default::default() },
             testcase: vec![Testcase {
@@ -299,7 +307,7 @@ mod tests {
         let yaml = serde_yaml::to_string(&example).unwrap();
         // println!("{}", yaml);
 
-        let round_trip: Config = serde_yaml::from_str(&yaml).unwrap();
+        let round_trip = Config::read_str(&yaml, Format::Yaml).unwrap();
         assert_eq!(example, round_trip);
     }
 
