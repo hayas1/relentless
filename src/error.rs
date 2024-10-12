@@ -27,16 +27,18 @@ impl From<Wrap> for RelentlessError_ {
     }
 }
 impl RelentlessError_ {
-    pub fn is<E: IntoRelentlessError>(&self) -> bool {
+    pub fn is<E: std::error::Error + Send + Sync + 'static>(&self) -> bool {
         self.source.is::<E>()
     }
-    pub fn downcast<E: IntoRelentlessError>(self) -> Result<Box<E>, Box<dyn std::error::Error + Send + Sync>> {
+    pub fn downcast<E: std::error::Error + Send + Sync + 'static>(
+        self,
+    ) -> Result<Box<E>, Box<dyn std::error::Error + Send + Sync>> {
         self.source.downcast()
     }
-    pub fn downcast_ref<E: IntoRelentlessError>(&self) -> Option<&E> {
+    pub fn downcast_ref<E: std::error::Error + Send + Sync + 'static>(&self) -> Option<&E> {
         self.source.downcast_ref()
     }
-    pub fn downcast_mut<E: IntoRelentlessError>(&mut self) -> Option<&mut E> {
+    pub fn downcast_mut<E: std::error::Error + Send + Sync + 'static>(&mut self) -> Option<&mut E> {
         self.source.downcast_mut()
     }
 }
@@ -74,16 +76,18 @@ impl Wrap {
     pub fn context<T>(self, context: T) -> Context<T> {
         Context { context, source: self.0 }
     }
-    pub fn is<E: IntoRelentlessError>(&self) -> bool {
+    pub fn is<E: std::error::Error + Send + Sync + 'static>(&self) -> bool {
         self.0.is::<E>()
     }
-    pub fn downcast<E: IntoRelentlessError>(self) -> Result<Box<E>, Box<dyn std::error::Error + Send + Sync>> {
+    pub fn downcast<E: std::error::Error + Send + Sync + 'static>(
+        self,
+    ) -> Result<Box<E>, Box<dyn std::error::Error + Send + Sync>> {
         self.0.downcast()
     }
-    pub fn downcast_ref<E: IntoRelentlessError>(&self) -> Option<&E> {
+    pub fn downcast_ref<E: std::error::Error + Send + Sync + 'static>(&self) -> Option<&E> {
         self.0.downcast_ref()
     }
-    pub fn downcast_mut<E: IntoRelentlessError>(&mut self) -> Option<&mut E> {
+    pub fn downcast_mut<E: std::error::Error + Send + Sync + 'static>(&mut self) -> Option<&mut E> {
         self.0.downcast_mut()
     }
 }
@@ -163,9 +167,6 @@ pub enum RelentlessError {
     #[cfg(feature = "json")]
     JsonPatchError(#[from] json_patch::PatchError),
 
-    #[cfg(feature = "json")]
-    JsonError(#[from] JsonError),
-
     BoxError(#[from] Box<dyn std::error::Error + Send + Sync>),
 }
 impl IntoRelentlessError for RelentlessError {}
@@ -208,11 +209,4 @@ pub enum HttpError {
 pub enum CaseError {
     #[error("fail to clone request")]
     FailCloneRequest,
-}
-
-#[cfg(feature = "json")]
-#[derive(Error, Debug)]
-pub enum JsonError {
-    #[error("fail to patch json")]
-    FailToPatch,
 }
