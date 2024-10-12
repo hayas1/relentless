@@ -8,7 +8,7 @@ use std::{
 use http::{HeaderMap, Method};
 use serde::{Deserialize, Serialize};
 
-use crate::error::{IntoContext, RunCommandError, RunCommandResult};
+use crate::error::{IntoContext, RelentlessResult_, RunCommandError, RunCommandResult};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
@@ -128,7 +128,7 @@ pub trait IsDefault: Default + PartialEq<Self> {
 impl<T> IsDefault for T where T: Default + PartialEq<T> {}
 
 impl Config {
-    pub fn read<P: AsRef<Path>>(path: P) -> crate::Result<Self> {
+    pub fn read<P: AsRef<Path>>(path: P) -> RelentlessResult_<Self> {
         Ok(Format::from_path(path.as_ref())?
             .deserialize_testcase(path.as_ref())
             .map_err(|e| e.context(path.as_ref().display().to_string()))?)

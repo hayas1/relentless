@@ -1,11 +1,14 @@
-use std::fmt::{Debug, Display};
+use std::{
+    fmt::{Debug, Display},
+    ops::{Deref, DerefMut},
+};
 
 use thiserror::Error;
 
 use crate::config::Config;
 
 pub type RelentlessResult<T, E = RelentlessError> = Result<T, E>;
-pub type RelentlessResult_<T, E = RelentlessError_> = Result<T, E>;
+pub type RelentlessResult_<T, E = Wrap> = Result<T, E>;
 
 #[derive(Error, Debug)]
 #[error(transparent)]
@@ -16,6 +19,11 @@ pub struct RelentlessError_ {
 impl<T: IntoRelentlessError> From<T> for RelentlessError_ {
     fn from(e: T) -> Self {
         RelentlessError_ { source: Box::new(e) }
+    }
+}
+impl From<Wrap> for RelentlessError_ {
+    fn from(wrap: Wrap) -> Self {
+        RelentlessError_ { source: wrap.0 }
     }
 }
 impl RelentlessError_ {
@@ -30,6 +38,30 @@ impl RelentlessError_ {
     }
     pub fn downcast_mut<E: IntoRelentlessError>(&mut self) -> Option<&mut E> {
         self.source.downcast_mut()
+    }
+}
+
+#[derive(Debug)]
+pub struct Wrap(pub Box<dyn std::error::Error + Send + Sync>);
+impl<E: std::error::Error + Send + Sync + 'static> From<E> for Wrap {
+    fn from(e: E) -> Self {
+        Self(Box::new(e))
+    }
+}
+impl Display for Wrap {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(&*self.0, f)
+    }
+}
+impl Deref for Wrap {
+    type Target = Box<dyn std::error::Error + Send + Sync>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl DerefMut for Wrap {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }
 
@@ -56,22 +88,6 @@ impl<T: Display> Display for Context<T> {
         writeln!(f, "{}: {}", self.context, self.source)
     }
 }
-impl From<Box<dyn std::error::Error + Send + Sync + 'static>> for Context<()> {
-    fn from(source: Box<dyn std::error::Error + Send + Sync + 'static>) -> Self {
-        Context { context: (), source }
-    }
-}
-impl Context<()> {
-    pub fn with<T>(self, detail: T) -> Context<T> {
-        let source = self.source;
-        Context { context: detail, source }
-    }
-}
-impl<T> Context<T> {
-    pub fn new<E: std::error::Error + Send + Sync + 'static>(detail: T, source: E) -> Self {
-        Context { context: detail, source: Box::new(source) }
-    }
-}
 
 // TODO derive macro
 pub trait IntoRelentlessError: std::error::Error + Send + Sync + 'static {}
@@ -84,7 +100,7 @@ pub enum RunCommandError {
     #[error("unknown format extension: {0}")]
     UnknownFormatExtension(String),
     #[error("cannot read some configs: {1:?}")]
-    CannotReadSomeConfigs(Vec<Config>, Vec<crate::Error>),
+    CannotReadSomeConfigs(Vec<Config>, Vec<Wrap>),
     #[error("cannot specify format")]
     CannotSpecifyFormat,
 

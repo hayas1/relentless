@@ -26,7 +26,7 @@ pub async fn execute() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sy
         unimplemented!("`--rps` is not implemented yet");
     }
 
-    let ret = cmd.assault().await?;
+    let ret = cmd.assault().await.map_err(crate::Error::from)?;
     Ok(ret.exit_code(cmd))
 }
 
