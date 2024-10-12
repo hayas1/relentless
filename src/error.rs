@@ -20,6 +20,12 @@ impl From<Wrap> for RelentlessError {
         RelentlessError { source: wrap.0 }
     }
 }
+impl<T> From<Context<T>> for RelentlessError {
+    fn from(context: Context<T>) -> Self {
+        let source = context.source;
+        RelentlessError { source }
+    }
+}
 impl RelentlessError {
     pub fn is<E: std::error::Error + Send + Sync + 'static>(&self) -> bool {
         self.source.is::<E>()
@@ -114,6 +120,44 @@ impl<C: Display + Debug> std::error::Error for Context<C> {
 impl<C: Display> Display for Context<C> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "{}: {}", self.context, self.source)
+    }
+}
+
+pub trait WithContext<T> {
+    type Err;
+    fn context<C>(self, context: C) -> Result<T, Context<C>>;
+    fn context_with<C, F>(self, f: F) -> Result<T, Context<C>>
+    where
+        F: FnOnce(&Self::Err) -> C;
+}
+impl<T, E: IntoContext> WithContext<T> for Result<T, E> {
+    type Err = E;
+    fn context<C>(self, context: C) -> Result<T, Context<C>> {
+        self.context_with(|_| context)
+    }
+    fn context_with<C, F>(self, f: F) -> Result<T, Context<C>>
+    where
+        F: FnOnce(&E) -> C,
+    {
+        self.map_err(|e| {
+            let context = f(&e);
+            e.context(context)
+        })
+    }
+}
+#[derive(Error, Debug)]
+#[error("value is missing")]
+pub struct MissingValue;
+impl<T> WithContext<T> for Option<T> {
+    type Err = MissingValue;
+    fn context<C>(self, context: C) -> Result<T, Context<C>> {
+        self.context_with(|_| context)
+    }
+    fn context_with<C, F>(self, f: F) -> Result<T, Context<C>>
+    where
+        F: FnOnce(&Self::Err) -> C,
+    {
+        self.ok_or_else(|| MissingValue.context(f(&MissingValue)))
     }
 }
 
