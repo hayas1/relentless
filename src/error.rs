@@ -1,7 +1,4 @@
-use std::{
-    fmt::{Debug, Display},
-    path::PathBuf,
-};
+use std::fmt::{Debug, Display};
 
 use thiserror::Error;
 
@@ -36,31 +33,43 @@ impl RelentlessError_ {
     }
 }
 
+pub trait IntoContext: std::error::Error + Send + Sync + 'static + Sized {
+    fn context<T>(self, context: T) -> Context<T> {
+        Context { context, source: Box::new(self) }
+    }
+}
+impl<E: std::error::Error + Send + Sync + 'static> IntoContext for E {}
+
 #[derive(Debug)]
-pub struct Inner<T> {
-    detail: T,
+pub struct Context<T> {
+    context: T,
     source: Box<dyn std::error::Error + Send + Sync>,
 }
-impl<T: Display + Debug + Send + Sync + 'static> IntoRelentlessError for Inner<T> {}
-impl<T: Display + Debug> std::error::Error for Inner<T> {
+impl<T: Display + Debug + Send + Sync + 'static> IntoRelentlessError for Context<T> {}
+impl<T: Display + Debug> std::error::Error for Context<T> {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         Some(self.source.as_ref())
     }
 }
-impl<T: Display> Display for Inner<T> {
+impl<T: Display> Display for Context<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "{}: {}", self.detail, self.source)
+        writeln!(f, "{}: {}", self.context, self.source)
     }
 }
-impl From<Box<dyn std::error::Error + Send + Sync + 'static>> for Inner<()> {
+impl From<Box<dyn std::error::Error + Send + Sync + 'static>> for Context<()> {
     fn from(source: Box<dyn std::error::Error + Send + Sync + 'static>) -> Self {
-        Inner { detail: (), source }
+        Context { context: (), source }
     }
 }
-impl Inner<()> {
-    pub fn with<T>(self, detail: T) -> Inner<T> {
+impl Context<()> {
+    pub fn with<T>(self, detail: T) -> Context<T> {
         let source = self.source;
-        Inner { detail, source }
+        Context { context: detail, source }
+    }
+}
+impl<T> Context<T> {
+    pub fn new<E: std::error::Error + Send + Sync + 'static>(detail: T, source: E) -> Self {
+        Context { context: detail, source: Box::new(source) }
     }
 }
 
@@ -75,7 +84,7 @@ pub enum RunCommandError {
     #[error("unknown format extension: {0}")]
     UnknownFormatExtension(String),
     #[error("cannot read some configs: {1:?}")]
-    CannotReadSomeConfigs(Vec<Config>, Vec<Box<Self>>),
+    CannotReadSomeConfigs(Vec<Config>, Vec<crate::Error>),
     #[error("cannot specify format")]
     CannotSpecifyFormat,
 
@@ -87,23 +96,12 @@ pub enum RunCommandError {
     #[cfg(feature = "json")]
     #[error(transparent)]
     JsonError(#[from] serde_json::Error),
-    #[cfg(feature = "json")]
-    #[error("{0}: {1}")]
-    JsonFileError(PathBuf, serde_json::Error),
-
     #[cfg(feature = "yaml")]
     #[error(transparent)]
     YamlError(#[from] serde_yaml::Error),
-    #[cfg(feature = "yaml")]
-    #[error("{0}: {1}")]
-    YamlFileError(PathBuf, serde_yaml::Error),
-
     #[cfg(feature = "toml")]
     #[error(transparent)]
     TomlError(#[from] toml::de::Error),
-    #[cfg(feature = "toml")]
-    #[error("{0}: {1}")]
-    TomlFileError(PathBuf, toml::de::Error),
 }
 impl IntoRelentlessError for RunCommandError {}
 

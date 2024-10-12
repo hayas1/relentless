@@ -5,4 +5,4 @@ pub mod outcome;
 pub mod service;
 pub mod worker;
 
-pub use error::RelentlessError_ as Error;
+pub use error::{RelentlessError_ as Error, RelentlessResult_ as Result};

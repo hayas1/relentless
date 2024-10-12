@@ -71,10 +71,8 @@ impl Relentless {
     pub fn configs(&self) -> RunCommandResult<Vec<Config>> {
         let Self { file, .. } = self;
         let (ok, err): (_, Vec<_>) = file.iter().map(Config::read).partition(Result::is_ok);
-        let (config, errors): (_, Vec<_>) = (
-            ok.into_iter().map(Result::unwrap).collect(),
-            err.into_iter().map(Result::unwrap_err).map(Box::new).collect(),
-        );
+        let (config, errors): (_, Vec<_>) =
+            (ok.into_iter().map(Result::unwrap).collect(), err.into_iter().map(Result::unwrap_err).collect());
         if errors.is_empty() {
             Ok(config)
         } else {
