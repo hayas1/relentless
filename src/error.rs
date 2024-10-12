@@ -7,7 +7,7 @@ use thiserror::Error;
 
 use crate::config::Config;
 
-pub type WrappedResult<T, E = Wrap> = Result<T, E>;
+pub type RelentlessResult<T, E = RelentlessError> = Result<T, E>;
 
 #[derive(Error, Debug)]
 #[error(transparent)]
@@ -41,6 +41,8 @@ impl RelentlessError {
         self.source.downcast_mut()
     }
 }
+
+pub type WrappedResult<T, E = Wrap> = Result<T, E>;
 
 #[derive(Debug)]
 pub struct Wrap(pub Box<dyn std::error::Error + Send + Sync>);

@@ -5,5 +5,4 @@ pub mod outcome;
 pub mod service;
 pub mod worker;
 
-pub use error::RelentlessError as Error;
-pub type Result<T> = error::WrappedResult<T, Error>;
+pub use {error::RelentlessError as Error, error::RelentlessResult as Result};
