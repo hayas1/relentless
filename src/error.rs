@@ -123,21 +123,19 @@ impl<C: Display> Display for Context<C> {
     }
 }
 
-pub trait WithContext<T, C> {
+pub trait WithContext<T, E, C> {
     type Err;
-    type Context;
-    fn context(self, context: C) -> Result<T, Context<Self::Context>>;
-    fn context_with<F>(self, f: F) -> Result<T, Context<Self::Context>>
+    fn context(self, context: C) -> Result<T, Self::Err>;
+    fn context_with<F>(self, f: F) -> Result<T, Self::Err>
     where
-        F: FnOnce(&Self::Err) -> C;
+        F: FnOnce(&E) -> C;
 }
-impl<T, E: IntoContext, C> WithContext<T, C> for Result<T, E> {
-    type Err = E;
-    type Context = C;
-    fn context(self, context: C) -> Result<T, Context<Self::Context>> {
+impl<T, E: IntoContext, C> WithContext<T, E, C> for Result<T, E> {
+    type Err = Context<C>;
+    fn context(self, context: C) -> Result<T, <Self as WithContext<T, E, C>>::Err> {
         self.context_with(|_| context)
     }
-    fn context_with<F>(self, f: F) -> Result<T, Context<Self::Context>>
+    fn context_with<F>(self, f: F) -> Result<T, <Self as WithContext<T, E, C>>::Err>
     where
         F: FnOnce(&E) -> C,
     {
@@ -147,17 +145,16 @@ impl<T, E: IntoContext, C> WithContext<T, C> for Result<T, E> {
         })
     }
 }
-impl<T, C: IntoContext> WithContext<T, C> for Option<T> {
-    type Err = ();
-    type Context = ();
-    fn context(self, context: C) -> Result<T, Context<Self::Context>> {
+impl<T, C: std::error::Error + Send + Sync + 'static> WithContext<T, (), C> for Option<T> {
+    type Err = Wrap;
+    fn context(self, context: C) -> Result<T, <Self as WithContext<T, (), C>>::Err> {
         self.context_with(|_| context)
     }
-    fn context_with<F>(self, f: F) -> Result<T, Context<Self::Context>>
+    fn context_with<F>(self, f: F) -> Result<T, <Self as WithContext<T, (), C>>::Err>
     where
-        F: FnOnce(&Self::Err) -> C,
+        F: FnOnce(&()) -> C,
     {
-        self.ok_or_else(|| f(&()).context(()))
+        self.ok_or_else(|| f(&()).into())
     }
 }
 
