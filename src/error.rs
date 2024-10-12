@@ -11,21 +11,21 @@ pub type WrappedResult<T, E = Wrap> = Result<T, E>;
 
 #[derive(Error, Debug)]
 #[error(transparent)]
-pub struct RelentlessError_ {
+pub struct RelentlessError {
     #[from]
     source: Box<dyn std::error::Error + Send + Sync>,
 }
-impl<T: IntoRelentlessError> From<T> for RelentlessError_ {
+impl<T: IntoRelentlessError> From<T> for RelentlessError {
     fn from(e: T) -> Self {
-        RelentlessError_ { source: Box::new(e) }
+        RelentlessError { source: Box::new(e) }
     }
 }
-impl From<Wrap> for RelentlessError_ {
+impl From<Wrap> for RelentlessError {
     fn from(wrap: Wrap) -> Self {
-        RelentlessError_ { source: wrap.0 }
+        RelentlessError { source: wrap.0 }
     }
 }
-impl RelentlessError_ {
+impl RelentlessError {
     pub fn is<E: std::error::Error + Send + Sync + 'static>(&self) -> bool {
         self.source.is::<E>()
     }
