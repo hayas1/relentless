@@ -9,7 +9,8 @@ use tower::Service;
 use crate::{
     config::{Config, Destinations},
     error::{IntoContext, MultiWrap, RunCommandError, Wrap, WrappedResult},
-    outcome::{Evaluator, Outcome},
+    evaluate::Evaluator,
+    outcome::Outcome,
     service::FromBodyStructure,
     worker::Control,
 };
@@ -102,7 +103,7 @@ impl Relentless {
     pub async fn assault(&self) -> crate::Result<Outcome> {
         let configs = self.configs_filtered(std::io::stderr())?;
         let clients = Control::default_http_clients(self, &configs).await?;
-        let outcome = self.assault_with(configs, clients, &crate::outcome::DefaultEvaluator).await?;
+        let outcome = self.assault_with(configs, clients, &crate::evaluate::DefaultEvaluator).await?;
         Ok(outcome)
     }
     /// TODO document
