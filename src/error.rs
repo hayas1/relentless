@@ -101,6 +101,40 @@ impl Wrap {
     }
 }
 
+#[derive(Debug)]
+pub struct MultiWrap(pub Vec<Wrap>);
+impl Display for MultiWrap {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // TODO implement ... and more n
+        for wrap in &self.0 {
+            write!(f, "{}", wrap)?;
+        }
+        Ok(())
+    }
+}
+impl std::error::Error for MultiWrap {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        // TODO multiple sources ?
+        self.0.first().map(|w| w.0.as_ref() as _)
+    }
+}
+impl FromIterator<Wrap> for MultiWrap {
+    fn from_iter<T: IntoIterator<Item = Wrap>>(iter: T) -> Self {
+        Self(iter.into_iter().collect())
+    }
+}
+impl Deref for MultiWrap {
+    type Target = Vec<Wrap>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl DerefMut for MultiWrap {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
 pub trait IntoContext: std::error::Error + Send + Sync + 'static + Sized {
     fn context<C>(self, context: C) -> Context<C> {
         Context { context, source: Box::new(self) }
@@ -109,8 +143,8 @@ pub trait IntoContext: std::error::Error + Send + Sync + 'static + Sized {
 impl<E: std::error::Error + Send + Sync + 'static> IntoContext for E {}
 #[derive(Debug)]
 pub struct Context<C> {
-    context: C,
-    source: Box<dyn std::error::Error + Send + Sync>,
+    pub context: C,
+    pub source: Box<dyn std::error::Error + Send + Sync>,
 }
 impl<C: Display + Debug> std::error::Error for Context<C> {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
@@ -121,6 +155,22 @@ impl<C: Display> Display for Context<C> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "{}:", self.context)?;
         write!(f, "{}", self.source)
+    }
+}
+impl<C> Context<C> {
+    pub fn context_ref(&self) -> &C {
+        &self.context
+    }
+    pub fn downcast<E: std::error::Error + Send + Sync + 'static>(
+        self,
+    ) -> Result<Box<E>, Box<dyn std::error::Error + Send + Sync>> {
+        self.source.downcast()
+    }
+    pub fn downcast_ref<E: std::error::Error + Send + Sync + 'static>(&self) -> Option<&E> {
+        self.source.downcast_ref()
+    }
+    pub fn downcast_mut<E: std::error::Error + Send + Sync + 'static>(&mut self) -> Option<&mut E> {
+        self.source.downcast_mut()
     }
 }
 
@@ -165,8 +215,8 @@ pub enum RunCommandError {
     KeyValueFormat(String),
     #[error("`{0}` is unknown extension format")]
     UnknownFormatExtension(String),
-    #[error("cannot read some configs: {1:?}")]
-    CannotReadSomeConfigs(Vec<Config>, Vec<Wrap>),
+    #[error("cannot read some configs")]
+    CannotReadSomeConfigs(Vec<Config>),
     #[error("cannot specify format")]
     CannotSpecifyFormat,
 }

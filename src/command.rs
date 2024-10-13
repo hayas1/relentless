@@ -8,7 +8,7 @@ use tower::Service;
 
 use crate::{
     config::{Config, Destinations},
-    error::{RunCommandError, Wrap, WrappedResult},
+    error::{Context, IntoContext, MultiWrap, RunCommandError, Wrap, WrappedResult},
     outcome::{Evaluator, Outcome},
     service::FromBodyStructure,
     worker::Control,
@@ -71,12 +71,12 @@ impl Relentless {
     pub fn configs(&self) -> WrappedResult<Vec<Config>> {
         let Self { file, .. } = self;
         let (ok, err): (_, Vec<_>) = file.iter().map(Config::read).partition(Result::is_ok);
-        let (config, errors): (_, Vec<_>) =
+        let (configs, errors): (_, MultiWrap) =
             (ok.into_iter().map(Result::unwrap).collect(), err.into_iter().map(Result::unwrap_err).collect());
         if errors.is_empty() {
-            Ok(config)
+            Ok(configs)
         } else {
-            Err(RunCommandError::CannotReadSomeConfigs(config, errors))?
+            Err(errors.context(RunCommandError::CannotReadSomeConfigs(configs)))?
         }
     }
 
@@ -85,11 +85,12 @@ impl Relentless {
         match self.configs() {
             Ok(configs) => Ok(configs),
             Err(e) => {
-                if let Some(RunCommandError::CannotReadSomeConfigs(configs, err)) = e.downcast_ref() {
-                    for e in err {
-                        writeln!(write, "{}", e)?;
+                if let Some(Context::<RunCommandError> { context, source }) = e.downcast_ref() {
+                    writeln!(write, "{}", source)?;
+                    match context {
+                        RunCommandError::CannotReadSomeConfigs(configs) => Ok(configs.to_vec()),
+                        _ => Err(e)?,
                     }
-                    Ok(configs.to_vec())
                 } else {
                     Err(e)?
                 }
