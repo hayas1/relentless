@@ -189,20 +189,39 @@ mod tests {
             Err(_) => panic!("specify multiple files should be ok"),
         };
 
-        match Relentless::try_parse_from(["relentless", "--file", "examples/config/*.yaml", "--file"]) {
+        // `--file examples/config/*.yaml` will expand as this by shell
+        match Relentless::try_parse_from([
+            "relentless",
+            "--file",
+            "examples/config/assault.yaml",
+            "examples/config/compare.yaml",
+        ]) {
             Ok(cmd) => assert_eq!(
                 cmd,
                 Relentless {
                     file: vec![
-                        // WARN: * may be wildcard in shell, clap doesn't support it
-                        PathBuf::from("examples/config/*.yaml"),
-                        // PathBuf::from("examples/config/assault.yaml"),
-                        // PathBuf::from("examples/config/compare.yaml")
+                        PathBuf::from("examples/config/assault.yaml"),
+                        PathBuf::from("examples/config/compare.yaml")
                     ],
                     ..Default::default()
                 }
             ),
             Err(_) => panic!("specify multiple files should be ok"),
         };
+    }
+
+    #[test]
+    #[cfg(feature = "cli")]
+    fn test_parse_key_value_err() {
+        let err_msg = Relentless::try_parse_from([
+            "relentless",
+            "--file",
+            "examples/config/*.yaml",
+            "--destination",
+            "key-value",
+        ])
+        .unwrap_err()
+        .to_string();
+        assert!(err_msg.contains(&RunCommandError::KeyValueFormat("key-value".to_string()).to_string()));
     }
 }
