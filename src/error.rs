@@ -193,7 +193,7 @@ impl<C: Display + Debug> std::error::Error for Context<C> {
 impl<C: Display> Display for Context<C> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "{}:", self.context)?;
-        write!(f, "{}", self.source)
+        writeln!(f, "{}", self.source)
     }
 }
 impl<C> Context<C> {
