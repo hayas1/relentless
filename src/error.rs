@@ -49,7 +49,7 @@ pub type WrappedResult<T, E = Wrap> = Result<T, E>;
 pub struct Wrap(pub Box<dyn std::error::Error + Send + Sync>);
 impl<E: std::error::Error + Send + Sync + 'static> From<E> for Wrap {
     fn from(e: E) -> Self {
-        Self(Box::new(e))
+        Self::new(Box::new(e))
     }
 }
 impl Display for Wrap {
