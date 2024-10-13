@@ -246,13 +246,13 @@ mod tests {
     #[test]
     fn test_nested_context() {
         fn nested_context() -> WrappedResult<()> {
-            Err(Err(RunCommandError::CannotSpecifyFormat).context(1).context(2).context(3)?)
+            Err(Err(RunCommandError::CannotSpecifyFormat).context(true).context("two").context(3)?)
         }
 
         let err = nested_context().unwrap_err();
         let Context { context: 3, source } = err.downcast_ref().unwrap() else { panic!() };
-        let Context { context: 2, source } = source.downcast_ref().unwrap() else { panic!() };
-        let Context { context: 1, source } = source.downcast_ref().unwrap() else { panic!() };
+        let Context { context: "two", source } = source.downcast_ref().unwrap() else { panic!() };
+        let Context { context: true, source } = source.downcast_ref().unwrap() else { panic!() };
         assert_eq!(source.downcast_ref(), Some(&RunCommandError::CannotSpecifyFormat));
     }
 }
