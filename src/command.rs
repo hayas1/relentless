@@ -242,7 +242,7 @@ mod tests {
             warn,
             [
                 r#"tests/config/invalid/invalid_config.yaml:"#,
-                r#"invalid type: string "this file is not yaml", expected struct Config"#,
+                r#"invalid type: string "simple string yaml", expected struct Config"#,
                 r#""#,
             ]
             .join("\n")
