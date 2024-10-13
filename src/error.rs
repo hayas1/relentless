@@ -163,7 +163,7 @@ impl<T, C: std::error::Error + Send + Sync + 'static> WithContext<T, (), C> for 
 pub enum RunCommandError {
     #[error("should be KEY=VALUE format, but `{0}` has no '='")]
     KeyValueFormat(String),
-    #[error("unknown format extension: {0}")]
+    #[error("`{0}` is unknown extension format")]
     UnknownFormatExtension(String),
     #[error("cannot read some configs: {1:?}")]
     CannotReadSomeConfigs(Vec<Config>, Vec<Wrap>),
