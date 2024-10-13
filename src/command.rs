@@ -244,7 +244,6 @@ mod tests {
                 r#"tests/config/invalid/invalid_config.yaml:"#,
                 r#"invalid type: string "simple string yaml", expected struct Config"#,
                 r#""#,
-                r#""#,
             ]
             .join("\n")
         )

@@ -142,9 +142,17 @@ impl Wrap {
 pub struct MultiWrap(pub Vec<Wrap>);
 impl Display for MultiWrap {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // TODO implement ... and more n
-        for wrap in &self.0 {
-            write!(f, "{}", wrap)?;
+        let (m, n) = (self.0.len(), 3);
+        for (i, wrap) in self.0[..n.min(m)].iter().enumerate() {
+            if i < n.min(m) - 1 {
+                writeln!(f, "{}", wrap)?;
+            } else {
+                write!(f, "{}", wrap)?;
+            }
+        }
+        if m > n {
+            writeln!(f)?;
+            write!(f, "... and {} more", m - n)?;
         }
         Ok(())
     }
@@ -193,7 +201,7 @@ impl<C: Display + Debug> std::error::Error for Context<C> {
 impl<C: Display> Display for Context<C> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "{}:", self.context)?;
-        writeln!(f, "{}", self.source)
+        write!(f, "{}", self.source)
     }
 }
 impl<C> Context<C> {
@@ -318,5 +326,62 @@ mod tests {
         }
 
         assert_eq!(crate_error().unwrap_err().downcast_ref(), Some(&RunCommandError::CannotSpecifyFormat));
+    }
+
+    #[test]
+    fn test_multi_wrap() {
+        fn multi_wrap(n: usize) -> WrappedResult<()> {
+            Err((0..n).map(|_| RunCommandError::CannotSpecifyFormat.into()).collect::<MultiWrap>())?
+        }
+
+        assert_eq!(multi_wrap(0).unwrap_err().to_string(), "");
+        assert_eq!(
+            multi_wrap(1).unwrap_err().to_string(),
+            [format!("{}", RunCommandError::CannotSpecifyFormat)].join("\n")
+        );
+        assert_eq!(
+            multi_wrap(2).unwrap_err().to_string(),
+            [format!("{}", RunCommandError::CannotSpecifyFormat), format!("{}", RunCommandError::CannotSpecifyFormat),]
+                .join("\n")
+        );
+        assert_eq!(
+            multi_wrap(3).unwrap_err().to_string(),
+            [
+                format!("{}", RunCommandError::CannotSpecifyFormat),
+                format!("{}", RunCommandError::CannotSpecifyFormat),
+                format!("{}", RunCommandError::CannotSpecifyFormat),
+            ]
+            .join("\n")
+        );
+        assert_eq!(
+            multi_wrap(4).unwrap_err().to_string(),
+            [
+                &format!("{}", RunCommandError::CannotSpecifyFormat),
+                &format!("{}", RunCommandError::CannotSpecifyFormat),
+                &format!("{}", RunCommandError::CannotSpecifyFormat),
+                r#"... and 1 more"#,
+            ]
+            .join("\n")
+        );
+        assert_eq!(
+            multi_wrap(5).unwrap_err().to_string(),
+            [
+                &format!("{}", RunCommandError::CannotSpecifyFormat),
+                &format!("{}", RunCommandError::CannotSpecifyFormat),
+                &format!("{}", RunCommandError::CannotSpecifyFormat),
+                r#"... and 2 more"#,
+            ]
+            .join("\n")
+        );
+        assert_eq!(
+            multi_wrap(100).unwrap_err().to_string(),
+            [
+                &format!("{}", RunCommandError::CannotSpecifyFormat),
+                &format!("{}", RunCommandError::CannotSpecifyFormat),
+                &format!("{}", RunCommandError::CannotSpecifyFormat),
+                r#"... and 97 more"#,
+            ]
+            .join("\n")
+        );
     }
 }
