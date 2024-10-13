@@ -85,12 +85,13 @@ impl Relentless {
         match self.configs() {
             Ok(configs) => Ok(configs),
             Err(e) => {
-                if let Some(Context::<RunCommandError> { context, source }) = e.downcast_ref() {
+                if let Some(Context::<RunCommandError> {
+                    context: RunCommandError::CannotReadSomeConfigs(configs),
+                    source,
+                }) = e.downcast_ref()
+                {
                     writeln!(write, "{}", source)?;
-                    match context {
-                        RunCommandError::CannotReadSomeConfigs(configs) => Ok(configs.to_vec()),
-                        _ => Err(e)?,
-                    }
+                    Ok(configs.to_vec())
                 } else {
                     Err(e)?
                 }
