@@ -209,7 +209,7 @@ impl<T, C: std::error::Error + Send + Sync + 'static> WithContext<T, (), C> for 
     }
 }
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum RunCommandError {
     #[error("should be KEY=VALUE format, but `{0}` has no '='")]
     KeyValueFormat(String),
@@ -221,11 +221,25 @@ pub enum RunCommandError {
     CannotSpecifyFormat,
 }
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum AssaultError {}
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum EvaluateError {}
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum ReportError {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_wrap() {
+        fn wrap_any_error() -> WrappedResult<()> {
+            Err(RunCommandError::CannotSpecifyFormat)?
+        }
+
+        assert_eq!(wrap_any_error().unwrap_err().downcast_ref(), Some(&RunCommandError::CannotSpecifyFormat));
+    }
+}
