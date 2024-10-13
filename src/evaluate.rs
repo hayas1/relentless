@@ -161,3 +161,26 @@ impl DefaultEvaluator {
             .collect()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_default_assault_evaluate() {
+        let response =
+            http::Response::builder().status(http::StatusCode::OK).body(http_body_util::Empty::<Bytes>::new()).unwrap();
+        let destination = Destinations::from_iter(vec![("test".to_string(), response)]);
+        let evaluator = DefaultEvaluator {};
+        let result = evaluator.evaluate(None, destination).await.unwrap();
+        assert!(result);
+
+        let response = http::Response::builder()
+            .status(http::StatusCode::SERVICE_UNAVAILABLE)
+            .body(http_body_util::Empty::<Bytes>::new())
+            .unwrap();
+        let destination = Destinations::from_iter(vec![("test".to_string(), response)]);
+        let result = evaluator.evaluate(None, destination).await.unwrap();
+        assert!(!result);
+    }
+}
