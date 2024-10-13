@@ -224,4 +224,20 @@ mod tests {
         .to_string();
         assert!(err_msg.contains(&RunCommandError::KeyValueFormat("key-value".to_string()).to_string()));
     }
+
+    #[test]
+    #[cfg(all(feature = "yaml", feature = "json"))]
+    fn test_read_configs_filtered() {
+        let cmd = Relentless {
+            file: glob::glob("tests/config/**/*.yaml").unwrap().collect::<Result<Vec<_>, _>>().unwrap(),
+            ..Default::default()
+        };
+        let mut buf = Vec::new();
+        let configs = cmd.configs_filtered(&mut buf).unwrap();
+        assert_eq!(configs.len(), glob::glob("tests/config/valid/**/*.yaml").unwrap().filter(Result::is_ok).count());
+
+        let warn = String::from_utf8_lossy(&buf);
+        // println!("{}", warn);
+        assert!(warn.contains("tests/config/invalid/invalid_config.yaml"));
+    }
 }
