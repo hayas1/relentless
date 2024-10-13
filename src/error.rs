@@ -99,6 +99,43 @@ impl Wrap {
     pub fn downcast_mut<E: std::error::Error + Send + Sync + 'static>(&mut self) -> Option<&mut E> {
         self.0.downcast_mut()
     }
+
+    pub fn is_context<C: Display + Debug + 'static>(&self) -> bool {
+        self.0.is::<Context<C>>()
+    }
+    pub fn downcast_context<C: Display + Debug + 'static, E: std::error::Error + Send + Sync + 'static>(
+        self,
+    ) -> Result<(C, Box<E>), Box<dyn std::error::Error + Send + Sync>> {
+        match self.0.downcast::<Context<C>>() {
+            Ok(c) => {
+                let (context, source) = c.unpack();
+                Ok((context, source.downcast()?))
+            }
+            Err(source) => Err(source),
+        }
+    }
+    pub fn downcast_context_ref<C: Display + Debug + 'static, E: std::error::Error + Send + Sync + 'static>(
+        &self,
+    ) -> Option<(&C, &E)> {
+        match self.0.downcast_ref::<Context<C>>() {
+            Some(c) => {
+                let (context, source) = c.unpack_ref();
+                Some((context, source.downcast_ref()?))
+            }
+            None => None,
+        }
+    }
+    pub fn downcast_context_mut<C: Display + Debug + 'static, E: std::error::Error + Send + Sync + 'static>(
+        &mut self,
+    ) -> Option<(&C, &mut E)> {
+        match self.0.downcast_mut::<Context<C>>() {
+            Some(c) => {
+                let (context, source) = c.unpack_mut();
+                Some((context, source.downcast_mut()?))
+            }
+            None => None,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -135,16 +172,18 @@ impl DerefMut for MultiWrap {
     }
 }
 
-pub trait IntoContext: std::error::Error + Send + Sync + 'static + Sized {
+pub trait IntoContext: std::error::Error + Send + Sync {
+    fn context<C>(self, context: C) -> Context<C>;
+}
+impl<E: std::error::Error + Send + Sync + 'static> IntoContext for E {
     fn context<C>(self, context: C) -> Context<C> {
         Context { context, source: Box::new(self) }
     }
 }
-impl<E: std::error::Error + Send + Sync + 'static> IntoContext for E {}
 #[derive(Debug)]
 pub struct Context<C> {
-    pub context: C,
-    pub source: Box<dyn std::error::Error + Send + Sync>,
+    context: C,
+    source: Box<dyn std::error::Error + Send + Sync>,
 }
 impl<C: Display + Debug> std::error::Error for Context<C> {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
@@ -158,8 +197,21 @@ impl<C: Display> Display for Context<C> {
     }
 }
 impl<C> Context<C> {
+    pub fn unpack(self) -> (C, Box<dyn std::error::Error + Send + Sync>) {
+        (self.context, self.source)
+    }
+    #[allow(clippy::borrowed_box)] // TODO
+    pub fn unpack_ref(&self) -> (&C, &Box<dyn std::error::Error + Send + Sync>) {
+        (&self.context, &self.source)
+    }
+    pub fn unpack_mut(&mut self) -> (&C, &mut Box<dyn std::error::Error + Send + Sync>) {
+        (&self.context, &mut self.source)
+    }
     pub fn context_ref(&self) -> &C {
         &self.context
+    }
+    pub fn context_mut(&mut self) -> &mut C {
+        &mut self.context
     }
     pub fn downcast<E: std::error::Error + Send + Sync + 'static>(
         self,

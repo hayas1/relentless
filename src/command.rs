@@ -8,7 +8,7 @@ use tower::Service;
 
 use crate::{
     config::{Config, Destinations},
-    error::{Context, IntoContext, MultiWrap, RunCommandError, Wrap, WrappedResult},
+    error::{IntoContext, MultiWrap, RunCommandError, Wrap, WrappedResult},
     outcome::{Evaluator, Outcome},
     service::FromBodyStructure,
     worker::Control,
@@ -85,10 +85,8 @@ impl Relentless {
         match self.configs() {
             Ok(configs) => Ok(configs),
             Err(e) => {
-                if let Some(Context::<RunCommandError> {
-                    context: RunCommandError::CannotReadSomeConfigs(configs),
-                    source,
-                }) = e.downcast_ref()
+                if let Some((RunCommandError::CannotReadSomeConfigs(configs), source)) =
+                    e.downcast_context_ref::<_, MultiWrap>()
                 {
                     writeln!(write, "{}", source)?;
                     Ok(configs.to_vec())
