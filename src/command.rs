@@ -237,7 +237,15 @@ mod tests {
         assert_eq!(configs.len(), glob::glob("tests/config/valid/**/*.yaml").unwrap().filter(Result::is_ok).count());
 
         let warn = String::from_utf8_lossy(&buf);
-        // println!("{}", warn);
         assert!(warn.contains("tests/config/invalid/invalid_config.yaml"));
+        assert_eq!(
+            warn,
+            [
+                r#"tests/config/invalid/invalid_config.yaml:"#,
+                r#"invalid type: string "this file is not yaml", expected struct Config"#,
+                r#""#,
+            ]
+            .join("\n")
+        )
     }
 }
