@@ -31,8 +31,9 @@ jobs:
     - run: cargo clippy --tests --manifest-path examples/server/http/Cargo.toml -- --deny warnings
 
     - run: cargo test --verbose
-    - run: cargo test --verbose --features=json --features=yaml
-    - run: cargo test --verbose --features=json --features=yaml --features=cli
+    - run: cargo test --verbose --no-default-features
+    - run: cargo test --verbose --no-default-features --features=json --features=yaml
+    - run: cargo test --verbose --no-default-features --features=json --features=yaml --features=cli
     - run: cargo fmt --check
     - run: RUSTDOCFLAGS="-D warnings" cargo doc --no-deps
     - run: cargo clippy --tests -- --deny warnings
