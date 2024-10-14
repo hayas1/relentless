@@ -134,4 +134,20 @@ mod tests {
         assert_eq!(res.status(), 200);
         assert_eq!(res.text().await.unwrap(), "hello world");
     }
+
+    #[tokio::test]
+    async fn test_from_body_structure_empty() {
+        let bytes_body = BytesBody::from_body_structure(BodyStructure::Empty);
+        assert!(bytes_body.is_end_stream());
+
+        let bytes1 = BodyExt::collect(http_body_util::Empty::<Bytes>::from_body_structure(BodyStructure::Empty))
+            .await
+            .map(http_body_util::Collected::to_bytes)
+            .unwrap();
+        let bytes2 = BodyExt::collect(http_body_util::Empty::<Bytes>::new())
+            .await
+            .map(http_body_util::Collected::to_bytes)
+            .unwrap();
+        assert_eq!(bytes1, bytes2);
+    }
 }
