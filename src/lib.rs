@@ -1,3 +1,12 @@
+//! Relentless HTTP load testing / comparison testing tool
+//!
+//! # Usage
+//! TODO
+//!
+//! # Testing
+//! ## coverage
+//! https://hayas1.github.io/relentless/tarpaulin-report.html
+
 pub mod command;
 pub mod config;
 pub mod error;
