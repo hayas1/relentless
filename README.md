@@ -8,6 +8,9 @@ Relentless HTTP load testing / comparison testing tool
 ## Usage
 TODO
 
+## Documents
+<https://hayas1.github.io/relentless/relentless>
+
 ## Testing
 ### coverage
-https://hayas1.github.io/relentless/tarpaulin-report.html
+<https://hayas1.github.io/relentless/tarpaulin-report.html>

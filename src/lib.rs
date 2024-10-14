@@ -3,9 +3,12 @@
 //! # Usage
 //! TODO
 //!
+//! # Documents
+//! <https://hayas1.github.io/relentless/relentless>
+//!
 //! # Testing
 //! ## coverage
-//! https://hayas1.github.io/relentless/tarpaulin-report.html
+//! <https://hayas1.github.io/relentless/tarpaulin-report.html>
 
 pub mod command;
 pub mod config;
