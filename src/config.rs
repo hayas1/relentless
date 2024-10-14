@@ -8,7 +8,7 @@ use std::{
 use http::{HeaderMap, Method};
 use serde::{Deserialize, Serialize};
 
-use crate::error::{RunCommandError, WithContext, WrappedResult};
+use crate::error::{RunCommandError, WrappedResult};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
@@ -234,7 +234,11 @@ impl Format {
             Format::Yaml => Ok(serde_yaml::from_reader(File::open(path)?)?),
             #[cfg(feature = "toml")]
             Format::Toml => Ok(toml::from_str(&read_to_string(path)?)?),
-            _ => Err(RunCommandError::UndefinedSerializeFormat).context(path.as_ref().display().to_string())?,
+            #[cfg(not(any(feature = "json", feature = "yaml", feature = "toml")))]
+            _ => {
+                use crate::error::WithContext;
+                Err(RunCommandError::UndefinedSerializeFormat).context(path.as_ref().display().to_string())?
+            }
         }
     }
 
@@ -246,7 +250,11 @@ impl Format {
             Format::Yaml => Ok(serde_yaml::from_str(content)?),
             #[cfg(feature = "toml")]
             Format::Toml => Ok(toml::from_str(content)?),
-            _ => Err(RunCommandError::UndefinedSerializeFormat).context(content.to_string())?,
+            #[cfg(not(any(feature = "json", feature = "yaml", feature = "toml")))]
+            _ => {
+                use crate::error::WithContext;
+                Err(RunCommandError::UndefinedSerializeFormat).context(content.to_string())?
+            }
         }
     }
 }
@@ -256,6 +264,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[cfg(not(any(feature = "json", feature = "yaml", feature = "toml")))]
     fn test_no_default_features() {
         let err = Config::read("path/to/config.yaml").unwrap_err();
         assert_eq!(err.downcast_ref(), Some(&RunCommandError::UnknownFormatExtension("yaml".to_string())));
