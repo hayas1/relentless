@@ -31,8 +31,9 @@ jobs:
     - run: cargo clippy --tests --manifest-path examples/server/http/Cargo.toml -- --deny warnings
 
     - run: cargo test --verbose
-    - run: cargo test --verbose --features=json --features=yaml
-    - run: cargo test --verbose --features=json --features=yaml --features=cli
+    - run: cargo test --verbose --no-default-features
+    - run: cargo test --verbose --no-default-features --features=json --features=yaml
+    - run: cargo test --verbose --no-default-features --features=json --features=yaml --features=cli
     - run: cargo fmt --check
     - run: RUSTDOCFLAGS="-D warnings" cargo doc --no-deps
     - run: cargo clippy --tests -- --deny warnings
@@ -76,7 +77,7 @@ jobs:
         set -euo pipefail
         {
           echo '```'
-          cargo run --features cli -- -f examples/config/*.yaml -d actual=http://localhost:3001 --no-color
+          cargo run --features cli -- -f examples/config/*.yaml -d actual=http://localhost:3001 --no-color --ng-only
           echo '```'
         } > target/outcome.txt
     - name: Comment on pull request

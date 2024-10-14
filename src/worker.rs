@@ -6,7 +6,8 @@ use crate::{
     command::Relentless,
     config::{Coalesce, Coalesced, Config, Destinations, Protocol, Setting, Testcase, WorkerConfig},
     error::WrappedResult,
-    outcome::{CaseOutcome, DefaultEvaluator, Evaluator, Outcome, WorkerOutcome},
+    evaluate::{DefaultEvaluator, Evaluator},
+    outcome::{CaseOutcome, Outcome, WorkerOutcome},
     service::FromBodyStructure,
 };
 use http_body::Body;

@@ -49,7 +49,7 @@ pub type WrappedResult<T, E = Wrap> = Result<T, E>;
 pub struct Wrap(pub Box<dyn std::error::Error + Send + Sync>);
 impl<E: std::error::Error + Send + Sync + 'static> From<E> for Wrap {
     fn from(e: E) -> Self {
-        Self(Box::new(e))
+        Self::new(Box::new(e))
     }
 }
 impl Display for Wrap {
@@ -99,14 +99,95 @@ impl Wrap {
     pub fn downcast_mut<E: std::error::Error + Send + Sync + 'static>(&mut self) -> Option<&mut E> {
         self.0.downcast_mut()
     }
+
+    pub fn is_context<C: Display + Debug + 'static>(&self) -> bool {
+        self.0.is::<Context<C>>()
+    }
+    pub fn downcast_context<C: Display + Debug + 'static, E: std::error::Error + Send + Sync + 'static>(
+        self,
+    ) -> Result<(C, Box<E>), Box<dyn std::error::Error + Send + Sync>> {
+        match self.0.downcast::<Context<C>>() {
+            Ok(c) => {
+                let (context, source) = c.unpack();
+                Ok((context, source.downcast()?))
+            }
+            Err(source) => Err(source),
+        }
+    }
+    pub fn downcast_context_ref<C: Display + Debug + 'static, E: std::error::Error + Send + Sync + 'static>(
+        &self,
+    ) -> Option<(&C, &E)> {
+        match self.0.downcast_ref::<Context<C>>() {
+            Some(c) => {
+                let (context, source) = c.unpack_ref();
+                Some((context, source.downcast_ref()?))
+            }
+            None => None,
+        }
+    }
+    pub fn downcast_context_mut<C: Display + Debug + 'static, E: std::error::Error + Send + Sync + 'static>(
+        &mut self,
+    ) -> Option<(&C, &mut E)> {
+        match self.0.downcast_mut::<Context<C>>() {
+            Some(c) => {
+                let (context, source) = c.unpack_mut();
+                Some((context, source.downcast_mut()?))
+            }
+            None => None,
+        }
+    }
 }
 
-pub trait IntoContext: std::error::Error + Send + Sync + 'static + Sized {
+#[derive(Debug)]
+pub struct MultiWrap(pub Vec<Wrap>);
+impl Display for MultiWrap {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let (m, n) = (self.0.len(), 3);
+        for (i, wrap) in self.0[..n.min(m)].iter().enumerate() {
+            if i < n.min(m) - 1 {
+                writeln!(f, "{}", wrap)?;
+            } else {
+                write!(f, "{}", wrap)?;
+            }
+        }
+        if m > n {
+            writeln!(f)?;
+            write!(f, "... and {} more", m - n)?;
+        }
+        Ok(())
+    }
+}
+impl std::error::Error for MultiWrap {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        // TODO multiple sources ?
+        self.0.first().map(|w| w.0.as_ref() as _)
+    }
+}
+impl FromIterator<Wrap> for MultiWrap {
+    fn from_iter<T: IntoIterator<Item = Wrap>>(iter: T) -> Self {
+        Self(iter.into_iter().collect())
+    }
+}
+impl Deref for MultiWrap {
+    type Target = Vec<Wrap>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl DerefMut for MultiWrap {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+pub trait IntoContext: std::error::Error + Send + Sync {
+    fn context<C>(self, context: C) -> Context<C>;
+}
+impl<E: std::error::Error + Send + Sync + 'static> IntoContext for E {
     fn context<C>(self, context: C) -> Context<C> {
         Context { context, source: Box::new(self) }
     }
 }
-impl<E: std::error::Error + Send + Sync + 'static> IntoContext for E {}
 #[derive(Debug)]
 pub struct Context<C> {
     context: C,
@@ -119,7 +200,37 @@ impl<C: Display + Debug> std::error::Error for Context<C> {
 }
 impl<C: Display> Display for Context<C> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "{}: {}", self.context, self.source)
+        writeln!(f, "{}:", self.context)?;
+        write!(f, "{}", self.source)
+    }
+}
+impl<C> Context<C> {
+    pub fn unpack(self) -> (C, Box<dyn std::error::Error + Send + Sync>) {
+        (self.context, self.source)
+    }
+    #[allow(clippy::borrowed_box)] // TODO
+    pub fn unpack_ref(&self) -> (&C, &Box<dyn std::error::Error + Send + Sync>) {
+        (&self.context, &self.source)
+    }
+    pub fn unpack_mut(&mut self) -> (&C, &mut Box<dyn std::error::Error + Send + Sync>) {
+        (&self.context, &mut self.source)
+    }
+    pub fn context_ref(&self) -> &C {
+        &self.context
+    }
+    pub fn context_mut(&mut self) -> &mut C {
+        &mut self.context
+    }
+    pub fn downcast<E: std::error::Error + Send + Sync + 'static>(
+        self,
+    ) -> Result<Box<E>, Box<dyn std::error::Error + Send + Sync>> {
+        self.source.downcast()
+    }
+    pub fn downcast_ref<E: std::error::Error + Send + Sync + 'static>(&self) -> Option<&E> {
+        self.source.downcast_ref()
+    }
+    pub fn downcast_mut<E: std::error::Error + Send + Sync + 'static>(&mut self) -> Option<&mut E> {
+        self.source.downcast_mut()
     }
 }
 
@@ -158,23 +269,121 @@ impl<T, C: std::error::Error + Send + Sync + 'static> WithContext<T, (), C> for 
     }
 }
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum RunCommandError {
+    #[error("at least one serde format is required")]
+    UndefinedSerializeFormat,
     #[error("should be KEY=VALUE format, but `{0}` has no '='")]
     KeyValueFormat(String),
-    #[error("unknown format extension: {0}")]
+    #[error("`{0}` is unknown extension format")]
     UnknownFormatExtension(String),
-    #[error("cannot read some configs: {1:?}")]
-    CannotReadSomeConfigs(Vec<Config>, Vec<Wrap>),
+    #[error("cannot read some configs")]
+    CannotReadSomeConfigs(Vec<Config>),
     #[error("cannot specify format")]
     CannotSpecifyFormat,
 }
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum AssaultError {}
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum EvaluateError {}
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum ReportError {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_wrap() {
+        fn wrap_any_error() -> WrappedResult<()> {
+            Err(RunCommandError::CannotSpecifyFormat)?
+        }
+
+        assert_eq!(wrap_any_error().unwrap_err().downcast_ref(), Some(&RunCommandError::CannotSpecifyFormat));
+    }
+
+    #[test]
+    fn test_nested_context() {
+        fn nested_context() -> WrappedResult<()> {
+            Err(RunCommandError::CannotSpecifyFormat).context(true).context("two").context(3)?
+        }
+
+        let err = nested_context().unwrap_err();
+        let Context { context: 3, source } = err.downcast_ref().unwrap() else { panic!() };
+        let Context { context: "two", source } = source.downcast_ref().unwrap() else { panic!() };
+        let Context { context: true, source } = source.downcast_ref().unwrap() else { panic!() };
+        assert_eq!(source.downcast_ref(), Some(&RunCommandError::CannotSpecifyFormat));
+    }
+
+    #[test]
+    fn test_crate_error() {
+        fn crate_error() -> crate::Result<()> {
+            fn wrapped() -> WrappedResult<()> {
+                Err(RunCommandError::CannotSpecifyFormat)?
+            }
+            Ok(wrapped()?)
+        }
+
+        assert_eq!(crate_error().unwrap_err().downcast_ref(), Some(&RunCommandError::CannotSpecifyFormat));
+    }
+
+    #[test]
+    fn test_multi_wrap() {
+        fn multi_wrap(n: usize) -> WrappedResult<()> {
+            Err((0..n).map(|_| RunCommandError::CannotSpecifyFormat.into()).collect::<MultiWrap>())?
+        }
+
+        assert_eq!(multi_wrap(0).unwrap_err().to_string(), "");
+        assert_eq!(
+            multi_wrap(1).unwrap_err().to_string(),
+            [format!("{}", RunCommandError::CannotSpecifyFormat)].join("\n")
+        );
+        assert_eq!(
+            multi_wrap(2).unwrap_err().to_string(),
+            [format!("{}", RunCommandError::CannotSpecifyFormat), format!("{}", RunCommandError::CannotSpecifyFormat),]
+                .join("\n")
+        );
+        assert_eq!(
+            multi_wrap(3).unwrap_err().to_string(),
+            [
+                format!("{}", RunCommandError::CannotSpecifyFormat),
+                format!("{}", RunCommandError::CannotSpecifyFormat),
+                format!("{}", RunCommandError::CannotSpecifyFormat),
+            ]
+            .join("\n")
+        );
+        assert_eq!(
+            multi_wrap(4).unwrap_err().to_string(),
+            [
+                &format!("{}", RunCommandError::CannotSpecifyFormat),
+                &format!("{}", RunCommandError::CannotSpecifyFormat),
+                &format!("{}", RunCommandError::CannotSpecifyFormat),
+                r#"... and 1 more"#,
+            ]
+            .join("\n")
+        );
+        assert_eq!(
+            multi_wrap(5).unwrap_err().to_string(),
+            [
+                &format!("{}", RunCommandError::CannotSpecifyFormat),
+                &format!("{}", RunCommandError::CannotSpecifyFormat),
+                &format!("{}", RunCommandError::CannotSpecifyFormat),
+                r#"... and 2 more"#,
+            ]
+            .join("\n")
+        );
+        assert_eq!(
+            multi_wrap(100).unwrap_err().to_string(),
+            [
+                &format!("{}", RunCommandError::CannotSpecifyFormat),
+                &format!("{}", RunCommandError::CannotSpecifyFormat),
+                &format!("{}", RunCommandError::CannotSpecifyFormat),
+                r#"... and 97 more"#,
+            ]
+            .join("\n")
+        );
+    }
+}

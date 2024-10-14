@@ -8,8 +8,9 @@ use tower::Service;
 
 use crate::{
     config::{Config, Destinations},
-    error::{RunCommandError, Wrap, WrappedResult},
-    outcome::{Evaluator, Outcome},
+    error::{IntoContext, MultiWrap, RunCommandError, Wrap, WrappedResult},
+    evaluate::Evaluator,
+    outcome::Outcome,
     service::FromBodyStructure,
     worker::Control,
 };
@@ -71,12 +72,12 @@ impl Relentless {
     pub fn configs(&self) -> WrappedResult<Vec<Config>> {
         let Self { file, .. } = self;
         let (ok, err): (_, Vec<_>) = file.iter().map(Config::read).partition(Result::is_ok);
-        let (config, errors): (_, Vec<_>) =
+        let (configs, errors): (_, MultiWrap) =
             (ok.into_iter().map(Result::unwrap).collect(), err.into_iter().map(Result::unwrap_err).collect());
         if errors.is_empty() {
-            Ok(config)
+            Ok(configs)
         } else {
-            Err(RunCommandError::CannotReadSomeConfigs(config, errors))?
+            Err(errors.context(RunCommandError::CannotReadSomeConfigs(configs)))?
         }
     }
 
@@ -85,10 +86,10 @@ impl Relentless {
         match self.configs() {
             Ok(configs) => Ok(configs),
             Err(e) => {
-                if let Some(RunCommandError::CannotReadSomeConfigs(configs, err)) = e.downcast_ref() {
-                    for e in err {
-                        writeln!(write, "{}", e)?;
-                    }
+                if let Some((RunCommandError::CannotReadSomeConfigs(configs), source)) =
+                    e.downcast_context_ref::<_, MultiWrap>()
+                {
+                    writeln!(write, "{}", source)?;
                     Ok(configs.to_vec())
                 } else {
                     Err(e)?
@@ -102,7 +103,7 @@ impl Relentless {
     pub async fn assault(&self) -> crate::Result<Outcome> {
         let configs = self.configs_filtered(std::io::stderr())?;
         let clients = Control::default_http_clients(self, &configs).await?;
-        let outcome = self.assault_with(configs, clients, &crate::outcome::DefaultEvaluator).await?;
+        let outcome = self.assault_with(configs, clients, &crate::evaluate::DefaultEvaluator).await?;
         Ok(outcome)
     }
     /// TODO document
@@ -189,20 +190,63 @@ mod tests {
             Err(_) => panic!("specify multiple files should be ok"),
         };
 
-        match Relentless::try_parse_from(["relentless", "--file", "examples/config/*.yaml", "--file"]) {
+        // `--file examples/config/*.yaml` will expand as this by shell
+        match Relentless::try_parse_from([
+            "relentless",
+            "--file",
+            "examples/config/assault.yaml",
+            "examples/config/compare.yaml",
+        ]) {
             Ok(cmd) => assert_eq!(
                 cmd,
                 Relentless {
                     file: vec![
-                        // WARN: * may be wildcard in shell, clap doesn't support it
-                        PathBuf::from("examples/config/*.yaml"),
-                        // PathBuf::from("examples/config/assault.yaml"),
-                        // PathBuf::from("examples/config/compare.yaml")
+                        PathBuf::from("examples/config/assault.yaml"),
+                        PathBuf::from("examples/config/compare.yaml")
                     ],
                     ..Default::default()
                 }
             ),
             Err(_) => panic!("specify multiple files should be ok"),
         };
+    }
+
+    #[test]
+    #[cfg(feature = "cli")]
+    fn test_parse_key_value_err() {
+        let err_msg = Relentless::try_parse_from([
+            "relentless",
+            "--file",
+            "examples/config/*.yaml",
+            "--destination",
+            "key-value",
+        ])
+        .unwrap_err()
+        .to_string();
+        assert!(err_msg.contains(&RunCommandError::KeyValueFormat("key-value".to_string()).to_string()));
+    }
+
+    #[test]
+    #[cfg(all(feature = "yaml", feature = "json"))]
+    fn test_read_configs_filtered() {
+        let cmd = Relentless {
+            file: glob::glob("tests/config/**/*.yaml").unwrap().collect::<Result<Vec<_>, _>>().unwrap(),
+            ..Default::default()
+        };
+        let mut buf = Vec::new();
+        let configs = cmd.configs_filtered(&mut buf).unwrap();
+        assert_eq!(configs.len(), glob::glob("tests/config/valid/**/*.yaml").unwrap().filter(Result::is_ok).count());
+
+        let warn = String::from_utf8_lossy(&buf);
+        assert!(warn.contains("tests/config/invalid/invalid_config.yaml"));
+        assert_eq!(
+            warn,
+            [
+                r#"tests/config/invalid/invalid_config.yaml:"#,
+                r#"invalid type: string "simple string yaml", expected struct Config"#,
+                r#""#,
+            ]
+            .join("\n")
+        )
     }
 }

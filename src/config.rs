@@ -234,6 +234,11 @@ impl Format {
             Format::Yaml => Ok(serde_yaml::from_reader(File::open(path)?)?),
             #[cfg(feature = "toml")]
             Format::Toml => Ok(toml::from_str(&read_to_string(path)?)?),
+            #[cfg(not(any(feature = "json", feature = "yaml", feature = "toml")))]
+            _ => {
+                use crate::error::WithContext;
+                Err(RunCommandError::UndefinedSerializeFormat).context(path.as_ref().display().to_string())?
+            }
         }
     }
 
@@ -245,6 +250,11 @@ impl Format {
             Format::Yaml => Ok(serde_yaml::from_str(content)?),
             #[cfg(feature = "toml")]
             Format::Toml => Ok(toml::from_str(content)?),
+            #[cfg(not(any(feature = "json", feature = "yaml", feature = "toml")))]
+            _ => {
+                use crate::error::WithContext;
+                Err(RunCommandError::UndefinedSerializeFormat).context(content.to_string())?
+            }
         }
     }
 }
@@ -252,6 +262,13 @@ impl Format {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    #[cfg(not(any(feature = "json", feature = "yaml", feature = "toml")))]
+    fn test_no_default_features() {
+        let err = Config::read("path/to/config.yaml").unwrap_err();
+        assert_eq!(err.downcast_ref(), Some(&RunCommandError::UnknownFormatExtension("yaml".to_string())));
+    }
 
     #[test]
     #[cfg(feature = "yaml")]
@@ -378,5 +395,19 @@ mod tests {
                 ])))
             }))
         );
+    }
+
+    #[test]
+    #[cfg(all(feature = "yaml", feature = "json"))]
+    fn test_read_valid_and_invalid_config_files() {
+        for valid in glob::glob("tests/config/valid/**/*.yaml").unwrap() {
+            // TODO assert
+            let _config = Config::read(valid.unwrap()).unwrap();
+        }
+
+        for invalid in glob::glob("tests/config/invalid/**/*.yaml").unwrap() {
+            // TODO assert
+            let _err = Config::read(invalid.unwrap()).unwrap_err();
+        }
     }
 }
