@@ -112,3 +112,26 @@ where
         BytesBody(self.map_err(Wrap::error).boxed())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    #[cfg(feature = "default-http-client")]
+    async fn test_default_http_client() {
+        use tower::ServiceExt;
+
+        let server = httptest::Server::run();
+        server.expect(
+            httptest::Expectation::matching(httptest::matchers::request::method_path("GET", "/"))
+                .respond_with(httptest::responders::status_code(200).body("hello world")),
+        );
+
+        let mut client = DefaultHttpClient::<Bytes, reqwest::Body>::new().await.unwrap();
+        let request = http::Request::builder().uri(server.url("/")).body(Bytes::new()).unwrap();
+        let res: reqwest::Response = client.ready().await.unwrap().call(request).await.unwrap().into();
+        assert_eq!(res.status(), 200);
+        assert_eq!(res.text().await.unwrap(), "hello world");
+    }
+}
