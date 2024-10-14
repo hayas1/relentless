@@ -271,6 +271,8 @@ impl<T, C: std::error::Error + Send + Sync + 'static> WithContext<T, (), C> for 
 
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum RunCommandError {
+    #[error("at least one serde format is required")]
+    UndefinedSerializeFormat,
     #[error("should be KEY=VALUE format, but `{0}` has no '='")]
     KeyValueFormat(String),
     #[error("`{0}` is unknown extension format")]

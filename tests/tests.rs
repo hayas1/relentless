@@ -1,3 +1,5 @@
+#![cfg(all(feature = "json", feature = "yaml"))]
+
 use axum::body::Body;
 use relentless::{command::Relentless, evaluate::DefaultEvaluator};
 

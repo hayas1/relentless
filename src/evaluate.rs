@@ -1,10 +1,13 @@
 use bytes::Bytes;
 use http_body::Body;
 use http_body_util::BodyExt;
+#[cfg(feature = "json")]
 use serde_json::Value;
 
+#[cfg(feature = "json")]
+use crate::config::{JsonEvaluate, PatchTo};
 use crate::{
-    config::{Destinations, Evaluate, JsonEvaluate, PatchTo},
+    config::{Destinations, Evaluate},
     error::{Wrap, WrappedResult},
 };
 
@@ -25,17 +28,17 @@ where
         res: Destinations<http::Response<ResB>>,
     ) -> Result<bool, Self::Error> {
         let parts = Self::parts(res).await?;
-        if !cfg!(feature = "json") {
-            Ok(Self::acceptable(cfg, &parts).await?)
-        } else {
-            match Self::json_acceptable(cfg, &parts).await {
-                Ok(v) => Ok(v),
-                Err(err) => {
-                    if err.is::<json_patch::PatchError>() {
-                        Ok(false)
-                    } else {
-                        Ok(Self::acceptable(cfg, &parts).await?)
-                    }
+        #[cfg(not(feature = "json"))]
+        return Ok(Self::acceptable(cfg, &parts).await?);
+
+        #[cfg(feature = "json")]
+        match Self::json_acceptable(cfg, &parts).await {
+            Ok(v) => Ok(v),
+            Err(err) => {
+                if err.is::<json_patch::PatchError>() {
+                    Ok(false)
+                } else {
+                    Ok(Self::acceptable(cfg, &parts).await?)
                 }
             }
         }
