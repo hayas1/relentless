@@ -39,6 +39,19 @@
 //! ```
 //! In this case the actual and expected are the same server, so the request gets the same response and the test passes.
 //!
+//! # Library Usage
+//! ## Install
+//! TODO (feature)
+//!
+//! ## Prepare Config
+//! Same config can be used in both binary and library. See [Binary section](#prepare-config).
+//!
+//! ### Run API for testing
+//! Same example-http-server can be used in both binary and library. See [Binary section](#run-api-for-testing).
+//!
+//! ## Run Testing
+//! TODO <https://github.com/hayas1/relentless/blob/master/tests/tests.rs>
+//!
 //! # Documents
 //! <https://hayas1.github.io/relentless/relentless>
 //!
