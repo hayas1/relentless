@@ -160,7 +160,7 @@ where
                 v.push(msg);
             }
 
-            outcome.push(CaseOutcome::new(testcase, passed, v));
+            outcome.push(CaseOutcome::new(testcase, passed, v.into_iter().collect()));
         }
         Ok(WorkerOutcome::new(config, outcome))
     }

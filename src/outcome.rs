@@ -6,7 +6,7 @@ use std::{
 use crate::{
     command::Relentless,
     config::{Coalesced, Destinations, Setting, Testcase, WorkerConfig},
-    error::{Wrap, WrappedResult},
+    error::{MultiWrap, Wrap, WrappedResult},
 };
 
 /// TODO document
@@ -105,10 +105,10 @@ pub struct CaseOutcome<T> {
     testcase: Coalesced<Testcase, Setting>,
     passed: usize,
     pass: bool,
-    message: Vec<Option<T>>,
+    message: MultiWrap<Option<T>>,
 }
 impl<T> CaseOutcome<T> {
-    pub fn new(testcase: Coalesced<Testcase, Setting>, passed: usize, message: Vec<Option<T>>) -> Self {
+    pub fn new(testcase: Coalesced<Testcase, Setting>, passed: usize, message: MultiWrap<Option<T>>) -> Self {
         let pass = passed == testcase.coalesce().setting.repeat.unwrap_or(1); // TODO here ?
         Self { testcase, passed, pass, message }
     }
