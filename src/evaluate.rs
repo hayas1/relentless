@@ -27,7 +27,7 @@ where
     ResB::Error: std::error::Error + Sync + Send + 'static,
 {
     type Error = crate::Error;
-    type Message = Wrap;
+    type Message = crate::Error;
     async fn evaluate(
         &self,
         cfg: Option<&Evaluate>,
@@ -42,7 +42,7 @@ where
             Ok(v) => Ok((v, None)),
             Err(err) => {
                 if err.is::<json_patch::PatchError>() {
-                    Ok((false, Some(err)))
+                    Ok((false, Some(err.into())))
                 } else {
                     Ok((Self::acceptable(cfg, &parts).await?, None))
                 }
