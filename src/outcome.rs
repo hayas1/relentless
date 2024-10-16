@@ -144,6 +144,15 @@ impl<T: Display> CaseOutcome<T> {
                 writeln!(w, "{} {}", console::Emoji("👟", ""), console::style("this testcase is allowed").green())
             })?;
         }
+        if self.message.iter().any(Option::is_some) {
+            w.scope(|w| {
+                writeln!(w, "{} {}", console::Emoji("💬", ""), console::style("message was found").yellow())?;
+                w.scope(|w| {
+                    let message = self.message.iter().filter_map(|m| m.as_ref()).collect::<MultiWrap<_>>();
+                    writeln!(w, "{}", console::style(&message).dim())
+                })
+            })?;
+        }
         Ok(())
     }
 }

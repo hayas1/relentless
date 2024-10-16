@@ -8,7 +8,7 @@ use serde_json::Value;
 use crate::config::{JsonEvaluate, PatchTo};
 use crate::{
     config::{Destinations, Evaluate},
-    error::{MultiWrap, Wrap, WrappedResult},
+    error::{Wrap, WrappedResult},
 };
 
 #[allow(async_fn_in_trait)] // TODO #[warn(async_fn_in_trait)] by default
