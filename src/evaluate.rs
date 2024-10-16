@@ -8,13 +8,18 @@ use serde_json::Value;
 use crate::config::{JsonEvaluate, PatchTo};
 use crate::{
     config::{Destinations, Evaluate},
-    error::{Wrap, WrappedResult},
+    error::{MultiWrap, Wrap, WrappedResult},
 };
 
 #[allow(async_fn_in_trait)] // TODO #[warn(async_fn_in_trait)] by default
 pub trait Evaluator<Res> {
     type Error;
-    async fn evaluate(&self, cfg: Option<&Evaluate>, res: Destinations<Res>) -> Result<bool, Self::Error>;
+    type Message;
+    async fn evaluate(
+        &self,
+        cfg: Option<&Evaluate>,
+        res: Destinations<Res>,
+    ) -> Result<(bool, Option<Self::Message>), Self::Error>;
 }
 pub struct DefaultEvaluator;
 impl<ResB: Body> Evaluator<http::Response<ResB>> for DefaultEvaluator
@@ -22,23 +27,24 @@ where
     ResB::Error: std::error::Error + Sync + Send + 'static,
 {
     type Error = crate::Error;
+    type Message = Wrap;
     async fn evaluate(
         &self,
         cfg: Option<&Evaluate>,
         res: Destinations<http::Response<ResB>>,
-    ) -> Result<bool, Self::Error> {
+    ) -> Result<(bool, Option<Self::Message>), Self::Error> {
         let parts = Self::parts(res).await?;
         #[cfg(not(feature = "json"))]
-        return Ok(Self::acceptable(cfg, &parts).await?);
+        return Ok((Self::acceptable(cfg, &parts).await?, None));
 
         #[cfg(feature = "json")]
         match Self::json_acceptable(cfg, &parts).await {
-            Ok(v) => Ok(v),
+            Ok(v) => Ok((v, None)),
             Err(err) => {
                 if err.is::<json_patch::PatchError>() {
-                    Ok(false)
+                    Ok((false, Some(err)))
                 } else {
-                    Ok(Self::acceptable(cfg, &parts).await?)
+                    Ok((Self::acceptable(cfg, &parts).await?, None))
                 }
             }
         }
@@ -176,16 +182,16 @@ mod tests {
         let ok =
             http::Response::builder().status(http::StatusCode::OK).body(http_body_util::Empty::<Bytes>::new()).unwrap();
         let responses = Destinations::from_iter(vec![("test".to_string(), ok)]);
-        let result = evaluator.evaluate(None, responses).await.unwrap();
-        assert!(result);
+        let (result, msg) = evaluator.evaluate(None, responses).await.unwrap();
+        assert!(matches!((result, msg), (true, None)));
 
         let unavailable = http::Response::builder()
             .status(http::StatusCode::SERVICE_UNAVAILABLE)
             .body(http_body_util::Empty::<Bytes>::new())
             .unwrap();
         let responses = Destinations::from_iter(vec![("test".to_string(), unavailable)]);
-        let result = evaluator.evaluate(None, responses).await.unwrap();
-        assert!(!result);
+        let (result, msg) = evaluator.evaluate(None, responses).await.unwrap();
+        assert!(matches!((result, msg), (false, None)));
     }
 
     // TODO more tests

@@ -150,7 +150,7 @@ where
                 }
             }
             for res in t {
-                let pass = evaluator.evaluate(evaluate.as_ref(), res).await?;
+                let (pass, msg) = evaluator.evaluate(evaluate.as_ref(), res).await?;
                 passed += pass as usize;
             }
             outcome.push(CaseOutcome::new(testcase, passed));
