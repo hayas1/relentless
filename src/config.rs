@@ -92,6 +92,8 @@ pub struct JsonEvaluate {
     pub ignore: Vec<String>,
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub patch: Option<PatchTo>,
+    #[serde(default, skip_serializing_if = "IsDefault::is_default")]
+    pub patch_fail: Option<Severity>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "snake_case", untagged)]
@@ -99,6 +101,14 @@ pub struct JsonEvaluate {
 pub enum PatchTo {
     All(json_patch::Patch),
     Destinations(Destinations<json_patch::Patch>),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "snake_case")]
+pub enum Severity {
+    Allow,
+    Warn,
+    Error,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -186,7 +196,6 @@ pub struct Coalesced<T, U> {
     base: T,
     coalesced: Vec<U>,
 }
-// TODO do not require S: Default
 impl<T: Clone + Coalesce<Other = U>, U> Coalesced<T, U> {
     pub fn new(base: T, coalesced: Vec<U>) -> Self {
         Self { base, coalesced }
@@ -287,7 +296,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "yaml")]
+    #[cfg(all(feature = "yaml", feature = "json"))]
     fn test_config_roundtrip() {
         let example = Config {
             worker_config: WorkerConfig { name: Some("example".to_string()), ..Default::default() },
@@ -315,6 +324,7 @@ mod tests {
                                     .unwrap(),
                             ),
                         ]))),
+                        patch_fail: Some(Severity::Error),
                     })),
                     ..Default::default()
                 },
@@ -356,7 +366,8 @@ mod tests {
                         serde_json::json!([{"op": "replace", "path": "/datetime", "value": "2021-01-01"}])
                     )
                     .unwrap(),
-                ))
+                )),
+                patch_fail: None,
             }))
         );
 
@@ -377,6 +388,7 @@ mod tests {
                 expect:
                 - op: remove
                   path: /datetime
+              patch_fail: warn
         "#;
         let config = Config::read_str(destinations_yaml, Format::Yaml).unwrap();
         assert_eq!(
@@ -392,7 +404,8 @@ mod tests {
                         "expect".to_string(),
                         serde_json::from_value(serde_json::json!([{"op": "remove", "path": "/datetime"}])).unwrap(),
                     ),
-                ])))
+                ]))),
+                patch_fail: Some(Severity::Warn),
             }))
         );
     }
