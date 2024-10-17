@@ -17,7 +17,7 @@ pub trait Evaluator<Res> {
     type Message;
     async fn evaluate(
         &self,
-        cfg: Option<&Evaluate>,
+        cfg: &Evaluate,
         res: Destinations<Res>,
     ) -> Result<(bool, Option<Self::Message>), Self::Error>;
 }
@@ -30,7 +30,7 @@ where
     type Message = crate::Error;
     async fn evaluate(
         &self,
-        cfg: Option<&Evaluate>,
+        cfg: &Evaluate,
         res: Destinations<http::Response<ResB>>,
     ) -> Result<(bool, Option<Self::Message>), Self::Error> {
         let parts = Self::parts(res).await?;
@@ -71,7 +71,7 @@ impl DefaultEvaluator {
     }
 
     pub async fn acceptable(
-        cfg: Option<&Evaluate>,
+        cfg: &Evaluate,
         parts: &Destinations<(http::StatusCode, http::HeaderMap, Bytes)>,
     ) -> WrappedResult<bool> {
         if parts.len() == 1 {
@@ -84,7 +84,7 @@ impl DefaultEvaluator {
         Ok(parts.iter().all(|(_name, (s, _h, _b))| s.is_success()))
     }
     pub async fn compare(
-        _cfg: Option<&Evaluate>,
+        _cfg: &Evaluate,
         parts: &Destinations<(http::StatusCode, http::HeaderMap, Bytes)>,
     ) -> WrappedResult<bool> {
         let v: Vec<_> = parts.values().collect();
@@ -96,7 +96,7 @@ impl DefaultEvaluator {
 #[cfg(feature = "json")]
 impl DefaultEvaluator {
     pub async fn json_acceptable(
-        cfg: Option<&Evaluate>,
+        cfg: &Evaluate,
         parts: &Destinations<(http::StatusCode, http::HeaderMap, Bytes)>,
     ) -> WrappedResult<bool> {
         let values = Self::patched(cfg, parts)?;
@@ -109,7 +109,7 @@ impl DefaultEvaluator {
     }
 
     pub fn patched(
-        cfg: Option<&Evaluate>,
+        cfg: &Evaluate,
         parts: &Destinations<(http::StatusCode, http::HeaderMap, Bytes)>,
     ) -> WrappedResult<Destinations<Value>> {
         parts
@@ -127,29 +127,25 @@ impl DefaultEvaluator {
             })
             .collect::<Result<Destinations<_>, _>>()
     }
-    pub fn patch(cfg: Option<&Evaluate>, name: &str, value: &mut Value) -> Result<(), json_patch::PatchError> {
-        let patch = cfg.map(|c| match c {
+    pub fn patch(cfg: &Evaluate, name: &str, value: &mut Value) -> Result<(), json_patch::PatchError> {
+        let patch = match cfg {
             Evaluate::Json(JsonEvaluate { patch, .. }) => match patch {
                 Some(PatchTo::All(p)) => p.clone(),
                 Some(PatchTo::Destinations(patch)) => patch.get(name).cloned().unwrap_or_default(),
                 None => json_patch::Patch::default(),
             },
             _ => json_patch::Patch::default(),
-        });
-        match patch {
-            Some(p) => Ok(json_patch::patch(value, &p)?),
-            None => Ok(()),
-        }
+        };
+        json_patch::patch(value, &patch)
     }
 
-    pub fn json_compare(cfg: Option<&Evaluate>, (va, vb): (&Value, &Value)) -> WrappedResult<bool> {
+    pub fn json_compare(cfg: &Evaluate, (va, vb): (&Value, &Value)) -> WrappedResult<bool> {
         let pointers = Self::pointers(&json_patch::diff(va, vb));
         let ignored = pointers.iter().all(|op| {
-            cfg.map(|c| match c {
+            match cfg {
                 Evaluate::Json(JsonEvaluate { ignore, .. }) => ignore.clone(),
                 _ => Vec::new(),
-            })
-            .unwrap_or_default()
+            }
             .contains(op)
         });
         Ok(ignored)
@@ -182,7 +178,7 @@ mod tests {
         let ok =
             http::Response::builder().status(http::StatusCode::OK).body(http_body_util::Empty::<Bytes>::new()).unwrap();
         let responses = Destinations::from_iter(vec![("test".to_string(), ok)]);
-        let (result, msg) = evaluator.evaluate(None, responses).await.unwrap();
+        let (result, msg) = evaluator.evaluate(&Evaluate::Nop, responses).await.unwrap();
         assert!(matches!((result, msg), (true, None)));
 
         let unavailable = http::Response::builder()
@@ -190,7 +186,7 @@ mod tests {
             .body(http_body_util::Empty::<Bytes>::new())
             .unwrap();
         let responses = Destinations::from_iter(vec![("test".to_string(), unavailable)]);
-        let (result, msg) = evaluator.evaluate(None, responses).await.unwrap();
+        let (result, msg) = evaluator.evaluate(&Evaluate::Nop, responses).await.unwrap();
         assert!(matches!((result, msg), (false, None)));
     }
 
