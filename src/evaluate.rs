@@ -129,12 +129,12 @@ impl DefaultEvaluator {
     }
     pub fn patch(cfg: Option<&Evaluate>, name: &str, value: &mut Value) -> Result<(), json_patch::PatchError> {
         let patch = cfg.map(|c| match c {
-            Evaluate::PlainText(_) => json_patch::Patch::default(),
             Evaluate::Json(JsonEvaluate { patch, .. }) => match patch {
                 Some(PatchTo::All(p)) => p.clone(),
                 Some(PatchTo::Destinations(patch)) => patch.get(name).cloned().unwrap_or_default(),
                 None => json_patch::Patch::default(),
             },
+            _ => json_patch::Patch::default(),
         });
         match patch {
             Some(p) => Ok(json_patch::patch(value, &p)?),
@@ -146,8 +146,8 @@ impl DefaultEvaluator {
         let pointers = Self::pointers(&json_patch::diff(va, vb));
         let ignored = pointers.iter().all(|op| {
             cfg.map(|c| match c {
-                Evaluate::PlainText(_) => Vec::new(),
                 Evaluate::Json(JsonEvaluate { ignore, .. }) => ignore.clone(),
+                _ => Vec::new(),
             })
             .unwrap_or_default()
             .contains(op)

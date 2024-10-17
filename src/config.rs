@@ -59,27 +59,20 @@ pub struct Http {
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub body: Option<BodyStructure>,
 }
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub enum BodyStructure {
+    #[default]
     Empty,
 }
-impl Default for BodyStructure {
-    fn default() -> Self {
-        Self::Empty
-    }
-}
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub enum Evaluate {
+    #[default]
+    Nop,
     PlainText(PlainTextEvaluate),
     #[cfg(feature = "json")]
     Json(JsonEvaluate),
-}
-impl Default for Evaluate {
-    fn default() -> Self {
-        Self::PlainText(PlainTextEvaluate {})
-    }
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
