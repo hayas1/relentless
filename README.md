@@ -9,9 +9,9 @@ Relentless HTTP load testing / comparison testing tool
 ### Install
 ```sh
 cargo install --git https://github.com/hayas1/relentless relentless
-``````
+```
 
-## Prepare Config
+### Prepare Config
 ```yaml:path/to/config.yaml
 name: basic comparison test
 destinations:
@@ -22,10 +22,10 @@ testcase:
   - target: /
   - target: /health
   - target: /healthz
-```
+```rust
 ...more examples in <https://github.com/hayas1/relentless/tree/master/examples/config>
 
-#### Run API for testing
+### Run API for testing
 If you have not API for testing, you can use `example-http-server`
 ```sh
 cargo install --git https://github.com/hayas1/relentless example-http-server

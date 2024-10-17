@@ -1,4 +1,4 @@
-use std::{io::Write, path::PathBuf, process::ExitCode};
+use std::{fmt::Display, io::Write, path::PathBuf, process::ExitCode};
 
 #[cfg(feature = "cli")]
 use clap::Parser;
@@ -100,7 +100,7 @@ impl Relentless {
 
     /// TODO document
     #[cfg(all(feature = "default-http-client", feature = "cli"))]
-    pub async fn assault(&self) -> crate::Result<Outcome> {
+    pub async fn assault(&self) -> crate::Result<Outcome<crate::Error>> {
         let configs = self.configs_filtered(std::io::stderr())?;
         let clients = Control::default_http_clients(self, &configs).await?;
         let outcome = self.assault_with(configs, clients, &crate::evaluate::DefaultEvaluator).await?;
@@ -112,7 +112,7 @@ impl Relentless {
         configs: Vec<Config>,
         services: Vec<Destinations<S>>,
         evaluator: &E,
-    ) -> crate::Result<Outcome>
+    ) -> crate::Result<Outcome<E::Message>>
     where
         ReqB: Body + FromBodyStructure + Send + 'static,
         ReqB::Data: Send + 'static,
@@ -124,6 +124,7 @@ impl Relentless {
         S::Error: std::error::Error + Sync + Send + 'static,
         E: Evaluator<http::Response<ResB>>,
         E::Error: std::error::Error + Sync + Send + 'static,
+        E::Message: Display,
     {
         let Self { no_color, no_report, .. } = self;
         console::set_colors_enabled(!no_color);

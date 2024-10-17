@@ -3,6 +3,10 @@ feature:
       - '^feat/'
       - '^feature/'
 
+breaking:
+   - head-branch:
+      - '^breaking/'
+
 bugfix:
    - head-branch:
       - '^fix/'

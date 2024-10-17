@@ -4,7 +4,7 @@
 //! ## Install
 //! ```sh
 //! cargo install --git https://github.com/hayas1/relentless relentless
-//! ``````
+//! ```
 //!
 //! ## Prepare Config
 //! ```yaml:path/to/config.yaml
