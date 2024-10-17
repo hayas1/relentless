@@ -103,7 +103,7 @@ pub enum PatchTo {
     Destinations(Destinations<json_patch::Patch>),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub enum Severity {
     Allow,

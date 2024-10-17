@@ -42,7 +42,7 @@ where
             Ok(v) => Ok((v, None)),
             Err(err) => {
                 if err.is::<json_patch::PatchError>() {
-                    Ok((false, Some(err.into())))
+                    Ok((false, Some(err.into()))) // patch fail
                 } else {
                     Ok((Self::acceptable(cfg, &parts).await?, None))
                 }
