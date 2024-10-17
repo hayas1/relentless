@@ -42,7 +42,7 @@ pub struct Setting {
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub timeout: Option<Duration>,
     #[serde(default, flatten, skip_serializing_if = "IsDefault::is_default")]
-    pub evaluate: Evaluate,
+    pub evaluate: Option<Evaluate>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
@@ -175,10 +175,7 @@ impl Coalesce for Setting {
             template: if self.template.is_empty() { other.clone().template } else { self.template },
             repeat: self.repeat.or(other.repeat),
             timeout: self.timeout.or(other.timeout),
-            evaluate: match self.evaluate {
-                Evaluate::Nop => other.clone().evaluate,
-                ev => ev,
-            },
+            evaluate: self.evaluate.or(other.clone().evaluate),
         }
     }
 }
@@ -300,7 +297,7 @@ mod tests {
                 description: Some("test description".to_string()),
                 target: "/information".to_string(),
                 setting: Setting {
-                    evaluate: Evaluate::Json(JsonEvaluate {
+                    evaluate: Some(Evaluate::Json(JsonEvaluate {
                         ignore: vec!["/datetime".to_string()],
                         // patch: Some(PatchTo::All(
                         //     serde_json::from_value(
@@ -321,7 +318,7 @@ mod tests {
                             ),
                         ]))),
                         patch_fail: Some(Severity::Error),
-                    }),
+                    })),
                     ..Default::default()
                 },
                 attr: Attribute { allow: true },
@@ -355,7 +352,7 @@ mod tests {
         let config = Config::read_str(all_yaml, Format::Yaml).unwrap();
         assert_eq!(
             config.testcase[0].setting.evaluate,
-            Evaluate::Json(JsonEvaluate {
+            Some(Evaluate::Json(JsonEvaluate {
                 ignore: vec![],
                 patch: Some(PatchTo::All(
                     serde_json::from_value(
@@ -364,7 +361,7 @@ mod tests {
                     .unwrap(),
                 )),
                 patch_fail: None,
-            })
+            }))
         );
 
         let destinations_yaml = r#"
@@ -389,7 +386,7 @@ mod tests {
         let config = Config::read_str(destinations_yaml, Format::Yaml).unwrap();
         assert_eq!(
             config.testcase[0].setting.evaluate,
-            Evaluate::Json(JsonEvaluate {
+            Some(Evaluate::Json(JsonEvaluate {
                 ignore: vec![],
                 patch: Some(PatchTo::Destinations(Destinations::from([
                     (
@@ -402,7 +399,7 @@ mod tests {
                     ),
                 ]))),
                 patch_fail: Some(Severity::Warn),
-            })
+            }))
         );
     }
 

@@ -155,7 +155,7 @@ where
             }
             let mut v = Vec::new();
             for res in t {
-                let (pass, msg) = evaluator.evaluate(evaluate, res).await?;
+                let (pass, msg) = evaluator.evaluate(evaluate.as_ref().unwrap_or(&Default::default()), res).await?;
                 passed += pass as usize;
                 v.push(msg);
             }

@@ -34,19 +34,22 @@ where
         res: Destinations<http::Response<ResB>>,
     ) -> Result<(bool, Option<Self::Message>), Self::Error> {
         let parts = Self::parts(res).await?;
-        #[cfg(not(feature = "json"))]
-        return Ok((Self::acceptable(cfg, &parts).await?, None));
-
-        #[cfg(feature = "json")]
-        match Self::json_acceptable(cfg, &parts).await {
-            Ok(v) => Ok((v, None)),
-            Err(err) => {
-                if err.is::<json_patch::PatchError>() {
-                    Ok((false, Some(err.into()))) // patch fail
-                } else {
-                    Ok((Self::acceptable(cfg, &parts).await?, None))
+        match cfg {
+            Evaluate::Nop | Evaluate::PlainText(_) => match Self::acceptable(cfg, &parts).await {
+                Ok(v) => Ok((v, None)),
+                Err(err) => Ok((false, Some(err.into()))),
+            },
+            #[cfg(feature = "json")]
+            Evaluate::Json(_) => match Self::json_acceptable(cfg, &parts).await {
+                Ok(v) => Ok((v, None)),
+                Err(err) => {
+                    if err.is::<json_patch::PatchError>() {
+                        Ok((false, Some(err.into()))) // patch fail
+                    } else {
+                        Ok((Self::acceptable(cfg, &parts).await?, None))
+                    }
                 }
-            }
+            },
         }
     }
 }
