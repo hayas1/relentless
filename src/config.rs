@@ -42,7 +42,7 @@ pub struct Setting {
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub timeout: Option<Duration>,
     #[serde(default, flatten, skip_serializing_if = "IsDefault::is_default")]
-    pub evaluate: Option<Evaluate>,
+    pub evaluate: Option<BodyEvaluate>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
@@ -67,7 +67,7 @@ pub enum BodyStructure {
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
-pub enum Evaluate {
+pub enum BodyEvaluate {
     #[default]
     Nop,
     PlainText(PlainTextEvaluate),
@@ -297,7 +297,7 @@ mod tests {
                 description: Some("test description".to_string()),
                 target: "/information".to_string(),
                 setting: Setting {
-                    evaluate: Some(Evaluate::Json(JsonEvaluate {
+                    evaluate: Some(BodyEvaluate::Json(JsonEvaluate {
                         ignore: vec!["/datetime".to_string()],
                         // patch: Some(PatchTo::All(
                         //     serde_json::from_value(
@@ -352,7 +352,7 @@ mod tests {
         let config = Config::read_str(all_yaml, Format::Yaml).unwrap();
         assert_eq!(
             config.testcase[0].setting.evaluate,
-            Some(Evaluate::Json(JsonEvaluate {
+            Some(BodyEvaluate::Json(JsonEvaluate {
                 ignore: vec![],
                 patch: Some(PatchTo::All(
                     serde_json::from_value(
@@ -386,7 +386,7 @@ mod tests {
         let config = Config::read_str(destinations_yaml, Format::Yaml).unwrap();
         assert_eq!(
             config.testcase[0].setting.evaluate,
-            Some(Evaluate::Json(JsonEvaluate {
+            Some(BodyEvaluate::Json(JsonEvaluate {
                 ignore: vec![],
                 patch: Some(PatchTo::Destinations(Destinations::from([
                     (
