@@ -145,7 +145,7 @@ where
         let mut outcome = Vec::new();
         for (testcase, process) in processes {
             let Testcase { setting, .. } = testcase.coalesce();
-            let Setting { repeat, evaluate, .. } = &setting;
+            let Setting { repeat, protocol, .. } = &setting;
             let mut passed = 0;
             let mut t = (0..repeat.unwrap_or(1)).map(|_| Destinations::new()).collect::<Vec<_>>();
             for (name, repeated) in process? {
@@ -155,7 +155,7 @@ where
             }
             let mut v = Vec::new();
             for res in t {
-                let (pass, msg) = evaluator.evaluate(evaluate.as_ref().unwrap_or(&Default::default()), res).await?;
+                let (pass, msg) = evaluator.evaluate(protocol.as_ref(), res).await?;
                 passed += pass as usize;
                 v.push(msg);
             }
