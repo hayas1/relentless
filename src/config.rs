@@ -75,14 +75,30 @@ pub enum BodyStructure {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub struct Evaluate {
+    #[serde(default, skip_serializing_if = "IsDefault::is_default")]
+    pub status: StatusEvaluate,
+    #[serde(default, skip_serializing_if = "IsDefault::is_default")]
+    pub header: HeaderEvaluate,
     #[serde(default, flatten, skip_serializing_if = "IsDefault::is_default")]
     pub body: BodyEvaluate,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
+pub enum StatusEvaluate {
+    #[default]
+    OkOrEqual,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields, rename_all = "snake_case")]
+pub enum HeaderEvaluate {
+    #[default]
+    Equal,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub enum BodyEvaluate {
     #[default]
-    Nop,
+    Equal,
     PlainText(PlainTextEvaluate),
     #[cfg(feature = "json")]
     Json(JsonEvaluate),
@@ -337,6 +353,7 @@ mod tests {
                                 ]))),
                                 patch_fail: Some(Severity::Error),
                             }),
+                            ..Default::default()
                         },
                         ..Default::default()
                     })),
@@ -386,7 +403,8 @@ mod tests {
                             .unwrap(),
                         )),
                         patch_fail: None,
-                    })
+                    }),
+                    ..Default::default()
                 },
                 ..Default::default()
             })
@@ -433,7 +451,8 @@ mod tests {
                             ),
                         ]))),
                         patch_fail: Some(Severity::Warn),
-                    })
+                    }),
+                    ..Default::default()
                 },
                 ..Default::default()
             })

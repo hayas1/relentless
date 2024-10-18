@@ -39,7 +39,7 @@ where
             None => &Default::default(),
         };
         match cfg.body {
-            BodyEvaluate::Nop | BodyEvaluate::PlainText(_) => match Self::acceptable(cfg, &parts).await {
+            BodyEvaluate::Equal | BodyEvaluate::PlainText(_) => match Self::acceptable(cfg, &parts).await {
                 Ok(v) => Ok((v, None)),
                 Err(err) => Ok((false, Some(err.into()))),
             },
