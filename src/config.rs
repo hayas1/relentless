@@ -52,6 +52,12 @@ pub enum Protocol {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct Http {
+    #[serde(default, flatten, skip_serializing_if = "IsDefault::is_default")]
+    pub request: HttpRequest,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
+pub struct HttpRequest {
     #[serde(default, with = "http_serde::option::method", skip_serializing_if = "IsDefault::is_default")]
     pub method: Option<Method>,
     #[serde(default, with = "http_serde::option::header_map", skip_serializing_if = "IsDefault::is_default")]

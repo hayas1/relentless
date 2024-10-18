@@ -4,7 +4,7 @@ use std::marker::PhantomData;
 use crate::service::DefaultHttpClient;
 use crate::{
     command::Relentless,
-    config::{Coalesce, Coalesced, Config, Destinations, Protocol, Setting, Testcase, WorkerConfig},
+    config::{Coalesce, Coalesced, Config, Destinations, HttpRequest, Protocol, Setting, Testcase, WorkerConfig},
     error::WrappedResult,
     evaluate::{DefaultEvaluator, Evaluator},
     outcome::{CaseOutcome, Outcome, WorkerOutcome},
@@ -253,14 +253,15 @@ where
         target: &str,
         http: &crate::config::Http,
     ) -> WrappedResult<http::Request<ReqB>> {
+        let HttpRequest { method, header, body, .. } = &http.request;
         let destination = destination.parse::<http::Uri>().unwrap();
         let uri = http::uri::Builder::from(destination).path_and_query(target).build().unwrap();
         let mut request = http::Request::builder()
             .uri(uri)
-            .method(http.method.clone().unwrap_or(http::Method::GET))
-            .body(ReqB::from_body_structure(http.body.clone().unwrap_or_default()))
+            .method(method.clone().unwrap_or(http::Method::GET))
+            .body(ReqB::from_body_structure(body.clone().unwrap_or_default()))
             .unwrap();
-        *request.headers_mut() = http.header.clone().unwrap_or_default();
+        *request.headers_mut() = header.clone().unwrap_or_default();
         Ok(request)
     }
 }
