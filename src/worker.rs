@@ -255,10 +255,10 @@ where
         let uri = http::uri::Builder::from(destination).path_and_query(target).build().unwrap();
         let mut request = http::Request::builder()
             .uri(uri)
-            .method(method.clone().unwrap_or(http::Method::GET))
+            .method(method.as_ref().map(|m| (**m).clone()).unwrap_or_default())
             .body(ReqB::from_body_structure(body.clone().unwrap_or_default()))
             .unwrap();
-        *request.headers_mut() = header.clone().unwrap_or_default();
+        *request.headers_mut() = header.as_ref().map(|h| (**h).clone()).unwrap_or_default();
         Ok(request)
     }
 }

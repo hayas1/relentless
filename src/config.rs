@@ -5,7 +5,6 @@ use std::{
     time::Duration,
 };
 
-use http::{HeaderMap, Method};
 use serde::{Deserialize, Serialize};
 
 use crate::error::{RunCommandError, WrappedResult};
@@ -58,10 +57,10 @@ pub struct Http {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct HttpRequest {
-    #[serde(default, with = "http_serde::option::method", skip_serializing_if = "IsDefault::is_default")]
-    pub method: Option<Method>,
-    #[serde(default, with = "http_serde::option::header_map", skip_serializing_if = "IsDefault::is_default")]
-    pub header: Option<HeaderMap>,
+    #[serde(default, skip_serializing_if = "IsDefault::is_default")]
+    pub method: Option<_http::Method>,
+    #[serde(default, skip_serializing_if = "IsDefault::is_default")]
+    pub header: Option<_http::HeaderMap>,
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub body: Option<BodyStructure>,
 }
@@ -293,7 +292,7 @@ impl Format {
 }
 
 // `http` do not support serde https://github.com/hyperium/http/pull/631
-mod _http {
+pub mod _http {
     use std::ops::{Deref, DerefMut};
 
     use super::*;
