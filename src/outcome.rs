@@ -105,12 +105,12 @@ pub struct CaseOutcome<T> {
     testcase: Coalesced<Testcase, Setting>,
     passed: usize,
     pass: bool,
-    message: MultiWrap<Option<T>>,
+    messages: MultiWrap<T>,
 }
 impl<T> CaseOutcome<T> {
-    pub fn new(testcase: Coalesced<Testcase, Setting>, passed: usize, message: MultiWrap<Option<T>>) -> Self {
+    pub fn new(testcase: Coalesced<Testcase, Setting>, passed: usize, messages: MultiWrap<T>) -> Self {
         let pass = passed == testcase.coalesce().setting.repeat.unwrap_or(1); // TODO here ?
-        Self { testcase, passed, pass, message }
+        Self { testcase, passed, pass, messages }
     }
     pub fn pass(&self) -> bool {
         self.pass
@@ -144,12 +144,12 @@ impl<T: Display> CaseOutcome<T> {
                 writeln!(w, "{} {}", console::Emoji("👟", ""), console::style("this testcase is allowed").green())
             })?;
         }
-        if self.message.iter().any(Option::is_some) {
+        if !self.messages.is_empty() {
             w.scope(|w| {
                 writeln!(w, "{} {}", console::Emoji("💬", ""), console::style("message was found").yellow())?;
                 w.scope(|w| {
-                    let message = self.message.iter().filter_map(|m| m.as_ref()).collect::<MultiWrap<_>>();
-                    writeln!(w, "{}", console::style(&message).dim())
+                    let message = &self.messages;
+                    writeln!(w, "{}", console::style(message).dim())
                 })
             })?;
         }

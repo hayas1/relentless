@@ -155,9 +155,8 @@ where
             }
             let mut v = Vec::new();
             for res in t {
-                let (pass, msg) = evaluator.evaluate(protocol.as_ref(), res).await?;
+                let pass = evaluator.evaluate(protocol.as_ref(), res, &mut v).await?;
                 passed += pass as usize;
-                v.push(msg);
             }
 
             outcome.push(CaseOutcome::new(testcase, passed, v.into_iter().collect()));
