@@ -3,6 +3,9 @@ destinations:
   test-api: http://localhost:3000
 setting:
   repeat: 10
+  http:
+    evaluate:
+      header: ignore
 
 
 testcase:

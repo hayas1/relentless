@@ -1,156 +1,197 @@
+use std::collections::HashMap;
+
 use bytes::Bytes;
 use http_body::Body;
 use http_body_util::BodyExt;
 #[cfg(feature = "json")]
 use serde_json::Value;
 
+use crate::config::EvaluateTo;
 #[cfg(feature = "json")]
-use crate::config::{JsonEvaluate, PatchTo};
+use crate::config::JsonEvaluate;
 use crate::{
-    config::{Destinations, Evaluate},
+    config::{BodyEvaluate, Destinations, HeaderEvaluate, Protocol, StatusEvaluate},
     error::{Wrap, WrappedResult},
 };
 
 #[allow(async_fn_in_trait)] // TODO #[warn(async_fn_in_trait)] by default
 pub trait Evaluator<Res> {
-    type Error;
-    async fn evaluate(&self, cfg: Option<&Evaluate>, res: Destinations<Res>) -> Result<bool, Self::Error>;
+    type Message;
+    async fn evaluate(&self, cfg: Option<&Protocol>, res: Destinations<Res>, msg: &mut Vec<Self::Message>) -> bool;
 }
 pub struct DefaultEvaluator;
 impl<ResB: Body> Evaluator<http::Response<ResB>> for DefaultEvaluator
 where
     ResB::Error: std::error::Error + Sync + Send + 'static,
 {
-    type Error = crate::Error;
+    type Message = String;
     async fn evaluate(
         &self,
-        cfg: Option<&Evaluate>,
+        cfg: Option<&Protocol>,
         res: Destinations<http::Response<ResB>>,
-    ) -> Result<bool, Self::Error> {
-        let parts = Self::parts(res).await?;
-        #[cfg(not(feature = "json"))]
-        return Ok(Self::acceptable(cfg, &parts).await?);
-
-        #[cfg(feature = "json")]
-        match Self::json_acceptable(cfg, &parts).await {
-            Ok(v) => Ok(v),
-            Err(err) => {
-                if err.is::<json_patch::PatchError>() {
-                    Ok(false)
-                } else {
-                    Ok(Self::acceptable(cfg, &parts).await?)
-                }
+        msg: &mut Vec<Self::Message>,
+    ) -> bool {
+        match Self::acceptable_parts(cfg, res, msg).await {
+            Ok(ok) => ok,
+            Err(e) => {
+                msg.push(format!("evaluate error: {}", e));
+                false
             }
         }
     }
 }
 
 impl DefaultEvaluator {
-    pub async fn parts<ResB: Body>(
+    pub async fn acceptable_parts<ResB: Body>(
+        cfg: Option<&Protocol>,
         res: Destinations<http::Response<ResB>>,
-    ) -> Result<
-        Destinations<(http::StatusCode, http::HeaderMap, Bytes)>,
-        <Self as Evaluator<http::Response<ResB>>>::Error,
-    >
+        msg: &mut Vec<String>,
+    ) -> Result<bool, crate::Error>
     where
         ResB::Error: std::error::Error + Sync + Send + 'static,
     {
-        let mut d = Destinations::new();
+        let (mut s, mut h, mut b) = (Destinations::new(), Destinations::new(), Destinations::new());
         for (name, r) in res {
             let (http::response::Parts { status, headers, .. }, body) = r.into_parts();
             let bytes = BodyExt::collect(body).await.map(|buf| buf.to_bytes()).map_err(Wrap::wrapping)?;
-            d.insert(name, (status, headers, bytes));
+            s.insert(name.clone(), status);
+            h.insert(name.clone(), headers);
+            b.insert(name.clone(), bytes);
         }
-        Ok(d)
+        let evaluate = match &cfg {
+            Some(Protocol::Http(http)) => &http.evaluate,
+            None => &Default::default(),
+        };
+        Ok(Self::acceptable_status(&evaluate.status, &s, msg)?
+            && Self::acceptable_header(&evaluate.header, &h, msg)?
+            && Self::acceptable_body(&evaluate.body, &b, msg)?)
     }
 
-    pub async fn acceptable(
-        cfg: Option<&Evaluate>,
-        parts: &Destinations<(http::StatusCode, http::HeaderMap, Bytes)>,
+    pub fn acceptable_status(
+        cfg: &StatusEvaluate,
+        status: &Destinations<http::StatusCode>,
+        msg: &mut Vec<String>,
     ) -> WrappedResult<bool> {
-        if parts.len() == 1 {
-            Self::status(parts).await
-        } else {
-            Self::compare(cfg, parts).await
+        let acceptable = match cfg {
+            StatusEvaluate::OkOrEqual => Self::assault_or_compare(status, http::StatusCode::is_success),
+            StatusEvaluate::Expect(EvaluateTo::All(code)) => status.values().all(|s| s == &**code),
+            StatusEvaluate::Expect(EvaluateTo::Destinations(codes)) => {
+                // TODO subset ?
+                status == &codes.iter().map(|(d, c)| (d.to_string(), **c)).collect::<HashMap<_, _>>()
+            }
+            StatusEvaluate::Ignore => true,
+        };
+        if !acceptable {
+            msg.push("status is not acceptable".to_string());
+        }
+        Ok(acceptable)
+    }
+
+    pub fn acceptable_header(
+        cfg: &HeaderEvaluate,
+        headers: &Destinations<http::HeaderMap>,
+        msg: &mut Vec<String>,
+    ) -> WrappedResult<bool> {
+        let acceptable = match cfg {
+            HeaderEvaluate::Equal => Self::assault_or_compare(headers, |_| true),
+            HeaderEvaluate::Ignore => true,
+        };
+        if !acceptable {
+            msg.push("header is not acceptable".to_string());
+        }
+        Ok(acceptable)
+    }
+
+    pub fn acceptable_body(
+        cfg: &BodyEvaluate,
+        body: &Destinations<Bytes>,
+        msg: &mut Vec<String>,
+    ) -> WrappedResult<bool> {
+        match cfg {
+            BodyEvaluate::Equal => Ok(Self::assault_or_compare(body, |_| true)),
+            BodyEvaluate::PlainText(_) => Ok(Self::assault_or_compare(body, |_| true)), // TODO
+            #[cfg(feature = "json")]
+            BodyEvaluate::Json(e) => Self::json_acceptable(e, body, msg),
         }
     }
-    pub async fn status(parts: &Destinations<(http::StatusCode, http::HeaderMap, Bytes)>) -> WrappedResult<bool> {
-        Ok(parts.iter().all(|(_name, (s, _h, _b))| s.is_success()))
+
+    pub fn assault_or_compare<T: PartialEq, F: Fn(&T) -> bool>(d: &Destinations<T>, f: F) -> bool {
+        if d.len() == 1 {
+            Self::validate_all(d, f)
+        } else {
+            Self::compare_all(d)
+        }
     }
-    pub async fn compare(
-        _cfg: Option<&Evaluate>,
-        parts: &Destinations<(http::StatusCode, http::HeaderMap, Bytes)>,
-    ) -> WrappedResult<bool> {
-        let v: Vec<_> = parts.values().collect();
-        let pass = v.windows(2).all(|w| w[0] == w[1]);
-        Ok(pass)
+    pub fn validate_all<T, F: Fn(&T) -> bool>(d: &Destinations<T>, f: F) -> bool {
+        d.values().all(f)
+    }
+    pub fn compare_all<T: PartialEq>(status: &Destinations<T>) -> bool {
+        let v: Vec<_> = status.values().collect();
+        v.windows(2).all(|w| w[0] == w[1])
     }
 }
 
 #[cfg(feature = "json")]
 impl DefaultEvaluator {
-    pub async fn json_acceptable(
-        cfg: Option<&Evaluate>,
-        parts: &Destinations<(http::StatusCode, http::HeaderMap, Bytes)>,
+    pub fn json_acceptable(
+        cfg: &JsonEvaluate,
+        parts: &Destinations<Bytes>,
+        msg: &mut Vec<String>,
     ) -> WrappedResult<bool> {
-        let values = Self::patched(cfg, parts)?;
+        let values: Vec<_> = match Self::patched(cfg, parts) {
+            Ok(values) => values,
+            Err(e) => {
+                msg.push(format!("patch error: {}", e));
+                return Ok(false);
+            }
+        }
+        .into_values()
+        .collect();
 
-        let pass = parts.iter().zip(values.into_iter()).collect::<Vec<_>>().windows(2).all(|w| {
-            let (((_na, (sa, ha, ba)), (__na, va)), ((_nb, (sb, hb, bb)), (__nb, vb))) = (&w[0], &w[1]);
-            sa == sb && ha == hb && Self::json_compare(cfg, (va, vb)).unwrap_or(ba == bb)
-        });
+        let pass = values.windows(2).all(|w| Self::json_compare(cfg, (&w[0], &w[1]), msg).unwrap_or(w[0] == w[1]));
         Ok(pass)
     }
 
-    pub fn patched(
-        cfg: Option<&Evaluate>,
-        parts: &Destinations<(http::StatusCode, http::HeaderMap, Bytes)>,
-    ) -> WrappedResult<Destinations<Value>> {
+    pub fn patched(cfg: &JsonEvaluate, parts: &Destinations<Bytes>) -> WrappedResult<Destinations<Value>> {
         parts
             .iter()
-            .map(|(name, (_, _, body))| {
+            .map(|(name, body)| {
                 let mut value = serde_json::from_slice(body)?;
                 if let Err(e) = Self::patch(cfg, name, &mut value) {
                     if parts.len() == 1 {
                         Err(e)?;
-                    } else {
-                        eprintln!("patch was failed"); // TODO warning output
                     }
                 }
                 Ok((name.clone(), value))
             })
             .collect::<Result<Destinations<_>, _>>()
     }
-    pub fn patch(cfg: Option<&Evaluate>, name: &str, value: &mut Value) -> Result<(), json_patch::PatchError> {
-        let patch = cfg.map(|c| match c {
-            Evaluate::PlainText(_) => json_patch::Patch::default(),
-            Evaluate::Json(JsonEvaluate { patch, .. }) => match patch {
-                Some(PatchTo::All(p)) => p.clone(),
-                Some(PatchTo::Destinations(patch)) => patch.get(name).cloned().unwrap_or_default(),
-                None => json_patch::Patch::default(),
-            },
-        });
-        match patch {
-            Some(p) => Ok(json_patch::patch(value, &p)?),
-            None => Ok(()),
-        }
+    pub fn patch(cfg: &JsonEvaluate, name: &str, value: &mut Value) -> Result<(), json_patch::PatchError> {
+        let default_patch = json_patch::Patch::default();
+        let patch = match &cfg.patch {
+            Some(EvaluateTo::All(p)) => p,
+            Some(EvaluateTo::Destinations(patch)) => patch.get(name).unwrap_or(&default_patch),
+            None => &default_patch,
+        };
+        json_patch::patch(value, patch)
     }
 
-    pub fn json_compare(cfg: Option<&Evaluate>, (va, vb): (&Value, &Value)) -> WrappedResult<bool> {
-        let pointers = Self::pointers(&json_patch::diff(va, vb));
-        let ignored = pointers.iter().all(|op| {
-            cfg.map(|c| match c {
-                Evaluate::PlainText(_) => Vec::new(),
-                Evaluate::Json(JsonEvaluate { ignore, .. }) => ignore.clone(),
-            })
-            .unwrap_or_default()
-            .contains(op)
-        });
-        Ok(ignored)
+    pub fn json_compare(cfg: &JsonEvaluate, (va, vb): (&Value, &Value), msg: &mut Vec<String>) -> WrappedResult<bool> {
+        let diff = json_patch::diff(va, vb);
+        let pointers = Self::pointers(&diff);
+        for (op, path) in diff.iter().zip(pointers) {
+            if cfg.ignore.contains(&path) {
+                continue;
+            } else {
+                msg.push(format!("diff: {}", op));
+                return Ok(false);
+            }
+        }
+        Ok(true)
     }
 
     pub fn pointers(p: &json_patch::Patch) -> Vec<String> {
-        // TODO implemented ?
+        // TODO implemented in json_patch ?
         p.iter()
             .map(|op| match op {
                 json_patch::PatchOperation::Add(json_patch::AddOperation { path, .. }) => path,
@@ -176,16 +217,20 @@ mod tests {
         let ok =
             http::Response::builder().status(http::StatusCode::OK).body(http_body_util::Empty::<Bytes>::new()).unwrap();
         let responses = Destinations::from_iter(vec![("test".to_string(), ok)]);
-        let result = evaluator.evaluate(None, responses).await.unwrap();
+        let mut msg = Vec::new();
+        let result = evaluator.evaluate(Default::default(), responses, &mut msg).await;
         assert!(result);
+        assert!(msg.is_empty());
 
         let unavailable = http::Response::builder()
             .status(http::StatusCode::SERVICE_UNAVAILABLE)
             .body(http_body_util::Empty::<Bytes>::new())
             .unwrap();
         let responses = Destinations::from_iter(vec![("test".to_string(), unavailable)]);
-        let result = evaluator.evaluate(None, responses).await.unwrap();
+        let mut msg = Vec::new();
+        let result = evaluator.evaluate(Default::default(), responses, &mut msg).await;
         assert!(!result);
+        assert_eq!(msg, ["status is not acceptable"]);
     }
 
     // TODO more tests

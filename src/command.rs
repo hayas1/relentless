@@ -1,4 +1,4 @@
-use std::{io::Write, path::PathBuf, process::ExitCode};
+use std::{fmt::Display, io::Write, path::PathBuf, process::ExitCode};
 
 #[cfg(feature = "cli")]
 use clap::Parser;
@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use tower::Service;
 
 use crate::{
-    config::{Config, Destinations},
+    config::{http_serde_priv, Config, Destinations},
     error::{IntoContext, MultiWrap, RunCommandError, Wrap, WrappedResult},
     evaluate::Evaluator,
     outcome::Outcome,
@@ -68,6 +68,14 @@ pub struct Relentless {
     pub rps: Option<usize>,
 }
 impl Relentless {
+    pub fn destinations(&self) -> WrappedResult<Destinations<http_serde_priv::Uri>> {
+        let Self { destination, .. } = self;
+        destination
+            .iter()
+            .map(|(k, v)| Ok((k.to_string(), http_serde_priv::Uri(v.parse()?))))
+            .collect::<Result<Destinations<_>, _>>()
+    }
+
     /// TODO document
     pub fn configs(&self) -> WrappedResult<Vec<Config>> {
         let Self { file, .. } = self;
@@ -100,7 +108,7 @@ impl Relentless {
 
     /// TODO document
     #[cfg(all(feature = "default-http-client", feature = "cli"))]
-    pub async fn assault(&self) -> crate::Result<Outcome> {
+    pub async fn assault(&self) -> crate::Result<Outcome<String>> {
         let configs = self.configs_filtered(std::io::stderr())?;
         let clients = Control::default_http_clients(self, &configs).await?;
         let outcome = self.assault_with(configs, clients, &crate::evaluate::DefaultEvaluator).await?;
@@ -112,7 +120,7 @@ impl Relentless {
         configs: Vec<Config>,
         services: Vec<Destinations<S>>,
         evaluator: &E,
-    ) -> crate::Result<Outcome>
+    ) -> crate::Result<Outcome<E::Message>>
     where
         ReqB: Body + FromBodyStructure + Send + 'static,
         ReqB::Data: Send + 'static,
@@ -123,7 +131,7 @@ impl Relentless {
         S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + Sync + 'static,
         S::Error: std::error::Error + Sync + Send + 'static,
         E: Evaluator<http::Response<ResB>>,
-        E::Error: std::error::Error + Sync + Send + 'static,
+        E::Message: Display,
     {
         let Self { no_color, no_report, .. } = self;
         console::set_colors_enabled(!no_color);

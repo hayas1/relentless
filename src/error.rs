@@ -138,9 +138,9 @@ impl Wrap {
     }
 }
 
-#[derive(Debug)]
-pub struct MultiWrap(pub Vec<Wrap>);
-impl Display for MultiWrap {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MultiWrap<W = Wrap>(pub Vec<W>);
+impl<W: Display> Display for MultiWrap<W> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let (m, n) = (self.0.len(), 3);
         for (i, wrap) in self.0[..n.min(m)].iter().enumerate() {
@@ -157,24 +157,30 @@ impl Display for MultiWrap {
         Ok(())
     }
 }
-impl std::error::Error for MultiWrap {
+impl<W: std::error::Error + 'static> std::error::Error for MultiWrap<W> {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        // TODO multiple sources ?
+        self.0.first().map(|w| w as _)
+    }
+}
+impl std::error::Error for MultiWrap<Wrap> {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         // TODO multiple sources ?
         self.0.first().map(|w| w.0.as_ref() as _)
     }
 }
-impl FromIterator<Wrap> for MultiWrap {
-    fn from_iter<T: IntoIterator<Item = Wrap>>(iter: T) -> Self {
+impl<W> FromIterator<W> for MultiWrap<W> {
+    fn from_iter<T: IntoIterator<Item = W>>(iter: T) -> Self {
         Self(iter.into_iter().collect())
     }
 }
-impl Deref for MultiWrap {
-    type Target = Vec<Wrap>;
+impl<W> Deref for MultiWrap<W> {
+    type Target = Vec<W>;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
-impl DerefMut for MultiWrap {
+impl<W> DerefMut for MultiWrap<W> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }

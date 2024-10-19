@@ -4,7 +4,10 @@ use std::marker::PhantomData;
 use crate::service::DefaultHttpClient;
 use crate::{
     command::Relentless,
-    config::{Coalesce, Coalesced, Config, Destinations, Protocol, Setting, Testcase, WorkerConfig},
+    config::{
+        http_serde_priv, Coalesce, Coalesced, Config, Destinations, HttpRequest, Protocol, Setting, Testcase,
+        WorkerConfig,
+    },
     error::WrappedResult,
     evaluate::{DefaultEvaluator, Evaluator},
     outcome::{CaseOutcome, Outcome, WorkerOutcome},
@@ -38,7 +41,7 @@ impl Control<'_, DefaultHttpClient<reqwest::Body, reqwest::Body>, reqwest::Body,
         config: &Config,
     ) -> WrappedResult<Destinations<DefaultHttpClient<reqwest::Body, reqwest::Body>>> {
         let mut destinations = Destinations::new();
-        for (name, _destination) in config.worker_config.destinations.clone().coalesce(&cmd.destination) {
+        for (name, _destination) in config.worker_config.destinations.clone().coalesce(&cmd.destinations()?) {
             let client = DefaultHttpClient::<reqwest::Body, reqwest::Body>::new().await?;
             destinations.insert(name.to_string(), client);
         }
@@ -56,7 +59,6 @@ where
     S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + Sync + 'static,
     S::Error: std::error::Error + Sync + Send + 'static,
     E: Evaluator<http::Response<ResB>>,
-    E::Error: std::error::Error + Sync + Send + 'static,
 {
     /// TODO document
     pub fn with_service(
@@ -80,7 +82,7 @@ where
         Self { _cmd: cmd, workers, cases, phantom }
     }
     /// TODO document
-    pub async fn assault(self, evaluator: &E) -> WrappedResult<Outcome> {
+    pub async fn assault(self, evaluator: &E) -> WrappedResult<Outcome<E::Message>> {
         let Self { workers, cases, .. } = self;
 
         let mut works = Vec::new();
@@ -100,7 +102,7 @@ where
 #[derive(Debug, Clone)]
 pub struct Worker<'a, S, ReqB, ResB, E> {
     _cmd: &'a Relentless,
-    config: Coalesced<WorkerConfig, Destinations<String>>,
+    config: Coalesced<WorkerConfig, Destinations<http_serde_priv::Uri>>,
     clients: Destinations<S>,
     phantom: PhantomData<(ReqB, ResB, E)>,
 }
@@ -120,15 +122,18 @@ where
     S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + Sync + 'static,
     S::Error: std::error::Error + Sync + Send + 'static,
     E: Evaluator<http::Response<ResB>>,
-    E::Error: std::error::Error + Sync + Send + 'static,
 {
     pub fn new(cmd: &'a Relentless, config: WorkerConfig, clients: Destinations<S>) -> WrappedResult<Self> {
-        let config = Coalesced::tuple(config, cmd.destination.clone().into_iter().collect());
+        let config = Coalesced::tuple(config, cmd.destinations()?);
         let phantom = PhantomData;
         Ok(Self { _cmd: cmd, config, clients, phantom })
     }
 
-    pub async fn assault(self, cases: Vec<Case<S, ReqB, ResB>>, evaluator: &E) -> WrappedResult<WorkerOutcome> {
+    pub async fn assault(
+        self,
+        cases: Vec<Case<S, ReqB, ResB>>,
+        evaluator: &E,
+    ) -> WrappedResult<WorkerOutcome<E::Message>> {
         let Self { config, mut clients, .. } = self;
 
         let mut processes = Vec::new();
@@ -141,7 +146,7 @@ where
         let mut outcome = Vec::new();
         for (testcase, process) in processes {
             let Testcase { setting, .. } = testcase.coalesce();
-            let Setting { repeat, evaluate, .. } = &setting;
+            let Setting { repeat, protocol, .. } = &setting;
             let mut passed = 0;
             let mut t = (0..repeat.unwrap_or(1)).map(|_| Destinations::new()).collect::<Vec<_>>();
             for (name, repeated) in process? {
@@ -149,11 +154,13 @@ where
                     t[i].insert(name.clone(), res);
                 }
             }
+            let mut v = Vec::new();
             for res in t {
-                let pass = evaluator.evaluate(evaluate.as_ref(), res).await?;
+                let pass = evaluator.evaluate(protocol.as_ref(), res, &mut v).await;
                 passed += pass as usize;
             }
-            outcome.push(CaseOutcome::new(testcase, passed));
+
+            outcome.push(CaseOutcome::new(testcase, passed, v.into_iter().collect()));
         }
         Ok(WorkerOutcome::new(config, outcome))
     }
@@ -189,7 +196,7 @@ where
 
     pub async fn process(
         self,
-        destinations: &Destinations<String>,
+        destinations: &Destinations<http_serde_priv::Uri>,
         clients: &mut Destinations<S>,
     ) -> WrappedResult<Destinations<Vec<http::Response<ResB>>>> {
         let Testcase { target, setting, .. } = self.testcase.coalesce();
@@ -208,7 +215,7 @@ where
     }
 
     pub fn requests(
-        destinations: &Destinations<String>,
+        destinations: &Destinations<http_serde_priv::Uri>,
         target: &str,
         setting: &Setting,
     ) -> WrappedResult<Destinations<Vec<http::Request<ReqB>>>> {
@@ -242,18 +249,18 @@ where
 
     // TODO generics
     pub fn http_request(
-        destination: &str,
+        destination: &http::Uri,
         target: &str,
         http: &crate::config::Http,
     ) -> WrappedResult<http::Request<ReqB>> {
-        let destination = destination.parse::<http::Uri>().unwrap();
-        let uri = http::uri::Builder::from(destination).path_and_query(target).build().unwrap();
+        let HttpRequest { method, header, body, .. } = &http.request;
+        let uri = http::uri::Builder::from(destination.clone()).path_and_query(target).build().unwrap();
         let mut request = http::Request::builder()
             .uri(uri)
-            .method(http.method.clone().unwrap_or(http::Method::GET))
-            .body(ReqB::from_body_structure(http.body.clone().unwrap_or_default()))
+            .method(method.as_ref().map(|m| (**m).clone()).unwrap_or_default())
+            .body(ReqB::from_body_structure(body.clone().unwrap_or_default()))
             .unwrap();
-        *request.headers_mut() = http.header.clone().unwrap_or_default();
+        *request.headers_mut() = header.as_ref().map(|h| (**h).clone()).unwrap_or_default();
         Ok(request)
     }
 }

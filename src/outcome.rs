@@ -5,18 +5,18 @@ use std::{
 
 use crate::{
     command::Relentless,
-    config::{Coalesced, Destinations, Setting, Testcase, WorkerConfig},
-    error::{Wrap, WrappedResult},
+    config::{http_serde_priv, Coalesced, Destinations, Setting, Testcase, WorkerConfig},
+    error::{MultiWrap, Wrap, WrappedResult},
 };
 
 /// TODO document
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Outcome {
-    outcome: Vec<WorkerOutcome>,
+pub struct Outcome<T> {
+    outcome: Vec<WorkerOutcome<T>>,
 }
 // TODO trait ?
-impl Outcome {
-    pub fn new(outcome: Vec<WorkerOutcome>) -> Self {
+impl<T> Outcome<T> {
+    pub fn new(outcome: Vec<WorkerOutcome<T>>) -> Self {
         Self { outcome }
     }
     pub fn pass(&self) -> bool {
@@ -28,10 +28,12 @@ impl Outcome {
     pub fn exit_code(&self, cmd: Relentless) -> ExitCode {
         (!self.allow(cmd.strict) as u8).into()
     }
+}
+impl<T: Display> Outcome<T> {
     pub fn report(&self, cmd: &Relentless) -> WrappedResult<()> {
         self.report_to(&mut OutcomeWriter::with_stdout(0), cmd)
     }
-    pub fn report_to<T: std::io::Write>(&self, w: &mut OutcomeWriter<T>, cmd: &Relentless) -> WrappedResult<()> {
+    pub fn report_to<W: std::io::Write>(&self, w: &mut OutcomeWriter<W>, cmd: &Relentless) -> WrappedResult<()> {
         for outcome in &self.outcome {
             if !outcome.skip_report(cmd) {
                 outcome.report_to(w, cmd)?;
@@ -44,12 +46,15 @@ impl Outcome {
 
 /// TODO document
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct WorkerOutcome {
-    config: Coalesced<WorkerConfig, Destinations<String>>,
-    outcome: Vec<CaseOutcome>,
+pub struct WorkerOutcome<T> {
+    config: Coalesced<WorkerConfig, Destinations<http_serde_priv::Uri>>,
+    outcome: Vec<CaseOutcome<T>>,
 }
-impl WorkerOutcome {
-    pub fn new(config: Coalesced<WorkerConfig, Destinations<String>>, outcome: Vec<CaseOutcome>) -> Self {
+impl<T> WorkerOutcome<T> {
+    pub fn new(
+        config: Coalesced<WorkerConfig, Destinations<http_serde_priv::Uri>>,
+        outcome: Vec<CaseOutcome<T>>,
+    ) -> Self {
         Self { config, outcome }
     }
     pub fn pass(&self) -> bool {
@@ -62,8 +67,9 @@ impl WorkerOutcome {
         let Relentless { strict, ng_only, no_report, .. } = cmd;
         *no_report || *ng_only && self.allow(*strict)
     }
-
-    pub fn report_to<T: std::io::Write>(&self, w: &mut OutcomeWriter<T>, cmd: &Relentless) -> WrappedResult<()> {
+}
+impl<T: Display> WorkerOutcome<T> {
+    pub fn report_to<W: std::io::Write>(&self, w: &mut OutcomeWriter<W>, cmd: &Relentless) -> WrappedResult<()> {
         let WorkerConfig { name, destinations, .. } = self.config.coalesce();
 
         let side = console::Emoji("🚀", "");
@@ -74,10 +80,10 @@ impl WorkerOutcome {
                 write!(w, "{}{} ", name, console::Emoji("🌐", ":"))?;
                 match self.config.base().destinations.get(&name) {
                     Some(base) if base != &destination => {
-                        writeln!(w, "{} {} {}", base, console::Emoji("👉", "->"), destination)?;
+                        writeln!(w, "{} {} {}", **base, console::Emoji("👉", "->"), *destination)?;
                     }
                     _ => {
-                        writeln!(w, "{}", destination)?;
+                        writeln!(w, "{}", *destination)?;
                     }
                 }
             }
@@ -98,15 +104,16 @@ impl WorkerOutcome {
 
 /// TODO document
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CaseOutcome {
+pub struct CaseOutcome<T> {
     testcase: Coalesced<Testcase, Setting>,
     passed: usize,
     pass: bool,
+    messages: MultiWrap<T>,
 }
-impl CaseOutcome {
-    pub fn new(testcase: Coalesced<Testcase, Setting>, passed: usize) -> Self {
+impl<T> CaseOutcome<T> {
+    pub fn new(testcase: Coalesced<Testcase, Setting>, passed: usize, messages: MultiWrap<T>) -> Self {
         let pass = passed == testcase.coalesce().setting.repeat.unwrap_or(1); // TODO here ?
-        Self { testcase, passed, pass }
+        Self { testcase, passed, pass, messages }
     }
     pub fn pass(&self) -> bool {
         self.pass
@@ -119,8 +126,9 @@ impl CaseOutcome {
         let Relentless { strict, ng_only, no_report, .. } = cmd;
         *no_report || *ng_only && self.allow(*strict)
     }
-
-    pub fn report_to<T: std::io::Write>(&self, w: &mut OutcomeWriter<T>, cmd: &Relentless) -> WrappedResult<()> {
+}
+impl<T: Display> CaseOutcome<T> {
+    pub fn report_to<W: std::io::Write>(&self, w: &mut OutcomeWriter<W>, cmd: &Relentless) -> WrappedResult<()> {
         let Testcase { description, target, setting, .. } = self.testcase.coalesce();
 
         let side = if self.pass() { console::Emoji("✅", "PASS") } else { console::Emoji("❌", "FAIL") };
@@ -139,13 +147,22 @@ impl CaseOutcome {
                 writeln!(w, "{} {}", console::Emoji("👟", ""), console::style("this testcase is allowed").green())
             })?;
         }
+        if !self.messages.is_empty() {
+            w.scope(|w| {
+                writeln!(w, "{} {}", console::Emoji("💬", ""), console::style("message was found").yellow())?;
+                w.scope(|w| {
+                    let message = &self.messages;
+                    writeln!(w, "{}", console::style(message).dim())
+                })
+            })?;
+        }
         Ok(())
     }
 }
 
-pub struct OutcomeWriter<T> {
+pub struct OutcomeWriter<W> {
     pub indent: usize,
-    pub buf: T,
+    pub buf: W,
     pub at_start_line: bool,
 }
 impl OutcomeWriter<std::io::BufWriter<std::io::Stdout>> {
@@ -154,8 +171,8 @@ impl OutcomeWriter<std::io::BufWriter<std::io::Stdout>> {
         Self::new(indent, buf)
     }
 }
-impl<T> OutcomeWriter<T> {
-    pub fn new(indent: usize, buf: T) -> Self {
+impl<W> OutcomeWriter<W> {
+    pub fn new(indent: usize, buf: W) -> Self {
         let at_start_line = true;
         Self { indent, buf, at_start_line }
     }
@@ -179,7 +196,7 @@ impl<T> OutcomeWriter<T> {
         Ok(ret)
     }
 }
-impl<T: std::io::Write> std::fmt::Write for OutcomeWriter<T> {
+impl<W: std::io::Write> std::fmt::Write for OutcomeWriter<W> {
     fn write_str(&mut self, s: &str) -> std::fmt::Result {
         // TODO better indent implementation ?
         if s.contains('\n') {
@@ -201,7 +218,7 @@ impl<T: std::io::Write> std::fmt::Write for OutcomeWriter<T> {
         Ok(())
     }
 }
-impl<T: Display> Display for OutcomeWriter<T> {
+impl<W: Display> Display for OutcomeWriter<W> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.buf)
     }

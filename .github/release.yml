@@ -3,6 +3,9 @@ changelog:
     - title: '🚀 Features'
       labels:
         - feature
+    - title: '🔨 Breaking Changes'
+      labels:
+        - breaking
     - title: '🐛 Bug Fixes'
       labels:
         - bugfix
@@ -11,13 +14,13 @@ changelog:
         - refactor
     - title: '📖 Documentation'
       labels:
-        - doc
+        - documentation
     - title: '👒 Dependency update'
       labels:
         - deps
     - title: '🧰 Maintenance'
       labels:
-        - 'maintenance'
+        - maintenance
     - title: Other Changes
       labels:
         - "*"

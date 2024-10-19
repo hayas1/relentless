@@ -3,6 +3,10 @@ feature:
       - '^feat/'
       - '^feature/'
 
+breaking:
+   - head-branch:
+      - '^breaking/'
+
 bugfix:
    - head-branch:
       - '^fix/'
@@ -13,7 +17,7 @@ refactor:
    - head-branch:
       - '^refactor/'
 
-doc:
+documentation:
    - changed-files:
       - any-glob-to-any-file:
         - '**/README.md'
