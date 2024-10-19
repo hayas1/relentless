@@ -125,7 +125,6 @@ pub struct JsonEvaluate {
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "snake_case", untagged)]
-#[cfg(feature = "json")]
 pub enum EvaluateTo<T> {
     All(T),
     Destinations(Destinations<T>),
