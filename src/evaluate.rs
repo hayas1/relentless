@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use bytes::Bytes;
 use http_body::Body;
 use http_body_util::BodyExt;
@@ -71,6 +73,11 @@ impl DefaultEvaluator {
     ) -> WrappedResult<bool> {
         let acceptable = match cfg {
             StatusEvaluate::OkOrEqual => Self::assault_or_compare(status, http::StatusCode::is_success),
+            StatusEvaluate::Expect(EvaluateTo::All(code)) => status.values().all(|s| s == &**code),
+            StatusEvaluate::Expect(EvaluateTo::Destinations(codes)) => {
+                // TODO subset ?
+                status == &codes.iter().map(|(d, c)| (d.to_string(), **c)).collect::<HashMap<_, _>>()
+            }
             StatusEvaluate::Ignore => true,
         };
         if !acceptable {

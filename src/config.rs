@@ -87,6 +87,7 @@ pub struct Evaluate {
 pub enum StatusEvaluate {
     #[default]
     OkOrEqual,
+    Expect(EvaluateTo<_http::StatusCode>),
     Ignore,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -287,6 +288,26 @@ impl Format {
                 use crate::error::WithContext;
                 Err(RunCommandError::UndefinedSerializeFormat).context(content.to_string())?
             }
+        }
+    }
+}
+
+// `http` do not support serde https://github.com/hyperium/http/pull/631
+mod _http {
+    use std::ops::{Deref, DerefMut};
+
+    use super::*;
+    #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+    pub struct StatusCode(#[serde(with = "http_serde::status_code")] pub http::StatusCode);
+    impl Deref for StatusCode {
+        type Target = http::StatusCode;
+        fn deref(&self) -> &Self::Target {
+            &self.0
+        }
+    }
+    impl DerefMut for StatusCode {
+        fn deref_mut(&mut self) -> &mut Self::Target {
+            &mut self.0
         }
     }
 }
