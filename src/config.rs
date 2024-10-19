@@ -93,6 +93,7 @@ pub enum StatusEvaluate {
 pub enum HeaderEvaluate {
     #[default]
     Equal,
+    Ignore,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]

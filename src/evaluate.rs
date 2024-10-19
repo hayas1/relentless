@@ -85,6 +85,7 @@ impl DefaultEvaluator {
     ) -> WrappedResult<bool> {
         let acceptable = match cfg {
             HeaderEvaluate::Equal => Self::assault_or_compare(headers, |_| true),
+            HeaderEvaluate::Ignore => true,
         };
         if !acceptable {
             msg.push("header is not acceptable".to_string());
