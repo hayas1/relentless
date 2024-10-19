@@ -5,7 +5,7 @@ use http_body_util::BodyExt;
 use serde_json::Value;
 
 #[cfg(feature = "json")]
-use crate::config::{JsonEvaluate, PatchTo};
+use crate::config::{EvaluateTo, JsonEvaluate};
 use crate::{
     config::{BodyEvaluate, Destinations, HeaderEvaluate, Protocol, StatusEvaluate},
     error::{Wrap, WrappedResult},
@@ -161,8 +161,8 @@ impl DefaultEvaluator {
     pub fn patch(cfg: &JsonEvaluate, name: &str, value: &mut Value) -> Result<(), json_patch::PatchError> {
         let default_patch = json_patch::Patch::default();
         let patch = match &cfg.patch {
-            Some(PatchTo::All(p)) => p,
-            Some(PatchTo::Destinations(patch)) => patch.get(name).unwrap_or(&default_patch),
+            Some(EvaluateTo::All(p)) => p,
+            Some(EvaluateTo::Destinations(patch)) => patch.get(name).unwrap_or(&default_patch),
             None => &default_patch,
         };
         json_patch::patch(value, patch)

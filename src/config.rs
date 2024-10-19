@@ -115,16 +115,16 @@ pub struct JsonEvaluate {
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub ignore: Vec<String>,
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
-    pub patch: Option<PatchTo>,
+    pub patch: Option<EvaluateTo<json_patch::Patch>>,
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub patch_fail: Option<Severity>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "snake_case", untagged)]
 #[cfg(feature = "json")]
-pub enum PatchTo {
-    All(json_patch::Patch),
-    Destinations(Destinations<json_patch::Patch>),
+pub enum EvaluateTo<T> {
+    All(T),
+    Destinations(Destinations<T>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -337,7 +337,7 @@ mod tests {
                                 //     )
                                 //     .unwrap(),
                                 // )),
-                                patch: Some(PatchTo::Destinations(Destinations::from([
+                                patch: Some(EvaluateTo::Destinations(Destinations::from([
                                     (
                                         "actual".to_string(),
                                         serde_json::from_value(
@@ -398,7 +398,7 @@ mod tests {
                 evaluate: Evaluate {
                     body: BodyEvaluate::Json(JsonEvaluate {
                         ignore: vec![],
-                        patch: Some(PatchTo::All(
+                        patch: Some(EvaluateTo::All(
                             serde_json::from_value(
                                 serde_json::json!([{"op": "replace", "path": "/datetime", "value": "2021-01-01"}])
                             )
@@ -440,7 +440,7 @@ mod tests {
                 evaluate: Evaluate {
                     body: BodyEvaluate::Json(JsonEvaluate {
                         ignore: vec![],
-                        patch: Some(PatchTo::Destinations(Destinations::from([
+                        patch: Some(EvaluateTo::Destinations(Destinations::from([
                             (
                                 "actual".to_string(),
                                 serde_json::from_value(serde_json::json!([{"op": "remove", "path": "/datetime"}]))
