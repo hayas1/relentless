@@ -67,21 +67,29 @@ impl DefaultEvaluator {
     pub fn acceptable_status(
         cfg: &StatusEvaluate,
         status: &Destinations<http::StatusCode>,
-        _msg: &mut Vec<String>,
+        msg: &mut Vec<String>,
     ) -> WrappedResult<bool> {
-        match cfg {
-            StatusEvaluate::OkOrEqual => Ok(Self::assault_or_compare(status, http::StatusCode::is_success)),
+        let acceptable = match cfg {
+            StatusEvaluate::OkOrEqual => Self::assault_or_compare(status, http::StatusCode::is_success),
+        };
+        if !acceptable {
+            msg.push("status is not acceptable".to_string());
         }
+        Ok(acceptable)
     }
 
     pub fn acceptable_header(
         cfg: &HeaderEvaluate,
         headers: &Destinations<http::HeaderMap>,
-        _msg: &mut Vec<String>,
+        msg: &mut Vec<String>,
     ) -> WrappedResult<bool> {
-        match cfg {
-            HeaderEvaluate::Equal => Ok(Self::assault_or_compare(headers, |_| true)),
+        let acceptable = match cfg {
+            HeaderEvaluate::Equal => Self::assault_or_compare(headers, |_| true),
+        };
+        if !acceptable {
+            msg.push("header is not acceptable".to_string());
         }
+        Ok(acceptable)
     }
 
     pub fn acceptable_body(
