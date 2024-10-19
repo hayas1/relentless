@@ -51,7 +51,11 @@ pub enum Protocol {
 pub struct Http {
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub request: HttpRequest,
-    #[serde(default, skip_serializing_if = "IsDefault::is_default")]
+    #[serde(
+        default,
+        skip_serializing_if = "IsDefault::is_default",
+        with = "serde_yaml::with::singleton_map_recursive"
+    )]
     pub evaluate: Evaluate,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -78,7 +82,7 @@ pub struct Evaluate {
     pub status: StatusEvaluate,
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub header: HeaderEvaluate,
-    #[serde(default, flatten, skip_serializing_if = "IsDefault::is_default")]
+    #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub body: BodyEvaluate,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -201,10 +205,78 @@ impl Coalesce for Setting {
     type Other = Self;
     fn coalesce(self, other: &Self) -> Self {
         Self {
-            protocol: self.protocol.or(other.clone().protocol),
+            protocol: match (self.protocol, &other.protocol) {
+                (Some(sp), Some(ref op)) => Some(sp.coalesce(op)),
+                (Some(sp), None) => Some(sp),
+                (None, s) => s.clone(),
+            },
             template: if self.template.is_empty() { other.clone().template } else { self.template },
             repeat: self.repeat.or(other.repeat),
             timeout: self.timeout.or(other.timeout),
+        }
+    }
+}
+impl Coalesce for Protocol {
+    type Other = Self;
+    fn coalesce(self, other: &Self) -> Self {
+        match (self, other) {
+            (Protocol::Http(s), Protocol::Http(o)) => Protocol::Http(s.coalesce(o)),
+        }
+    }
+}
+impl Coalesce for Http {
+    type Other = Self;
+    fn coalesce(self, other: &Self) -> Self {
+        Self { request: self.request.coalesce(&other.request), evaluate: self.evaluate.coalesce(&other.evaluate) }
+    }
+}
+impl Coalesce for HttpRequest {
+    type Other = Self;
+    fn coalesce(self, other: &Self) -> Self {
+        Self {
+            method: self.method.or(other.method.clone()),
+            header: self.header.or(other.header.clone()),
+            body: self.body.or(other.body.clone()),
+        }
+    }
+}
+impl Coalesce for Evaluate {
+    type Other = Self;
+    fn coalesce(self, other: &Self) -> Self {
+        Self {
+            status: self.status.coalesce(&other.status),
+            header: self.header.coalesce(&other.header),
+            body: self.body.coalesce(&other.body),
+        }
+    }
+}
+impl Coalesce for StatusEvaluate {
+    type Other = Self;
+    fn coalesce(self, other: &Self) -> Self {
+        if self.is_default() {
+            other.clone()
+        } else {
+            self
+        }
+    }
+}
+impl Coalesce for HeaderEvaluate {
+    type Other = Self;
+    fn coalesce(self, other: &Self) -> Self {
+        if self.is_default() {
+            other.clone()
+        } else {
+            self
+        }
+    }
+}
+impl Coalesce for BodyEvaluate {
+    type Other = Self;
+    fn coalesce(self, other: &Self) -> Self {
+        if self.is_default() {
+            other.clone()
+        } else {
+            self
         }
     }
 }
@@ -442,7 +514,17 @@ mod tests {
     #[cfg(all(feature = "yaml", feature = "json"))]
     fn test_config_roundtrip() {
         let example = Config {
-            worker_config: WorkerConfig { name: Some("example".to_string()), ..Default::default() },
+            worker_config: WorkerConfig {
+                name: Some("example".to_string()),
+                setting: Setting {
+                    protocol: Some(Protocol::Http(Http {
+                        evaluate: Evaluate { header: HeaderEvaluate::Ignore, ..Default::default() },
+                        ..Default::default()
+                    })),
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
             testcase: vec![Testcase {
                 description: Some("test description".to_string()),
                 target: "/information".to_string(),
@@ -485,7 +567,7 @@ mod tests {
             }],
         };
         let yaml = serde_yaml::to_string(&example).unwrap();
-        // println!("{}", yaml);
+        println!("{}", yaml);
 
         let round_trip = Config::read_str(&yaml, Format::Yaml).unwrap();
         assert_eq!(example, round_trip);
@@ -505,11 +587,12 @@ mod tests {
           setting:
             http:
               evaluate:
-                json:
-                  patch:
-                  - op: replace
-                    path: /datetime
-                    value: 2021-01-01
+                body:
+                  json:
+                    patch:
+                    - op: replace
+                      path: /datetime
+                      value: 2021-01-01
         "#;
         let config = Config::read_str(all_yaml, Format::Yaml).unwrap();
         assert_eq!(
@@ -543,15 +626,16 @@ mod tests {
           setting:
             http:
               evaluate:
-                json:
-                  patch:
-                    actual:
-                    - op: remove
-                      path: /datetime
-                    expect:
-                    - op: remove
-                      path: /datetime
-                  patch_fail: warn
+                body:
+                  json:
+                    patch:
+                      actual:
+                      - op: remove
+                        path: /datetime
+                      expect:
+                      - op: remove
+                        path: /datetime
+                    patch_fail: warn
         "#;
         let config = Config::read_str(destinations_yaml, Format::Yaml).unwrap();
         assert_eq!(
