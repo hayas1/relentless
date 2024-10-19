@@ -32,32 +32,21 @@ pub type Destinations<T> = HashMap<String, T>;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct Setting {
-    #[serde(default, flatten, skip_serializing_if = "IsDefault::is_default")]
-    pub protocol: Option<Protocol>,
+    #[serde(default, skip_serializing_if = "IsDefault::is_default")]
+    pub request: RequestInfo,
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub template: HashMap<String, Destinations<String>>,
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub repeat: Option<usize>,
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub timeout: Option<Duration>,
-}
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "snake_case")]
-pub enum Protocol {
-    Http(Http),
-}
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(deny_unknown_fields)]
-pub struct Http {
-    #[serde(default, skip_serializing_if = "IsDefault::is_default")]
-    pub request: HttpRequest,
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
     pub evaluate: Evaluate,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
-pub struct HttpRequest {
+pub struct RequestInfo {
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub method: Option<http_serde_priv::Method>,
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
@@ -201,32 +190,15 @@ impl Coalesce for Setting {
     type Other = Self;
     fn coalesce(self, other: &Self) -> Self {
         Self {
-            protocol: match (self.protocol, &other.protocol) {
-                (Some(sp), Some(ref op)) => Some(sp.coalesce(op)),
-                (Some(sp), None) => Some(sp),
-                (None, s) => s.clone(),
-            },
+            request: self.request.coalesce(&other.request),
             template: if self.template.is_empty() { other.clone().template } else { self.template },
             repeat: self.repeat.or(other.repeat),
             timeout: self.timeout.or(other.timeout),
+            evaluate: self.evaluate.coalesce(&other.evaluate),
         }
     }
 }
-impl Coalesce for Protocol {
-    type Other = Self;
-    fn coalesce(self, other: &Self) -> Self {
-        match (self, other) {
-            (Protocol::Http(s), Protocol::Http(o)) => Protocol::Http(s.coalesce(o)),
-        }
-    }
-}
-impl Coalesce for Http {
-    type Other = Self;
-    fn coalesce(self, other: &Self) -> Self {
-        Self { request: self.request.coalesce(&other.request), evaluate: self.evaluate.coalesce(&other.evaluate) }
-    }
-}
-impl Coalesce for HttpRequest {
+impl Coalesce for RequestInfo {
     type Other = Self;
     fn coalesce(self, other: &Self) -> Self {
         Self {
@@ -513,10 +485,7 @@ mod tests {
             worker_config: WorkerConfig {
                 name: Some("example".to_string()),
                 setting: Setting {
-                    protocol: Some(Protocol::Http(Http {
-                        evaluate: Evaluate { header: HeaderEvaluate::Ignore, ..Default::default() },
-                        ..Default::default()
-                    })),
+                    evaluate: Evaluate { header: HeaderEvaluate::Ignore, ..Default::default() },
                     ..Default::default()
                 },
                 ..Default::default()
@@ -525,38 +494,31 @@ mod tests {
                 description: Some("test description".to_string()),
                 target: "/information".to_string(),
                 setting: Setting {
-                    protocol: Some(Protocol::Http(Http {
-                        evaluate: Evaluate {
-                            body: BodyEvaluate::Json(JsonEvaluate {
-                                ignore: vec!["/datetime".to_string()],
-                                // patch: Some(PatchTo::All(
-                                //     serde_json::from_value(
-                                //         serde_json::json!([{"op": "replace", "path": "/datetime", "value": "2021-01-01"}]),
-                                //     )
-                                //     .unwrap(),
-                                // )),
-                                patch: Some(EvaluateTo::Destinations(Destinations::from([
-                                    (
-                                        "actual".to_string(),
-                                        serde_json::from_value(
-                                            serde_json::json!([{"op": "remove", "path": "/datetime"}]),
-                                        )
+                    evaluate: Evaluate {
+                        body: BodyEvaluate::Json(JsonEvaluate {
+                            ignore: vec!["/datetime".to_string()],
+                            // patch: Some(PatchTo::All(
+                            //     serde_json::from_value(
+                            //         serde_json::json!([{"op": "replace", "path": "/datetime", "value": "2021-01-01"}]),
+                            //     )
+                            //     .unwrap(),
+                            // )),
+                            patch: Some(EvaluateTo::Destinations(Destinations::from([
+                                (
+                                    "actual".to_string(),
+                                    serde_json::from_value(serde_json::json!([{"op": "remove", "path": "/datetime"}]))
                                         .unwrap(),
-                                    ),
-                                    (
-                                        "expect".to_string(),
-                                        serde_json::from_value(
-                                            serde_json::json!([{"op": "remove", "path": "/datetime"}]),
-                                        )
+                                ),
+                                (
+                                    "expect".to_string(),
+                                    serde_json::from_value(serde_json::json!([{"op": "remove", "path": "/datetime"}]))
                                         .unwrap(),
-                                    ),
-                                ]))),
-                                patch_fail: Some(Severity::Error),
-                            }),
-                            ..Default::default()
-                        },
+                                ),
+                            ]))),
+                            patch_fail: Some(Severity::Error),
+                        }),
                         ..Default::default()
-                    })),
+                    },
                     ..Default::default()
                 },
                 attr: Attribute { allow: true },
@@ -581,34 +543,30 @@ mod tests {
         - description: test description
           target: /information
           setting:
-            http:
-              evaluate:
-                body:
-                  json:
-                    patch:
-                    - op: replace
-                      path: /datetime
-                      value: 2021-01-01
+            evaluate:
+              body:
+                json:
+                  patch:
+                  - op: replace
+                    path: /datetime
+                    value: 2021-01-01
         "#;
         let config = Config::read_str(all_yaml, Format::Yaml).unwrap();
         assert_eq!(
-            config.testcase[0].setting.protocol.as_ref().unwrap(),
-            &Protocol::Http(Http {
-                evaluate: Evaluate {
-                    body: BodyEvaluate::Json(JsonEvaluate {
-                        ignore: vec![],
-                        patch: Some(EvaluateTo::All(
-                            serde_json::from_value(
-                                serde_json::json!([{"op": "replace", "path": "/datetime", "value": "2021-01-01"}])
-                            )
-                            .unwrap(),
-                        )),
-                        patch_fail: None,
-                    }),
-                    ..Default::default()
-                },
+            config.testcase[0].setting.evaluate,
+            Evaluate {
+                body: BodyEvaluate::Json(JsonEvaluate {
+                    ignore: vec![],
+                    patch: Some(EvaluateTo::All(
+                        serde_json::from_value(
+                            serde_json::json!([{"op": "replace", "path": "/datetime", "value": "2021-01-01"}])
+                        )
+                        .unwrap(),
+                    )),
+                    patch_fail: None,
+                }),
                 ..Default::default()
-            })
+            },
         );
 
         let destinations_yaml = r#"
@@ -620,44 +578,38 @@ mod tests {
         - description: test description
           target: /information
           setting:
-            http:
-              evaluate:
-                body:
-                  json:
-                    patch:
-                      actual:
-                      - op: remove
-                        path: /datetime
-                      expect:
-                      - op: remove
-                        path: /datetime
-                    patch_fail: warn
+            evaluate:
+              body:
+                json:
+                  patch:
+                    actual:
+                    - op: remove
+                      path: /datetime
+                    expect:
+                    - op: remove
+                      path: /datetime
+                  patch_fail: warn
         "#;
         let config = Config::read_str(destinations_yaml, Format::Yaml).unwrap();
         assert_eq!(
-            config.testcase[0].setting.protocol.as_ref().unwrap(),
-            &Protocol::Http(Http {
-                evaluate: Evaluate {
-                    body: BodyEvaluate::Json(JsonEvaluate {
-                        ignore: vec![],
-                        patch: Some(EvaluateTo::Destinations(Destinations::from([
-                            (
-                                "actual".to_string(),
-                                serde_json::from_value(serde_json::json!([{"op": "remove", "path": "/datetime"}]))
-                                    .unwrap(),
-                            ),
-                            (
-                                "expect".to_string(),
-                                serde_json::from_value(serde_json::json!([{"op": "remove", "path": "/datetime"}]))
-                                    .unwrap(),
-                            ),
-                        ]))),
-                        patch_fail: Some(Severity::Warn),
-                    }),
-                    ..Default::default()
-                },
+            config.testcase[0].setting.evaluate,
+            Evaluate {
+                body: BodyEvaluate::Json(JsonEvaluate {
+                    ignore: vec![],
+                    patch: Some(EvaluateTo::Destinations(Destinations::from([
+                        (
+                            "actual".to_string(),
+                            serde_json::from_value(serde_json::json!([{"op": "remove", "path": "/datetime"}])).unwrap(),
+                        ),
+                        (
+                            "expect".to_string(),
+                            serde_json::from_value(serde_json::json!([{"op": "remove", "path": "/datetime"}])).unwrap(),
+                        ),
+                    ]))),
+                    patch_fail: Some(Severity::Warn),
+                }),
                 ..Default::default()
-            })
+            },
         );
     }
 

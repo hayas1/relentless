@@ -3,9 +3,8 @@ destinations:
   actual: http://localhost:3000
   expect: http://localhost:3000
 setting:
-  http:
-    evaluate:
-      header: ignore
+  evaluate:
+    header: ignore
 
 testcase:
   - target: /counter/increment
@@ -17,14 +16,13 @@ testcase:
   - target: /information
     description: ignore datetime and hostname
     setting:
-      http:
-        evaluate:
-          body:
-            json:
-              ignore:
-              - /datetime
-              - /hostname
-              - /headers/host
+      evaluate:
+        body:
+          json:
+            ignore:
+            - /datetime
+            - /hostname
+            - /headers/host
   - target: /information
     description: do not ignore datetime and hostname (must be failed, so attr allowed)
     attr:
@@ -32,25 +30,23 @@ testcase:
   - target: /information
     description: patch datetime and hostname
     setting:
-      http:
-        evaluate:
-          body:
-            json:
-              patch:
-              - {"op": "replace", "path": "/datetime", "value": "2024-10-10T00:00:00Z"}
-              - {"op": "remove", "path": "/hostname"}
-              - {"op": "replace", "path": "/headers/host", "value": "127.0.0.1:3000"}
-              - {"op": "test", "path": "/path", "value": "/information"}
+      evaluate:
+        body:
+          json:
+            patch:
+            - {"op": "replace", "path": "/datetime", "value": "2024-10-10T00:00:00Z"}
+            - {"op": "remove", "path": "/hostname"}
+            - {"op": "replace", "path": "/headers/host", "value": "127.0.0.1:3000"}
+            - {"op": "test", "path": "/path", "value": "/information"}
   - target: /information
     description: remove actual datetime only (must be failed, so attr allowed)
     setting:
-      http:
-        evaluate:
-          body:
-            json:
-              patch:
-                actual:
-                - op: remove
-                  path: /datetime
+      evaluate:
+        body:
+          json:
+            patch:
+              actual:
+              - op: remove
+                path: /datetime
     attr:
       allow: true

@@ -8,9 +8,8 @@ destinations:
 #       actual: v1
 #       expect: v2
 setting:
-  http:
-    evaluate:
-      header: ignore
+  evaluate:
+    header: ignore
 
 testcase:
   - target: /

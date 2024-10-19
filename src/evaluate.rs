@@ -6,18 +6,18 @@ use http_body_util::BodyExt;
 #[cfg(feature = "json")]
 use serde_json::Value;
 
-use crate::config::EvaluateTo;
 #[cfg(feature = "json")]
 use crate::config::JsonEvaluate;
+use crate::config::{Evaluate, EvaluateTo};
 use crate::{
-    config::{BodyEvaluate, Destinations, HeaderEvaluate, Protocol, StatusEvaluate},
+    config::{BodyEvaluate, Destinations, HeaderEvaluate, StatusEvaluate},
     error::{Wrap, WrappedResult},
 };
 
 #[allow(async_fn_in_trait)] // TODO #[warn(async_fn_in_trait)] by default
 pub trait Evaluator<Res> {
     type Message;
-    async fn evaluate(&self, cfg: Option<&Protocol>, res: Destinations<Res>, msg: &mut Vec<Self::Message>) -> bool;
+    async fn evaluate(&self, cfg: &Evaluate, res: Destinations<Res>, msg: &mut Vec<Self::Message>) -> bool;
 }
 pub struct DefaultEvaluator;
 impl<ResB: Body> Evaluator<http::Response<ResB>> for DefaultEvaluator
@@ -27,7 +27,7 @@ where
     type Message = String;
     async fn evaluate(
         &self,
-        cfg: Option<&Protocol>,
+        cfg: &Evaluate,
         res: Destinations<http::Response<ResB>>,
         msg: &mut Vec<Self::Message>,
     ) -> bool {
@@ -43,7 +43,7 @@ where
 
 impl DefaultEvaluator {
     pub async fn acceptable_parts<ResB: Body>(
-        cfg: Option<&Protocol>,
+        cfg: &Evaluate,
         res: Destinations<http::Response<ResB>>,
         msg: &mut Vec<String>,
     ) -> Result<bool, crate::Error>
@@ -58,13 +58,9 @@ impl DefaultEvaluator {
             h.insert(name.clone(), headers);
             b.insert(name.clone(), bytes);
         }
-        let evaluate = match &cfg {
-            Some(Protocol::Http(http)) => &http.evaluate,
-            None => &Default::default(),
-        };
-        Ok(Self::acceptable_status(&evaluate.status, &s, msg)?
-            && Self::acceptable_header(&evaluate.header, &h, msg)?
-            && Self::acceptable_body(&evaluate.body, &b, msg)?)
+        Ok(Self::acceptable_status(&cfg.status, &s, msg)?
+            && Self::acceptable_header(&cfg.header, &h, msg)?
+            && Self::acceptable_body(&cfg.body, &b, msg)?)
     }
 
     pub fn acceptable_status(
@@ -218,7 +214,7 @@ mod tests {
             http::Response::builder().status(http::StatusCode::OK).body(http_body_util::Empty::<Bytes>::new()).unwrap();
         let responses = Destinations::from_iter(vec![("test".to_string(), ok)]);
         let mut msg = Vec::new();
-        let result = evaluator.evaluate(Default::default(), responses, &mut msg).await;
+        let result = evaluator.evaluate(&Default::default(), responses, &mut msg).await;
         assert!(result);
         assert!(msg.is_empty());
 
@@ -228,7 +224,7 @@ mod tests {
             .unwrap();
         let responses = Destinations::from_iter(vec![("test".to_string(), unavailable)]);
         let mut msg = Vec::new();
-        let result = evaluator.evaluate(Default::default(), responses, &mut msg).await;
+        let result = evaluator.evaluate(&Default::default(), responses, &mut msg).await;
         assert!(!result);
         assert_eq!(msg, ["status is not acceptable"]);
     }

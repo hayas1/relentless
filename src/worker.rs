@@ -5,8 +5,7 @@ use crate::service::DefaultHttpClient;
 use crate::{
     command::Relentless,
     config::{
-        http_serde_priv, Coalesce, Coalesced, Config, Destinations, HttpRequest, Protocol, Setting, Testcase,
-        WorkerConfig,
+        http_serde_priv, Coalesce, Coalesced, Config, Destinations, RequestInfo, Setting, Testcase, WorkerConfig,
     },
     error::WrappedResult,
     evaluate::{DefaultEvaluator, Evaluator},
@@ -146,7 +145,7 @@ where
         let mut outcome = Vec::new();
         for (testcase, process) in processes {
             let Testcase { setting, .. } = testcase.coalesce();
-            let Setting { repeat, protocol, .. } = &setting;
+            let Setting { repeat, evaluate, .. } = &setting;
             let mut passed = 0;
             let mut t = (0..repeat.unwrap_or(1)).map(|_| Destinations::new()).collect::<Vec<_>>();
             for (name, repeated) in process? {
@@ -156,7 +155,7 @@ where
             }
             let mut v = Vec::new();
             for res in t {
-                let pass = evaluator.evaluate(protocol.as_ref(), res, &mut v).await;
+                let pass = evaluator.evaluate(evaluate, res, &mut v).await;
                 passed += pass as usize;
             }
 
@@ -219,7 +218,7 @@ where
         target: &str,
         setting: &Setting,
     ) -> WrappedResult<Destinations<Vec<http::Request<ReqB>>>> {
-        let Setting { protocol, template, repeat, timeout, .. } = setting;
+        let Setting { request, template, repeat, timeout, .. } = setting;
 
         if !template.is_empty() {
             unimplemented!("template is not implemented yet");
@@ -231,15 +230,8 @@ where
         destinations
             .iter()
             .map(|(name, destination)| {
-                let default_http = Default::default();
-                let http = protocol
-                    .as_ref()
-                    .map(|p| match p {
-                        Protocol::Http(http) => http,
-                    })
-                    .unwrap_or(&default_http);
                 let requests = (0..repeat.unwrap_or(1))
-                    .map(|_| Self::http_request(destination, target, http))
+                    .map(|_| Self::http_request(destination, target, request))
                     .collect::<Result<Vec<_>, _>>()
                     .unwrap(); // TODO
                 Ok((name.to_string(), requests))
@@ -251,9 +243,9 @@ where
     pub fn http_request(
         destination: &http::Uri,
         target: &str,
-        http: &crate::config::Http,
+        request_info: &RequestInfo,
     ) -> WrappedResult<http::Request<ReqB>> {
-        let HttpRequest { method, header, body, .. } = &http.request;
+        let RequestInfo { method, header, body, .. } = &request_info;
         let uri = http::uri::Builder::from(destination.clone()).path_and_query(target).build().unwrap();
         let mut request = http::Request::builder()
             .uri(uri)
