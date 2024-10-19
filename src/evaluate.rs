@@ -222,7 +222,7 @@ mod tests {
         let mut msg = Vec::new();
         let result = evaluator.evaluate(Default::default(), responses, &mut msg).await;
         assert!(!result);
-        assert!(msg.is_empty());
+        assert_eq!(msg, ["status is not acceptable"]);
     }
 
     // TODO more tests
