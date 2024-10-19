@@ -87,6 +87,7 @@ pub struct Evaluate {
 pub enum StatusEvaluate {
     #[default]
     OkOrEqual,
+    Ignore,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]

@@ -71,6 +71,7 @@ impl DefaultEvaluator {
     ) -> WrappedResult<bool> {
         let acceptable = match cfg {
             StatusEvaluate::OkOrEqual => Self::assault_or_compare(status, http::StatusCode::is_success),
+            StatusEvaluate::Ignore => true,
         };
         if !acceptable {
             msg.push("status is not acceptable".to_string());
