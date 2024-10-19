@@ -5,7 +5,8 @@ use crate::service::DefaultHttpClient;
 use crate::{
     command::Relentless,
     config::{
-        Coalesce, Coalesced, Config, Destinations, HttpRequest, Protocol, Setting, Testcase, WorkerConfig, _http,
+        http_serde_priv, Coalesce, Coalesced, Config, Destinations, HttpRequest, Protocol, Setting, Testcase,
+        WorkerConfig,
     },
     error::WrappedResult,
     evaluate::{DefaultEvaluator, Evaluator},
@@ -101,7 +102,7 @@ where
 #[derive(Debug, Clone)]
 pub struct Worker<'a, S, ReqB, ResB, E> {
     _cmd: &'a Relentless,
-    config: Coalesced<WorkerConfig, Destinations<_http::Uri>>,
+    config: Coalesced<WorkerConfig, Destinations<http_serde_priv::Uri>>,
     clients: Destinations<S>,
     phantom: PhantomData<(ReqB, ResB, E)>,
 }
@@ -195,7 +196,7 @@ where
 
     pub async fn process(
         self,
-        destinations: &Destinations<_http::Uri>,
+        destinations: &Destinations<http_serde_priv::Uri>,
         clients: &mut Destinations<S>,
     ) -> WrappedResult<Destinations<Vec<http::Response<ResB>>>> {
         let Testcase { target, setting, .. } = self.testcase.coalesce();
@@ -214,7 +215,7 @@ where
     }
 
     pub fn requests(
-        destinations: &Destinations<_http::Uri>,
+        destinations: &Destinations<http_serde_priv::Uri>,
         target: &str,
         setting: &Setting,
     ) -> WrappedResult<Destinations<Vec<http::Request<ReqB>>>> {

@@ -24,7 +24,7 @@ pub struct WorkerConfig {
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub name: Option<String>,
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
-    pub destinations: Destinations<_http::Uri>,
+    pub destinations: Destinations<http_serde_priv::Uri>,
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub setting: Setting,
 }
@@ -58,9 +58,9 @@ pub struct Http {
 #[serde(deny_unknown_fields)]
 pub struct HttpRequest {
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
-    pub method: Option<_http::Method>,
+    pub method: Option<http_serde_priv::Method>,
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
-    pub header: Option<_http::HeaderMap>,
+    pub header: Option<http_serde_priv::HeaderMap>,
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub body: Option<BodyStructure>,
 }
@@ -86,7 +86,7 @@ pub struct Evaluate {
 pub enum StatusEvaluate {
     #[default]
     OkOrEqual,
-    Expect(EvaluateTo<_http::StatusCode>),
+    Expect(EvaluateTo<http_serde_priv::StatusCode>),
     Ignore,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -172,7 +172,7 @@ impl Config {
     }
 }
 impl Coalesce for WorkerConfig {
-    type Other = Destinations<_http::Uri>;
+    type Other = Destinations<http_serde_priv::Uri>;
     fn coalesce(self, other: &Self::Other) -> Self {
         let destinations = self.destinations.coalesce(&other.iter().map(|(k, v)| (k.to_string(), v.clone())).collect());
         Self { destinations, ..self }
@@ -291,7 +291,7 @@ impl Format {
 }
 
 // `http` do not support serde https://github.com/hyperium/http/pull/631
-pub mod _http {
+pub(crate) mod http_serde_priv {
     use std::ops::{Deref, DerefMut};
 
     use super::*;

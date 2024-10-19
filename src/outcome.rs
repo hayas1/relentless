@@ -5,7 +5,7 @@ use std::{
 
 use crate::{
     command::Relentless,
-    config::{Coalesced, Destinations, Setting, Testcase, WorkerConfig, _http},
+    config::{Coalesced, Destinations, Setting, Testcase, WorkerConfig, http_serde_priv},
     error::{MultiWrap, Wrap, WrappedResult},
 };
 
@@ -47,11 +47,11 @@ impl<T: Display> Outcome<T> {
 /// TODO document
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WorkerOutcome<T> {
-    config: Coalesced<WorkerConfig, Destinations<_http::Uri>>,
+    config: Coalesced<WorkerConfig, Destinations<http_serde_priv::Uri>>,
     outcome: Vec<CaseOutcome<T>>,
 }
 impl<T> WorkerOutcome<T> {
-    pub fn new(config: Coalesced<WorkerConfig, Destinations<_http::Uri>>, outcome: Vec<CaseOutcome<T>>) -> Self {
+    pub fn new(config: Coalesced<WorkerConfig, Destinations<http_serde_priv::Uri>>, outcome: Vec<CaseOutcome<T>>) -> Self {
         Self { config, outcome }
     }
     pub fn pass(&self) -> bool {

@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use tower::Service;
 
 use crate::{
-    config::{Config, Destinations, _http},
+    config::{http_serde_priv, Config, Destinations},
     error::{IntoContext, MultiWrap, RunCommandError, Wrap, WrappedResult},
     evaluate::Evaluator,
     outcome::Outcome,
@@ -68,11 +68,11 @@ pub struct Relentless {
     pub rps: Option<usize>,
 }
 impl Relentless {
-    pub fn destinations(&self) -> WrappedResult<Destinations<_http::Uri>> {
+    pub fn destinations(&self) -> WrappedResult<Destinations<http_serde_priv::Uri>> {
         let Self { destination, .. } = self;
         destination
             .iter()
-            .map(|(k, v)| Ok((k.to_string(), _http::Uri(v.parse()?))))
+            .map(|(k, v)| Ok((k.to_string(), http_serde_priv::Uri(v.parse()?))))
             .collect::<Result<Destinations<_>, _>>()
     }
 
