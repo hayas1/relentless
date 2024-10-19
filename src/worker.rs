@@ -4,7 +4,9 @@ use std::marker::PhantomData;
 use crate::service::DefaultHttpClient;
 use crate::{
     command::Relentless,
-    config::{Coalesce, Coalesced, Config, Destinations, HttpRequest, Protocol, Setting, Testcase, WorkerConfig},
+    config::{
+        Coalesce, Coalesced, Config, Destinations, HttpRequest, Protocol, Setting, Testcase, WorkerConfig, _http,
+    },
     error::WrappedResult,
     evaluate::{DefaultEvaluator, Evaluator},
     outcome::{CaseOutcome, Outcome, WorkerOutcome},
@@ -38,7 +40,7 @@ impl Control<'_, DefaultHttpClient<reqwest::Body, reqwest::Body>, reqwest::Body,
         config: &Config,
     ) -> WrappedResult<Destinations<DefaultHttpClient<reqwest::Body, reqwest::Body>>> {
         let mut destinations = Destinations::new();
-        for (name, _destination) in config.worker_config.destinations.clone().coalesce(&cmd.destination) {
+        for (name, _destination) in config.worker_config.destinations.clone().coalesce(&cmd.destinations()?) {
             let client = DefaultHttpClient::<reqwest::Body, reqwest::Body>::new().await?;
             destinations.insert(name.to_string(), client);
         }
@@ -99,7 +101,7 @@ where
 #[derive(Debug, Clone)]
 pub struct Worker<'a, S, ReqB, ResB, E> {
     _cmd: &'a Relentless,
-    config: Coalesced<WorkerConfig, Destinations<String>>,
+    config: Coalesced<WorkerConfig, Destinations<_http::Uri>>,
     clients: Destinations<S>,
     phantom: PhantomData<(ReqB, ResB, E)>,
 }
@@ -121,7 +123,7 @@ where
     E: Evaluator<http::Response<ResB>>,
 {
     pub fn new(cmd: &'a Relentless, config: WorkerConfig, clients: Destinations<S>) -> WrappedResult<Self> {
-        let config = Coalesced::tuple(config, cmd.destination.clone().into_iter().collect());
+        let config = Coalesced::tuple(config, cmd.destinations()?);
         let phantom = PhantomData;
         Ok(Self { _cmd: cmd, config, clients, phantom })
     }
@@ -193,7 +195,7 @@ where
 
     pub async fn process(
         self,
-        destinations: &Destinations<String>,
+        destinations: &Destinations<_http::Uri>,
         clients: &mut Destinations<S>,
     ) -> WrappedResult<Destinations<Vec<http::Response<ResB>>>> {
         let Testcase { target, setting, .. } = self.testcase.coalesce();
@@ -212,7 +214,7 @@ where
     }
 
     pub fn requests(
-        destinations: &Destinations<String>,
+        destinations: &Destinations<_http::Uri>,
         target: &str,
         setting: &Setting,
     ) -> WrappedResult<Destinations<Vec<http::Request<ReqB>>>> {
@@ -246,13 +248,12 @@ where
 
     // TODO generics
     pub fn http_request(
-        destination: &str,
+        destination: &http::Uri,
         target: &str,
         http: &crate::config::Http,
     ) -> WrappedResult<http::Request<ReqB>> {
         let HttpRequest { method, header, body, .. } = &http.request;
-        let destination = destination.parse::<http::Uri>().unwrap();
-        let uri = http::uri::Builder::from(destination).path_and_query(target).build().unwrap();
+        let uri = http::uri::Builder::from(destination.clone()).path_and_query(target).build().unwrap();
         let mut request = http::Request::builder()
             .uri(uri)
             .method(method.as_ref().map(|m| (**m).clone()).unwrap_or_default())

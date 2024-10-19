@@ -5,7 +5,7 @@ use std::{
 
 use crate::{
     command::Relentless,
-    config::{Coalesced, Destinations, Setting, Testcase, WorkerConfig},
+    config::{Coalesced, Destinations, Setting, Testcase, WorkerConfig, _http},
     error::{MultiWrap, Wrap, WrappedResult},
 };
 
@@ -47,11 +47,11 @@ impl<T: Display> Outcome<T> {
 /// TODO document
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WorkerOutcome<T> {
-    config: Coalesced<WorkerConfig, Destinations<String>>,
+    config: Coalesced<WorkerConfig, Destinations<_http::Uri>>,
     outcome: Vec<CaseOutcome<T>>,
 }
 impl<T> WorkerOutcome<T> {
-    pub fn new(config: Coalesced<WorkerConfig, Destinations<String>>, outcome: Vec<CaseOutcome<T>>) -> Self {
+    pub fn new(config: Coalesced<WorkerConfig, Destinations<_http::Uri>>, outcome: Vec<CaseOutcome<T>>) -> Self {
         Self { config, outcome }
     }
     pub fn pass(&self) -> bool {
@@ -77,10 +77,10 @@ impl<T: Display> WorkerOutcome<T> {
                 write!(w, "{}{} ", name, console::Emoji("🌐", ":"))?;
                 match self.config.base().destinations.get(&name) {
                     Some(base) if base != &destination => {
-                        writeln!(w, "{} {} {}", base, console::Emoji("👉", "->"), destination)?;
+                        writeln!(w, "{} {} {}", **base, console::Emoji("👉", "->"), *destination)?;
                     }
                     _ => {
-                        writeln!(w, "{}", destination)?;
+                        writeln!(w, "{}", *destination)?;
                     }
                 }
             }
