@@ -51,11 +51,8 @@ pub enum Protocol {
 pub struct Http {
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub request: HttpRequest,
-    #[serde(
-        default,
-        skip_serializing_if = "IsDefault::is_default",
-        with = "serde_yaml::with::singleton_map_recursive"
-    )]
+    #[serde(default, skip_serializing_if = "IsDefault::is_default")]
+    #[cfg_attr(feature = "cli", serde(with = "serde_yaml::with::singleton_map_recursive"))]
     pub evaluate: Evaluate,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]

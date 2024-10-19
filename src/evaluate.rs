@@ -6,8 +6,9 @@ use http_body_util::BodyExt;
 #[cfg(feature = "json")]
 use serde_json::Value;
 
+use crate::config::EvaluateTo;
 #[cfg(feature = "json")]
-use crate::config::{EvaluateTo, JsonEvaluate};
+use crate::config::JsonEvaluate;
 use crate::{
     config::{BodyEvaluate, Destinations, HeaderEvaluate, Protocol, StatusEvaluate},
     error::{Wrap, WrappedResult},
