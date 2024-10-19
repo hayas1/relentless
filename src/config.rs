@@ -52,7 +52,7 @@ pub struct Http {
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub request: HttpRequest,
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
-    #[cfg_attr(feature = "cli", serde(with = "serde_yaml::with::singleton_map_recursive"))]
+    #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
     pub evaluate: Evaluate,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -563,7 +563,7 @@ mod tests {
             }],
         };
         let yaml = serde_yaml::to_string(&example).unwrap();
-        println!("{}", yaml);
+        // println!("{}", yaml);
 
         let round_trip = Config::read_str(&yaml, Format::Yaml).unwrap();
         assert_eq!(example, round_trip);
