@@ -56,7 +56,6 @@ where
     S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + Sync + 'static,
     S::Error: std::error::Error + Sync + Send + 'static,
     E: Evaluator<http::Response<ResB>>,
-    E::Error: std::error::Error + Sync + Send + 'static,
 {
     /// TODO document
     pub fn with_service(
@@ -120,7 +119,6 @@ where
     S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + Sync + 'static,
     S::Error: std::error::Error + Sync + Send + 'static,
     E: Evaluator<http::Response<ResB>>,
-    E::Error: std::error::Error + Sync + Send + 'static,
 {
     pub fn new(cmd: &'a Relentless, config: WorkerConfig, clients: Destinations<S>) -> WrappedResult<Self> {
         let config = Coalesced::tuple(config, cmd.destination.clone().into_iter().collect());
@@ -155,7 +153,7 @@ where
             }
             let mut v = Vec::new();
             for res in t {
-                let pass = evaluator.evaluate(protocol.as_ref(), res, &mut v).await?;
+                let pass = evaluator.evaluate(protocol.as_ref(), res, &mut v).await;
                 passed += pass as usize;
             }
 

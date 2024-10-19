@@ -13,38 +13,37 @@ use crate::{
 
 #[allow(async_fn_in_trait)] // TODO #[warn(async_fn_in_trait)] by default
 pub trait Evaluator<Res> {
-    type Error;
     type Message;
-    async fn evaluate(
-        &self,
-        cfg: Option<&Protocol>,
-        res: Destinations<Res>,
-        msg: &mut Vec<Self::Message>,
-    ) -> Result<bool, Self::Error>;
+    async fn evaluate(&self, cfg: Option<&Protocol>, res: Destinations<Res>, msg: &mut Vec<Self::Message>) -> bool;
 }
 pub struct DefaultEvaluator;
 impl<ResB: Body> Evaluator<http::Response<ResB>> for DefaultEvaluator
 where
     ResB::Error: std::error::Error + Sync + Send + 'static,
 {
-    type Error = crate::Error;
     type Message = String;
     async fn evaluate(
         &self,
         cfg: Option<&Protocol>,
         res: Destinations<http::Response<ResB>>,
         msg: &mut Vec<Self::Message>,
-    ) -> Result<bool, Self::Error> {
-        Self::parts(cfg, res, msg).await
+    ) -> bool {
+        match Self::acceptable_parts(cfg, res, msg).await {
+            Ok(ok) => ok,
+            Err(e) => {
+                msg.push(format!("evaluate error: {}", e));
+                false
+            }
+        }
     }
 }
 
 impl DefaultEvaluator {
-    pub async fn parts<ResB: Body>(
+    pub async fn acceptable_parts<ResB: Body>(
         cfg: Option<&Protocol>,
         res: Destinations<http::Response<ResB>>,
         msg: &mut Vec<String>,
-    ) -> Result<bool, <Self as Evaluator<http::Response<ResB>>>::Error>
+    ) -> Result<bool, crate::Error>
     where
         ResB::Error: std::error::Error + Sync + Send + 'static,
     {
@@ -201,7 +200,7 @@ mod tests {
             http::Response::builder().status(http::StatusCode::OK).body(http_body_util::Empty::<Bytes>::new()).unwrap();
         let responses = Destinations::from_iter(vec![("test".to_string(), ok)]);
         let mut msg = Vec::new();
-        let result = evaluator.evaluate(Default::default(), responses, &mut msg).await.unwrap();
+        let result = evaluator.evaluate(Default::default(), responses, &mut msg).await;
         assert!(result);
         assert!(msg.is_empty());
 
@@ -211,7 +210,7 @@ mod tests {
             .unwrap();
         let responses = Destinations::from_iter(vec![("test".to_string(), unavailable)]);
         let mut msg = Vec::new();
-        let result = evaluator.evaluate(Default::default(), responses, &mut msg).await.unwrap();
+        let result = evaluator.evaluate(Default::default(), responses, &mut msg).await;
         assert!(!result);
         assert!(msg.is_empty());
     }

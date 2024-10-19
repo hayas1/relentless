@@ -123,7 +123,6 @@ impl Relentless {
         S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + Sync + 'static,
         S::Error: std::error::Error + Sync + Send + 'static,
         E: Evaluator<http::Response<ResB>>,
-        E::Error: std::error::Error + Sync + Send + 'static,
         E::Message: Display,
     {
         let Self { no_color, no_report, .. } = self;
