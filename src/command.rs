@@ -56,7 +56,7 @@ pub struct Relentless {
     pub no_color: bool,
 
     /// report nothing
-    #[cfg_attr(feature = "cli", arg(long), clap(value_enum, default_value_t))]
+    #[cfg_attr(feature = "cli", arg(short, long), clap(value_enum, default_value_t))]
     pub report_to: ReportTo,
 
     /// number of threads
@@ -64,7 +64,7 @@ pub struct Relentless {
     pub number_of_threads: Option<usize>,
 
     /// requests per second
-    #[cfg_attr(feature = "cli", arg(short, long))]
+    #[cfg_attr(feature = "cli", arg(long))]
     pub rps: Option<usize>,
 }
 #[cfg_attr(feature = "cli", derive(ValueEnum))]
