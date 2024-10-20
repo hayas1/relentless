@@ -30,6 +30,8 @@
 //! ## Run CLI
 //! ```sh
 //! relentless -f examples/config/compare.yaml
+//! ```
+//! ```sh
 //! 🚀 basic comparison test 🚀
 //! actual🌐 http://localhost:3000
 //! expect🌐 http://localhost:3000
