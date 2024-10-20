@@ -144,7 +144,7 @@ impl<T: Display> CaseOutcome<T> {
         }
         if !self.pass() && self.allow(cmd.strict) {
             w.scope(|w| {
-                writeln!(w, "{} {}", console::Emoji("👟", ""), console::style("this testcase is allowed").green())
+                writeln!(w, "{} {}", console::Emoji("👀", ""), console::style("this testcase is allowed").green())
             })?;
         }
         if !self.messages.is_empty() {
