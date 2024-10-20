@@ -464,18 +464,18 @@ mod tests {
 
     #[test]
     #[cfg(feature = "yaml")]
-    fn test_read_example() {
+    fn test_read_basic() {
         // TODO assert
-        let _assault = Config::read("examples/config/assault.yaml").unwrap();
-        let _compare = Config::read("examples/config/compare.yaml").unwrap();
+        let _assault = Config::read("tests/config/basic/assault.yaml").unwrap();
+        let _compare = Config::read("tests/config/basic/compare.yaml").unwrap();
     }
 
     #[test]
     #[cfg(all(feature = "yaml", feature = "json"))]
-    fn test_read_json_example() {
+    fn test_read_json_basic() {
         // TODO assert
-        let _assault = Config::read("examples/config/assault_json.yaml").unwrap();
-        let _compare = Config::read("examples/config/compare_json.yaml").unwrap();
+        let _assault = Config::read("tests/config/basic/assault_json.yaml").unwrap();
+        let _compare = Config::read("tests/config/basic/compare_json.yaml").unwrap();
     }
 
     #[test]

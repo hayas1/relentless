@@ -238,7 +238,7 @@ mod tests {
     #[cfg(all(feature = "yaml", feature = "json"))]
     fn test_read_configs_filtered() {
         let cmd = Relentless {
-            file: glob::glob("tests/config/**/*.yaml").unwrap().collect::<Result<Vec<_>, _>>().unwrap(),
+            file: glob::glob("tests/config/*valid/**/*.yaml").unwrap().collect::<Result<Vec<_>, _>>().unwrap(),
             ..Default::default()
         };
         let mut buf = Vec::new();
