@@ -149,7 +149,7 @@ impl DefaultEvaluator {
             .map(|(name, body)| {
                 let mut value = serde_json::from_slice(body)?;
                 if let Err(e) = Self::patch(cfg, name, &mut value) {
-                    if parts.len() == 1 || cfg.patch_fail > Some(Severity::Warn) {
+                    if cfg.patch_fail.is_none() && parts.len() == 1 || cfg.patch_fail > Some(Severity::Warn) {
                         Err(e)?;
                     }
                 }
