@@ -6,7 +6,7 @@ use std::{
 use crate::{
     command::Relentless,
     config::{http_serde_priv, Coalesced, Destinations, Setting, Testcase, WorkerConfig},
-    error::{MultiWrap, Wrap, WrappedResult},
+    error::{MultiWrap, Wrap},
 };
 
 /// TODO document
@@ -14,7 +14,6 @@ use crate::{
 pub struct Outcome<T> {
     outcome: Vec<WorkerOutcome<T>>,
 }
-// TODO trait ?
 impl<T> Outcome<T> {
     pub fn new(outcome: Vec<WorkerOutcome<T>>) -> Self {
         Self { outcome }
@@ -29,14 +28,12 @@ impl<T> Outcome<T> {
         (!self.allow(cmd.strict) as u8).into()
     }
 }
-impl<T: Display> Outcome<T> {
-    pub fn report(&self, cmd: &Relentless) -> WrappedResult<()> {
-        self.report_to(&mut OutcomeWriter::with_stdout(0), cmd)
-    }
-    pub fn report_to<W: std::io::Write>(&self, w: &mut OutcomeWriter<W>, cmd: &Relentless) -> WrappedResult<()> {
+impl<T: Display> Reportable for Outcome<T> {
+    type Error = Wrap;
+    fn report_to<W: std::io::Write>(&self, cmd: &Relentless, w: &mut OutcomeWriter<W>) -> Result<(), Self::Error> {
         for outcome in &self.outcome {
             if !outcome.skip_report(cmd) {
-                outcome.report_to(w, cmd)?;
+                outcome.report_to(cmd, w)?;
                 writeln!(w)?;
             }
         }
@@ -68,8 +65,9 @@ impl<T> WorkerOutcome<T> {
         *no_report || *ng_only && self.allow(*strict)
     }
 }
-impl<T: Display> WorkerOutcome<T> {
-    pub fn report_to<W: std::io::Write>(&self, w: &mut OutcomeWriter<W>, cmd: &Relentless) -> WrappedResult<()> {
+impl<T: Display> Reportable for WorkerOutcome<T> {
+    type Error = Wrap;
+    fn report_to<W: std::io::Write>(&self, cmd: &Relentless, w: &mut OutcomeWriter<W>) -> Result<(), Self::Error> {
         let WorkerConfig { name, destinations, .. } = self.config.coalesce();
 
         let side = console::Emoji("🚀", "");
@@ -93,7 +91,7 @@ impl<T: Display> WorkerOutcome<T> {
         w.scope(|w| {
             for outcome in &self.outcome {
                 if !outcome.skip_report(cmd) {
-                    outcome.report_to(w, cmd)?;
+                    outcome.report_to(cmd, w)?;
                 }
             }
             Ok::<_, Wrap>(())
@@ -127,8 +125,9 @@ impl<T> CaseOutcome<T> {
         *no_report || *ng_only && self.allow(*strict)
     }
 }
-impl<T: Display> CaseOutcome<T> {
-    pub fn report_to<W: std::io::Write>(&self, w: &mut OutcomeWriter<W>, cmd: &Relentless) -> WrappedResult<()> {
+impl<T: Display> Reportable for CaseOutcome<T> {
+    type Error = Wrap;
+    fn report_to<W: std::io::Write>(&self, cmd: &Relentless, w: &mut OutcomeWriter<W>) -> Result<(), Self::Error> {
         let Testcase { description, target, setting, .. } = self.testcases.coalesce();
 
         let side = if self.pass() { console::Emoji("✅", "PASS") } else { console::Emoji("❌", "FAIL") };
@@ -160,6 +159,13 @@ impl<T: Display> CaseOutcome<T> {
     }
 }
 
+pub trait Reportable {
+    type Error;
+    fn report_to<W: std::io::Write>(&self, cmd: &Relentless, w: &mut OutcomeWriter<W>) -> Result<(), Self::Error>;
+    fn report(&self, cmd: &Relentless) -> Result<(), Self::Error> {
+        self.report_to(cmd, &mut OutcomeWriter::with_stdout(0))
+    }
+}
 pub struct OutcomeWriter<W> {
     pub indent: usize,
     pub buf: W,

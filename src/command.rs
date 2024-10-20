@@ -10,7 +10,7 @@ use crate::{
     config::{http_serde_priv, Config, Destinations},
     error::{IntoContext, MultiWrap, RunCommandError, Wrap, WrappedResult},
     evaluate::Evaluator,
-    outcome::Outcome,
+    outcome::{Outcome, Reportable},
     service::FromBodyStructure,
     worker::Control,
 };
