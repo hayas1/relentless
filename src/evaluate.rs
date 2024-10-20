@@ -133,7 +133,7 @@ impl DefaultEvaluator {
         let values: Vec<_> = match Self::patched(cfg, parts) {
             Ok(values) => values,
             Err(e) => {
-                msg.push(EvaluateError::FailToJsonPatch(e));
+                msg.push(EvaluateError::FailToPatchJson(e));
                 return false;
             }
         }
@@ -170,8 +170,8 @@ impl DefaultEvaluator {
     pub fn json_compare(cfg: &JsonEvaluate, (va, vb): (&Value, &Value), msg: &mut Vec<EvaluateError>) -> bool {
         let diff = json_patch::diff(va, vb);
         let pointers = Self::pointers(&diff);
-        diff.iter().zip(pointers).filter(|(_op, path)| !cfg.ignore.contains(path)).fold(true, |_acc, (op, _path)| {
-            msg.push(EvaluateError::Diff(op.clone()));
+        diff.iter().zip(pointers).filter(|(_op, path)| !cfg.ignore.contains(path)).fold(true, |_acc, (_op, path)| {
+            msg.push(EvaluateError::Diff(path));
             false
         })
     }

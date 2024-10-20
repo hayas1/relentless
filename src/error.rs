@@ -302,11 +302,11 @@ pub enum EvaluateError {
     UnacceptableHeaderMap,
 
     #[cfg(feature = "json")]
-    #[error("fail to json patch: {0}")]
-    FailToJsonPatch(Wrap),
+    #[error("{0}")]
+    FailToPatchJson(Wrap),
     #[cfg(feature = "json")]
-    #[error("json diff: {0}")]
-    Diff(json_patch::PatchOperation),
+    #[error("diff in `{0}`")]
+    Diff(String),
 }
 
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
