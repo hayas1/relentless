@@ -140,8 +140,7 @@ impl DefaultEvaluator {
         .into_values()
         .collect();
 
-        let pass = values.windows(2).all(|w| Self::json_compare(cfg, (&w[0], &w[1]), msg));
-        pass
+        values.windows(2).all(|w| Self::json_compare(cfg, (&w[0], &w[1]), msg))
     }
 
     pub fn patched(cfg: &JsonEvaluate, parts: &Destinations<Bytes>) -> WrappedResult<Destinations<Value>> {
@@ -156,7 +155,7 @@ impl DefaultEvaluator {
                 }
                 Ok((name.clone(), value))
             })
-            .collect::<Result<Destinations<_>, _>>()
+            .collect()
     }
     pub fn patch(cfg: &JsonEvaluate, name: &str, value: &mut Value) -> Result<(), json_patch::PatchError> {
         let default_patch = json_patch::Patch::default();
