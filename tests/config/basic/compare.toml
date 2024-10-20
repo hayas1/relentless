@@ -1,0 +1,42 @@
+name = "example yaml of basic compare test"
+
+[destinations]
+actual = "http://localhost:3000"
+expect = "http://localhost:3000"
+
+[setting]
+evaluate = { header = "ignore" }
+
+[[testcase]]
+target = "/"
+
+[[testcase]]
+target = "/health"
+
+[[testcase]]
+target = "/healthz"
+
+[[testcase]]
+target = "/health/rich"
+
+[[testcase]]
+target = "/counter/increment"
+setting.repeat = 10
+attr = { allow = true }
+
+[[testcase]]
+target = "/counter/increment/10"
+setting.repeat = 10
+attr = { allow = true }
+
+[[testcase]]
+target = "/counter/decrement"
+setting.repeat = 10
+attr = { allow = true }
+
+[[testcase]]
+target = "/counter/decrement/10"
+setting.repeat = 10
+
+[[testcase]]
+target = "/wait/100/ms"
