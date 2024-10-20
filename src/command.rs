@@ -10,7 +10,7 @@ use crate::{
     config::{http_serde_priv, Config, Destinations},
     error::{IntoContext, MultiWrap, RunCommandError, Wrap, WrappedResult},
     evaluate::Evaluator,
-    outcome::{Outcome, Reportable},
+    outcome::{ConsoleReport, Outcome},
     service::FromBodyStructure,
     worker::Control,
 };
@@ -134,13 +134,13 @@ impl Relentless {
         E::Message: Display,
     {
         let Self { no_color, no_report, .. } = self;
-        #[cfg(feature = "console")]
+        #[cfg(feature = "console-report")]
         console::set_colors_enabled(!no_color);
 
         let control = Control::with_service(self, configs, services)?;
         let outcome = control.assault(evaluator).await?;
         if !no_report {
-            outcome.report(self)?;
+            outcome.console_report(self)?;
         }
         Ok(outcome)
     }

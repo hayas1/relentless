@@ -28,13 +28,17 @@ impl<T> Outcome<T> {
         (!self.allow(cmd.strict) as u8).into()
     }
 }
-#[cfg(feature = "console")]
-impl<T: Display> Reportable for Outcome<T> {
+#[cfg(feature = "console-report")]
+impl<T: Display> ConsoleReport for Outcome<T> {
     type Error = Wrap;
-    fn report_to<W: std::io::Write>(&self, cmd: &Relentless, w: &mut OutcomeWriter<W>) -> Result<(), Self::Error> {
+    fn console_report_to<W: std::io::Write>(
+        &self,
+        cmd: &Relentless,
+        w: &mut OutcomeWriter<W>,
+    ) -> Result<(), Self::Error> {
         for outcome in &self.outcome {
             if !outcome.skip_report(cmd) {
-                outcome.report_to(cmd, w)?;
+                outcome.console_report_to(cmd, w)?;
                 writeln!(w)?;
             }
         }
@@ -66,10 +70,14 @@ impl<T> WorkerOutcome<T> {
         *no_report || *ng_only && self.allow(*strict)
     }
 }
-#[cfg(feature = "console")]
-impl<T: Display> Reportable for WorkerOutcome<T> {
+#[cfg(feature = "console-report")]
+impl<T: Display> ConsoleReport for WorkerOutcome<T> {
     type Error = Wrap;
-    fn report_to<W: std::io::Write>(&self, cmd: &Relentless, w: &mut OutcomeWriter<W>) -> Result<(), Self::Error> {
+    fn console_report_to<W: std::io::Write>(
+        &self,
+        cmd: &Relentless,
+        w: &mut OutcomeWriter<W>,
+    ) -> Result<(), Self::Error> {
         let WorkerConfig { name, destinations, .. } = self.config.coalesce();
 
         let side = console::Emoji("🚀", "");
@@ -93,7 +101,7 @@ impl<T: Display> Reportable for WorkerOutcome<T> {
         w.scope(|w| {
             for outcome in &self.outcome {
                 if !outcome.skip_report(cmd) {
-                    outcome.report_to(cmd, w)?;
+                    outcome.console_report_to(cmd, w)?;
                 }
             }
             Ok::<_, Wrap>(())
@@ -127,10 +135,14 @@ impl<T> CaseOutcome<T> {
         *no_report || *ng_only && self.allow(*strict)
     }
 }
-#[cfg(feature = "console")]
-impl<T: Display> Reportable for CaseOutcome<T> {
+#[cfg(feature = "console-report")]
+impl<T: Display> ConsoleReport for CaseOutcome<T> {
     type Error = Wrap;
-    fn report_to<W: std::io::Write>(&self, cmd: &Relentless, w: &mut OutcomeWriter<W>) -> Result<(), Self::Error> {
+    fn console_report_to<W: std::io::Write>(
+        &self,
+        cmd: &Relentless,
+        w: &mut OutcomeWriter<W>,
+    ) -> Result<(), Self::Error> {
         let Testcase { description, target, setting, .. } = self.testcases.coalesce();
 
         let side = if self.pass() { console::Emoji("✅", "PASS") } else { console::Emoji("❌", "FAIL") };
@@ -162,11 +174,16 @@ impl<T: Display> Reportable for CaseOutcome<T> {
     }
 }
 
-pub trait Reportable {
+#[cfg(feature = "console-report")]
+pub trait ConsoleReport {
     type Error;
-    fn report_to<W: std::io::Write>(&self, cmd: &Relentless, w: &mut OutcomeWriter<W>) -> Result<(), Self::Error>;
-    fn report(&self, cmd: &Relentless) -> Result<(), Self::Error> {
-        self.report_to(cmd, &mut OutcomeWriter::with_stdout(0))
+    fn console_report_to<W: std::io::Write>(
+        &self,
+        cmd: &Relentless,
+        w: &mut OutcomeWriter<W>,
+    ) -> Result<(), Self::Error>;
+    fn console_report(&self, cmd: &Relentless) -> Result<(), Self::Error> {
+        self.console_report_to(cmd, &mut OutcomeWriter::with_stdout(0))
     }
 }
 pub struct OutcomeWriter<W> {

@@ -14,7 +14,8 @@ full = ["json", "yaml", "toml", "cli", "default-http-client"]
 
 json = ["serde_json", "json-patch", "jsonptr"]
 yaml = ["serde_yaml"]
-cli = ["clap", "default-http-client", "console"]
+cli = ["clap", "default-http-client", "console-report"]
+console-report = ["console"]
 default-http-client = ["reqwest"]
 
 
