@@ -108,7 +108,7 @@ impl Relentless {
 
     /// TODO document
     #[cfg(all(feature = "default-http-client", feature = "cli"))]
-    pub async fn assault(&self) -> crate::Result<Outcome<String>> {
+    pub async fn assault(&self) -> crate::Result<Outcome<crate::error::EvaluateError>> {
         let configs = self.configs_filtered(std::io::stderr())?;
         let clients = Control::default_http_clients(self, &configs).await?;
         let outcome = self.assault_with(configs, clients, &crate::evaluate::DefaultEvaluator).await?;
@@ -238,7 +238,7 @@ mod tests {
     #[cfg(all(feature = "yaml", feature = "json"))]
     fn test_read_configs_filtered() {
         let cmd = Relentless {
-            file: glob::glob("tests/config/**/*.yaml").unwrap().collect::<Result<Vec<_>, _>>().unwrap(),
+            file: glob::glob("tests/config/*valid/**/*.yaml").unwrap().collect::<Result<Vec<_>, _>>().unwrap(),
             ..Default::default()
         };
         let mut buf = Vec::new();

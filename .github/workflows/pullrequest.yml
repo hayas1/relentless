@@ -77,7 +77,7 @@ jobs:
         set -euo pipefail
         {
           echo '```'
-          cargo run --features cli -- -f examples/config/*.yaml -d actual=http://localhost:3001 --no-color --ng-only
+          cargo run --features cli -- -f tests/config/basic/*.yaml -d actual=http://localhost:3001 --no-color --ng-only
           echo '```'
         } > target/outcome.txt
     - name: Comment on pull request

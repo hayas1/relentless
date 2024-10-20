@@ -1,0 +1,38 @@
+name: example config of basic compare test
+destinations:
+  actual: http://localhost:3000
+  expect: http://localhost:3000
+# setting:
+#   template:
+#     version:
+#       actual: v1
+#       expect: v2
+setting:
+  evaluate:
+    header: ignore
+
+testcases:
+  - target: /
+  - target: /health
+  - target: /healthz
+  - target: /health/rich
+  - target: /counter/increment
+    setting:
+      repeat: 10
+    attr:
+      allow: true
+  - target: /counter/increment/10
+    setting:
+      repeat: 10
+    attr:
+      allow: true
+  - target: /counter/decrement
+    setting:
+      repeat: 10
+    attr:
+      allow: true
+  - target: /counter/decrement/10
+    setting:
+      repeat: 10
+  - target: /wait/100/ms
+

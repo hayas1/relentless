@@ -1,26 +1,8 @@
-name: example yaml of basic assault test
+name: basic assault test
 destinations:
   test-api: http://localhost:3000
-setting:
-  repeat: 10
-  http:
-    evaluate:
-      header: ignore
 
-
-testcase:
+testcases:
   - target: /
-    description: request to root
-    setting:
-      repeat: 100
   - target: /health
   - target: /healthz
-  - target: /health/rich
-  - target: /health/disabled
-    description: this endpoint will respond with 503 service unavailable
-    setting:
-      http:
-        method: GET
-      repeat: 1
-    attr:
-      allow: true

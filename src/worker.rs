@@ -5,8 +5,7 @@ use crate::service::DefaultHttpClient;
 use crate::{
     command::Relentless,
     config::{
-        http_serde_priv, Coalesce, Coalesced, Config, Destinations, HttpRequest, Protocol, Setting, Testcase,
-        WorkerConfig,
+        http_serde_priv, Coalesce, Coalesced, Config, Destinations, RequestInfo, Setting, Testcase, WorkerConfig,
     },
     error::WrappedResult,
     evaluate::{DefaultEvaluator, Evaluator},
@@ -76,7 +75,7 @@ where
     pub fn new(cmd: &'a Relentless, configs: Vec<Config>, workers: Vec<Worker<'a, S, ReqB, ResB, E>>) -> Self {
         let cases = configs
             .iter()
-            .map(|c| c.testcase.clone().into_iter().map(|t| Case::new(&c.worker_config, t)).collect())
+            .map(|c| c.testcases.clone().into_iter().map(|t| Case::new(&c.worker_config, t)).collect())
             .collect();
         let phantom = PhantomData;
         Self { _cmd: cmd, workers, cases, phantom }
@@ -140,13 +139,13 @@ where
         for case in cases {
             // TODO do not await here, use stream
             let destinations = config.coalesce().destinations;
-            processes.push((case.testcase.clone(), case.process(&destinations, &mut clients).await));
+            processes.push((case.testcases.clone(), case.process(&destinations, &mut clients).await));
         }
 
         let mut outcome = Vec::new();
         for (testcase, process) in processes {
             let Testcase { setting, .. } = testcase.coalesce();
-            let Setting { repeat, protocol, .. } = &setting;
+            let Setting { repeat, evaluate, .. } = &setting;
             let mut passed = 0;
             let mut t = (0..repeat.unwrap_or(1)).map(|_| Destinations::new()).collect::<Vec<_>>();
             for (name, repeated) in process? {
@@ -156,7 +155,7 @@ where
             }
             let mut v = Vec::new();
             for res in t {
-                let pass = evaluator.evaluate(protocol.as_ref(), res, &mut v).await;
+                let pass = evaluator.evaluate(evaluate, res, &mut v).await;
                 passed += pass as usize;
             }
 
@@ -169,12 +168,12 @@ where
 /// TODO document
 #[derive(Debug, Clone)]
 pub struct Case<S, ReqB, ResB> {
-    testcase: Coalesced<Testcase, Setting>,
+    testcases: Coalesced<Testcase, Setting>,
     phantom: PhantomData<(S, ReqB, ResB)>,
 }
 impl<S, ReqB, ResB> Case<S, ReqB, ResB> {
     pub fn testcase(&self) -> &Testcase {
-        self.testcase.base()
+        self.testcases.base()
     }
 }
 impl<S, ReqB, ResB> Case<S, ReqB, ResB>
@@ -188,10 +187,10 @@ where
     S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + Sync + 'static,
     S::Error: std::error::Error + Sync + Send + 'static,
 {
-    pub fn new(worker_config: &WorkerConfig, testcase: Testcase) -> Self {
-        let testcase = Coalesced::tuple(testcase, worker_config.setting.clone());
+    pub fn new(worker_config: &WorkerConfig, testcases: Testcase) -> Self {
+        let testcase = Coalesced::tuple(testcases, worker_config.setting.clone());
         let phantom = PhantomData;
-        Self { testcase, phantom }
+        Self { testcases: testcase, phantom }
     }
 
     pub async fn process(
@@ -199,7 +198,7 @@ where
         destinations: &Destinations<http_serde_priv::Uri>,
         clients: &mut Destinations<S>,
     ) -> WrappedResult<Destinations<Vec<http::Response<ResB>>>> {
-        let Testcase { target, setting, .. } = self.testcase.coalesce();
+        let Testcase { target, setting, .. } = self.testcases.coalesce();
 
         let mut dest = Destinations::new();
         for (name, repeated) in Self::requests(destinations, &target, &setting)? {
@@ -219,7 +218,7 @@ where
         target: &str,
         setting: &Setting,
     ) -> WrappedResult<Destinations<Vec<http::Request<ReqB>>>> {
-        let Setting { protocol, template, repeat, timeout, .. } = setting;
+        let Setting { request, template, repeat, timeout, .. } = setting;
 
         if !template.is_empty() {
             unimplemented!("template is not implemented yet");
@@ -231,15 +230,8 @@ where
         destinations
             .iter()
             .map(|(name, destination)| {
-                let default_http = Default::default();
-                let http = protocol
-                    .as_ref()
-                    .map(|p| match p {
-                        Protocol::Http(http) => http,
-                    })
-                    .unwrap_or(&default_http);
                 let requests = (0..repeat.unwrap_or(1))
-                    .map(|_| Self::http_request(destination, target, http))
+                    .map(|_| Self::http_request(destination, target, request))
                     .collect::<Result<Vec<_>, _>>()
                     .unwrap(); // TODO
                 Ok((name.to_string(), requests))
@@ -251,9 +243,9 @@ where
     pub fn http_request(
         destination: &http::Uri,
         target: &str,
-        http: &crate::config::Http,
+        request_info: &RequestInfo,
     ) -> WrappedResult<http::Request<ReqB>> {
-        let HttpRequest { method, header, body, .. } = &http.request;
+        let RequestInfo { method, header, body, .. } = &request_info;
         let uri = http::uri::Builder::from(destination.clone()).path_and_query(target).build().unwrap();
         let mut request = http::Request::builder()
             .uri(uri)
