@@ -152,7 +152,7 @@ impl Relentless {
         match report_to {
             ReportTo::Null => {}
             #[cfg(feature = "console-report")]
-            ReportTo::Console => outcome.console_report(self)?,
+            ReportTo::Console => outcome.console_report_stdout(self)?,
         }
         Ok(outcome)
     }
