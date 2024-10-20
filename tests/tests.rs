@@ -1,14 +1,20 @@
 #![cfg(all(feature = "json", feature = "yaml"))]
 
 use axum::body::Body;
-use relentless::{command::Relentless, evaluate::DefaultEvaluator};
+use relentless::{
+    command::{Relentless, ReportTo},
+    evaluate::DefaultEvaluator,
+};
 
 use example_http_server::route;
 
 #[tokio::test]
 async fn test_example_assault() {
-    let relentless =
-        Relentless { file: vec!["examples/config/assault.yaml".into()], no_report: true, ..Default::default() };
+    let relentless = Relentless {
+        file: vec!["examples/config/assault.yaml".into()],
+        report_to: ReportTo::Null,
+        ..Default::default()
+    };
     let configs = relentless.configs().unwrap();
     let services = [("test-api".to_string(), route::app_with(Default::default()))].into_iter().collect();
     let outcome =

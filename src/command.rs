@@ -1,7 +1,7 @@
 use std::{fmt::Display, io::Write, path::PathBuf, process::ExitCode};
 
 #[cfg(feature = "cli")]
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 use http_body::Body;
 use serde::{Deserialize, Serialize};
 use tower::Service;
@@ -56,8 +56,8 @@ pub struct Relentless {
     pub no_color: bool,
 
     /// report nothing
-    #[cfg_attr(feature = "cli", arg(long))]
-    pub no_report: bool,
+    #[cfg_attr(feature = "cli", arg(long), clap(value_enum, default_value_t))]
+    pub report_to: ReportTo,
 
     /// number of threads
     #[cfg_attr(feature = "cli", arg(short, long))]
@@ -67,6 +67,16 @@ pub struct Relentless {
     #[cfg_attr(feature = "cli", arg(short, long))]
     pub rps: Option<usize>,
 }
+#[cfg_attr(feature = "cli", derive(ValueEnum))]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum ReportTo {
+    #[cfg_attr(not(feature = "console-report"), default)]
+    Null,
+    #[cfg(feature = "console-report")]
+    #[default]
+    Console,
+}
+
 impl Relentless {
     pub fn destinations(&self) -> WrappedResult<Destinations<http_serde_priv::Uri>> {
         let Self { destination, .. } = self;
@@ -133,14 +143,16 @@ impl Relentless {
         E: Evaluator<http::Response<ResB>>,
         E::Message: Display,
     {
-        let Self { no_color, no_report, .. } = self;
+        let Self { no_color, report_to, .. } = self;
         #[cfg(feature = "console-report")]
         console::set_colors_enabled(!no_color);
 
         let control = Control::with_service(self, configs, services)?;
         let outcome = control.assault(evaluator).await?;
-        if !no_report {
-            outcome.console_report(self)?;
+        match report_to {
+            ReportTo::Null => {}
+            #[cfg(feature = "console-report")]
+            ReportTo::Console => outcome.console_report(self)?,
         }
         Ok(outcome)
     }

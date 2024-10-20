@@ -4,7 +4,7 @@ use std::{
 };
 
 use crate::{
-    command::Relentless,
+    command::{Relentless, ReportTo},
     config::{http_serde_priv, Coalesced, Destinations, Setting, Testcase, WorkerConfig},
     error::{MultiWrap, Wrap},
 };
@@ -66,8 +66,8 @@ impl<T> WorkerOutcome<T> {
         self.outcome.iter().all(|o| o.allow(strict))
     }
     pub fn skip_report(&self, cmd: &Relentless) -> bool {
-        let Relentless { strict, ng_only, no_report, .. } = cmd;
-        *no_report || *ng_only && self.allow(*strict)
+        let Relentless { strict, ng_only, report_to, .. } = cmd;
+        matches!(report_to, ReportTo::Null) || *ng_only && self.allow(*strict)
     }
 }
 #[cfg(feature = "console-report")]
@@ -131,8 +131,8 @@ impl<T> CaseOutcome<T> {
         self.pass() || !strict && allowed
     }
     pub fn skip_report(&self, cmd: &Relentless) -> bool {
-        let Relentless { strict, ng_only, no_report, .. } = cmd;
-        *no_report || *ng_only && self.allow(*strict)
+        let Relentless { strict, ng_only, report_to, .. } = cmd;
+        matches!(report_to, ReportTo::Null) || *ng_only && self.allow(*strict)
     }
 }
 #[cfg(feature = "console-report")]
