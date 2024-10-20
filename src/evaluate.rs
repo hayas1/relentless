@@ -7,6 +7,7 @@ use serde_json::Value;
 #[cfg(feature = "json")]
 use crate::config::JsonEvaluate;
 use crate::config::{Evaluate, EvaluateTo};
+use crate::error::EvaluateError;
 use crate::{
     config::{BodyEvaluate, Destinations, HeaderEvaluate, StatusEvaluate},
     error::WrappedResult,
@@ -22,7 +23,7 @@ impl<ResB: Body> Evaluator<http::Response<ResB>> for DefaultEvaluator
 where
     ResB::Error: std::error::Error + Sync + Send + 'static,
 {
-    type Message = String;
+    type Message = EvaluateError;
     async fn evaluate(
         &self,
         cfg: &Evaluate,
@@ -37,7 +38,7 @@ impl DefaultEvaluator {
     pub async fn acceptable_parts<ResB: Body>(
         cfg: &Evaluate,
         res: Destinations<http::Response<ResB>>,
-        msg: &mut Vec<String>,
+        msg: &mut Vec<EvaluateError>,
     ) -> bool
     where
         ResB::Error: std::error::Error + Sync + Send + 'static,
@@ -48,7 +49,7 @@ impl DefaultEvaluator {
             let bytes = match BodyExt::collect(body).await.map(http_body_util::Collected::to_bytes) {
                 Ok(b) => b,
                 Err(e) => {
-                    msg.push(format!("fail to collect body: {}", e));
+                    msg.push(EvaluateError::FailToCollectBody(e.into()));
                     return false;
                 }
             };
@@ -64,7 +65,7 @@ impl DefaultEvaluator {
     pub fn acceptable_status(
         cfg: &StatusEvaluate,
         status: &Destinations<http::StatusCode>,
-        msg: &mut Vec<String>,
+        msg: &mut Vec<EvaluateError>,
     ) -> bool {
         let acceptable = match cfg {
             StatusEvaluate::OkOrEqual => Self::assault_or_compare(status, http::StatusCode::is_success),
@@ -76,7 +77,7 @@ impl DefaultEvaluator {
             StatusEvaluate::Ignore => true,
         };
         if !acceptable {
-            msg.push("status is not acceptable".to_string());
+            msg.push(EvaluateError::UnacceptableStatus);
         }
         acceptable
     }
@@ -84,7 +85,7 @@ impl DefaultEvaluator {
     pub fn acceptable_header(
         cfg: &HeaderEvaluate,
         headers: &Destinations<http::HeaderMap>,
-        msg: &mut Vec<String>,
+        msg: &mut Vec<EvaluateError>,
     ) -> bool {
         let acceptable = match cfg {
             HeaderEvaluate::Equal => Self::assault_or_compare(headers, |_| true),
@@ -96,12 +97,12 @@ impl DefaultEvaluator {
             HeaderEvaluate::Ignore => true,
         };
         if !acceptable {
-            msg.push("header is not acceptable".to_string());
+            msg.push(EvaluateError::UnacceptableHeaderMap);
         }
         acceptable
     }
 
-    pub fn acceptable_body(cfg: &BodyEvaluate, body: &Destinations<Bytes>, msg: &mut Vec<String>) -> bool {
+    pub fn acceptable_body(cfg: &BodyEvaluate, body: &Destinations<Bytes>, msg: &mut Vec<EvaluateError>) -> bool {
         match cfg {
             BodyEvaluate::Equal => Self::assault_or_compare(body, |_| true),
             BodyEvaluate::PlainText(_) => Self::assault_or_compare(body, |_| true), // TODO
@@ -128,11 +129,11 @@ impl DefaultEvaluator {
 
 #[cfg(feature = "json")]
 impl DefaultEvaluator {
-    pub fn json_acceptable(cfg: &JsonEvaluate, parts: &Destinations<Bytes>, msg: &mut Vec<String>) -> bool {
+    pub fn json_acceptable(cfg: &JsonEvaluate, parts: &Destinations<Bytes>, msg: &mut Vec<EvaluateError>) -> bool {
         let values: Vec<_> = match Self::patched(cfg, parts) {
             Ok(values) => values,
             Err(e) => {
-                msg.push(format!("patch error: {}", e));
+                msg.push(EvaluateError::FailToJsonPatch(e));
                 return false;
             }
         }
@@ -167,14 +168,14 @@ impl DefaultEvaluator {
         json_patch::patch(value, patch)
     }
 
-    pub fn json_compare(cfg: &JsonEvaluate, (va, vb): (&Value, &Value), msg: &mut Vec<String>) -> bool {
+    pub fn json_compare(cfg: &JsonEvaluate, (va, vb): (&Value, &Value), msg: &mut Vec<EvaluateError>) -> bool {
         let diff = json_patch::diff(va, vb);
         let pointers = Self::pointers(&diff);
         for (op, path) in diff.iter().zip(pointers) {
             if cfg.ignore.contains(&path) {
                 continue;
             } else {
-                msg.push(format!("diff: {}", op));
+                msg.push(EvaluateError::Diff(op.clone()));
                 return false;
             }
         }
@@ -221,7 +222,7 @@ mod tests {
         let mut msg = Vec::new();
         let result = evaluator.evaluate(&Default::default(), responses, &mut msg).await;
         assert!(!result);
-        assert_eq!(msg, ["status is not acceptable"]);
+        assert!(matches!(msg[0], EvaluateError::UnacceptableStatus));
     }
 
     // TODO more tests

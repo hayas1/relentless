@@ -292,8 +292,22 @@ pub enum RunCommandError {
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum AssaultError {}
 
-#[derive(Error, Debug, Clone, PartialEq, Eq)]
-pub enum EvaluateError {}
+#[derive(Error, Debug)]
+pub enum EvaluateError {
+    #[error("fail to collect body: {0}")]
+    FailToCollectBody(Wrap),
+    #[error("status is not acceptable")]
+    UnacceptableStatus,
+    #[error("header map is not acceptable")]
+    UnacceptableHeaderMap,
+
+    #[cfg(feature = "json")]
+    #[error("fail to json patch: {0}")]
+    FailToJsonPatch(Wrap),
+    #[cfg(feature = "json")]
+    #[error("json diff: {0}")]
+    Diff(json_patch::PatchOperation),
+}
 
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum ReportError {}

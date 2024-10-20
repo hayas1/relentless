@@ -108,7 +108,7 @@ impl Relentless {
 
     /// TODO document
     #[cfg(all(feature = "default-http-client", feature = "cli"))]
-    pub async fn assault(&self) -> crate::Result<Outcome<String>> {
+    pub async fn assault(&self) -> crate::Result<Outcome<crate::error::EvaluateError>> {
         let configs = self.configs_filtered(std::io::stderr())?;
         let clients = Control::default_http_clients(self, &configs).await?;
         let outcome = self.assault_with(configs, clients, &crate::evaluate::DefaultEvaluator).await?;
