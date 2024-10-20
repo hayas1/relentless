@@ -1,5 +1,4 @@
 use std::{
-    convert::Infallible,
     fmt::{Display, Formatter, Write as _},
     process::ExitCode,
 };
@@ -20,10 +19,7 @@ impl<T> Outcome<T> {
         Self { outcome }
     }
     pub fn exit_code(&self, cmd: Relentless) -> ExitCode {
-        match self.allow(cmd.strict) {
-            Ok(allow) => (!allow as u8).into(),
-            Err(_) => ExitCode::FAILURE,
-        }
+        (!self.allow(cmd.strict) as u8).into()
     }
 }
 impl<T> Reportable for Outcome<T> {
@@ -40,7 +36,7 @@ impl<T: Display> ConsoleReport for Outcome<T> {
         w: &mut OutcomeWriter<W>,
     ) -> Result<(), Self::Error> {
         for outcome in &self.outcome {
-            if !outcome.skip_report(cmd)? {
+            if !outcome.skip_report(cmd) {
                 outcome.console_report_to(cmd, w)?;
                 writeln!(w)?;
             }
@@ -98,7 +94,7 @@ impl<T: Display> ConsoleReport for WorkerOutcome<T> {
 
         w.scope(|w| {
             for outcome in &self.outcome {
-                if !outcome.skip_report(cmd)? {
+                if !outcome.skip_report(cmd) {
                     outcome.console_report_to(cmd, w)?;
                 }
             }
@@ -126,12 +122,12 @@ impl<T> Reportable for CaseOutcome<T> {
     fn sub_reportable(&self) -> Vec<&dyn Reportable> {
         vec![]
     }
-    fn pass(&self) -> Result<bool, Infallible> {
-        Ok(self.pass)
+    fn pass(&self) -> bool {
+        self.pass
     }
-    fn allow(&self, strict: bool) -> Result<bool, Infallible> {
+    fn allow(&self, strict: bool) -> bool {
         let allowed = self.testcases.coalesce().attr.allow;
-        Ok(self.pass()? || !strict && allowed)
+        self.pass() || !strict && allowed
     }
 }
 #[cfg(feature = "console-report")]
@@ -144,9 +140,9 @@ impl<T: Display> ConsoleReport for CaseOutcome<T> {
     ) -> Result<(), Self::Error> {
         let Testcase { description, target, setting, .. } = self.testcases.coalesce();
 
-        let side = if self.pass()? { console::Emoji("✅", "PASS") } else { console::Emoji("❌", "FAIL") };
+        let side = if self.pass() { console::Emoji("✅", "PASS") } else { console::Emoji("❌", "FAIL") };
         let target = console::style(&target);
-        write!(w, "{} {} ", side, if self.pass()? { target.green() } else { target.red() })?;
+        write!(w, "{} {} ", side, if self.pass() { target.green() } else { target.red() })?;
         if let Some(ref repeat) = setting.repeat {
             write!(w, "{}{}/{} ", console::Emoji("🔁", ""), self.passed, repeat)?;
         }
@@ -155,7 +151,7 @@ impl<T: Display> ConsoleReport for CaseOutcome<T> {
         } else {
             writeln!(w)?;
         }
-        if !self.pass()? && self.allow(cmd.strict)? {
+        if !self.pass() && self.allow(cmd.strict) {
             w.scope(|w| {
                 writeln!(w, "{} {}", console::Emoji("👀", ""), console::style("this testcase is allowed").green())
             })?;
@@ -176,23 +172,23 @@ impl<T: Display> ConsoleReport for CaseOutcome<T> {
 pub trait Reportable {
     // TODO https://std-dev-guide.rust-lang.org/policy/specialization.html
     fn sub_reportable(&self) -> Vec<&dyn Reportable>;
-    fn pass(&self) -> Result<bool, Infallible> {
+    fn pass(&self) -> bool {
         if self.sub_reportable().is_empty() {
             unreachable!("a reportable without children should implement its own method");
         } else {
-            Ok(self.sub_reportable().iter().filter_map(|c| c.pass().ok()).all(|c| c))
+            self.sub_reportable().iter().all(|r| r.pass())
         }
     }
-    fn allow(&self, strict: bool) -> Result<bool, Infallible> {
+    fn allow(&self, strict: bool) -> bool {
         if self.sub_reportable().is_empty() {
             unreachable!("a reportable without children should implement its own method");
         } else {
-            Ok(self.sub_reportable().iter().filter_map(|c| c.allow(strict).ok()).all(|c| c))
+            self.sub_reportable().iter().all(|r| r.allow(strict))
         }
     }
-    fn skip_report(&self, cmd: &Relentless) -> Result<bool, Infallible> {
+    fn skip_report(&self, cmd: &Relentless) -> bool {
         let Relentless { strict, ng_only, report_to, .. } = cmd;
-        Ok(matches!(report_to, ReportTo::Null) || *ng_only && self.allow(*strict)?)
+        matches!(report_to, ReportTo::Null) || *ng_only && self.allow(*strict)
     }
 }
 

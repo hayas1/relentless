@@ -21,5 +21,5 @@ async fn test_example_assault() {
     let outcome =
         relentless.assault_with::<_, Body, Body, _>(configs, vec![services], &DefaultEvaluator).await.unwrap();
 
-    assert!(outcome.allow(false).unwrap());
+    assert!(outcome.allow(false));
 }
