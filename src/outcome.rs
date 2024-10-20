@@ -193,7 +193,7 @@ pub trait Reportable {
 }
 
 #[cfg(feature = "console-report")]
-pub trait ConsoleReport {
+pub trait ConsoleReport: Reportable {
     type Error;
     fn console_report_to<W: std::io::Write>(
         &self,
