@@ -1,4 +1,4 @@
-name: example yaml of basic assault test
+name: example config of basic assault test
 destinations:
   test-api: http://localhost:3000
 setting:

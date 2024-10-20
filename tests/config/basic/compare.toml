@@ -1,4 +1,4 @@
-name = "example yaml of basic compare test"
+name = "example config of basic compare test"
 
 [destinations]
 actual = "http://localhost:3000"

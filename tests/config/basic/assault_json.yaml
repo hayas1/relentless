@@ -1,4 +1,4 @@
-name: example yaml of basic json assault test
+name: example config of basic json assault test
 destinations:
   test-api: http://localhost:3000
 setting:
