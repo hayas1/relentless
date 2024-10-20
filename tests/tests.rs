@@ -4,6 +4,7 @@ use axum::body::Body;
 use relentless::{
     command::{Relentless, ReportTo},
     evaluate::DefaultEvaluator,
+    outcome::Reportable,
 };
 
 use example_http_server::route;

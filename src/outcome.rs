@@ -18,14 +18,14 @@ impl<T> Outcome<T> {
     pub fn new(outcome: Vec<WorkerOutcome<T>>) -> Self {
         Self { outcome }
     }
-    pub fn pass(&self) -> bool {
-        self.outcome.iter().all(|o| o.pass())
-    }
-    pub fn allow(&self, strict: bool) -> bool {
-        self.outcome.iter().all(|o| o.allow(strict))
-    }
     pub fn exit_code(&self, cmd: Relentless) -> ExitCode {
         (!self.allow(cmd.strict) as u8).into()
+    }
+}
+impl<T> Reportable for Outcome<T> {
+    type Error = Wrap;
+    fn children(&self) -> Vec<&dyn Reportable<Error = Self::Error>> {
+        self.outcome.iter().map(|o| o as _).collect()
     }
 }
 #[cfg(feature = "console-report")]
@@ -59,15 +59,11 @@ impl<T> WorkerOutcome<T> {
     ) -> Self {
         Self { config, outcome }
     }
-    pub fn pass(&self) -> bool {
-        self.outcome.iter().all(|o| o.pass())
-    }
-    pub fn allow(&self, strict: bool) -> bool {
-        self.outcome.iter().all(|o| o.allow(strict))
-    }
-    pub fn skip_report(&self, cmd: &Relentless) -> bool {
-        let Relentless { strict, ng_only, report_to, .. } = cmd;
-        matches!(report_to, ReportTo::Null) || *ng_only && self.allow(*strict)
+}
+impl<T> Reportable for WorkerOutcome<T> {
+    type Error = Wrap;
+    fn children(&self) -> Vec<&dyn Reportable<Error = Self::Error>> {
+        self.outcome.iter().map(|o| o as _).collect()
     }
 }
 #[cfg(feature = "console-report")]
@@ -123,16 +119,18 @@ impl<T> CaseOutcome<T> {
         let pass = passed == testcases.coalesce().setting.repeat.unwrap_or(1); // TODO here ?
         Self { testcases, passed, pass, messages }
     }
-    pub fn pass(&self) -> bool {
+}
+impl<T> Reportable for CaseOutcome<T> {
+    type Error = Wrap;
+    fn children(&self) -> Vec<&dyn Reportable<Error = Self::Error>> {
+        vec![]
+    }
+    fn pass(&self) -> bool {
         self.pass
     }
-    pub fn allow(&self, strict: bool) -> bool {
+    fn allow(&self, strict: bool) -> bool {
         let allowed = self.testcases.coalesce().attr.allow;
         self.pass() || !strict && allowed
-    }
-    pub fn skip_report(&self, cmd: &Relentless) -> bool {
-        let Relentless { strict, ng_only, report_to, .. } = cmd;
-        matches!(report_to, ReportTo::Null) || *ng_only && self.allow(*strict)
     }
 }
 #[cfg(feature = "console-report")]
@@ -174,6 +172,21 @@ impl<T: Display> ConsoleReport for CaseOutcome<T> {
     }
 }
 
+pub trait Reportable {
+    type Error; // TODO remove ?
+    fn children(&self) -> Vec<&dyn Reportable<Error = Self::Error>>;
+    fn pass(&self) -> bool {
+        self.children().iter().all(|c| c.pass())
+    }
+    fn allow(&self, strict: bool) -> bool {
+        self.children().iter().all(|c| c.allow(strict))
+    }
+    fn skip_report(&self, cmd: &Relentless) -> bool {
+        let Relentless { strict, ng_only, report_to, .. } = cmd;
+        matches!(report_to, ReportTo::Null) || *ng_only && self.allow(*strict)
+    }
+}
+
 #[cfg(feature = "console-report")]
 pub trait ConsoleReport {
     type Error;
@@ -182,6 +195,7 @@ pub trait ConsoleReport {
         cmd: &Relentless,
         w: &mut OutcomeWriter<W>,
     ) -> Result<(), Self::Error>;
+
     fn console_report(&self, cmd: &Relentless) -> Result<(), Self::Error> {
         self.console_report_to(cmd, &mut OutcomeWriter::with_stdout(0))
     }
