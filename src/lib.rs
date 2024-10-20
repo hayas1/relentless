@@ -7,7 +7,7 @@
 //! ```
 //!
 //! ## Prepare Config
-//! ```yaml:examples/config/compare.yaml
+//! ```yaml
 //! name: basic comparison test
 //! destinations:
 //!   actual: http://localhost:3000
