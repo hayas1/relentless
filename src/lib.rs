@@ -13,7 +13,7 @@
 //!   actual: http://localhost:3000
 //!   expect: http://localhost:3000
 //!
-//! testcase:
+//! testcases:
 //!   - target: /
 //!   - target: /health
 //!   - target: /healthz

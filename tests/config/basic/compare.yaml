@@ -11,7 +11,7 @@ setting:
   evaluate:
     header: ignore
 
-testcase:
+testcases:
   - target: /
   - target: /health
   - target: /healthz

@@ -7,7 +7,7 @@ setting:
     header: ignore
 
 
-testcase:
+testcases:
   - target: /health/rich
     description: request to json response endpoint
     setting:

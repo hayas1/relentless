@@ -16,7 +16,7 @@ pub struct Config {
     pub worker_config: WorkerConfig,
 
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
-    pub testcase: Vec<Testcase>,
+    pub testcases: Vec<Testcase>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
@@ -503,7 +503,7 @@ mod tests {
                 },
                 ..Default::default()
             },
-            testcase: vec![Testcase {
+            testcases: vec![Testcase {
                 description: Some("test description".to_string()),
                 target: "/information".to_string(),
                 setting: Setting {
@@ -552,7 +552,7 @@ mod tests {
         destinations:
           actual: http://localhost:3000
           expect: http://localhost:3000
-        testcase:
+        testcases:
         - description: test description
           target: /information
           setting:
@@ -566,7 +566,7 @@ mod tests {
         "#;
         let config = Config::read_str(all_yaml, Format::Yaml).unwrap();
         assert_eq!(
-            config.testcase[0].setting.evaluate,
+            config.testcases[0].setting.evaluate,
             Evaluate {
                 body: BodyEvaluate::Json(JsonEvaluate {
                     ignore: vec![],
@@ -587,7 +587,7 @@ mod tests {
         destinations:
           actual: http://localhost:3000
           expect: http://localhost:3000
-        testcase:
+        testcases:
         - description: test description
           target: /information
           setting:
@@ -605,7 +605,7 @@ mod tests {
         "#;
         let config = Config::read_str(destinations_yaml, Format::Yaml).unwrap();
         assert_eq!(
-            config.testcase[0].setting.evaluate,
+            config.testcases[0].setting.evaluate,
             Evaluate {
                 body: BodyEvaluate::Json(JsonEvaluate {
                     ignore: vec![],

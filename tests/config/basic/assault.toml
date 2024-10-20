@@ -7,21 +7,21 @@ test-api = "http://localhost:3000"
 repeat = 10
 evaluate = { header = "ignore" }
 
-[[testcase]]
+[[testcases]]
 target = "/"
 description = "request to root"
 setting.repeat = 100
 
-[[testcase]]
+[[testcases]]
 target = "/health"
 
-[[testcase]]
+[[testcases]]
 target = "/healthz"
 
-[[testcase]]
+[[testcases]]
 target = "/health/rich"
 
-[[testcase]]
+[[testcases]]
 target = "/health/disabled"
 description = "this endpoint will respond with 503 service unavailable"
 setting = { request = { method = "GET" }, repeat = 1 }

@@ -6,7 +6,7 @@ setting:
   evaluate:
     header: ignore
 
-testcase:
+testcases:
   - target: /counter/increment
     setting:
       repeat: 10

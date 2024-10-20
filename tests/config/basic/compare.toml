@@ -7,36 +7,36 @@ expect = "http://localhost:3000"
 [setting]
 evaluate = { header = "ignore" }
 
-[[testcase]]
+[[testcases]]
 target = "/"
 
-[[testcase]]
+[[testcases]]
 target = "/health"
 
-[[testcase]]
+[[testcases]]
 target = "/healthz"
 
-[[testcase]]
+[[testcases]]
 target = "/health/rich"
 
-[[testcase]]
+[[testcases]]
 target = "/counter/increment"
 setting.repeat = 10
 attr = { allow = true }
 
-[[testcase]]
+[[testcases]]
 target = "/counter/increment/10"
 setting.repeat = 10
 attr = { allow = true }
 
-[[testcase]]
+[[testcases]]
 target = "/counter/decrement"
 setting.repeat = 10
 attr = { allow = true }
 
-[[testcase]]
+[[testcases]]
 target = "/counter/decrement/10"
 setting.repeat = 10
 
-[[testcase]]
+[[testcases]]
 target = "/wait/100/ms"

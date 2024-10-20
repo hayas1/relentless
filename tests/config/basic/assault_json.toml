@@ -7,7 +7,7 @@ test-api = "http://localhost:3000"
 repeat = 10
 evaluate = { header = "ignore" }
 
-[[testcase]]
+[[testcases]]
 target = "/health/rich"
 description = "request to json response endpoint"
 setting = { repeat = 100, evaluate = { body = { json = { patch = [
@@ -15,7 +15,7 @@ setting = { repeat = 100, evaluate = { body = { json = { patch = [
     { op = "test", path = "", value = { status = "200 OK", code = 200 } },
 ] } } } }
 
-[[testcase]]
+[[testcases]]
 target = "/health/rich"
 description = 'test failed ({"status": "200 OK"} but test for {"status": "200 NG"})'
 setting.repeat = 100

@@ -105,21 +105,21 @@ impl<T: Display> WorkerOutcome<T> {
 /// TODO document
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CaseOutcome<T> {
-    testcase: Coalesced<Testcase, Setting>,
+    testcases: Coalesced<Testcase, Setting>,
     passed: usize,
     pass: bool,
     messages: MultiWrap<T>,
 }
 impl<T> CaseOutcome<T> {
-    pub fn new(testcase: Coalesced<Testcase, Setting>, passed: usize, messages: MultiWrap<T>) -> Self {
-        let pass = passed == testcase.coalesce().setting.repeat.unwrap_or(1); // TODO here ?
-        Self { testcase, passed, pass, messages }
+    pub fn new(testcases: Coalesced<Testcase, Setting>, passed: usize, messages: MultiWrap<T>) -> Self {
+        let pass = passed == testcases.coalesce().setting.repeat.unwrap_or(1); // TODO here ?
+        Self { testcases, passed, pass, messages }
     }
     pub fn pass(&self) -> bool {
         self.pass
     }
     pub fn allow(&self, strict: bool) -> bool {
-        let allowed = self.testcase.coalesce().attr.allow;
+        let allowed = self.testcases.coalesce().attr.allow;
         self.pass() || !strict && allowed
     }
     pub fn skip_report(&self, cmd: &Relentless) -> bool {
@@ -129,7 +129,7 @@ impl<T> CaseOutcome<T> {
 }
 impl<T: Display> CaseOutcome<T> {
     pub fn report_to<W: std::io::Write>(&self, w: &mut OutcomeWriter<W>, cmd: &Relentless) -> WrappedResult<()> {
-        let Testcase { description, target, setting, .. } = self.testcase.coalesce();
+        let Testcase { description, target, setting, .. } = self.testcases.coalesce();
 
         let side = if self.pass() { console::Emoji("✅", "PASS") } else { console::Emoji("❌", "FAIL") };
         let target = console::style(&target);

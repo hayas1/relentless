@@ -2,7 +2,7 @@ name: basic assault test
 destinations:
   test-api: http://localhost:3000
 
-testcase:
+testcases:
   - target: /
   - target: /health
   - target: /healthz

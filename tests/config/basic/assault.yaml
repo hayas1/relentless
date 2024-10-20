@@ -7,7 +7,7 @@ setting:
     header: ignore
 
 
-testcase:
+testcases:
   - target: /
     description: request to root
     setting:

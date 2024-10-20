@@ -75,7 +75,7 @@ where
     pub fn new(cmd: &'a Relentless, configs: Vec<Config>, workers: Vec<Worker<'a, S, ReqB, ResB, E>>) -> Self {
         let cases = configs
             .iter()
-            .map(|c| c.testcase.clone().into_iter().map(|t| Case::new(&c.worker_config, t)).collect())
+            .map(|c| c.testcases.clone().into_iter().map(|t| Case::new(&c.worker_config, t)).collect())
             .collect();
         let phantom = PhantomData;
         Self { _cmd: cmd, workers, cases, phantom }
@@ -139,7 +139,7 @@ where
         for case in cases {
             // TODO do not await here, use stream
             let destinations = config.coalesce().destinations;
-            processes.push((case.testcase.clone(), case.process(&destinations, &mut clients).await));
+            processes.push((case.testcases.clone(), case.process(&destinations, &mut clients).await));
         }
 
         let mut outcome = Vec::new();
@@ -168,12 +168,12 @@ where
 /// TODO document
 #[derive(Debug, Clone)]
 pub struct Case<S, ReqB, ResB> {
-    testcase: Coalesced<Testcase, Setting>,
+    testcases: Coalesced<Testcase, Setting>,
     phantom: PhantomData<(S, ReqB, ResB)>,
 }
 impl<S, ReqB, ResB> Case<S, ReqB, ResB> {
     pub fn testcase(&self) -> &Testcase {
-        self.testcase.base()
+        self.testcases.base()
     }
 }
 impl<S, ReqB, ResB> Case<S, ReqB, ResB>
@@ -187,10 +187,10 @@ where
     S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + Sync + 'static,
     S::Error: std::error::Error + Sync + Send + 'static,
 {
-    pub fn new(worker_config: &WorkerConfig, testcase: Testcase) -> Self {
-        let testcase = Coalesced::tuple(testcase, worker_config.setting.clone());
+    pub fn new(worker_config: &WorkerConfig, testcases: Testcase) -> Self {
+        let testcase = Coalesced::tuple(testcases, worker_config.setting.clone());
         let phantom = PhantomData;
-        Self { testcase, phantom }
+        Self { testcases: testcase, phantom }
     }
 
     pub async fn process(
@@ -198,7 +198,7 @@ where
         destinations: &Destinations<http_serde_priv::Uri>,
         clients: &mut Destinations<S>,
     ) -> WrappedResult<Destinations<Vec<http::Response<ResB>>>> {
-        let Testcase { target, setting, .. } = self.testcase.coalesce();
+        let Testcase { target, setting, .. } = self.testcases.coalesce();
 
         let mut dest = Destinations::new();
         for (name, repeated) in Self::requests(destinations, &target, &setting)? {
