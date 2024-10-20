@@ -47,7 +47,7 @@ impl DefaultEvaluator {
         let (mut s, mut h, mut b) = (Destinations::new(), Destinations::new(), Destinations::new());
         for (name, r) in res {
             let (http::response::Parts { status, headers, .. }, body) = r.into_parts();
-            let bytes = match BodyExt::collect(body).await.map(|buf| buf.to_bytes()) {
+            let bytes = match BodyExt::collect(body).await.map(http_body_util::Collected::to_bytes) {
                 Ok(b) => b,
                 Err(e) => {
                     msg.push(format!("fail to collect body: {}", e));
