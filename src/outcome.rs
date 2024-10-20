@@ -28,6 +28,7 @@ impl<T> Outcome<T> {
         (!self.allow(cmd.strict) as u8).into()
     }
 }
+#[cfg(feature = "console")]
 impl<T: Display> Reportable for Outcome<T> {
     type Error = Wrap;
     fn report_to<W: std::io::Write>(&self, cmd: &Relentless, w: &mut OutcomeWriter<W>) -> Result<(), Self::Error> {
@@ -65,6 +66,7 @@ impl<T> WorkerOutcome<T> {
         *no_report || *ng_only && self.allow(*strict)
     }
 }
+#[cfg(feature = "console")]
 impl<T: Display> Reportable for WorkerOutcome<T> {
     type Error = Wrap;
     fn report_to<W: std::io::Write>(&self, cmd: &Relentless, w: &mut OutcomeWriter<W>) -> Result<(), Self::Error> {
@@ -125,6 +127,7 @@ impl<T> CaseOutcome<T> {
         *no_report || *ng_only && self.allow(*strict)
     }
 }
+#[cfg(feature = "console")]
 impl<T: Display> Reportable for CaseOutcome<T> {
     type Error = Wrap;
     fn report_to<W: std::io::Write>(&self, cmd: &Relentless, w: &mut OutcomeWriter<W>) -> Result<(), Self::Error> {

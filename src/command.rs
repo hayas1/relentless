@@ -134,6 +134,7 @@ impl Relentless {
         E::Message: Display,
     {
         let Self { no_color, no_report, .. } = self;
+        #[cfg(feature = "console")]
         console::set_colors_enabled(!no_color);
 
         let control = Control::with_service(self, configs, services)?;
