@@ -84,6 +84,7 @@ pub enum StatusEvaluate {
 pub enum HeaderEvaluate {
     #[default]
     Equal,
+    Expect(EvaluateTo<http_serde_priv::HeaderMap>),
     Ignore,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
