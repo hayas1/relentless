@@ -6,7 +6,7 @@ use serde_json::Value;
 
 #[cfg(feature = "json")]
 use crate::config::JsonEvaluate;
-use crate::config::{Evaluate, EvaluateTo};
+use crate::config::{Evaluate, EvaluateTo, Severity};
 use crate::error::EvaluateError;
 use crate::{
     config::{BodyEvaluate, Destinations, HeaderEvaluate, StatusEvaluate},
@@ -149,7 +149,7 @@ impl DefaultEvaluator {
             .map(|(name, body)| {
                 let mut value = serde_json::from_slice(body)?;
                 if let Err(e) = Self::patch(cfg, name, &mut value) {
-                    if parts.len() == 1 {
+                    if parts.len() == 1 || cfg.patch_fail > Some(Severity::Warn) {
                         Err(e)?;
                     }
                 }
