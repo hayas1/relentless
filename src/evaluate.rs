@@ -69,7 +69,7 @@ impl DefaultEvaluator {
     ) -> bool {
         let acceptable = match cfg {
             StatusEvaluate::OkOrEqual => Self::assault_or_compare(status, http::StatusCode::is_success),
-            StatusEvaluate::Expect(EvaluateTo::All(code)) => status.values().all(|s| s == &**code),
+            StatusEvaluate::Expect(EvaluateTo::All(code)) => Self::validate_all(status, |s| s == &**code),
             StatusEvaluate::Expect(EvaluateTo::Destinations(code)) => {
                 // TODO subset ?
                 status == &code.iter().map(|(d, c)| (d.to_string(), **c)).collect()
@@ -89,7 +89,7 @@ impl DefaultEvaluator {
     ) -> bool {
         let acceptable = match cfg {
             HeaderEvaluate::Equal => Self::assault_or_compare(headers, |_| true),
-            HeaderEvaluate::Expect(EvaluateTo::All(header)) => headers.values().all(|h| h == &**header),
+            HeaderEvaluate::Expect(EvaluateTo::All(header)) => Self::validate_all(headers, |h| h == &**header),
             HeaderEvaluate::Expect(EvaluateTo::Destinations(header)) => {
                 // TODO subset ?
                 headers == &header.iter().map(|(d, h)| (d.to_string(), (**h).clone())).collect()
