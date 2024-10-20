@@ -34,6 +34,7 @@ setting.evaluate.body.json.patch = [
     { op = "replace", path = "/headers/host", value = "127.0.0.1:3000" },
     { op = "test", path = "/path", value = "/information" },
 ]
+setting.evaluate.body.json.patch_fail = "error"
 
 [[testcases]]
 target = "/information"
