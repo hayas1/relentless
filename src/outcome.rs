@@ -112,7 +112,7 @@ impl<T> CaseOutcome<T> {
 }
 impl<T> Reportable for CaseOutcome<T> {
     fn sub_reportable(&self) -> Vec<&dyn Reportable> {
-        vec![]
+        Vec::new()
     }
     fn pass(&self) -> bool {
         self.pass

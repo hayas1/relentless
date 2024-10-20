@@ -75,7 +75,7 @@ pub enum ReportFormat {
     #[cfg_attr(not(feature = "console-report"), default)]
     NullDevice,
     #[cfg(feature = "console-report")]
-    #[default]
+    #[cfg_attr(feature = "console-report", default)]
     Console,
 }
 
