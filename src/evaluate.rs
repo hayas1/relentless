@@ -170,15 +170,13 @@ impl DefaultEvaluator {
     pub fn json_compare(cfg: &JsonEvaluate, (va, vb): (&Value, &Value), msg: &mut Vec<EvaluateError>) -> bool {
         let diff = json_patch::diff(va, vb);
         let pointers = Self::pointers(&diff);
-        for (op, path) in diff.iter().zip(pointers) {
-            if cfg.ignore.contains(&path) {
-                continue;
-            } else {
+        match diff.iter().zip(pointers).find(|(_op, path)| !cfg.ignore.contains(path)) {
+            Some((op, _path)) => {
                 msg.push(EvaluateError::Diff(op.clone()));
-                return false;
+                false
             }
+            None => true,
         }
-        true
     }
 
     pub fn pointers(p: &json_patch::Patch) -> Vec<String> {
