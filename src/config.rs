@@ -463,19 +463,27 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "yaml")]
-    fn test_read_basic() {
-        // TODO assert
-        let _assault = Config::read("tests/config/basic/assault.yaml").unwrap();
-        let _compare = Config::read("tests/config/basic/compare.yaml").unwrap();
+    #[cfg(all(feature = "yaml", feature = "toml"))]
+    fn test_read_basic_config() {
+        let assault_yaml = Config::read("tests/config/basic/assault.yaml").unwrap();
+        let assault_toml = Config::read("tests/config/basic/assault.toml").unwrap();
+        assert_json_diff::assert_json_eq!(assault_yaml, assault_toml);
+
+        let compare_yaml = Config::read("tests/config/basic/compare.yaml").unwrap();
+        let compare_toml = Config::read("tests/config/basic/compare.toml").unwrap();
+        assert_json_diff::assert_json_eq!(compare_yaml, compare_toml);
     }
 
     #[test]
-    #[cfg(all(feature = "yaml", feature = "json"))]
-    fn test_read_json_basic() {
-        // TODO assert
-        let _assault = Config::read("tests/config/basic/assault_json.yaml").unwrap();
-        let _compare = Config::read("tests/config/basic/compare_json.yaml").unwrap();
+    #[cfg(all(feature = "yaml", feature = "json", feature = "toml"))]
+    fn test_read_basic_config_for_json() {
+        let assault_yaml = Config::read("tests/config/basic/assault_json.yaml").unwrap();
+        let assault_toml = Config::read("tests/config/basic/assault_json.toml").unwrap();
+        assert_json_diff::assert_json_eq!(assault_yaml, assault_toml);
+
+        let compare_yaml = Config::read("tests/config/basic/compare_json.yaml").unwrap();
+        let compare_toml = Config::read("tests/config/basic/compare_json.toml").unwrap();
+        assert_json_diff::assert_json_eq!(compare_yaml, compare_toml);
     }
 
     #[test]
