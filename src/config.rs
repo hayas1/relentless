@@ -468,10 +468,12 @@ mod tests {
         let assault_yaml = Config::read("tests/config/basic/assault.yaml").unwrap();
         let assault_toml = Config::read("tests/config/basic/assault.toml").unwrap();
         assert_json_diff::assert_json_eq!(assault_yaml, assault_toml);
+        assert_eq!(assault_yaml, assault_toml);
 
         let compare_yaml = Config::read("tests/config/basic/compare.yaml").unwrap();
         let compare_toml = Config::read("tests/config/basic/compare.toml").unwrap();
         assert_json_diff::assert_json_eq!(compare_yaml, compare_toml);
+        assert_eq!(compare_yaml, compare_toml);
     }
 
     #[test]
@@ -480,10 +482,12 @@ mod tests {
         let assault_yaml = Config::read("tests/config/basic/assault_json.yaml").unwrap();
         let assault_toml = Config::read("tests/config/basic/assault_json.toml").unwrap();
         assert_json_diff::assert_json_eq!(assault_yaml, assault_toml);
+        assert_eq!(assault_yaml, assault_toml);
 
         let compare_yaml = Config::read("tests/config/basic/compare_json.yaml").unwrap();
         let compare_toml = Config::read("tests/config/basic/compare_json.toml").unwrap();
         assert_json_diff::assert_json_eq!(compare_yaml, compare_toml);
+        assert_eq!(compare_yaml, compare_toml);
     }
 
     #[test]
