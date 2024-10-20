@@ -2,7 +2,7 @@
 
 use axum::body::Body;
 use relentless::{
-    command::{Relentless, ReportTo},
+    command::{Relentless, ReportFormat},
     evaluate::DefaultEvaluator,
     outcome::Reportable,
 };
@@ -13,7 +13,7 @@ use example_http_server::route;
 async fn test_example_assault() {
     let relentless = Relentless {
         file: vec!["examples/config/assault.yaml".into()],
-        report_to: ReportTo::Null,
+        report_format: ReportFormat::NullDevice,
         ..Default::default()
     };
     let configs = relentless.configs().unwrap();

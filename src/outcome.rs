@@ -4,7 +4,7 @@ use std::{
 };
 
 use crate::{
-    command::{Relentless, ReportTo},
+    command::{Relentless, ReportFormat},
     config::{http_serde_priv, Coalesced, Destinations, Setting, Testcase, WorkerConfig},
     error::{MultiWrap, Wrap},
 };
@@ -175,8 +175,8 @@ pub trait Reportable {
         }
     }
     fn skip_report(&self, cmd: &Relentless) -> bool {
-        let Relentless { strict, ng_only, report_to, .. } = cmd;
-        matches!(report_to, ReportTo::Null) || *ng_only && self.allow(*strict)
+        let Relentless { strict, ng_only, report_format: report_to, .. } = cmd;
+        matches!(report_to, ReportFormat::NullDevice) || *ng_only && self.allow(*strict)
     }
 }
 

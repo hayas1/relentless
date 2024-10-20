@@ -57,7 +57,7 @@ pub struct Relentless {
 
     /// report nothing
     #[cfg_attr(feature = "cli", arg(short, long), clap(value_enum, default_value_t))]
-    pub report_to: ReportTo,
+    pub report_format: ReportFormat,
 
     /// number of threads
     #[cfg_attr(feature = "cli", arg(short, long))]
@@ -69,9 +69,9 @@ pub struct Relentless {
 }
 #[cfg_attr(feature = "cli", derive(ValueEnum))]
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
-pub enum ReportTo {
+pub enum ReportFormat {
     #[cfg_attr(not(feature = "console-report"), default)]
-    Null,
+    NullDevice,
     #[cfg(feature = "console-report")]
     #[default]
     Console,
@@ -143,16 +143,16 @@ impl Relentless {
         E: Evaluator<http::Response<ResB>>,
         E::Message: Display,
     {
-        let Self { no_color, report_to, .. } = self;
+        let Self { no_color, report_format: report_to, .. } = self;
         #[cfg(feature = "console-report")]
         console::set_colors_enabled(!no_color);
 
         let control = Control::with_service(self, configs, services)?;
         let outcome = control.assault(evaluator).await?;
         match report_to {
-            ReportTo::Null => {}
+            ReportFormat::NullDevice => {}
             #[cfg(feature = "console-report")]
-            ReportTo::Console => outcome.console_report_stdout(self)?, // TODO other than stdout
+            ReportFormat::Console => outcome.console_report_stdout(self)?, // TODO other than stdout
         }
         Ok(outcome)
     }
