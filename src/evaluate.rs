@@ -68,8 +68,8 @@ impl DefaultEvaluator {
         msg: &mut Vec<EvaluateError>,
     ) -> bool {
         let acceptable = match cfg {
-            StatusEvaluate::OkOrEqual => Self::assault_or_compare(status, http::StatusCode::is_success),
-            StatusEvaluate::Expect(EvaluateTo::All(code)) => Self::validate_all(status, |s| s == &**code),
+            StatusEvaluate::OkOrEqual => Self::assault_or_compare(status, |(_, s)| s.is_success()),
+            StatusEvaluate::Expect(EvaluateTo::All(code)) => Self::validate_all(status, |(_, s)| s == &**code),
             StatusEvaluate::Expect(EvaluateTo::Destinations(code)) => {
                 // TODO subset ?
                 status == &code.iter().map(|(d, c)| (d.to_string(), **c)).collect()
@@ -89,7 +89,7 @@ impl DefaultEvaluator {
     ) -> bool {
         let acceptable = match cfg {
             HeaderEvaluate::Equal => Self::assault_or_compare(headers, |_| true),
-            HeaderEvaluate::Expect(EvaluateTo::All(header)) => Self::validate_all(headers, |h| h == &**header),
+            HeaderEvaluate::Expect(EvaluateTo::All(header)) => Self::validate_all(headers, |(_, h)| h == &**header),
             HeaderEvaluate::Expect(EvaluateTo::Destinations(header)) => {
                 // TODO subset ?
                 headers == &header.iter().map(|(d, h)| (d.to_string(), (**h).clone())).collect()
@@ -105,21 +105,21 @@ impl DefaultEvaluator {
     pub fn acceptable_body(cfg: &BodyEvaluate, body: &Destinations<Bytes>, msg: &mut Vec<EvaluateError>) -> bool {
         match cfg {
             BodyEvaluate::Equal => Self::assault_or_compare(body, |_| true),
-            BodyEvaluate::PlainText(_) => Self::assault_or_compare(body, |_| true), // TODO
+            BodyEvaluate::PlainText(_) => Self::assault_or_compare(body, |_| true), // TODO regex?
             #[cfg(feature = "json")]
             BodyEvaluate::Json(e) => Self::json_acceptable(e, body, msg),
         }
     }
 
-    pub fn assault_or_compare<T: PartialEq, F: Fn(&T) -> bool>(d: &Destinations<T>, f: F) -> bool {
+    pub fn assault_or_compare<T: PartialEq, F: Fn((&String, &T)) -> bool>(d: &Destinations<T>, f: F) -> bool {
         if d.len() == 1 {
             Self::validate_all(d, f)
         } else {
             Self::compare_all(d)
         }
     }
-    pub fn validate_all<T, F: Fn(&T) -> bool>(d: &Destinations<T>, f: F) -> bool {
-        d.values().all(f)
+    pub fn validate_all<T, F: Fn((&String, &T)) -> bool>(d: &Destinations<T>, f: F) -> bool {
+        d.iter().all(f)
     }
     pub fn compare_all<T: PartialEq>(status: &Destinations<T>) -> bool {
         let v: Vec<_> = status.values().collect();
