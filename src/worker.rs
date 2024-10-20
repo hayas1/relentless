@@ -147,7 +147,7 @@ where
             let Testcase { setting, .. } = testcase.coalesce();
             let Setting { repeat, evaluate, .. } = &setting;
             let mut passed = 0;
-            let mut t = (0..repeat.unwrap_or(1)).map(|_| Destinations::new()).collect::<Vec<_>>();
+            let mut t = repeat.range().map(|_| Destinations::new()).collect::<Vec<_>>();
             for (name, repeated) in process? {
                 for (i, res) in repeated.into_iter().enumerate() {
                     t[i].insert(name.clone(), res);
@@ -230,7 +230,8 @@ where
         destinations
             .iter()
             .map(|(name, destination)| {
-                let requests = (0..repeat.unwrap_or(1))
+                let requests = repeat
+                    .range()
                     .map(|_| Self::http_request(destination, target, request))
                     .collect::<Result<Vec<_>, _>>()
                     .unwrap(); // TODO

@@ -5,7 +5,7 @@ use std::{
 
 use crate::{
     command::{Relentless, ReportFormat},
-    config::{http_serde_priv, Coalesced, Destinations, Setting, Testcase, WorkerConfig},
+    config::{http_serde_priv, Coalesced, Destinations, Repeat, Setting, Testcase, WorkerConfig},
     error::{MultiWrap, Wrap},
 };
 
@@ -106,7 +106,7 @@ pub struct CaseOutcome<T> {
 }
 impl<T> CaseOutcome<T> {
     pub fn new(testcases: Coalesced<Testcase, Setting>, passed: usize, messages: MultiWrap<T>) -> Self {
-        let pass = passed == testcases.coalesce().setting.repeat.unwrap_or(1); // TODO here ?
+        let pass = passed == testcases.coalesce().setting.repeat.times();
         Self { testcases, passed, pass, messages }
     }
 }
@@ -131,7 +131,7 @@ impl<T: Display> ConsoleReport for CaseOutcome<T> {
         let side = if self.pass() { console::Emoji("✅", "PASS") } else { console::Emoji("❌", "FAIL") };
         let target = console::style(&target);
         write!(w, "{} {} ", side, if self.pass() { target.green() } else { target.red() })?;
-        if let Some(ref repeat) = setting.repeat {
+        if let Repeat(Some(ref repeat)) = setting.repeat {
             write!(w, "{}{}/{} ", console::Emoji("🔁", ""), self.passed, repeat)?;
         }
         if let Some(ref description) = description {
