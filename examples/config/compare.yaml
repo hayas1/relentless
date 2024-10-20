@@ -1,0 +1,9 @@
+name: basic comparison test
+destinations:
+  actual: http://localhost:3000
+  expect: http://localhost:3000
+
+testcase:
+  - target: /
+  - target: /health
+  - target: /healthz
