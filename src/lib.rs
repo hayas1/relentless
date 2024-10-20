@@ -7,7 +7,7 @@
 //! ```
 //!
 //! ## Prepare Config
-//! ```yaml:path/to/config.yaml
+//! ```yaml:examples/config/compare.yaml
 //! name: basic comparison test
 //! destinations:
 //!   actual: http://localhost:3000
@@ -29,7 +29,7 @@
 //!
 //! ## Run CLI
 //! ```sh
-//! relentless -f path/to/config.yaml
+//! relentless -f examples/config/compare.yaml
 //! 🚀 basic comparison test 🚀
 //! actual🌐 http://localhost:3000
 //! expect🌐 http://localhost:3000
