@@ -152,13 +152,13 @@ impl Relentless {
         E: Evaluator<http::Response<ResB>>,
         E::Message: Display,
     {
-        let Self { no_color, report_format: report_to, .. } = self;
+        let Self { no_color, report_format, .. } = self;
         #[cfg(feature = "console-report")]
         console::set_colors_enabled(!no_color);
 
         let control = Control::with_service(self, configs, services)?;
         let outcome = control.assault(evaluator).await?;
-        match report_to {
+        match report_format {
             ReportFormat::NullDevice => {}
             #[cfg(feature = "console-report")]
             ReportFormat::Console => outcome.console_report_stdout(self)?, // TODO other than stdout

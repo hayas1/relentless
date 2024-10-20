@@ -175,8 +175,8 @@ pub trait Reportable {
         }
     }
     fn skip_report(&self, cmd: &Relentless) -> bool {
-        let Relentless { strict, ng_only, report_format: report_to, .. } = cmd;
-        matches!(report_to, ReportFormat::NullDevice) || *ng_only && self.allow(*strict)
+        let Relentless { strict, ng_only, report_format, .. } = cmd;
+        matches!(report_format, ReportFormat::NullDevice) || *ng_only && self.allow(*strict)
     }
 }
 
