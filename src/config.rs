@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use crate::error::{RunCommandError, WrappedResult};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct Config {
     #[serde(flatten, default, skip_serializing_if = "IsDefault::is_default")]
     pub worker_config: WorkerConfig,
@@ -19,7 +19,7 @@ pub struct Config {
     pub testcases: Vec<Testcase>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct WorkerConfig {
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub name: Option<String>,
@@ -30,7 +30,7 @@ pub struct WorkerConfig {
 }
 pub type Destinations<T> = HashMap<String, T>;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct Setting {
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub request: RequestInfo,
@@ -45,7 +45,7 @@ pub struct Setting {
     pub evaluate: Evaluate,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct RequestInfo {
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub method: Option<http_serde_priv::Method>,
@@ -55,14 +55,14 @@ pub struct RequestInfo {
     pub body: Option<BodyStructure>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(deny_unknown_fields, rename_all = "snake_case")]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub enum BodyStructure {
     #[default]
     Empty,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(deny_unknown_fields, rename_all = "snake_case")]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct Evaluate {
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub status: StatusEvaluate,
@@ -72,7 +72,7 @@ pub struct Evaluate {
     pub body: BodyEvaluate,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(deny_unknown_fields, rename_all = "snake_case")]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub enum StatusEvaluate {
     #[default]
     OkOrEqual,
@@ -80,7 +80,7 @@ pub enum StatusEvaluate {
     Ignore,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(deny_unknown_fields, rename_all = "snake_case")]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub enum HeaderEvaluate {
     #[default]
     Equal,
@@ -88,7 +88,7 @@ pub enum HeaderEvaluate {
     Ignore,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(deny_unknown_fields, rename_all = "snake_case")]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub enum BodyEvaluate {
     #[default]
     Equal,
@@ -97,10 +97,10 @@ pub enum BodyEvaluate {
     Json(JsonEvaluate),
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct PlainTextEvaluate {}
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg(feature = "json")]
 pub struct JsonEvaluate {
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
@@ -111,14 +111,14 @@ pub struct JsonEvaluate {
     pub patch_fail: Option<Severity>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "snake_case", untagged)]
+#[serde(deny_unknown_fields, rename_all = "kebab-case", untagged)]
 pub enum EvaluateTo<T> {
     All(T),
     Destinations(Destinations<T>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "snake_case")]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub enum Severity {
     Allow,
     Warn,
@@ -126,7 +126,7 @@ pub enum Severity {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct Testcase {
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub description: Option<String>,
@@ -138,7 +138,7 @@ pub struct Testcase {
     pub attr: Attribute,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct Attribute {
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub allow: bool,
@@ -601,7 +601,7 @@ mod tests {
                     expect:
                     - op: remove
                       path: /datetime
-                  patch_fail: warn
+                  patch-fail: warn
         "#;
         let config = Config::read_str(destinations_yaml, Format::Yaml).unwrap();
         assert_eq!(

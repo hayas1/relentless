@@ -38,7 +38,7 @@ testcases:
             - {"op": "remove", "path": "/hostname"}
             - {"op": "replace", "path": "/headers/host", "value": "127.0.0.1:3000"}
             - {"op": "test", "path": "/path", "value": "/information"}
-            patch_fail: error
+            patch-fail: error
   - target: /information
     description: remove actual datetime only (must be failed, so attr allowed)
     setting:
