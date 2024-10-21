@@ -7,12 +7,12 @@ use serde::{Deserialize, Serialize};
 use tower::Service;
 
 #[cfg(feature = "console-report")]
-use crate::outcome::ConsoleReport;
+use crate::report::ConsoleReport;
 use crate::{
     config::{http_serde_priv, Config, Destinations},
     error::{IntoContext, MultiWrap, RunCommandError, Wrap, WrappedResult},
     evaluate::Evaluator,
-    outcome::Outcome,
+    report::Outcome,
     service::FromBodyStructure,
     worker::Control,
 };

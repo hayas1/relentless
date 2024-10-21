@@ -9,7 +9,7 @@ use crate::{
     },
     error::WrappedResult,
     evaluate::{DefaultEvaluator, Evaluator},
-    outcome::{CaseOutcome, Outcome, WorkerOutcome},
+    report::{CaseOutcome, Outcome, WorkerOutcome},
     service::FromBodyStructure,
 };
 use http_body::Body;
