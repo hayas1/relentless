@@ -79,13 +79,13 @@ jobs:
           echo '```'
           cargo run --features cli -- -f tests/config/basic/*.yaml -d actual=http://localhost:3001 --no-color --ng-only
           echo '```'
-        } > target/outcome.txt
+        } > target/report.txt
     - name: Comment on pull request
       if: failure()
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        gh pr comment ${{ github.event.number }} --body-file target/outcome.txt
+        gh pr comment ${{ github.event.number }} --body-file target/report.txt
 
 
   version:

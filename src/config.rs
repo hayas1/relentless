@@ -1,6 +1,7 @@
 use std::{
     collections::HashMap,
     fs::{read_to_string, File},
+    ops::{Deref, DerefMut},
     path::Path,
     time::Duration,
 };
@@ -37,7 +38,7 @@ pub struct Setting {
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub template: HashMap<String, Destinations<String>>,
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
-    pub repeat: Option<usize>,
+    pub repeat: Repeat,
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub timeout: Option<Duration>,
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
@@ -59,6 +60,29 @@ pub struct RequestInfo {
 pub enum BodyStructure {
     #[default]
     Empty,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
+pub struct Repeat(pub Option<usize>);
+impl Deref for Repeat {
+    type Target = Option<usize>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl DerefMut for Repeat {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+impl Repeat {
+    pub fn range(&self) -> std::ops::Range<usize> {
+        0..self.0.unwrap_or(1)
+    }
+    pub fn times(&self) -> usize {
+        self.0.unwrap_or(1)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -193,7 +217,7 @@ impl Coalesce for Setting {
         Self {
             request: self.request.coalesce(&other.request),
             template: if self.template.is_empty() { other.clone().template } else { self.template },
-            repeat: self.repeat.or(other.repeat),
+            repeat: Repeat(self.repeat.or(*other.repeat)),
             timeout: self.timeout.or(other.timeout),
             evaluate: self.evaluate.coalesce(&other.evaluate),
         }

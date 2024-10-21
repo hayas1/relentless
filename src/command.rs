@@ -1,16 +1,18 @@
 use std::{fmt::Display, io::Write, path::PathBuf, process::ExitCode};
 
 #[cfg(feature = "cli")]
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 use http_body::Body;
 use serde::{Deserialize, Serialize};
 use tower::Service;
 
+#[cfg(feature = "console-report")]
+use crate::report::ConsoleReport;
 use crate::{
     config::{http_serde_priv, Config, Destinations},
     error::{IntoContext, MultiWrap, RunCommandError, Wrap, WrappedResult},
     evaluate::Evaluator,
-    outcome::Outcome,
+    report::Report,
     service::FromBodyStructure,
     worker::Control,
 };
@@ -19,7 +21,11 @@ use crate::{
 pub async fn execute() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sync>> {
     let cmd = Relentless::parse();
 
-    let &Relentless { number_of_threads, rps, .. } = &cmd;
+    let Relentless { output_dir, number_of_threads, rps, .. } = &cmd;
+    if output_dir.is_some() {
+        // TODO record in filesystem, HTML report format
+        unimplemented!("`--output-dir` is not implemented yet");
+    }
     if number_of_threads.is_some() {
         unimplemented!("`--number-of-threads` is not implemented yet");
     }
@@ -56,17 +62,30 @@ pub struct Relentless {
     pub no_color: bool,
 
     /// report nothing
-    #[cfg_attr(feature = "cli", arg(long))]
-    pub no_report: bool,
+    #[cfg_attr(feature = "cli", arg(short, long), clap(value_enum, default_value_t))]
+    pub report_format: ReportFormat,
+
+    /// output directory
+    pub output_dir: Option<PathBuf>,
 
     /// number of threads
     #[cfg_attr(feature = "cli", arg(short, long))]
     pub number_of_threads: Option<usize>,
 
     /// requests per second
-    #[cfg_attr(feature = "cli", arg(short, long))]
+    #[cfg_attr(feature = "cli", arg(long))]
     pub rps: Option<usize>,
 }
+#[cfg_attr(feature = "cli", derive(ValueEnum))]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum ReportFormat {
+    #[cfg_attr(not(feature = "console-report"), default)]
+    NullDevice,
+    #[cfg(feature = "console-report")]
+    #[cfg_attr(feature = "console-report", default)]
+    Console,
+}
+
 impl Relentless {
     pub fn destinations(&self) -> WrappedResult<Destinations<http_serde_priv::Uri>> {
         let Self { destination, .. } = self;
@@ -108,11 +127,11 @@ impl Relentless {
 
     /// TODO document
     #[cfg(all(feature = "default-http-client", feature = "cli"))]
-    pub async fn assault(&self) -> crate::Result<Outcome<crate::error::EvaluateError>> {
+    pub async fn assault(&self) -> crate::Result<Report<crate::error::EvaluateError>> {
         let configs = self.configs_filtered(std::io::stderr())?;
         let clients = Control::default_http_clients(self, &configs).await?;
-        let outcome = self.assault_with(configs, clients, &crate::evaluate::DefaultEvaluator).await?;
-        Ok(outcome)
+        let report = self.assault_with(configs, clients, &crate::evaluate::DefaultEvaluator).await?;
+        Ok(report)
     }
     /// TODO document
     pub async fn assault_with<S, ReqB, ResB, E>(
@@ -120,7 +139,7 @@ impl Relentless {
         configs: Vec<Config>,
         services: Vec<Destinations<S>>,
         evaluator: &E,
-    ) -> crate::Result<Outcome<E::Message>>
+    ) -> crate::Result<Report<E::Message>>
     where
         ReqB: Body + FromBodyStructure + Send + 'static,
         ReqB::Data: Send + 'static,
@@ -133,15 +152,18 @@ impl Relentless {
         E: Evaluator<http::Response<ResB>>,
         E::Message: Display,
     {
-        let Self { no_color, no_report, .. } = self;
+        let Self { no_color, report_format, .. } = self;
+        #[cfg(feature = "console-report")]
         console::set_colors_enabled(!no_color);
 
         let control = Control::with_service(self, configs, services)?;
-        let outcome = control.assault(evaluator).await?;
-        if !no_report {
-            outcome.report(self)?;
+        let report = control.assault(evaluator).await?;
+        match report_format {
+            ReportFormat::NullDevice => {}
+            #[cfg(feature = "console-report")]
+            ReportFormat::Console => report.console_report_stdout(self)?, // TODO other than stdout
         }
-        Ok(outcome)
+        Ok(report)
     }
 }
 

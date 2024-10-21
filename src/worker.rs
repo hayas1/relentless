@@ -9,7 +9,7 @@ use crate::{
     },
     error::WrappedResult,
     evaluate::{DefaultEvaluator, Evaluator},
-    outcome::{CaseOutcome, Outcome, WorkerOutcome},
+    report::{CaseReport, Report, WorkerReport},
     service::FromBodyStructure,
 };
 use http_body::Body;
@@ -81,7 +81,7 @@ where
         Self { _cmd: cmd, workers, cases, phantom }
     }
     /// TODO document
-    pub async fn assault(self, evaluator: &E) -> WrappedResult<Outcome<E::Message>> {
+    pub async fn assault(self, evaluator: &E) -> WrappedResult<Report<E::Message>> {
         let Self { workers, cases, .. } = self;
 
         let mut works = Vec::new();
@@ -89,11 +89,11 @@ where
             works.push(worker.assault(cases, evaluator));
         }
 
-        let mut outcomes = Vec::new();
+        let mut report = Vec::new();
         for work in works {
-            outcomes.push(work.await?);
+            report.push(work.await?);
         }
-        Ok(Outcome::new(outcomes))
+        Ok(Report::new(report))
     }
 }
 
@@ -132,7 +132,7 @@ where
         self,
         cases: Vec<Case<S, ReqB, ResB>>,
         evaluator: &E,
-    ) -> WrappedResult<WorkerOutcome<E::Message>> {
+    ) -> WrappedResult<WorkerReport<E::Message>> {
         let Self { config, mut clients, .. } = self;
 
         let mut processes = Vec::new();
@@ -142,12 +142,12 @@ where
             processes.push((case.testcases.clone(), case.process(&destinations, &mut clients).await));
         }
 
-        let mut outcome = Vec::new();
+        let mut report = Vec::new();
         for (testcase, process) in processes {
             let Testcase { setting, .. } = testcase.coalesce();
             let Setting { repeat, evaluate, .. } = &setting;
             let mut passed = 0;
-            let mut t = (0..repeat.unwrap_or(1)).map(|_| Destinations::new()).collect::<Vec<_>>();
+            let mut t = repeat.range().map(|_| Destinations::new()).collect::<Vec<_>>();
             for (name, repeated) in process? {
                 for (i, res) in repeated.into_iter().enumerate() {
                     t[i].insert(name.clone(), res);
@@ -159,9 +159,9 @@ where
                 passed += pass as usize;
             }
 
-            outcome.push(CaseOutcome::new(testcase, passed, v.into_iter().collect()));
+            report.push(CaseReport::new(testcase, passed, v.into_iter().collect()));
         }
-        Ok(WorkerOutcome::new(config, outcome))
+        Ok(WorkerReport::new(config, report))
     }
 }
 
@@ -230,7 +230,8 @@ where
         destinations
             .iter()
             .map(|(name, destination)| {
-                let requests = (0..repeat.unwrap_or(1))
+                let requests = repeat
+                    .range()
                     .map(|_| Self::http_request(destination, target, request))
                     .collect::<Result<Vec<_>, _>>()
                     .unwrap(); // TODO

@@ -14,7 +14,8 @@ full = ["json", "yaml", "toml", "cli", "default-http-client"]
 
 json = ["serde_json", "json-patch", "jsonptr"]
 yaml = ["serde_yaml"]
-cli = ["clap", "default-http-client"]
+cli = ["clap", "default-http-client", "console-report"]
+console-report = ["console"]
 default-http-client = ["reqwest"]
 
 
@@ -37,7 +38,7 @@ json-patch = { version = "3.0.1", optional = true }
 jsonptr = { version = "0.6.3", optional = true }
 
 clap = { version = "4.5.20", features = ["derive"], optional = true }
-console = "0.15.8"
+console = { version = "0.15.8", optional = true }
 
 
 [dev-dependencies]
