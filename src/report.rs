@@ -11,29 +11,29 @@ use crate::{
 
 /// TODO document
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Outcome<T> {
-    outcome: Vec<WorkerOutcome<T>>,
+pub struct Report<T> {
+    report: Vec<WorkerReport<T>>,
 }
-impl<T> Outcome<T> {
-    pub fn new(outcome: Vec<WorkerOutcome<T>>) -> Self {
-        Self { outcome }
+impl<T> Report<T> {
+    pub fn new(report: Vec<WorkerReport<T>>) -> Self {
+        Self { report }
     }
     pub fn exit_code(&self, cmd: Relentless) -> ExitCode {
         (!self.allow(cmd.strict) as u8).into()
     }
 }
-impl<T> Reportable for Outcome<T> {
+impl<T> Reportable for Report<T> {
     fn sub_reportable(&self) -> Vec<&dyn Reportable> {
-        self.outcome.iter().map(|o| o as _).collect()
+        self.report.iter().map(|o| o as _).collect()
     }
 }
 #[cfg(feature = "console-report")]
-impl<T: Display> ConsoleReport for Outcome<T> {
+impl<T: Display> ConsoleReport for Report<T> {
     type Error = Wrap;
-    fn console_report<W: std::io::Write>(&self, cmd: &Relentless, w: &mut OutcomeWriter<W>) -> Result<(), Self::Error> {
-        for outcome in &self.outcome {
-            if !outcome.skip_report(cmd) {
-                outcome.console_report(cmd, w)?;
+    fn console_report<W: std::io::Write>(&self, cmd: &Relentless, w: &mut ReportWriter<W>) -> Result<(), Self::Error> {
+        for report in &self.report {
+            if !report.skip_report(cmd) {
+                report.console_report(cmd, w)?;
                 writeln!(w)?;
             }
         }
@@ -43,27 +43,27 @@ impl<T: Display> ConsoleReport for Outcome<T> {
 
 /// TODO document
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct WorkerOutcome<T> {
+pub struct WorkerReport<T> {
     config: Coalesced<WorkerConfig, Destinations<http_serde_priv::Uri>>,
-    outcome: Vec<CaseOutcome<T>>,
+    report: Vec<CaseReport<T>>,
 }
-impl<T> WorkerOutcome<T> {
+impl<T> WorkerReport<T> {
     pub fn new(
         config: Coalesced<WorkerConfig, Destinations<http_serde_priv::Uri>>,
-        outcome: Vec<CaseOutcome<T>>,
+        report: Vec<CaseReport<T>>,
     ) -> Self {
-        Self { config, outcome }
+        Self { config, report }
     }
 }
-impl<T> Reportable for WorkerOutcome<T> {
+impl<T> Reportable for WorkerReport<T> {
     fn sub_reportable(&self) -> Vec<&dyn Reportable> {
-        self.outcome.iter().map(|o| o as _).collect()
+        self.report.iter().map(|o| o as _).collect()
     }
 }
 #[cfg(feature = "console-report")]
-impl<T: Display> ConsoleReport for WorkerOutcome<T> {
+impl<T: Display> ConsoleReport for WorkerReport<T> {
     type Error = Wrap;
-    fn console_report<W: std::io::Write>(&self, cmd: &Relentless, w: &mut OutcomeWriter<W>) -> Result<(), Self::Error> {
+    fn console_report<W: std::io::Write>(&self, cmd: &Relentless, w: &mut ReportWriter<W>) -> Result<(), Self::Error> {
         let WorkerConfig { name, destinations, .. } = self.config.coalesce();
 
         let side = console::Emoji("🚀", "");
@@ -85,9 +85,9 @@ impl<T: Display> ConsoleReport for WorkerOutcome<T> {
         })?;
 
         w.scope(|w| {
-            for outcome in &self.outcome {
-                if !outcome.skip_report(cmd) {
-                    outcome.console_report(cmd, w)?;
+            for report in &self.report {
+                if !report.skip_report(cmd) {
+                    report.console_report(cmd, w)?;
                 }
             }
             Ok::<_, Wrap>(())
@@ -98,19 +98,19 @@ impl<T: Display> ConsoleReport for WorkerOutcome<T> {
 
 /// TODO document
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CaseOutcome<T> {
+pub struct CaseReport<T> {
     testcases: Coalesced<Testcase, Setting>,
     passed: usize,
     pass: bool,
     messages: MultiWrap<T>,
 }
-impl<T> CaseOutcome<T> {
+impl<T> CaseReport<T> {
     pub fn new(testcases: Coalesced<Testcase, Setting>, passed: usize, messages: MultiWrap<T>) -> Self {
         let pass = passed == testcases.coalesce().setting.repeat.times();
         Self { testcases, passed, pass, messages }
     }
 }
-impl<T> Reportable for CaseOutcome<T> {
+impl<T> Reportable for CaseReport<T> {
     fn sub_reportable(&self) -> Vec<&dyn Reportable> {
         Vec::new()
     }
@@ -123,9 +123,9 @@ impl<T> Reportable for CaseOutcome<T> {
     }
 }
 #[cfg(feature = "console-report")]
-impl<T: Display> ConsoleReport for CaseOutcome<T> {
+impl<T: Display> ConsoleReport for CaseReport<T> {
     type Error = Wrap;
-    fn console_report<W: std::io::Write>(&self, cmd: &Relentless, w: &mut OutcomeWriter<W>) -> Result<(), Self::Error> {
+    fn console_report<W: std::io::Write>(&self, cmd: &Relentless, w: &mut ReportWriter<W>) -> Result<(), Self::Error> {
         let Testcase { description, target, setting, .. } = self.testcases.coalesce();
 
         let side = if self.pass() { console::Emoji("✅", "PASS") } else { console::Emoji("❌", "FAIL") };
@@ -183,23 +183,23 @@ pub trait Reportable {
 #[cfg(feature = "console-report")]
 pub trait ConsoleReport: Reportable {
     type Error;
-    fn console_report<W: std::io::Write>(&self, cmd: &Relentless, w: &mut OutcomeWriter<W>) -> Result<(), Self::Error>;
+    fn console_report<W: std::io::Write>(&self, cmd: &Relentless, w: &mut ReportWriter<W>) -> Result<(), Self::Error>;
     fn console_report_stdout(&self, cmd: &Relentless) -> Result<(), Self::Error> {
-        self.console_report(cmd, &mut OutcomeWriter::with_stdout(0))
+        self.console_report(cmd, &mut ReportWriter::with_stdout(0))
     }
 }
-pub struct OutcomeWriter<W> {
+pub struct ReportWriter<W> {
     pub indent: usize,
     pub buf: W,
     pub at_start_line: bool,
 }
-impl OutcomeWriter<std::io::BufWriter<std::io::Stdout>> {
+impl ReportWriter<std::io::BufWriter<std::io::Stdout>> {
     pub fn with_stdout(indent: usize) -> Self {
         let buf = std::io::BufWriter::new(std::io::stdout());
         Self::new(indent, buf)
     }
 }
-impl<W> OutcomeWriter<W> {
+impl<W> ReportWriter<W> {
     pub fn new(indent: usize, buf: W) -> Self {
         let at_start_line = true;
         Self { indent, buf, at_start_line }
@@ -224,7 +224,7 @@ impl<W> OutcomeWriter<W> {
         Ok(ret)
     }
 }
-impl<W: std::io::Write> std::fmt::Write for OutcomeWriter<W> {
+impl<W: std::io::Write> std::fmt::Write for ReportWriter<W> {
     fn write_str(&mut self, s: &str) -> std::fmt::Result {
         // TODO better indent implementation ?
         if s.contains('\n') {
@@ -246,7 +246,7 @@ impl<W: std::io::Write> std::fmt::Write for OutcomeWriter<W> {
         Ok(())
     }
 }
-impl<W: Display> Display for OutcomeWriter<W> {
+impl<W: Display> Display for ReportWriter<W> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.buf)
     }

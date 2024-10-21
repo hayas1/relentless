@@ -12,7 +12,7 @@ use crate::{
     config::{http_serde_priv, Config, Destinations},
     error::{IntoContext, MultiWrap, RunCommandError, Wrap, WrappedResult},
     evaluate::Evaluator,
-    report::Outcome,
+    report::Report,
     service::FromBodyStructure,
     worker::Control,
 };
@@ -127,11 +127,11 @@ impl Relentless {
 
     /// TODO document
     #[cfg(all(feature = "default-http-client", feature = "cli"))]
-    pub async fn assault(&self) -> crate::Result<Outcome<crate::error::EvaluateError>> {
+    pub async fn assault(&self) -> crate::Result<Report<crate::error::EvaluateError>> {
         let configs = self.configs_filtered(std::io::stderr())?;
         let clients = Control::default_http_clients(self, &configs).await?;
-        let outcome = self.assault_with(configs, clients, &crate::evaluate::DefaultEvaluator).await?;
-        Ok(outcome)
+        let report = self.assault_with(configs, clients, &crate::evaluate::DefaultEvaluator).await?;
+        Ok(report)
     }
     /// TODO document
     pub async fn assault_with<S, ReqB, ResB, E>(
@@ -139,7 +139,7 @@ impl Relentless {
         configs: Vec<Config>,
         services: Vec<Destinations<S>>,
         evaluator: &E,
-    ) -> crate::Result<Outcome<E::Message>>
+    ) -> crate::Result<Report<E::Message>>
     where
         ReqB: Body + FromBodyStructure + Send + 'static,
         ReqB::Data: Send + 'static,
@@ -157,13 +157,13 @@ impl Relentless {
         console::set_colors_enabled(!no_color);
 
         let control = Control::with_service(self, configs, services)?;
-        let outcome = control.assault(evaluator).await?;
+        let report = control.assault(evaluator).await?;
         match report_format {
             ReportFormat::NullDevice => {}
             #[cfg(feature = "console-report")]
-            ReportFormat::Console => outcome.console_report_stdout(self)?, // TODO other than stdout
+            ReportFormat::Console => report.console_report_stdout(self)?, // TODO other than stdout
         }
-        Ok(outcome)
+        Ok(report)
     }
 }
 
