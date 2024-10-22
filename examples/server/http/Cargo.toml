@@ -8,6 +8,7 @@ axum = { version = "0.7.7", features = ["tokio", "original-uri"] }
 chrono = { version = "0.4.38", features = ["serde"] }
 http-serde = "2.1.1"
 num = { version = "0.4.3", features = ["serde"] }
+rand = "0.8.5"
 serde = { version = "1.0.210", features = ["derive"] }
 serde_json = "1.0.128"
 # serde_qs = "0.13.0"
