@@ -26,7 +26,7 @@ testcases:
 ...more examples in <https://github.com/hayas1/relentless/tree/master/examples/config>
 
 #### Run API for testing
-If you have not API for testing, you can use `relentless-dev-server`
+If you have no API for testing, you can use `relentless-dev-server`
 ```sh
 cargo install --git https://github.com/hayas1/relentless relentless-dev-server
 relentless-dev-server
