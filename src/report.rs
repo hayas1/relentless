@@ -24,7 +24,7 @@ impl<T> Report<T> {
 }
 impl<T> Reportable for Report<T> {
     fn sub_reportable(&self) -> Vec<&dyn Reportable> {
-        self.report.iter().map(|o| o as _).collect()
+        self.report.iter().map(|r| r as _).collect()
     }
 }
 #[cfg(feature = "console-report")]
@@ -57,7 +57,7 @@ impl<T> WorkerReport<T> {
 }
 impl<T> Reportable for WorkerReport<T> {
     fn sub_reportable(&self) -> Vec<&dyn Reportable> {
-        self.report.iter().map(|o| o as _).collect()
+        self.report.iter().map(|r| r as _).collect()
     }
 }
 #[cfg(feature = "console-report")]
