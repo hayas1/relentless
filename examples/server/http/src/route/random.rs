@@ -4,7 +4,16 @@ use rand::distributions::{Alphanumeric, DistString};
 use crate::state::AppState;
 
 pub fn route_random() -> Router<AppState> {
-    Router::new().route("/", get(randint)).route("/int", get(randint)).route("/string", get(rands))
+    Router::new()
+        .route("/", get(random))
+        .route("/int", get(randint))
+        .route("/float", get(random))
+        .route("/string", get(rands))
+}
+
+#[tracing::instrument]
+pub async fn random() -> Result<Json<f64>> {
+    Ok(Json(rand::random::<f64>()))
 }
 
 #[tracing::instrument]
