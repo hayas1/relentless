@@ -42,7 +42,7 @@ console = { version = "0.15.8", optional = true }
 
 
 [dev-dependencies]
-example-http-server = { path = "dev/server" }
+relentless-dev-server = { path = "dev/server" }
 axum = "0.7.5"
 glob = "0.3.1"
 httptest = "0.16.1"

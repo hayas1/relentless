@@ -7,7 +7,7 @@ use relentless::{
     report::Reportable,
 };
 
-use example_http_server::route;
+use relentless_dev_server::route;
 
 #[tokio::test]
 async fn test_example_assault() {

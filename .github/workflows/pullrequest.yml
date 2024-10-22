@@ -63,11 +63,11 @@ jobs:
         key: cargo-${{ hashFiles('**/Cargo.toml') }}
 
     - name: Run example http server (actual)
-      uses: ./.github/actions/example-http-server
+      uses: ./.github/actions/run-develop-server
       with:
         port: 3001
     - name: Run example http server (expect)
-      uses: ./.github/actions/example-http-server
+      uses: ./.github/actions/run-develop-server
       with:
         port: 3000
 

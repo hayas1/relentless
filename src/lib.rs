@@ -21,10 +21,10 @@
 //! ...more examples in <https://github.com/hayas1/relentless/tree/master/examples/config>
 //!
 //! ### Run API for testing
-//! If you have not API for testing, you can use `example-http-server`
+//! If you have not API for testing, you can use `relentless-dev-server`
 //! ```sh
-//! cargo install --git https://github.com/hayas1/relentless example-http-server
-//! example-http-server
+//! cargo install --git https://github.com/hayas1/relentless relentless-dev-server
+//! relentless-dev-server
 //! ```
 //!
 //! ## Run CLI
@@ -49,7 +49,7 @@
 //! Same config can be used in both binary and library. See [Binary section](#prepare-config).
 //!
 //! ### Run API for testing
-//! Same example-http-server can be used in both binary and library. See [Binary section](#run-api-for-testing).
+//! Same relentless-dev-server can be used in both binary and library. See [Binary section](#run-api-for-testing).
 //!
 //! ## Run Testing
 //! TODO <https://github.com/hayas1/relentless/blob/master/tests/tests.rs>

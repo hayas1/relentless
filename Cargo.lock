@@ -386,26 +386,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "example-http-server"
-version = "0.1.0"
-dependencies = [
- "axum",
- "chrono",
- "http-serde",
- "num",
- "rand",
- "serde",
- "serde_json",
- "serde_urlencoded",
- "thiserror",
- "tokio",
- "tower",
- "tower-http",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "fastrand"
 version = "2.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1215,7 +1195,6 @@ dependencies = [
  "bytes",
  "clap",
  "console",
- "example-http-server",
  "glob",
  "http",
  "http-body",
@@ -1224,6 +1203,7 @@ dependencies = [
  "httptest",
  "json-patch",
  "jsonptr",
+ "relentless-dev-server",
  "reqwest",
  "serde",
  "serde_json",
@@ -1232,6 +1212,26 @@ dependencies = [
  "tokio",
  "toml",
  "tower",
+]
+
+[[package]]
+name = "relentless-dev-server"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "chrono",
+ "http-serde",
+ "num",
+ "rand",
+ "serde",
+ "serde_json",
+ "serde_urlencoded",
+ "thiserror",
+ "tokio",
+ "tower",
+ "tower-http",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
