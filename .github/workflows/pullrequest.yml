@@ -62,11 +62,11 @@ jobs:
           ${{ steps.cargo-home.outputs.path }}
         key: cargo-${{ hashFiles('**/Cargo.toml') }}
 
-    - name: Run example http server (actual)
+    - name: Run develop http server (actual)
       uses: ./.github/actions/run-develop-server
       with:
         port: 3001
-    - name: Run example http server (expect)
+    - name: Run develop http server (expect)
       uses: ./.github/actions/run-develop-server
       with:
         port: 3000
