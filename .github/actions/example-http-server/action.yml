@@ -4,7 +4,7 @@ inputs:
   manifest-path:
     description: Manifest path to Cargo.toml of the example http server
     required: false
-    default: examples/server/http/Cargo.toml
+    default: dev/server/Cargo.toml
   port:
     description: Port to listen on
     required: false

@@ -20,7 +20,7 @@ jobs:
     - uses: dtolnay/rust-toolchain@stable
 
     - name: Release test for example server
-      run: cargo test --release --manifest-path examples/server/http/Cargo.toml
+      run: cargo test --release --manifest-path dev/server/Cargo.toml
 
     - name: Release test
       run: cargo test --release
