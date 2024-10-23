@@ -19,7 +19,7 @@ pub fn route_random() -> Router<AppState> {
         .route("/:distribution/float", get(rand))
         .route("/:distribution/string", get(rands))
         .route("/:distribution/response", get(random_response))
-        .route("/:distribution/json", get(randjson))
+        .route("/json", get(randjson))
     // .fallback() // TODO
 }
 
@@ -98,7 +98,7 @@ pub async fn random_response(Path(distribution): Path<DistributionType>) -> Resu
 }
 
 #[tracing::instrument]
-pub async fn randjson(Path(distribution): Path<DistributionType>) -> Result<Json<Value>> {
+pub async fn randjson() -> Result<Json<Value>> {
     let (max_size, max_depth) = (10, 3);
     fn recursive_json(max_size: usize, max_depth: i32) -> Value {
         let mut rng = rand::thread_rng();
@@ -128,4 +128,44 @@ pub async fn randjson(Path(distribution): Path<DistributionType>) -> Result<Json
         }
     }
     Ok(Json(recursive_json(max_size, max_depth)))
+}
+
+#[cfg(test)]
+mod tests {
+    use axum::{
+        body::Body,
+        http::{Request, StatusCode},
+    };
+
+    use crate::route::{app_with, tests::call_bytes};
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_random_handler() {
+        let int = randint(Path(DistributionType::Standard)).await.unwrap();
+
+        assert!(int.parse::<i64>().is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_random() {
+        let mut app = app_with(Default::default());
+
+        let (status, body) =
+            call_bytes(&mut app, Request::builder().uri("/random/standard").body(Body::empty()).unwrap()).await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(String::from_utf8_lossy(&body[..]).parse::<f64>().unwrap() >= 0.0);
+        assert!(String::from_utf8_lossy(&body[..]).parse::<f64>().unwrap() <= 1.0);
+    }
+
+    #[tokio::test]
+    async fn test_random_json() {
+        let mut app = app_with(Default::default());
+
+        let (status, body) =
+            call_bytes(&mut app, Request::builder().uri("/random/json").body(Body::empty()).unwrap()).await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(!body.is_empty());
+    }
 }
