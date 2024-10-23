@@ -3,6 +3,7 @@ use rand::{
     distributions::{Alphanumeric, DistString, Distribution, Standard},
     Rng,
 };
+use rand_distr::StandardNormal;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -26,6 +27,7 @@ pub fn route_random() -> Router<AppState> {
 pub enum DistributionType {
     Standard,
     Alphanumeric,
+    Normal,
 }
 impl DistributionType {
     pub fn sample_i64(&self, rng: &mut impl Rng) -> Result<i64, RandomError> {
@@ -34,6 +36,7 @@ impl DistributionType {
             DistributionType::Alphanumeric => {
                 Err(RandomError::UnsupportedDistribution("i64".to_string(), self.clone()))
             }
+            DistributionType::Normal => Err(RandomError::UnsupportedDistribution("i64".to_string(), self.clone())),
         }
     }
     pub fn sample_f64(&self, rng: &mut impl Rng) -> Result<f64, RandomError> {
@@ -42,12 +45,14 @@ impl DistributionType {
             DistributionType::Alphanumeric => {
                 Err(RandomError::UnsupportedDistribution("f64".to_string(), self.clone()))
             }
+            DistributionType::Normal => Ok(StandardNormal.sample(rng)),
         }
     }
     pub fn sample_string(&self, rng: &mut impl Rng, len: usize) -> Result<String, RandomError> {
         match self {
             DistributionType::Standard => Ok(Standard.sample_string(rng, len)),
             DistributionType::Alphanumeric => Ok(Alphanumeric.sample_string(rng, len)),
+            DistributionType::Normal => Err(RandomError::UnsupportedDistribution("string".to_string(), self.clone())),
         }
     }
 }
