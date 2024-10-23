@@ -1,6 +1,15 @@
-use axum::{routing::get, Json, Router};
+use std::{future::Future, pin::Pin};
+
+use axum::{
+    body::Body,
+    extract::Request,
+    handler::Handler,
+    response::{IntoResponse, Response},
+    routing::get,
+    Json, Router,
+};
 use rand::{
-    distributions::{Alphanumeric, DistString},
+    distributions::{Alphanumeric, DistString, Distribution, Standard},
     Rng,
 };
 use serde::{Deserialize, Serialize};
@@ -10,12 +19,38 @@ use crate::state::AppState;
 
 pub fn route_random() -> Router<AppState> {
     Router::new()
-        .route("/", get(random))
-        .route("/int", get(randint))
-        .route("/float", get(random))
-        .route("/string", get(rands))
-        .route("/response", get(random_response))
-        .route("/json", get(randjson))
+        .nest("/", route_random_distribute::<f64>())
+        .nest("/int", route_random_distribute::<i64>())
+        .nest("/float", route_random_distribute::<f64>())
+        .nest("/string", route_random_distribute_string())
+    // .nest("/response", route_random_distribute::<RandomResponse>())
+    // .nest("/json", route_random_distribute::<Value>())
+}
+pub fn route_random_distribute<T>() -> Router<AppState>
+where
+    Standard: Distribution<T> + Clone,
+    T: Serialize + 'static,
+{
+    Router::new().route("/", get(standard::<T>)).route("/standard", get(standard::<T>))
+}
+pub fn route_random_distribute_string() -> Router<AppState> {
+    Router::new().route("/", get(alphanumeric)).route("/standard", get(standard_string))
+}
+
+#[derive(Debug, Clone)]
+pub struct StandardHandler;
+impl<T> Handler<T, AppState> for StandardHandler
+where
+    Standard: Distribution<T>,
+    T: Serialize,
+{
+    type Future = Pin<Box<dyn Future<Output = Response<Body>> + Send>>;
+    fn call(self, _req: Request, _state: AppState) -> Self::Future {
+        Box::pin(async move {
+            let mut rng = rand::thread_rng();
+            Json(<Standard as Distribution<T>>::sample(&Standard, &mut rng)).into_response()
+        })
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -26,24 +61,34 @@ pub struct RandomResponse {
 }
 
 #[tracing::instrument]
-pub async fn random() -> Json<f64> {
-    Json(rand::random::<f64>())
-}
-
-#[tracing::instrument]
-pub async fn randint() -> Json<i64> {
-    Json(rand::random())
-}
-
-#[tracing::instrument]
-pub async fn rands() -> String {
+pub async fn standard<T>() -> Json<T>
+where
+    Standard: Distribution<T>,
+    T: Serialize,
+{
     let mut rng = rand::thread_rng();
-    Alphanumeric.sample_string(&mut rng, 32)
+    Json(<Standard as Distribution<T>>::sample(&Standard, &mut rng))
+}
+
+#[tracing::instrument]
+pub async fn standard_string() -> String {
+    let mut rng = rand::thread_rng();
+    Standard.sample_string(&mut rng, 10)
+}
+
+#[tracing::instrument]
+pub async fn alphanumeric() -> String {
+    let mut rng = rand::thread_rng();
+    Alphanumeric.sample_string(&mut rng, 10)
 }
 
 #[tracing::instrument]
 pub async fn random_response() -> Json<RandomResponse> {
-    Json(RandomResponse { int: randint().await.0, float: random().await.0, string: rands().await })
+    Json(RandomResponse {
+        int: rand::random(),
+        float: rand::random(),
+        string: Alphanumeric.sample_string(&mut rand::thread_rng(), 32),
+    })
 }
 
 #[tracing::instrument]
