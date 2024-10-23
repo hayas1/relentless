@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::{
-    error::{kind::BadRequest, random::RandomError, AppError},
+    error::{kind::BadRequest, random::RandomError, AppErrorDetail},
     state::AppState,
 };
 
@@ -65,19 +65,19 @@ impl DistributionType {
 #[tracing::instrument]
 pub async fn rand(Path(distribution): Path<DistributionType>) -> Result<String> {
     let mut rng = rand::thread_rng();
-    Ok(distribution.sample_f64(&mut rng).map_err(AppError::<BadRequest>::wrap)?.to_string())
+    Ok(distribution.sample_f64(&mut rng).map_err(AppErrorDetail::<BadRequest, _>::detail_display)?.to_string())
 }
 
 #[tracing::instrument]
 pub async fn randint(Path(distribution): Path<DistributionType>) -> Result<String> {
     let mut rng = rand::thread_rng();
-    Ok(distribution.sample_i64(&mut rng).map_err(AppError::<BadRequest>::wrap)?.to_string())
+    Ok(distribution.sample_i64(&mut rng).map_err(AppErrorDetail::<BadRequest, _>::detail_display)?.to_string())
 }
 
 #[tracing::instrument]
 pub async fn rands(Path(distribution): Path<DistributionType>) -> Result<String> {
     let mut rng = rand::thread_rng();
-    Ok(distribution.sample_string(&mut rng, 32).map_err(AppError::<BadRequest>::wrap)?)
+    Ok(distribution.sample_string(&mut rng, 32).map_err(AppErrorDetail::<BadRequest, _>::detail_display)?)
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -91,9 +91,9 @@ pub struct RandomResponse {
 pub async fn random_response(Path(distribution): Path<DistributionType>) -> Result<Json<RandomResponse>> {
     let mut rng = rand::thread_rng();
     Ok(Json(RandomResponse {
-        int: distribution.sample_i64(&mut rng).map_err(AppError::<BadRequest>::wrap)?,
-        float: distribution.sample_f64(&mut rng).map_err(AppError::<BadRequest>::wrap)?,
-        string: distribution.sample_string(&mut rng, 32).map_err(AppError::<BadRequest>::wrap)?,
+        int: distribution.sample_i64(&mut rng).map_err(AppErrorDetail::<BadRequest, _>::detail_display)?,
+        float: distribution.sample_f64(&mut rng).map_err(AppErrorDetail::<BadRequest, _>::detail_display)?,
+        string: distribution.sample_string(&mut rng, 32).map_err(AppErrorDetail::<BadRequest, _>::detail_display)?,
     }))
 }
 
@@ -137,7 +137,13 @@ mod tests {
         http::{Request, StatusCode},
     };
 
-    use crate::route::{app_with, tests::call_bytes};
+    use crate::{
+        error::{kind::Kind, ErrorResponseInner},
+        route::{
+            app_with,
+            tests::{call_bytes, call_with_assert},
+        },
+    };
 
     use super::*;
 
@@ -157,6 +163,23 @@ mod tests {
         assert_eq!(status, StatusCode::OK);
         assert!(String::from_utf8_lossy(&body[..]).parse::<f64>().unwrap() >= 0.0);
         assert!(String::from_utf8_lossy(&body[..]).parse::<f64>().unwrap() <= 1.0);
+    }
+
+    #[tokio::test]
+    async fn test_random_unsupported() {
+        let mut app = app_with(Default::default());
+
+        call_with_assert(
+            &mut app,
+            Request::builder().uri("/random/alphanumeric/int").body(Body::empty()).unwrap(),
+            StatusCode::BAD_REQUEST,
+            ErrorResponseInner {
+                msg: BadRequest::msg().to_string(),
+                detail: RandomError::UnsupportedDistribution("i64".to_string(), DistributionType::Alphanumeric)
+                    .to_string(),
+            },
+        )
+        .await;
     }
 
     #[tokio::test]

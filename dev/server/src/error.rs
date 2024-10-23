@@ -144,7 +144,7 @@ impl<K: kind::Kind, T> From<AppErrorInner<K, T>> for ErrorResponseInner<T> {
 pub mod counter {
     use super::*;
 
-    #[derive(Error, Debug, Clone, PartialEq, Eq)]
+    #[derive(Error, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
     pub enum CounterError<E> {
         #[error("overflow counter")]
         Overflow(E),
@@ -172,7 +172,7 @@ pub mod random {
 
     use super::*;
 
-    #[derive(Error, Debug, Clone, PartialEq, Eq)]
+    #[derive(Error, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
     pub enum RandomError {
         #[error("unsupported distribution for {0}: {1:?}")]
         UnsupportedDistribution(String, DistributionType),
