@@ -1,6 +1,10 @@
 use axum::{response::Result, routing::get, Json, Router};
-use rand::distributions::{Alphanumeric, DistString};
+use rand::{
+    distributions::{Alphanumeric, DistString},
+    Rng,
+};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 use crate::state::AppState;
 
@@ -21,23 +25,22 @@ pub struct RandomResponse {
 }
 
 #[tracing::instrument]
-pub async fn random() -> Result<Json<f64>> {
-    Ok(Json(rand::random::<f64>()))
+pub async fn random() -> Json<f64> {
+    Json(rand::random::<f64>())
 }
 
 #[tracing::instrument]
-pub async fn randint() -> Result<Json<i64>> {
-    Ok(Json(rand::random()))
+pub async fn randint() -> Json<i64> {
+    Json(rand::random())
 }
 
 #[tracing::instrument]
-pub async fn rands() -> Result<String> {
+pub async fn rands() -> String {
     let mut rng = rand::thread_rng();
-    let sample = Alphanumeric.sample_string(&mut rng, 32);
-    Ok(sample)
+    Alphanumeric.sample_string(&mut rng, 32)
 }
 
 #[tracing::instrument]
-pub async fn random_response() -> Result<Json<RandomResponse>> {
-    Ok(Json(RandomResponse { int: randint().await?.0, float: random().await?.0, string: rands().await? }))
+pub async fn random_response() -> Json<RandomResponse> {
+    Json(RandomResponse { int: randint().await.0, float: random().await.0, string: rands().await })
 }
