@@ -166,3 +166,21 @@ pub mod counter {
         }
     }
 }
+
+pub mod random {
+    use crate::route::random::DistributionType;
+
+    use super::*;
+
+    #[derive(Error, Debug, Clone, PartialEq, Eq)]
+    pub enum RandomError {
+        #[error("unsupported distribution for {0}: {1:?}")]
+        UnsupportedDistribution(String, DistributionType),
+    }
+
+    impl IntoResponse for RandomError {
+        fn into_response(self) -> Response {
+            AppErrorDetail::<kind::BadRequest, _>::detail_display(self).into_response()
+        }
+    }
+}
