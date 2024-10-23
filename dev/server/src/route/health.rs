@@ -82,9 +82,12 @@ mod tests {
 
     use axum::{body::Body, http::Request};
 
-    use crate::route::{
-        app_with,
-        tests::{call_bytes, call_with_assert},
+    use crate::{
+        error::{kind::Kind, ErrorResponseInner},
+        route::{
+            app_with,
+            tests::{call_bytes, call_with_assert},
+        },
     };
 
     use super::*;
@@ -142,7 +145,10 @@ mod tests {
             &mut app,
             Request::builder().uri("/health/disabled").body(Body::empty()).unwrap(),
             StatusCode::SERVICE_UNAVAILABLE,
-            Health { status: StatusCode::SERVICE_UNAVAILABLE },
+            ErrorResponseInner {
+                msg: Retriable::msg().to_string(),
+                detail: Health { status: StatusCode::SERVICE_UNAVAILABLE },
+            },
         )
         .await;
     }
