@@ -1,4 +1,4 @@
-use axum::{response::Result, routing::get, Json, Router};
+use axum::{routing::get, Json, Router};
 use rand::{
     distributions::{Alphanumeric, DistString},
     Rng,
@@ -15,6 +15,7 @@ pub fn route_random() -> Router<AppState> {
         .route("/float", get(random))
         .route("/string", get(rands))
         .route("/response", get(random_response))
+        .route("/json", get(randjson))
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -43,4 +44,37 @@ pub async fn rands() -> String {
 #[tracing::instrument]
 pub async fn random_response() -> Json<RandomResponse> {
     Json(RandomResponse { int: randint().await.0, float: random().await.0, string: rands().await })
+}
+
+#[tracing::instrument]
+pub async fn randjson() -> Json<Value> {
+    let (max_size, max_depth) = (10, 3);
+    fn recursive_json(max_size: usize, max_depth: i32) -> Value {
+        let mut rng = rand::thread_rng();
+        let size = rng.gen_range(0..max_size);
+        if max_depth == 0 || max_size == 0 {
+            match rng.gen_range(0..4) {
+                0 => Value::Null,
+                1 => Value::Number(rng.gen::<i64>().into()),
+                2 => Value::Bool(rng.gen::<bool>()),
+                3 => Value::String(Alphanumeric.sample_string(&mut rng, size)),
+                _ => unreachable!(),
+            }
+        } else {
+            match rng.gen_range(0..6) {
+                0 => Value::Null,
+                1 => Value::Number(rng.gen::<i64>().into()),
+                2 => Value::Bool(rng.gen::<bool>()),
+                3 => Value::String(Alphanumeric.sample_string(&mut rng, size)),
+                4 => Value::Array((0..size).map(|_| recursive_json(max_size, max_depth - 1)).collect()),
+                5 => Value::Object(
+                    (0..size)
+                        .map(|_| (Alphanumeric.sample_string(&mut rng, size), recursive_json(max_size, max_depth - 1)))
+                        .collect(),
+                ),
+                _ => unreachable!(),
+            }
+        }
+    }
+    Json(recursive_json(max_size, max_depth))
 }
