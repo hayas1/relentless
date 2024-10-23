@@ -20,6 +20,7 @@ pub fn route_random() -> Router<AppState> {
         .route("/:distribution/string", get(rands))
         .route("/:distribution/response", get(random_response))
         .route("/:distribution/json", get(randjson))
+    // .fallback() // TODO
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
