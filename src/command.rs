@@ -61,7 +61,7 @@ pub struct Relentless {
     #[cfg_attr(feature = "cli", arg(long))]
     pub no_color: bool,
 
-    /// report nothing
+    /// format of report
     #[cfg_attr(feature = "cli", arg(short, long), clap(value_enum, default_value_t))]
     pub report_format: ReportFormat,
 
@@ -79,8 +79,11 @@ pub struct Relentless {
 #[cfg_attr(feature = "cli", derive(ValueEnum))]
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum ReportFormat {
+    /// without report
     #[cfg_attr(not(feature = "console-report"), default)]
     NullDevice,
+
+    /// report to console
     #[cfg(feature = "console-report")]
     #[cfg_attr(feature = "console-report", default)]
     Console,
