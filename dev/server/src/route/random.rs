@@ -1,3 +1,5 @@
+use std::{fmt::Display, future::Future, pin::Pin};
+
 use axum::{extract::Path, response::Result, routing::get, Json, Router};
 use rand::{
     distributions::{Alphanumeric, DistString, Distribution, Standard},
@@ -14,15 +16,68 @@ use crate::{
 
 pub fn route_random() -> Router<AppState> {
     Router::new()
-        .route("/:distribution", get(rand))
-        .route("/:distribution/int", get(randint))
-        .route("/:distribution/float", get(rand))
-        .route("/:distribution/string", get(rands))
-        .route("/:distribution/response", get(random_response))
+        .route("/", get(random_handler::<f64, _>(Standard)))
+        .route("/string", get(random_string_handler(Alphanumeric)))
+        .route("/response", get(random_response_handler(Standard, Standard, Alphanumeric)))
+        .route("/standard", get(random_handler::<f64, _>(Standard)))
+        .route("/standard/int", get(random_handler::<i64, _>(Standard)))
+        .route("/standard/float", get(random_handler::<f64, _>(Standard)))
+        .route("/standard/string", get(random_string_handler(Standard)))
+        .route("/standard/response", get(random_response_handler(Standard, Standard, Standard)))
         .route("/json", get(randjson))
     // .fallback() // TODO
 }
 
+pub fn random_handler<T, D>(
+    distribution: D,
+) -> impl FnOnce() -> Pin<Box<dyn Future<Output = Result<String>> + Send>> + Clone
+where
+    T: Display + Clone + Send + 'static,
+    D: Distribution<T> + Clone + Send + 'static,
+{
+    move || {
+        Box::pin(async move {
+            let mut rng = rand::thread_rng();
+            Ok(distribution.sample(&mut rng).to_string())
+        })
+    }
+}
+
+pub fn random_string_handler<D>(
+    distribution: D,
+) -> impl FnOnce() -> Pin<Box<dyn Future<Output = Result<String>> + Send>> + Clone
+where
+    D: DistString + Clone + Send + 'static,
+{
+    move || {
+        Box::pin(async move {
+            let mut rng = rand::thread_rng();
+            Ok(distribution.sample_string(&mut rng, 32))
+        })
+    }
+}
+
+pub fn random_response_handler<DI, DF, DS>(
+    int_distribution: DI,
+    float_distribution: DF,
+    distribution_string: DS,
+) -> impl FnOnce() -> Pin<Box<dyn Future<Output = Result<Json<RandomResponse>>> + Send>> + Clone
+where
+    DI: Distribution<i64> + Clone + Send + 'static,
+    DF: Distribution<f64> + Clone + Send + 'static,
+    DS: DistString + Clone + Send + 'static,
+{
+    move || {
+        Box::pin(async move {
+            let mut rng = rand::thread_rng();
+            Ok(Json(RandomResponse {
+                int: int_distribution.sample(&mut rng),
+                float: float_distribution.sample(&mut rng),
+                string: distribution_string.sample_string(&mut rng, 32),
+            }))
+        })
+    }
+}
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub enum DistributionType {
