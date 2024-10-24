@@ -112,13 +112,19 @@ pub struct DistRangeParam<T> {
     pub low: Option<T>,
     #[serde(default)]
     pub high: Option<T>,
+    #[serde(default)]
+    pub inclusive: bool,
 }
 impl<T> RangeBounds<T> for DistRangeParam<T> {
     fn start_bound(&self) -> Bound<&T> {
         self.low.as_ref().map(Bound::Included).unwrap_or(Bound::Unbounded)
     }
     fn end_bound(&self) -> Bound<&T> {
-        self.high.as_ref().map(Bound::Excluded).unwrap_or(Bound::Unbounded)
+        if self.inclusive {
+            self.high.as_ref().map(Bound::Included).unwrap_or(Bound::Unbounded)
+        } else {
+            self.high.as_ref().map(Bound::Excluded).unwrap_or(Bound::Unbounded)
+        }
     }
 }
 pub trait DistRange<T>: Distribution<T> {
