@@ -5,7 +5,12 @@ use std::{
     pin::Pin,
 };
 
-use axum::{extract::Query, response::Result, routing::get, Json, Router};
+use axum::{
+    extract::Query,
+    response::{ErrorResponse, Result},
+    routing::get,
+    Json, Router,
+};
 use rand::{
     distributions::{DistString, Distribution},
     Rng,
@@ -14,7 +19,7 @@ use rand_distr::{Alphanumeric, Binomial, Standard, StandardNormal, Uniform};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::state::AppState;
+use crate::{error::random::RandomError, state::AppState};
 
 pub fn route_random() -> Router<AppState> {
     Router::new()
@@ -127,25 +132,43 @@ impl<T> RangeBounds<T> for DistRangeParam<T> {
         }
     }
 }
+impl<T: Display> Display for DistRangeParam<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let Self { low, high, inclusive } = self;
+        write!(
+            f,
+            "{}{}{}",
+            low.as_ref().map(T::to_string).unwrap_or_default(),
+            if *inclusive { "..=" } else { ".." },
+            high.as_ref().map(T::to_string).unwrap_or_default(),
+        )
+    }
+}
 pub trait DistRange<T>: Distribution<T> {
-    fn new<R: RangeBounds<T>>(range: R) -> Self;
+    type Error;
+    fn new<R>(range: R) -> Result<Self, Self::Error>
+    where
+        R: RangeBounds<T>,
+        Self: Sized;
 
     fn handler() -> impl FnOnce(Query<DistRangeParam<T>>) -> Pin<Box<dyn Future<Output = Result<String>> + Send>> + Clone
     where
         Self: DistRange<T> + Sized,
+        ErrorResponse: From<Self::Error>,
         T: Display + Clone + Send + 'static,
     {
         move |Query(r): Query<DistRangeParam<T>>| {
             Box::pin(async move {
                 let mut rng = rand::thread_rng();
-                let dist = Self::new(r);
+                let dist = Self::new(r)?;
                 Ok(dist.sample(&mut rng).to_string())
             })
         }
     }
 }
 impl DistRange<usize> for Uniform<usize> {
-    fn new<R: RangeBounds<usize>>(range: R) -> Self {
+    type Error = RandomError<usize>;
+    fn new<R: RangeBounds<usize>>(range: R) -> Result<Self, Self::Error> {
         let start = match range.start_bound() {
             Bound::Included(x) => x,
             Bound::Excluded(x) => &(*x + 1),
@@ -156,7 +179,7 @@ impl DistRange<usize> for Uniform<usize> {
             Bound::Excluded(x) => x,
             Bound::Unbounded => &usize::MAX,
         };
-        Uniform::new(start, end)
+        Ok(Uniform::new(start, end))
     }
 }
 

@@ -144,7 +144,7 @@ impl<K: kind::Kind, T> From<AppErrorInner<K, T>> for ErrorResponseInner<T> {
 pub mod counter {
     use super::*;
 
-    #[derive(Error, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+    #[derive(Error, Debug, Clone, PartialEq, Eq)]
     pub enum CounterError<E> {
         #[error("overflow counter")]
         Overflow(E),
@@ -163,6 +163,24 @@ pub mod counter {
                 CounterError::CannotParse(e, _) => e,
             })
             .into_response()
+        }
+    }
+}
+
+pub mod random {
+    use crate::route::random::DistRangeParam;
+
+    use super::*;
+
+    #[derive(Error, Debug, Clone, PartialEq, Eq)]
+    pub enum RandomError<T: Display> {
+        #[error("`{0}` is empty range")]
+        EmptyRange(DistRangeParam<T>),
+    }
+
+    impl<T: Display + Debug + Send + Sync + 'static> IntoResponse for RandomError<T> {
+        fn into_response(self) -> Response {
+            AppErrorDetail::<kind::BadRequest, _>::detail_display(self).into_response()
         }
     }
 }
