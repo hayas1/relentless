@@ -6,11 +6,12 @@ use std::{
 };
 
 use axum::{extract::Query, response::Result, routing::get, Json, Router};
+use num::Bounded;
 use rand::{
     distributions::{DistString, Distribution},
     Rng,
 };
-use rand_distr::{Alphanumeric, Binomial, Standard, StandardNormal, Uniform};
+use rand_distr::{uniform::SampleUniform, Alphanumeric, Binomial, Standard, StandardNormal, Uniform};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -32,9 +33,9 @@ pub fn route_random() -> Router<AppState> {
         .route("/normal/float", get(random_handler::<f64, _>(StandardNormal)))
         .route("/binomial", get(random_handler(Binomial::new(10, 0.5).unwrap())))
         .route("/binomial/int", get(random_handler(Binomial::new(10, 0.5).unwrap())))
-        .route("/uniform", get(Uniform::handler()))
-        .route("/uniform/int", get(Uniform::handler()))
-    // .route("/uniform/float", get(Uniform::handler()))
+        .route("/uniform", get(Uniform::<usize>::handler()))
+        .route("/uniform/int", get(Uniform::<i64>::handler()))
+        .route("/uniform/float", get(Uniform::<f64>::handler()))
     // .fallback() // TODO
 }
 
@@ -159,17 +160,20 @@ pub trait DistRange<T>: Distribution<T> {
         }
     }
 }
-impl DistRange<usize> for Uniform<usize> {
-    fn new<R: RangeBounds<usize>>(range: &R) -> Option<Self> {
+impl<T> DistRange<T> for Uniform<T>
+where
+    T: SampleUniform + PartialOrd + Bounded,
+{
+    fn new<R: RangeBounds<T>>(range: &R) -> Option<Self> {
         let start = match range.start_bound() {
             Bound::Included(s) => s,
-            Bound::Excluded(s) => s, // TODO &(*s + 1),
-            Bound::Unbounded => &0,
+            Bound::Excluded(s) => s, // TODO? &(*s + 1),
+            Bound::Unbounded => &T::min_value(),
         };
         match range.end_bound() {
             Bound::Included(end) => (start <= end).then(|| Uniform::new_inclusive(start, end)),
             Bound::Excluded(end) => (start < end).then(|| Uniform::new(start, end)),
-            Bound::Unbounded => (start < &usize::MAX).then(|| Uniform::new_inclusive(start, usize::MAX)),
+            Bound::Unbounded => (start <= &T::max_value()).then(|| Uniform::new_inclusive(start, T::max_value())),
         }
     }
 }
@@ -269,14 +273,14 @@ mod tests {
         assert_eq!(status, StatusCode::OK);
         assert!(String::from_utf8_lossy(&body[..]).parse::<usize>().is_ok());
 
-        // let (status, body) = call_bytes(
-        //     &mut app,
-        //     Request::builder().uri("/random/uniform?low=0.0&high=1.0").body(Body::empty()).unwrap(),
-        // )
-        // .await;
-        // assert_eq!(status, StatusCode::OK);
-        // assert!(String::from_utf8_lossy(&body[..]).parse::<f64>().unwrap() >= 0.0);
-        // assert!(String::from_utf8_lossy(&body[..]).parse::<f64>().unwrap() < 1.0);
+        let (status, body) = call_bytes(
+            &mut app,
+            Request::builder().uri("/random/uniform/float?low=0.0&high=1.0").body(Body::empty()).unwrap(),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(String::from_utf8_lossy(&body[..]).parse::<f64>().unwrap() >= 0.0);
+        assert!(String::from_utf8_lossy(&body[..]).parse::<f64>().unwrap() < 1.0);
 
         let (status, body) = call_bytes(
             &mut app,
