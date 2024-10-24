@@ -1,16 +1,11 @@
 use std::{
-    fmt::Display,
+    fmt::{Debug, Display},
     future::Future,
     ops::{Bound, RangeBounds},
     pin::Pin,
 };
 
-use axum::{
-    extract::Query,
-    response::{ErrorResponse, Result},
-    routing::get,
-    Json, Router,
-};
+use axum::{extract::Query, response::Result, routing::get, Json, Router};
 use rand::{
     distributions::{DistString, Distribution},
     Rng,
@@ -145,8 +140,7 @@ impl<T: Display> Display for DistRangeParam<T> {
     }
 }
 pub trait DistRange<T>: Distribution<T> {
-    type Error;
-    fn new<R>(range: R) -> Result<Self, Self::Error>
+    fn new<R>(range: &R) -> Option<Self>
     where
         R: RangeBounds<T>,
         Self: Sized;
@@ -154,32 +148,29 @@ pub trait DistRange<T>: Distribution<T> {
     fn handler() -> impl FnOnce(Query<DistRangeParam<T>>) -> Pin<Box<dyn Future<Output = Result<String>> + Send>> + Clone
     where
         Self: DistRange<T> + Sized,
-        ErrorResponse: From<Self::Error>,
-        T: Display + Clone + Send + 'static,
+        T: Display + Debug + Clone + Send + Sync + 'static,
     {
         move |Query(r): Query<DistRangeParam<T>>| {
             Box::pin(async move {
                 let mut rng = rand::thread_rng();
-                let dist = Self::new(r)?;
+                let dist = Self::new(&r).ok_or_else(|| RandomError::EmptyRange(r))?;
                 Ok(dist.sample(&mut rng).to_string())
             })
         }
     }
 }
 impl DistRange<usize> for Uniform<usize> {
-    type Error = RandomError<usize>;
-    fn new<R: RangeBounds<usize>>(range: R) -> Result<Self, Self::Error> {
+    fn new<R: RangeBounds<usize>>(range: &R) -> Option<Self> {
         let start = match range.start_bound() {
-            Bound::Included(x) => x,
-            Bound::Excluded(x) => &(*x + 1),
+            Bound::Included(s) => s,
+            Bound::Excluded(s) => s, // TODO &(*s + 1),
             Bound::Unbounded => &0,
         };
-        let end = match range.end_bound() {
-            Bound::Included(x) => &(*x + 1),
-            Bound::Excluded(x) => x,
-            Bound::Unbounded => &usize::MAX,
-        };
-        Ok(Uniform::new(start, end))
+        match range.end_bound() {
+            Bound::Included(end) => (start <= end).then(|| Uniform::new_inclusive(start, end)),
+            Bound::Excluded(end) => (start < end).then(|| Uniform::new(start, end)),
+            Bound::Unbounded => (start < &usize::MAX).then(|| Uniform::new_inclusive(start, usize::MAX)),
+        }
     }
 }
 
@@ -223,7 +214,16 @@ mod tests {
         http::{Request, StatusCode},
     };
 
-    use crate::route::{app_with, tests::call_bytes};
+    use crate::{
+        error::{
+            kind::{BadRequest, Kind},
+            ErrorResponseInner, APP_DEFAULT_ERROR_CODE,
+        },
+        route::{
+            app_with,
+            tests::{call_bytes, call_with_assert},
+        },
+    };
 
     use super::*;
 
@@ -291,6 +291,26 @@ mod tests {
             call_bytes(&mut app, Request::builder().uri("/random/uniform?high=1").body(Body::empty()).unwrap()).await;
         assert_eq!(status, StatusCode::OK);
         assert_eq!(String::from_utf8_lossy(&body[..]).parse::<usize>().unwrap(), 0);
+
+        let (status, body) = call_bytes(
+            &mut app,
+            Request::builder().uri("/random/uniform?high=0&inclusive=true").body(Body::empty()).unwrap(),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(String::from_utf8_lossy(&body[..]).parse::<usize>().unwrap(), 0);
+
+        call_with_assert(
+            &mut app,
+            Request::builder().uri("/random/uniform?low=100&high=0").body(Body::empty()).unwrap(),
+            APP_DEFAULT_ERROR_CODE,
+            ErrorResponseInner {
+                msg: BadRequest::msg().to_string(),
+                detail: RandomError::EmptyRange(DistRangeParam { low: Some(100), high: Some(0), inclusive: false })
+                    .to_string(),
+            },
+        )
+        .await;
     }
 
     #[tokio::test]
