@@ -1,6 +1,6 @@
 use std::{fmt::Display, future::Future, pin::Pin};
 
-use axum::{response::Result, routing::get, Json, Router};
+use axum::{extract::Query, response::Result, routing::get, Json, Router};
 use rand::{
     distributions::{DistString, Distribution},
     Rng,
@@ -47,16 +47,21 @@ where
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Length {
+    #[serde(default)]
+    pub len: Option<usize>,
+}
 pub fn random_string_handler<D>(
     distribution: D,
-) -> impl FnOnce() -> Pin<Box<dyn Future<Output = Result<String>> + Send>> + Clone
+) -> impl FnOnce(Query<Length>) -> Pin<Box<dyn Future<Output = Result<String>> + Send>> + Clone
 where
     D: DistString + Clone + Send + 'static,
 {
-    move || {
+    move |Query(length): Query<Length>| {
         Box::pin(async move {
             let mut rng = rand::thread_rng();
-            Ok(distribution.sample_string(&mut rng, 32))
+            Ok(distribution.sample_string(&mut rng, length.len.unwrap_or(32)))
         })
     }
 }
@@ -71,19 +76,19 @@ impl RandomResponse {
         int_distribution: DI,
         float_distribution: DF,
         distribution_string: DS,
-    ) -> impl FnOnce() -> Pin<Box<dyn Future<Output = Result<Json<Self>>> + Send>> + Clone
+    ) -> impl FnOnce(Query<Length>) -> Pin<Box<dyn Future<Output = Result<Json<Self>>> + Send>> + Clone
     where
         DI: Distribution<i64> + Clone + Send + 'static,
         DF: Distribution<f64> + Clone + Send + 'static,
         DS: DistString + Clone + Send + 'static,
     {
-        move || {
+        move |Query(length): Query<Length>| {
             Box::pin(async move {
                 let mut rng = rand::thread_rng();
                 Ok(Json(RandomResponse {
                     int: int_distribution.sample(&mut rng),
                     float: float_distribution.sample(&mut rng),
-                    string: distribution_string.sample_string(&mut rng, 32),
+                    string: distribution_string.sample_string(&mut rng, length.len.unwrap_or(32)),
                 }))
             })
         }
