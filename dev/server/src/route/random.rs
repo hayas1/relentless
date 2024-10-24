@@ -15,13 +15,13 @@ pub fn route_random() -> Router<AppState> {
     Router::new()
         .route("/", get(random_handler::<f64, _>(Standard)))
         .route("/string", get(random_string_handler(Alphanumeric)))
-        .route("/response", get(random_response_handler(Standard, Standard, Alphanumeric)))
+        .route("/response", get(RandomResponse::handler(Standard, Standard, Alphanumeric)))
         .route("/json", get(randjson))
         .route("/standard", get(random_handler::<f64, _>(Standard)))
         .route("/standard/int", get(random_handler::<i64, _>(Standard)))
         .route("/standard/float", get(random_handler::<f64, _>(Standard)))
         .route("/standard/string", get(random_string_handler(Standard)))
-        .route("/standard/response", get(random_response_handler(Standard, Standard, Standard)))
+        .route("/standard/response", get(RandomResponse::handler(Standard, Standard, Standard)))
         .route("/normal", get(random_handler::<f64, _>(StandardNormal)))
         .route("/normal/float", get(random_handler::<f64, _>(StandardNormal)))
         .route("/binomial", get(random_handler::<u64, _>(Binomial::new(10, 0.5).unwrap())))
@@ -57,33 +57,34 @@ where
         })
     }
 }
-
-pub fn random_response_handler<DI, DF, DS>(
-    int_distribution: DI,
-    float_distribution: DF,
-    distribution_string: DS,
-) -> impl FnOnce() -> Pin<Box<dyn Future<Output = Result<Json<RandomResponse>>> + Send>> + Clone
-where
-    DI: Distribution<i64> + Clone + Send + 'static,
-    DF: Distribution<f64> + Clone + Send + 'static,
-    DS: DistString + Clone + Send + 'static,
-{
-    move || {
-        Box::pin(async move {
-            let mut rng = rand::thread_rng();
-            Ok(Json(RandomResponse {
-                int: int_distribution.sample(&mut rng),
-                float: float_distribution.sample(&mut rng),
-                string: distribution_string.sample_string(&mut rng, 32),
-            }))
-        })
-    }
-}
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RandomResponse {
     pub int: i64,
     pub float: f64,
     pub string: String,
+}
+impl RandomResponse {
+    pub fn handler<DI, DF, DS>(
+        int_distribution: DI,
+        float_distribution: DF,
+        distribution_string: DS,
+    ) -> impl FnOnce() -> Pin<Box<dyn Future<Output = Result<Json<Self>>> + Send>> + Clone
+    where
+        DI: Distribution<i64> + Clone + Send + 'static,
+        DF: Distribution<f64> + Clone + Send + 'static,
+        DS: DistString + Clone + Send + 'static,
+    {
+        move || {
+            Box::pin(async move {
+                let mut rng = rand::thread_rng();
+                Ok(Json(RandomResponse {
+                    int: int_distribution.sample(&mut rng),
+                    float: float_distribution.sample(&mut rng),
+                    string: distribution_string.sample_string(&mut rng, 32),
+                }))
+            })
+        }
+    }
 }
 
 #[tracing::instrument]
@@ -119,65 +120,42 @@ pub async fn randjson() -> Result<Json<Value>> {
     Ok(Json(recursive_json(max_size, max_depth)))
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use axum::{
-//         body::Body,
-//         http::{Request, StatusCode},
-//     };
+#[cfg(test)]
+mod tests {
+    use axum::{
+        body::Body,
+        http::{Request, StatusCode},
+    };
 
-//     use crate::{
-//         error::{kind::Kind, ErrorResponseInner},
-//         route::{
-//             app_with,
-//             tests::{call_bytes, call_with_assert},
-//         },
-//     };
+    use crate::route::{app_with, tests::call_bytes};
 
-//     use super::*;
+    use super::*;
 
-//     #[tokio::test]
-//     async fn test_random_handler() {
-//         let int = randint(Path(DistributionType::Standard)).await.unwrap();
+    #[tokio::test]
+    async fn test_random_handler() {
+        let int = random_handler::<i64, _>(Standard)().await.unwrap();
 
-//         assert!(int.parse::<i64>().is_ok());
-//     }
+        assert!(int.parse::<i64>().is_ok());
+    }
 
-//     #[tokio::test]
-//     async fn test_random() {
-//         let mut app = app_with(Default::default());
+    #[tokio::test]
+    async fn test_random() {
+        let mut app = app_with(Default::default());
 
-//         let (status, body) =
-//             call_bytes(&mut app, Request::builder().uri("/random/standard").body(Body::empty()).unwrap()).await;
-//         assert_eq!(status, StatusCode::OK);
-//         assert!(String::from_utf8_lossy(&body[..]).parse::<f64>().unwrap() >= 0.0);
-//         assert!(String::from_utf8_lossy(&body[..]).parse::<f64>().unwrap() <= 1.0);
-//     }
+        let (status, body) =
+            call_bytes(&mut app, Request::builder().uri("/random/standard").body(Body::empty()).unwrap()).await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(String::from_utf8_lossy(&body[..]).parse::<f64>().unwrap() >= 0.0);
+        assert!(String::from_utf8_lossy(&body[..]).parse::<f64>().unwrap() <= 1.0);
+    }
 
-//     #[tokio::test]
-//     async fn test_random_unsupported() {
-//         let mut app = app_with(Default::default());
+    #[tokio::test]
+    async fn test_random_json() {
+        let mut app = app_with(Default::default());
 
-//         call_with_assert(
-//             &mut app,
-//             Request::builder().uri("/random/alphanumeric/int").body(Body::empty()).unwrap(),
-//             StatusCode::BAD_REQUEST,
-//             ErrorResponseInner {
-//                 msg: BadRequest::msg().to_string(),
-//                 detail: RandomError::UnsupportedDistribution("i64".to_string(), DistributionType::Alphanumeric)
-//                     .to_string(),
-//             },
-//         )
-//         .await;
-//     }
-
-//     #[tokio::test]
-//     async fn test_random_json() {
-//         let mut app = app_with(Default::default());
-
-//         let (status, body) =
-//             call_bytes(&mut app, Request::builder().uri("/random/json").body(Body::empty()).unwrap()).await;
-//         assert_eq!(status, StatusCode::OK);
-//         assert!(!body.is_empty());
-//     }
-// }
+        let (status, body) =
+            call_bytes(&mut app, Request::builder().uri("/random/json").body(Body::empty()).unwrap()).await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(serde_json::from_slice::<Value>(&body[..]).is_ok());
+    }
+}
