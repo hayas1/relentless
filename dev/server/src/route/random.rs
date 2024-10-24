@@ -113,12 +113,12 @@ pub struct DistRangeParam<T> {
     #[serde(default)]
     pub high: Option<T>,
 }
-impl<T> DistRangeParam<T> {
-    pub fn range_bounds(self) -> impl RangeBounds<T> {
-        (
-            self.low.map(Bound::Included).unwrap_or(Bound::Unbounded),
-            self.high.map(Bound::Excluded).unwrap_or(Bound::Unbounded),
-        )
+impl<T> RangeBounds<T> for DistRangeParam<T> {
+    fn start_bound(&self) -> Bound<&T> {
+        self.low.as_ref().map(Bound::Included).unwrap_or(Bound::Unbounded)
+    }
+    fn end_bound(&self) -> Bound<&T> {
+        self.high.as_ref().map(Bound::Excluded).unwrap_or(Bound::Unbounded)
     }
 }
 pub trait DistRange<T>: Distribution<T> {
@@ -132,7 +132,7 @@ pub trait DistRange<T>: Distribution<T> {
         move |Query(r): Query<DistRangeParam<T>>| {
             Box::pin(async move {
                 let mut rng = rand::thread_rng();
-                let dist = Self::new(r.range_bounds());
+                let dist = Self::new(r);
                 Ok(dist.sample(&mut rng).to_string())
             })
         }
