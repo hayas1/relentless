@@ -2,10 +2,10 @@ use std::{fmt::Display, future::Future, pin::Pin};
 
 use axum::{response::Result, routing::get, Json, Router};
 use rand::{
-    distributions::{Alphanumeric, DistString, Distribution, Standard},
+    distributions::{DistString, Distribution},
     Rng,
 };
-use rand_distr::{Binomial, StandardNormal, Uniform};
+use rand_distr::{Alphanumeric, Binomial, Standard, StandardNormal, Uniform};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -24,8 +24,8 @@ pub fn route_random() -> Router<AppState> {
         .route("/alphanumeric", get(random_string_handler(Alphanumeric)))
         .route("/normal", get(random_handler::<f64, _>(StandardNormal)))
         .route("/normal/float", get(random_handler::<f64, _>(StandardNormal)))
-        .route("/binomial", get(random_handler::<u64, _>(Binomial::new(10, 0.5).unwrap())))
-        .route("/binomial/int", get(random_handler::<u64, _>(Binomial::new(10, 0.5).unwrap())))
+        .route("/binomial", get(random_handler(Binomial::new(10, 0.5).unwrap())))
+        .route("/binomial/int", get(random_handler(Binomial::new(10, 0.5).unwrap())))
         .route("/uniform", get(random_handler(Uniform::new_inclusive(0, 100))))
         .route("/uniform/int", get(random_handler(Uniform::new_inclusive(0, 100))))
         .route("/uniform/float", get(random_handler(Uniform::new_inclusive(0.0, 1.0))))
