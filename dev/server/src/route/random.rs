@@ -14,6 +14,7 @@ use crate::state::AppState;
 pub fn route_random() -> Router<AppState> {
     Router::new()
         .route("/", get(random_handler::<f64, _>(Standard)))
+        .route("/string", get(RandomString::handler(Alphanumeric)))
         .route("/response", get(RandomResponse::handler(Standard, Standard, Alphanumeric)))
         .route("/json", get(randjson))
         .route("/standard", get(random_handler::<f64, _>(Standard)))
@@ -161,6 +162,21 @@ mod tests {
         assert_eq!(status, StatusCode::OK);
         assert!(String::from_utf8_lossy(&body[..]).parse::<f64>().unwrap() >= 0.0);
         assert!(String::from_utf8_lossy(&body[..]).parse::<f64>().unwrap() <= 1.0);
+    }
+
+    #[tokio::test]
+    async fn test_random_string_length() {
+        let mut app = app_with(Default::default());
+
+        let (status, body) =
+            call_bytes(&mut app, Request::builder().uri("/random/string").body(Body::empty()).unwrap()).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(body.len(), 32);
+
+        let (status, body) =
+            call_bytes(&mut app, Request::builder().uri("/random/string?len=999").body(Body::empty()).unwrap()).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(body.len(), 999);
     }
 
     #[tokio::test]
