@@ -19,9 +19,9 @@ pub fn route_random() -> Router<AppState> {
         .route("/standard", get(random_handler::<f64, _>(Standard)))
         .route("/standard/int", get(random_handler::<i64, _>(Standard)))
         .route("/standard/float", get(random_handler::<f64, _>(Standard)))
-        .route("/standard/string", get(random_string_handler(Standard)))
+        .route("/standard/string", get(RandomString::handler(Standard)))
         .route("/standard/response", get(RandomResponse::handler(Standard, Standard, Standard)))
-        .route("/alphanumeric", get(random_string_handler(Alphanumeric)))
+        .route("/alphanumeric", get(RandomString::handler(Alphanumeric)))
         .route("/normal", get(random_handler::<f64, _>(StandardNormal)))
         .route("/normal/float", get(random_handler::<f64, _>(StandardNormal)))
         .route("/binomial", get(random_handler(Binomial::new(10, 0.5).unwrap())))
@@ -48,21 +48,27 @@ where
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Length {
+pub struct RandomString {
     #[serde(default)]
     pub len: Option<usize>,
 }
-pub fn random_string_handler<D>(
-    distribution: D,
-) -> impl FnOnce(Query<Length>) -> Pin<Box<dyn Future<Output = Result<String>> + Send>> + Clone
-where
-    D: DistString + Clone + Send + 'static,
-{
-    move |Query(length): Query<Length>| {
-        Box::pin(async move {
-            let mut rng = rand::thread_rng();
-            Ok(distribution.sample_string(&mut rng, length.len.unwrap_or(32)))
-        })
+impl RandomString {
+    pub fn handler<D>(
+        distribution: D,
+    ) -> impl FnOnce(Query<RandomString>) -> Pin<Box<dyn Future<Output = Result<String>> + Send>> + Clone
+    where
+        D: DistString + Clone + Send + 'static,
+    {
+        move |Query(rs): Query<RandomString>| {
+            Box::pin(async move {
+                let mut rng = rand::thread_rng();
+                Ok(distribution.sample_string(&mut rng, rs.length()))
+            })
+        }
+    }
+
+    pub fn length(&self) -> usize {
+        self.len.unwrap_or(32)
     }
 }
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -76,19 +82,19 @@ impl RandomResponse {
         int_distribution: DI,
         float_distribution: DF,
         distribution_string: DS,
-    ) -> impl FnOnce(Query<Length>) -> Pin<Box<dyn Future<Output = Result<Json<Self>>> + Send>> + Clone
+    ) -> impl FnOnce(Query<RandomString>) -> Pin<Box<dyn Future<Output = Result<Json<Self>>> + Send>> + Clone
     where
         DI: Distribution<i64> + Clone + Send + 'static,
         DF: Distribution<f64> + Clone + Send + 'static,
         DS: DistString + Clone + Send + 'static,
     {
-        move |Query(length): Query<Length>| {
+        move |Query(rs): Query<RandomString>| {
             Box::pin(async move {
                 let mut rng = rand::thread_rng();
                 Ok(Json(RandomResponse {
                     int: int_distribution.sample(&mut rng),
                     float: float_distribution.sample(&mut rng),
-                    string: distribution_string.sample_string(&mut rng, length.len.unwrap_or(32)),
+                    string: distribution_string.sample_string(&mut rng, rs.length()),
                 }))
             })
         }
