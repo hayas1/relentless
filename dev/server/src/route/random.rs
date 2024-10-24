@@ -1,4 +1,9 @@
-use std::{fmt::Display, future::Future, pin::Pin};
+use std::{
+    fmt::Display,
+    future::Future,
+    ops::{Bound, RangeBounds},
+    pin::Pin,
+};
 
 use axum::{extract::Query, response::Result, routing::get, Json, Router};
 use rand::{
@@ -27,9 +32,9 @@ pub fn route_random() -> Router<AppState> {
         .route("/normal/float", get(random_handler::<f64, _>(StandardNormal)))
         .route("/binomial", get(random_handler(Binomial::new(10, 0.5).unwrap())))
         .route("/binomial/int", get(random_handler(Binomial::new(10, 0.5).unwrap())))
-        .route("/uniform", get(random_handler(Uniform::new_inclusive(0, 100))))
-        .route("/uniform/int", get(random_handler(Uniform::new_inclusive(0, 100))))
-        .route("/uniform/float", get(random_handler(Uniform::new_inclusive(0.0, 1.0))))
+        .route("/uniform", get(Uniform::handler()))
+        .route("/uniform/int", get(Uniform::handler()))
+    // .route("/uniform/float", get(Uniform::handler()))
     // .fallback() // TODO
 }
 
@@ -99,6 +104,56 @@ impl RandomResponse {
                 }))
             })
         }
+    }
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DistRangeParam<T> {
+    #[serde(default)]
+    pub low: Option<T>,
+    #[serde(default)]
+    pub high: Option<T>,
+}
+impl<T> DistRangeParam<T> {
+    pub fn range_bounds(&self) -> impl RangeBounds<&T> {
+        (
+            self.low.as_ref().map(Bound::Included).unwrap_or(Bound::Unbounded),
+            self.high.as_ref().map(Bound::Excluded).unwrap_or(Bound::Unbounded),
+        )
+    }
+}
+pub trait DistRange<T>: Distribution<T> {
+    fn new<'a, R>(range: R) -> Self
+    where
+        R: RangeBounds<&'a T>,
+        T: 'a;
+
+    fn handler() -> impl FnOnce(Query<DistRangeParam<T>>) -> Pin<Box<dyn Future<Output = Result<String>> + Send>> + Clone
+    where
+        Self: DistRange<T> + Sized,
+        T: Display + Clone + Send + 'static,
+    {
+        move |Query(r): Query<DistRangeParam<T>>| {
+            Box::pin(async move {
+                let mut rng = rand::thread_rng();
+                let dist = Self::new(r.range_bounds());
+                Ok(dist.sample(&mut rng).to_string())
+            })
+        }
+    }
+}
+impl DistRange<usize> for Uniform<usize> {
+    fn new<'a, R: RangeBounds<&'a usize>>(range: R) -> Self {
+        let start = match range.start_bound() {
+            Bound::Included(x) => x,
+            Bound::Excluded(x) => &(*x + 1),
+            Bound::Unbounded => &0,
+        };
+        let end = match range.end_bound() {
+            Bound::Included(x) => &(*x + 1),
+            Bound::Excluded(x) => x,
+            Bound::Unbounded => &usize::MAX,
+        };
+        Uniform::new(start, end)
     }
 }
 
@@ -177,6 +232,39 @@ mod tests {
             call_bytes(&mut app, Request::builder().uri("/random/string?len=999").body(Body::empty()).unwrap()).await;
         assert_eq!(status, StatusCode::OK);
         assert_eq!(body.len(), 999);
+    }
+
+    #[tokio::test]
+    async fn test_random_uniform() {
+        let mut app = app_with(Default::default());
+
+        let (status, body) =
+            call_bytes(&mut app, Request::builder().uri("/random/uniform").body(Body::empty()).unwrap()).await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(String::from_utf8_lossy(&body[..]).parse::<usize>().is_ok());
+
+        // let (status, body) = call_bytes(
+        //     &mut app,
+        //     Request::builder().uri("/random/uniform?low=0.0&high=1.0").body(Body::empty()).unwrap(),
+        // )
+        // .await;
+        // assert_eq!(status, StatusCode::OK);
+        // assert!(String::from_utf8_lossy(&body[..]).parse::<f64>().unwrap() >= 0.0);
+        // assert!(String::from_utf8_lossy(&body[..]).parse::<f64>().unwrap() < 1.0);
+
+        let (status, body) = call_bytes(
+            &mut app,
+            Request::builder().uri("/random/uniform?low=10&high=100").body(Body::empty()).unwrap(),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(String::from_utf8_lossy(&body[..]).parse::<usize>().unwrap() >= 10);
+        assert!(String::from_utf8_lossy(&body[..]).parse::<usize>().unwrap() < 100);
+
+        let (status, body) =
+            call_bytes(&mut app, Request::builder().uri("/random/uniform?high=1").body(Body::empty()).unwrap()).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(String::from_utf8_lossy(&body[..]).parse::<usize>().unwrap(), 0);
     }
 
     #[tokio::test]
