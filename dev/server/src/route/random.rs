@@ -5,7 +5,7 @@ use rand::{
     distributions::{Alphanumeric, DistString, Distribution, Standard},
     Rng,
 };
-use rand_distr::{Binomial, StandardNormal};
+use rand_distr::{Binomial, StandardNormal, Uniform};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -14,7 +14,6 @@ use crate::state::AppState;
 pub fn route_random() -> Router<AppState> {
     Router::new()
         .route("/", get(random_handler::<f64, _>(Standard)))
-        .route("/string", get(random_string_handler(Alphanumeric)))
         .route("/response", get(RandomResponse::handler(Standard, Standard, Alphanumeric)))
         .route("/json", get(randjson))
         .route("/standard", get(random_handler::<f64, _>(Standard)))
@@ -22,10 +21,14 @@ pub fn route_random() -> Router<AppState> {
         .route("/standard/float", get(random_handler::<f64, _>(Standard)))
         .route("/standard/string", get(random_string_handler(Standard)))
         .route("/standard/response", get(RandomResponse::handler(Standard, Standard, Standard)))
+        .route("/alphanumeric", get(random_string_handler(Alphanumeric)))
         .route("/normal", get(random_handler::<f64, _>(StandardNormal)))
         .route("/normal/float", get(random_handler::<f64, _>(StandardNormal)))
         .route("/binomial", get(random_handler::<u64, _>(Binomial::new(10, 0.5).unwrap())))
         .route("/binomial/int", get(random_handler::<u64, _>(Binomial::new(10, 0.5).unwrap())))
+        .route("/uniform", get(random_handler(Uniform::new_inclusive(0, 100))))
+        .route("/uniform/int", get(random_handler(Uniform::new_inclusive(0, 100))))
+        .route("/uniform/float", get(random_handler(Uniform::new_inclusive(0.0, 1.0))))
     // .fallback() // TODO
 }
 
