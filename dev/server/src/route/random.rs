@@ -114,18 +114,15 @@ pub struct DistRangeParam<T> {
     pub high: Option<T>,
 }
 impl<T> DistRangeParam<T> {
-    pub fn range_bounds(&self) -> impl RangeBounds<&T> {
+    pub fn range_bounds(self) -> impl RangeBounds<T> {
         (
-            self.low.as_ref().map(Bound::Included).unwrap_or(Bound::Unbounded),
-            self.high.as_ref().map(Bound::Excluded).unwrap_or(Bound::Unbounded),
+            self.low.map(Bound::Included).unwrap_or(Bound::Unbounded),
+            self.high.map(Bound::Excluded).unwrap_or(Bound::Unbounded),
         )
     }
 }
 pub trait DistRange<T>: Distribution<T> {
-    fn new<'a, R>(range: R) -> Self
-    where
-        R: RangeBounds<&'a T>,
-        T: 'a;
+    fn new<R: RangeBounds<T>>(range: R) -> Self;
 
     fn handler() -> impl FnOnce(Query<DistRangeParam<T>>) -> Pin<Box<dyn Future<Output = Result<String>> + Send>> + Clone
     where
@@ -142,7 +139,7 @@ pub trait DistRange<T>: Distribution<T> {
     }
 }
 impl DistRange<usize> for Uniform<usize> {
-    fn new<'a, R: RangeBounds<&'a usize>>(range: R) -> Self {
+    fn new<R: RangeBounds<usize>>(range: R) -> Self {
         let start = match range.start_bound() {
             Bound::Included(x) => x,
             Bound::Excluded(x) => &(*x + 1),
