@@ -166,3 +166,21 @@ pub mod counter {
         }
     }
 }
+
+pub mod random {
+    use crate::route::random::DistRangeParam;
+
+    use super::*;
+
+    #[derive(Error, Debug, Clone, PartialEq, Eq)]
+    pub enum RandomError<T: Display> {
+        #[error("`{0}` is empty range")]
+        EmptyRange(DistRangeParam<T>),
+    }
+
+    impl<T: Display + Debug + Send + Sync + 'static> IntoResponse for RandomError<T> {
+        fn into_response(self) -> Response {
+            AppErrorDetail::<kind::BadRequest, _>::detail_display(self).into_response()
+        }
+    }
+}

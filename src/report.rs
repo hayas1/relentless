@@ -24,17 +24,17 @@ impl<T> Report<T> {
 }
 impl<T> Reportable for Report<T> {
     fn sub_reportable(&self) -> Vec<&dyn Reportable> {
-        self.report.iter().map(|o| o as _).collect()
+        self.report.iter().map(|r| r as _).collect()
     }
 }
 #[cfg(feature = "console-report")]
 impl<T: Display> ConsoleReport for Report<T> {
-    type Error = Wrap;
+    type Error = crate::Error;
     fn console_report<W: std::io::Write>(&self, cmd: &Relentless, w: &mut ReportWriter<W>) -> Result<(), Self::Error> {
         for report in &self.report {
             if !report.skip_report(cmd) {
                 report.console_report(cmd, w)?;
-                writeln!(w)?;
+                writeln!(w).map_err(Wrap::wrapping)?;
             }
         }
         Ok(())
@@ -57,12 +57,12 @@ impl<T> WorkerReport<T> {
 }
 impl<T> Reportable for WorkerReport<T> {
     fn sub_reportable(&self) -> Vec<&dyn Reportable> {
-        self.report.iter().map(|o| o as _).collect()
+        self.report.iter().map(|r| r as _).collect()
     }
 }
 #[cfg(feature = "console-report")]
 impl<T: Display> ConsoleReport for WorkerReport<T> {
-    type Error = Wrap;
+    type Error = Wrap; // TODO crate::Error ?
     fn console_report<W: std::io::Write>(&self, cmd: &Relentless, w: &mut ReportWriter<W>) -> Result<(), Self::Error> {
         let WorkerConfig { name, destinations, .. } = self.config.coalesce();
 
@@ -124,7 +124,7 @@ impl<T> Reportable for CaseReport<T> {
 }
 #[cfg(feature = "console-report")]
 impl<T: Display> ConsoleReport for CaseReport<T> {
-    type Error = Wrap;
+    type Error = Wrap; // TODO crate::Error ?
     fn console_report<W: std::io::Write>(&self, cmd: &Relentless, w: &mut ReportWriter<W>) -> Result<(), Self::Error> {
         let Testcase { description, target, setting, .. } = self.testcases.coalesce();
 
