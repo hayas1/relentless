@@ -173,7 +173,7 @@ where
         match range.end_bound() {
             Bound::Included(end) => (start <= end).then(|| Uniform::new_inclusive(start, end)),
             Bound::Excluded(end) => (start < end).then(|| Uniform::new(start, end)),
-            Bound::Unbounded => (start <= &T::max_value()).then(|| Uniform::new_inclusive(start, T::max_value())),
+            Bound::Unbounded => (start <= &T::max_value()).then(|| Uniform::new_inclusive(start, T::max_value())), // TODO float max cause panic and empty reply
         }
     }
 }
