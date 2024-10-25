@@ -1,4 +1,5 @@
 pub mod counter;
+pub mod echo;
 pub mod health;
 pub mod information;
 pub mod random;
@@ -37,9 +38,10 @@ pub fn router(state: AppState) -> Router<()> {
         .route("/", get(root::root))
         .nest("/health", health::route_health())
         .route("/healthz", get(health::health))
+        .nest("/echo", echo::route_echo())
+        .nest("/information", information::route_information())
         .nest("/counter", counter::route_counter())
         .nest("/wait", wait::route_wait())
-        .nest("/information", information::route_information())
         .nest("/random", random::route_random())
         .fallback(not_found)
         .layer(middleware::from_fn_with_state(state.clone(), logging))
