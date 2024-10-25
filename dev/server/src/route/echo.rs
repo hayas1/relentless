@@ -17,6 +17,8 @@ pub fn route_echo() -> Router<AppState> {
         .route("/path/*rest", any(path))
         .route("/method", any(method))
         .route("/headers", any(headers))
+        .route("/json", get(jsonize))
+        .route("/json", post(json_body))
 }
 
 #[tracing::instrument]
@@ -59,4 +61,14 @@ pub async fn headers(headers: HeaderMap) -> Json<Value> {
             })
             .collect(),
     )
+}
+
+#[tracing::instrument]
+pub async fn jsonize() -> Json<Value> {
+    todo!()
+}
+
+#[tracing::instrument]
+pub async fn json_body(body: Json<Value>) -> Json<Value> {
+    body
 }
