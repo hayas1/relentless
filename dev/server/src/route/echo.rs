@@ -5,6 +5,9 @@ use axum::{
     routing::{any, get, post},
     Json, Router,
 };
+use chrono::Local;
+use rand::distributions::DistString;
+use rand_distr::Alphanumeric;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
@@ -21,7 +24,8 @@ pub fn route_echo() -> Router<AppState> {
         .route("/path/*rest", any(path))
         .route("/method", any(method))
         .route("/headers", any(headers))
-        .route("/json", get(Jsonizer::dot_splitted_handler))
+        .route("/json", get(Jsonizer::dot_splitted_handler::<false>))
+        .route("/json/rich", get(Jsonizer::dot_splitted_handler::<true>))
         .route("/json", post(json_body))
 }
 
@@ -121,37 +125,51 @@ impl Jsonizer {
             }
         }
     }
-    pub fn parse(v: &str) -> Value {
+    pub fn parse<const RICH: bool>(v: &str) -> Result<Value, JsonizeError> {
         if let Ok(int) = v.parse::<i64>() {
-            json!(int)
+            Ok(json!(int))
         } else if let Ok(float) = v.parse::<f64>() {
-            json!(float)
+            Ok(json!(float))
         } else if let Ok(bool) = v.parse::<bool>() {
-            json!(bool)
+            Ok(json!(bool))
         } else if v == "null" {
-            json!(null)
+            Ok(json!(null))
+        } else if RICH {
+            Self::parse_rich(v)
         } else {
-            json!(v)
+            Ok(json!(v))
         }
     }
-    pub fn dot_splitted(&self) -> Result<Value, JsonizeError> {
+    pub fn parse_rich(v: &str) -> Result<Value, JsonizeError> {
+        match v.strip_prefix('$') {
+            Some("randint") => Ok(json!(rand::random::<i64>())),
+            Some("rand") => Ok(json!(rand::random::<f64>())),
+            Some("rands") => Ok(json!(Alphanumeric.sample_string(&mut rand::thread_rng(), 32))),
+            Some("now") => Ok(json!(Local::now().to_rfc3339())),
+            Some(_) => Err(JsonizeError::UnknownFunction(v.to_string())),
+            None => Ok(json!(v)),
+        }
+    }
+    pub fn dot_splitted<const RICH: bool>(&self) -> Result<Value, JsonizeError> {
         let mut value = Value::Null;
         for (k, v) in &self.0 {
-            Self::put(Self::entry(&mut value, k.split('.'))?, Self::parse(v));
+            Self::put(Self::entry(&mut value, k.split('.'))?, Self::parse::<RICH>(v)?);
         }
         Ok(value)
     }
 
     #[tracing::instrument]
-    pub async fn dot_splitted_handler(Query(v): Query<Vec<(String, String)>>) -> Result<Json<Value>, EchoError> {
-        Ok(Json(Self(v).dot_splitted()?))
+    pub async fn dot_splitted_handler<const RICH: bool>(
+        Query(v): Query<Vec<(String, String)>>,
+    ) -> Result<Json<Value>, EchoError> {
+        Ok(Json(Self(v).dot_splitted::<RICH>()?))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::route::app_with;
-    use crate::route::tests::{call_bytes, call_with_assert};
+    use crate::route::tests::{call_bytes, call_with_assert, call_with_assert_ne_body};
 
     use super::*;
     use axum::body::Body;
@@ -237,35 +255,35 @@ mod tests {
     #[tokio::test]
     async fn test_jsonizer() {
         let j = Jsonizer(vec![]);
-        assert_eq!(j.dot_splitted().unwrap(), Value::Null);
+        assert_eq!(j.dot_splitted::<false>().unwrap(), Value::Null);
 
         let j = Jsonizer(vec![(String::from("key"), String::from("value"))]);
-        assert_eq!(j.dot_splitted().unwrap(), json!({ "key": "value" }));
+        assert_eq!(j.dot_splitted::<false>().unwrap(), json!({ "key": "value" }));
 
         let j = Jsonizer(vec![
             (String::from("key"), String::from("value1")),
             (String::from("key"), String::from("value2")),
         ]);
-        assert_eq!(j.dot_splitted().unwrap(), json!({ "key": ["value1", "value2"] }));
+        assert_eq!(j.dot_splitted::<false>().unwrap(), json!({ "key": ["value1", "value2"] }));
 
         let j = Jsonizer(vec![(String::from("foo.bar.baz"), String::from("value"))]);
-        assert_eq!(j.dot_splitted().unwrap(), json!({ "foo": { "bar": { "baz": "value" } } }));
+        assert_eq!(j.dot_splitted::<false>().unwrap(), json!({ "foo": { "bar": { "baz": "value" } } }));
 
         let j = Jsonizer(vec![
             (String::from("foo.bar.baz"), String::from("value1")),
             (String::from("foo.bar.baz"), String::from("value2")),
         ]);
-        assert_eq!(j.dot_splitted().unwrap(), json!({ "foo": { "bar": { "baz": ["value1", "value2"] } } }));
+        assert_eq!(j.dot_splitted::<false>().unwrap(), json!({ "foo": { "bar": { "baz": ["value1", "value2"] } } }));
 
         let j = Jsonizer(vec![(String::from("number.3.value"), String::from("three"))]);
-        assert_eq!(j.dot_splitted().unwrap(), json!({ "number": [null, null, null, { "value": "three" }] }));
+        assert_eq!(j.dot_splitted::<false>().unwrap(), json!({ "number": [null, null, null, { "value": "three" }] }));
 
         let j = Jsonizer(vec![
             (String::from("number.3.value"), String::from("three")),
             (String::from("number.1.value"), String::from("one")),
         ]);
         assert_eq!(
-            j.dot_splitted().unwrap(),
+            j.dot_splitted::<false>().unwrap(),
             json!({ "number": [null, { "value": "one" }, null, { "value": "three" }] })
         );
 
@@ -273,13 +291,51 @@ mod tests {
             (String::from("hoge.fuga"), String::from("hogera")),
             (String::from("hoge.fuga.piyo"), String::from("hogehoge")),
         ]);
-        assert!(j.dot_splitted().is_err()); // hoge.fuga will be [hogera, {piyo: hogehoge}], but in this case that is not hoge.fuga.piyo but hoge.fuga.1.piyo
+        assert!(j.dot_splitted::<false>().is_err()); // hoge.fuga will be [hogera, {piyo: hogehoge}], but in this case that is not hoge.fuga.piyo but hoge.fuga.1.piyo
 
         let j = Jsonizer(vec![
             (String::from("hoge.fuga"), String::from("hogera")),
             (String::from("hoge.fuga.1.piyo"), String::from("hogehoge")),
         ]);
-        assert_eq!(j.dot_splitted().unwrap(), json!({ "hoge": { "fuga": ["hogera", { "piyo": "hogehoge" }] } }));
+        assert_eq!(
+            j.dot_splitted::<false>().unwrap(),
+            json!({ "hoge": { "fuga": ["hogera", { "piyo": "hogehoge" }] } })
+        );
+    }
+
+    #[tokio::test]
+    async fn test_jsonizer_rich() {
+        let j1 = Jsonizer(vec![(String::from("key"), String::from("value"))]);
+        let j2 = Jsonizer(vec![(String::from("key"), String::from("value"))]);
+        assert_eq!(j1.dot_splitted::<true>().unwrap(), j2.dot_splitted::<true>().unwrap());
+
+        let j1 = Jsonizer(vec![(String::from("now"), String::from("$now"))]);
+        let j2 = Jsonizer(vec![(String::from("now"), String::from("$now"))]);
+        assert_ne!(j1.dot_splitted::<true>().unwrap(), j2.dot_splitted::<true>().unwrap());
+        let j1 = Jsonizer(vec![(String::from("now"), String::from("now"))]);
+        let j2 = Jsonizer(vec![(String::from("now"), String::from("now"))]);
+        assert_eq!(j1.dot_splitted::<true>().unwrap(), j2.dot_splitted::<true>().unwrap());
+
+        let j1 = Jsonizer(vec![(String::from("randint"), String::from("$randint"))]);
+        let j2 = Jsonizer(vec![(String::from("randint"), String::from("$randint"))]);
+        assert_ne!(j1.dot_splitted::<true>().unwrap(), j2.dot_splitted::<true>().unwrap());
+        let j1 = Jsonizer(vec![(String::from("randint"), String::from("randint"))]);
+        let j2 = Jsonizer(vec![(String::from("randint"), String::from("randint"))]);
+        assert_eq!(j1.dot_splitted::<true>().unwrap(), j2.dot_splitted::<true>().unwrap());
+
+        let j1 = Jsonizer(vec![(String::from("rand"), String::from("$rand"))]);
+        let j2 = Jsonizer(vec![(String::from("rand"), String::from("$rand"))]);
+        assert_ne!(j1.dot_splitted::<true>().unwrap(), j2.dot_splitted::<true>().unwrap());
+        let j1 = Jsonizer(vec![(String::from("rand"), String::from("rand"))]);
+        let j2 = Jsonizer(vec![(String::from("rand"), String::from("rand"))]);
+        assert_eq!(j1.dot_splitted::<true>().unwrap(), j2.dot_splitted::<true>().unwrap());
+
+        let j1 = Jsonizer(vec![(String::from("rands"), String::from("$rands"))]);
+        let j2 = Jsonizer(vec![(String::from("rands"), String::from("$rands"))]);
+        assert_ne!(j1.dot_splitted::<true>().unwrap(), j2.dot_splitted::<true>().unwrap());
+        let j1 = Jsonizer(vec![(String::from("rands"), String::from("rands"))]);
+        let j2 = Jsonizer(vec![(String::from("rands"), String::from("rands"))]);
+        assert_eq!(j1.dot_splitted::<true>().unwrap(), j2.dot_splitted::<true>().unwrap());
     }
 
     #[tokio::test]
@@ -306,6 +362,16 @@ mod tests {
                 "a": { "foo": null, "bar": true, "baz": 2.0, "qux": "three", "quux": 4 },
                 "d": [ "zero", null, null, null, null, "five" ],
             }),
+        )
+        .await;
+
+        call_with_assert_ne_body(
+            &mut app,
+            Request::builder().uri("/echo/json?key=value&current.time=$now").body(Body::empty()).unwrap(),
+            StatusCode::OK,
+            json!({
+                "key": "value",
+                "current.time": "2024-10-10T00:00:00-09:00",}),
         )
         .await;
     }

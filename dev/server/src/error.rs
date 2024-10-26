@@ -209,6 +209,8 @@ pub mod echo {
         CannotParseInt(#[from] std::num::ParseIntError),
         #[error("cannot parse value as float: {0}")]
         CannotParseFloat(#[from] std::num::ParseFloatError),
+        #[error("unknown function: {0}")]
+        UnknownFunction(String),
     }
     impl IntoResponse for JsonizeError {
         fn into_response(self) -> Response {

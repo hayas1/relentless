@@ -113,4 +113,20 @@ mod tests {
         assert_eq!(actual_status, expected_status);
         assert_eq!(actual_body, expected_body);
     }
+
+    pub async fn call_with_assert_ne_body<S, T>(
+        app: &mut S,
+        req: Request<Body>,
+        expected_status: StatusCode,
+        expected_body: T,
+    ) where
+        S: Service<Request<Body>, Response = Response<Body>>,
+        S::Error: Debug,
+        Box<dyn std::error::Error + Send + Sync + 'static>: From<S::Error>,
+        T: DeserializeOwned + Eq + std::fmt::Debug,
+    {
+        let (actual_status, actual_body): (_, T) = call(app, req).await;
+        assert_eq!(actual_status, expected_status);
+        assert_ne!(actual_body, expected_body);
+    }
 }
