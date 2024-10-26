@@ -8,7 +8,7 @@ use relentless::{
 use relentless_dev_server::route;
 
 #[tokio::test]
-#[cfg(feature = "json")]
+#[cfg(all(feature = "json", feature = "yaml"))]
 async fn test_example_yaml_config() {
     let relentless = Relentless {
         file: glob::glob("examples/config/*.yaml").unwrap().collect::<Result<Vec<_>, _>>().unwrap(),
