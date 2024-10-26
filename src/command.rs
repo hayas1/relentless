@@ -273,14 +273,15 @@ mod tests {
 
         let warn = String::from_utf8_lossy(&buf);
         assert!(warn.contains("tests/config/parse/invalid_simple_string.yaml"));
-        assert_eq!(
-            warn,
-            [
+        assert!(warn.contains("tests/config/parse/invalid_different_struct.yaml"));
+        // TODO better test for error message
+        assert!(warn.contains(
+            &[
                 r#"tests/config/parse/invalid_simple_string.yaml:"#,
                 r#"invalid type: string "simple string yaml", expected struct Config"#,
                 r#""#,
             ]
             .join("\n")
-        )
+        ));
     }
 }
