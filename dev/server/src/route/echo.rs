@@ -146,7 +146,13 @@ impl Jsonizer {
             Some("rand") => Ok(json!(rand::random::<f64>())),
             Some("rands") => Ok(json!(Alphanumeric.sample_string(&mut rand::thread_rng(), 32))),
             Some("now") => Ok(json!(Local::now().to_rfc3339())),
-            Some(_) => Err(JsonizeError::UnknownFunction(v.to_string())),
+            Some(s) => {
+                if s.starts_with('$') {
+                    Ok(json!(s))
+                } else {
+                    Err(JsonizeError::UnknownFunction(v.to_string()))
+                }
+            }
             None => Ok(json!(v)),
         }
     }
@@ -336,6 +342,11 @@ mod tests {
         let j1 = Jsonizer(vec![(String::from("rands"), String::from("rands"))]);
         let j2 = Jsonizer(vec![(String::from("rands"), String::from("rands"))]);
         assert_eq!(j1.dot_splitted::<true>().unwrap(), j2.dot_splitted::<true>().unwrap());
+
+        let j = Jsonizer(vec![(String::from("unknown"), String::from("$unknown"))]);
+        assert_eq!(j.dot_splitted::<true>().unwrap_err(), JsonizeError::UnknownFunction(String::from("$unknown")));
+        let j = Jsonizer(vec![(String::from("escape"), String::from("$$escape"))]);
+        assert_eq!(j.dot_splitted::<true>().unwrap(), json!({ "escape": "$escape" }));
     }
 
     #[tokio::test]
