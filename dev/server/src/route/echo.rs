@@ -100,10 +100,11 @@ impl Jsonizer {
                 }
             }
             val => {
-                let mut array = Value::Null;
+                let idx = p.parse::<usize>()?;
+                let mut array = Value::Array(vec![Value::Null; idx + 1]);
                 std::mem::swap(val, &mut array);
-                *val = Value::Array(vec![array]);
-                Ok(val)
+                *val.as_array_mut().unwrap().first_mut().unwrap() = array;
+                Ok(&mut val[idx])
             }
         })
     }
@@ -268,11 +269,17 @@ mod tests {
             json!({ "number": [null, { "value": "one" }, null, { "value": "three" }] })
         );
 
-        let _j = Jsonizer(vec![
+        let j = Jsonizer(vec![
             (String::from("hoge.fuga"), String::from("hogera")),
             (String::from("hoge.fuga.piyo"), String::from("hogehoge")),
         ]);
-        // assert!(j.dot_splitted().is_err()); // TODO
+        assert!(j.dot_splitted().is_err()); // hoge.fuga will be [hogera, {piyo: hogehoge}], but in this case that is not hoge.fuga.piyo but hoge.fuga.1.piyo
+
+        let j = Jsonizer(vec![
+            (String::from("hoge.fuga"), String::from("hogera")),
+            (String::from("hoge.fuga.1.piyo"), String::from("hogehoge")),
+        ]);
+        assert_eq!(j.dot_splitted().unwrap(), json!({ "hoge": { "fuga": ["hogera", { "piyo": "hogehoge" }] } }));
     }
 
     #[tokio::test]
