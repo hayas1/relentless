@@ -1,13 +1,17 @@
 use axum::{
     body::Bytes,
-    extract::{OriginalUri, Path, Request},
+    extract::{OriginalUri, Path, Query, Request},
     http::HeaderMap,
     routing::{any, get, post},
     Json, Router,
 };
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
-use crate::state::AppState;
+use crate::{
+    error::echo::{EchoError, JsonizeError},
+    state::AppState,
+};
 
 pub fn route_echo() -> Router<AppState> {
     Router::new()
@@ -17,7 +21,7 @@ pub fn route_echo() -> Router<AppState> {
         .route("/path/*rest", any(path))
         .route("/method", any(method))
         .route("/headers", any(headers))
-        .route("/json", get(jsonize))
+        .route("/json", get(Jsonizer::dot_splitted_handler))
         .route("/json", post(json_body))
 }
 
@@ -64,13 +68,83 @@ pub async fn headers(headers: HeaderMap) -> Json<Value> {
 }
 
 #[tracing::instrument]
-pub async fn jsonize() -> Json<Value> {
-    todo!()
-}
-
-#[tracing::instrument]
 pub async fn json_body(body: Json<Value>) -> Json<Value> {
     body
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Jsonizer(pub Vec<(String, String)>);
+impl Jsonizer {
+    pub fn entry<'a, I: Iterator<Item = &'a str>>(
+        value: &'a mut Value,
+        mut path: I,
+    ) -> Result<&'a mut Value, JsonizeError> {
+        path.try_fold(value, |v, p| match v {
+            Value::Object(o) => Ok(o.entry(p).or_insert(Value::Null)),
+            Value::Array(a) => {
+                let (idx, len) = (p.parse::<usize>()?, a.len());
+                if idx >= len {
+                    a.extend(vec![Value::Null; idx + 1 - len]);
+                }
+                Ok(&mut a[idx])
+            }
+            Value::Null => {
+                if let Ok(idx) = p.parse::<usize>() {
+                    let mut null = Value::Array(vec![Value::Null; idx + 1]);
+                    std::mem::swap(v, &mut null);
+                    Ok(v.as_array_mut().unwrap().get_mut(idx).unwrap())
+                } else {
+                    let mut null = Value::Object(Default::default());
+                    std::mem::swap(v, &mut null);
+                    Ok(v.as_object_mut().unwrap().entry(p.to_string()).or_insert(null))
+                }
+            }
+            val => {
+                let mut array = Value::Null;
+                std::mem::swap(val, &mut array);
+                *val = Value::Array(vec![array]);
+                Ok(val)
+            }
+        })
+    }
+    pub fn put(v: &mut Value, p: Value) {
+        match v {
+            Value::Null => *v = p,
+            Value::Array(a) => {
+                a.push(p);
+            }
+            _ => {
+                let mut array = Value::Null;
+                std::mem::swap(v, &mut array);
+                *v = Value::Array(vec![array, p]);
+            }
+        }
+    }
+    pub fn parse(v: &str) -> Value {
+        if let Ok(int) = v.parse::<i64>() {
+            json!(int)
+        } else if let Ok(float) = v.parse::<f64>() {
+            json!(float)
+        } else if let Ok(bool) = v.parse::<bool>() {
+            json!(bool)
+        } else if v == "null" {
+            json!(null)
+        } else {
+            json!(v)
+        }
+    }
+    pub fn dot_splitted(&self) -> Result<Value, JsonizeError> {
+        let mut value = Value::Null;
+        for (k, v) in &self.0 {
+            Self::put(Self::entry(&mut value, k.split('.'))?, Self::parse(v));
+        }
+        Ok(value)
+    }
+
+    #[tracing::instrument]
+    pub async fn dot_splitted_handler(Query(v): Query<Vec<(String, String)>>) -> Result<Json<Value>, EchoError> {
+        Ok(Json(Self(v).dot_splitted()?))
+    }
 }
 
 #[cfg(test)]
@@ -83,11 +157,6 @@ mod tests {
     use axum::http::header::CONTENT_TYPE;
     use axum::http::{Method, Request, StatusCode};
     use mime::APPLICATION_JSON;
-
-    #[tokio::test]
-    async fn test_echo_empty_handler() {
-        assert_eq!(empty().await, "");
-    }
 
     #[tokio::test]
     async fn test_echo_empty() {
@@ -165,16 +234,73 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_echo_json() {
-        // let mut app = app_with(Default::default());
+    async fn test_jsonizer() {
+        let j = Jsonizer(vec![]);
+        assert_eq!(j.dot_splitted().unwrap(), Value::Null);
 
-        // call_with_assert(
-        //     &mut app,
-        //     Request::builder().uri("/echo/json").body(Body::empty()).unwrap(),
-        //     StatusCode::OK,
-        //     json!({}),
-        // )
-        // .await;
+        let j = Jsonizer(vec![(String::from("key"), String::from("value"))]);
+        assert_eq!(j.dot_splitted().unwrap(), json!({ "key": "value" }));
+
+        let j = Jsonizer(vec![
+            (String::from("key"), String::from("value1")),
+            (String::from("key"), String::from("value2")),
+        ]);
+        assert_eq!(j.dot_splitted().unwrap(), json!({ "key": ["value1", "value2"] }));
+
+        let j = Jsonizer(vec![(String::from("foo.bar.baz"), String::from("value"))]);
+        assert_eq!(j.dot_splitted().unwrap(), json!({ "foo": { "bar": { "baz": "value" } } }));
+
+        let j = Jsonizer(vec![
+            (String::from("foo.bar.baz"), String::from("value1")),
+            (String::from("foo.bar.baz"), String::from("value2")),
+        ]);
+        assert_eq!(j.dot_splitted().unwrap(), json!({ "foo": { "bar": { "baz": ["value1", "value2"] } } }));
+
+        let j = Jsonizer(vec![(String::from("number.3.value"), String::from("three"))]);
+        assert_eq!(j.dot_splitted().unwrap(), json!({ "number": [null, null, null, { "value": "three" }] }));
+
+        let j = Jsonizer(vec![
+            (String::from("number.3.value"), String::from("three")),
+            (String::from("number.1.value"), String::from("one")),
+        ]);
+        assert_eq!(
+            j.dot_splitted().unwrap(),
+            json!({ "number": [null, { "value": "one" }, null, { "value": "three" }] })
+        );
+
+        let _j = Jsonizer(vec![
+            (String::from("hoge.fuga"), String::from("hogera")),
+            (String::from("hoge.fuga.piyo"), String::from("hogehoge")),
+        ]);
+        // assert!(j.dot_splitted().is_err()); // TODO
+    }
+
+    #[tokio::test]
+    async fn test_echo_json() {
+        let mut app = app_with(Default::default());
+
+        call_with_assert(
+            &mut app,
+            Request::builder().uri("/echo/json").body(Body::empty()).unwrap(),
+            StatusCode::OK,
+            json!(null),
+        )
+        .await;
+
+        call_with_assert(
+            &mut app,
+            Request::builder()
+                .uri("/echo/json?key=value&a.foo=null&a.bar=true&a.baz=2.0&a.qux=three&a.quux=4&d.5=five&d.0=zero")
+                .body(Body::empty())
+                .unwrap(),
+            StatusCode::OK,
+            json!({
+                "key": "value",
+                "a": { "foo": null, "bar": true, "baz": 2.0, "qux": "three", "quux": 4 },
+                "d": [ "zero", null, null, null, null, "five" ],
+            }),
+        )
+        .await;
     }
 
     #[tokio::test]

@@ -184,3 +184,35 @@ pub mod random {
         }
     }
 }
+
+pub mod echo {
+    use serde_json::Value;
+
+    use super::*;
+
+    #[derive(Error, Debug, Clone, PartialEq, Eq)]
+    pub enum EchoError {
+        #[error(transparent)]
+        JsonizeError(#[from] JsonizeError),
+    }
+    impl IntoResponse for EchoError {
+        fn into_response(self) -> Response {
+            AppErrorDetail::<kind::BadRequest, _>::detail_display(self).into_response()
+        }
+    }
+
+    #[derive(Error, Debug, Clone, PartialEq, Eq)]
+    pub enum JsonizeError {
+        #[error("conflict in {0:?}, already {1} but want {2}")]
+        Conflict(String, Value, Value),
+        #[error("cannot parse value as integer: {0}")]
+        CannotParseInt(#[from] std::num::ParseIntError),
+        #[error("cannot parse value as float: {0}")]
+        CannotParseFloat(#[from] std::num::ParseFloatError),
+    }
+    impl IntoResponse for JsonizeError {
+        fn into_response(self) -> Response {
+            AppErrorDetail::<kind::BadRequest, _>::detail_display(self).into_response()
+        }
+    }
+}
