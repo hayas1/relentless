@@ -263,19 +263,20 @@ mod tests {
     #[cfg(all(feature = "yaml", feature = "json"))]
     fn test_read_configs_filtered() {
         let cmd = Relentless {
-            file: glob::glob("tests/config/*valid/**/*.yaml").unwrap().collect::<Result<Vec<_>, _>>().unwrap(),
+            file: glob::glob("tests/config/parse/*.yaml").unwrap().collect::<Result<Vec<_>, _>>().unwrap(),
+            report_format: ReportFormat::NullDevice,
             ..Default::default()
         };
         let mut buf = Vec::new();
         let configs = cmd.configs_filtered(&mut buf).unwrap();
-        assert_eq!(configs.len(), glob::glob("tests/config/valid/**/*.yaml").unwrap().filter(Result::is_ok).count());
+        assert_eq!(configs.len(), glob::glob("tests/config/parse/valid_*.yaml").unwrap().filter(Result::is_ok).count());
 
         let warn = String::from_utf8_lossy(&buf);
-        assert!(warn.contains("tests/config/invalid/invalid_config.yaml"));
+        assert!(warn.contains("tests/config/parse/invalid_simple_string.yaml"));
         assert_eq!(
             warn,
             [
-                r#"tests/config/invalid/invalid_config.yaml:"#,
+                r#"tests/config/parse/invalid_simple_string.yaml:"#,
                 r#"invalid type: string "simple string yaml", expected struct Config"#,
                 r#""#,
             ]
