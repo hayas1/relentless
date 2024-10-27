@@ -158,7 +158,6 @@ impl Relentless {
     {
         let control = Control::with_service(self, configs, services)?;
         let report = control.assault(evaluator).await?;
-
         Ok(report)
     }
 
