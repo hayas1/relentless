@@ -3,7 +3,7 @@ use axum::body::Body;
 use relentless::{
     command::{Relentless, ReportFormat},
     evaluate::DefaultEvaluator,
-    report::{ConsoleReport, ReportWriter, Reportable},
+    report::{ConsoleCaseReport, ConsoleReport, ReportWriter, Reportable},
 };
 
 use relentless_dev_server::route;
@@ -26,10 +26,10 @@ async fn test_repeat_config() {
     let out = String::from_utf8_lossy(&buf);
 
     for line in [
-        format!("{} /counter/increment {}10/10", console::Emoji("✅", "PASS"), console::Emoji("🔁", "")),
-        format!("{} /counter/increment/10 {}10/10", console::Emoji("✅", "PASS"), console::Emoji("🔁", "")),
-        format!("{} /counter/decrement {}10/10", console::Emoji("✅", "PASS"), console::Emoji("🔁", "")),
-        format!("{} /counter/decrement/10 {}1/1", console::Emoji("✅", "PASS"), console::Emoji("🔁", "")),
+        format!("{} /counter/increment {}10/10", ConsoleCaseReport::PASS_EMOJI, ConsoleCaseReport::REPEAT_EMOJI),
+        format!("{} /counter/increment/10 {}10/10", ConsoleCaseReport::PASS_EMOJI, ConsoleCaseReport::REPEAT_EMOJI),
+        format!("{} /counter/decrement {}10/10", ConsoleCaseReport::PASS_EMOJI, ConsoleCaseReport::REPEAT_EMOJI),
+        format!("{} /counter/decrement/10 {}1/1", ConsoleCaseReport::PASS_EMOJI, ConsoleCaseReport::REPEAT_EMOJI),
     ] {
         assert!(out.contains(&line));
     }

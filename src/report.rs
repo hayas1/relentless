@@ -61,20 +61,40 @@ impl<T> Reportable for WorkerReport<T> {
     }
 }
 #[cfg(feature = "console-report")]
+pub enum ConsoleWorkerReport {}
+#[cfg(feature = "console-report")]
+impl ConsoleWorkerReport {
+    pub const NAME_DEFAULT: &'_ str = "testcases";
+    pub const NAME_EMOJI: console::Emoji<'_, '_> = console::Emoji("🚀", "");
+    pub const DESTINATION_EMOJI: console::Emoji<'_, '_> = console::Emoji("🌐", ":");
+    pub const OVERWRITE_DESTINATION_EMOJI: console::Emoji<'_, '_> = console::Emoji("👉", "->");
+}
+#[cfg(feature = "console-report")]
 impl<T: Display> ConsoleReport for WorkerReport<T> {
     type Error = Wrap; // TODO crate::Error ?
     fn console_report<W: std::io::Write>(&self, cmd: &Relentless, w: &mut ReportWriter<W>) -> Result<(), Self::Error> {
         let WorkerConfig { name, destinations, .. } = self.config.coalesce();
 
-        let side = console::Emoji("🚀", "");
-        writeln!(w, "{} {} {}", side, name.as_ref().unwrap_or(&"testcases".to_string()), side)?;
+        writeln!(
+            w,
+            "{} {} {}",
+            ConsoleWorkerReport::NAME_EMOJI,
+            name.as_ref().unwrap_or(&ConsoleWorkerReport::NAME_DEFAULT.to_string()),
+            ConsoleWorkerReport::NAME_EMOJI
+        )?;
 
         w.scope(|w| {
             for (name, destination) in destinations {
-                write!(w, "{}{} ", name, console::Emoji("🌐", ":"))?;
+                write!(w, "{}{} ", name, ConsoleWorkerReport::DESTINATION_EMOJI)?;
                 match self.config.base().destinations.get(&name) {
                     Some(base) if base != &destination => {
-                        writeln!(w, "{} {} {}", **base, console::Emoji("👉", "->"), *destination)?;
+                        writeln!(
+                            w,
+                            "{} {} {}",
+                            **base,
+                            ConsoleWorkerReport::OVERWRITE_DESTINATION_EMOJI,
+                            *destination
+                        )?;
                     }
                     _ => {
                         writeln!(w, "{}", *destination)?;
@@ -123,30 +143,41 @@ impl<T> Reportable for CaseReport<T> {
     }
 }
 #[cfg(feature = "console-report")]
+pub enum ConsoleCaseReport {}
+#[cfg(feature = "console-report")]
+impl ConsoleCaseReport {
+    pub const PASS_EMOJI: console::Emoji<'_, '_> = console::Emoji("✅", "PASS");
+    pub const FAIL_EMOJI: console::Emoji<'_, '_> = console::Emoji("❌", "FAIL");
+    pub const REPEAT_EMOJI: console::Emoji<'_, '_> = console::Emoji("🔁", "");
+    pub const DESCRIPTION_EMOJI: console::Emoji<'_, '_> = console::Emoji("📝", "");
+    pub const ALLOW_EMOJI: console::Emoji<'_, '_> = console::Emoji("👀", "");
+    pub const MESSAGE_EMOJI: console::Emoji<'_, '_> = console::Emoji("💬", "");
+}
+#[cfg(feature = "console-report")]
 impl<T: Display> ConsoleReport for CaseReport<T> {
     type Error = Wrap; // TODO crate::Error ?
     fn console_report<W: std::io::Write>(&self, cmd: &Relentless, w: &mut ReportWriter<W>) -> Result<(), Self::Error> {
         let Testcase { description, target, setting, .. } = self.testcases.coalesce();
 
-        let side = if self.pass() { console::Emoji("✅", "PASS") } else { console::Emoji("❌", "FAIL") };
+        let side = if self.pass() { ConsoleCaseReport::PASS_EMOJI } else { ConsoleCaseReport::FAIL_EMOJI };
         let target = console::style(&target);
         write!(w, "{} {} ", side, if self.pass() { target.green() } else { target.red() })?;
         if let Repeat(Some(ref repeat)) = setting.repeat {
-            write!(w, "{}{}/{} ", console::Emoji("🔁", ""), self.passed, repeat)?;
+            write!(w, "{}{}/{} ", ConsoleCaseReport::REPEAT_EMOJI, self.passed, repeat)?;
         }
         if let Some(ref description) = description {
-            writeln!(w, "{} {}", console::Emoji("📝", ""), description)?;
+            writeln!(w, "{} {}", ConsoleCaseReport::DESCRIPTION_EMOJI, description)?;
         } else {
             writeln!(w)?;
         }
         if !self.pass() && self.allow(cmd.strict) {
             w.scope(|w| {
-                writeln!(w, "{} {}", console::Emoji("👀", ""), console::style("this testcase is allowed").green())
+                writeln!(w, "{} {}", ConsoleCaseReport::ALLOW_EMOJI, console::style("this testcase is allowed").green())
             })?;
         }
         if !self.messages.is_empty() {
             w.scope(|w| {
-                writeln!(w, "{} {}", console::Emoji("💬", ""), console::style("message was found").yellow())?;
+                writeln!(w, "{} {}", ConsoleCaseReport::MESSAGE_EMOJI, console::style("message was found").yellow())?;
                 w.scope(|w| {
                     let message = &self.messages;
                     writeln!(w, "{}", console::style(message).dim())
