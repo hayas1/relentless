@@ -3,7 +3,7 @@ use std::process::ExitCode;
 #[tokio::main]
 #[cfg(all(feature = "yaml", feature = "json", feature = "console-report"))]
 async fn main() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sync>> {
-    use relentless::{command::Relentless, report::console_report::ConsoleReport};
+    use relentless::command::Relentless;
 
     let cmd = Relentless {
         file: vec!["examples/config/assault.yaml".into(), "examples/config/compare.yaml".into()],
@@ -12,8 +12,8 @@ async fn main() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sync>> {
 
     let report = cmd.assault().await?;
 
-    report.console_report_stdout(&cmd)?;
-    Ok(report.exit_code(cmd))
+    cmd.report(&report)?;
+    Ok(report.exit_code(&cmd))
 }
 
 #[cfg(not(all(feature = "yaml", feature = "json", feature = "console-report")))]

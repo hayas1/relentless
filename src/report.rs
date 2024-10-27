@@ -15,7 +15,7 @@ impl<T> Report<T> {
     pub fn new(report: Vec<WorkerReport<T>>) -> Self {
         Self { report }
     }
-    pub fn exit_code(&self, cmd: Relentless) -> ExitCode {
+    pub fn exit_code(&self, cmd: &Relentless) -> ExitCode {
         (!self.allow(cmd.strict) as u8).into()
     }
 }

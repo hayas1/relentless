@@ -33,8 +33,9 @@ pub async fn execute() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sy
         unimplemented!("`--rps` is not implemented yet");
     }
 
-    let ret = cmd.assault().await?;
-    Ok(ret.exit_code(cmd))
+    let rep = cmd.assault().await?;
+    cmd.report(&rep)?;
+    Ok(rep.exit_code(&cmd))
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -155,18 +156,24 @@ impl Relentless {
         E: Evaluator<http::Response<ResB>>,
         E::Message: Display,
     {
+        let control = Control::with_service(self, configs, services)?;
+        let report = control.assault(evaluator).await?;
+
+        Ok(report)
+    }
+
+    pub fn report<M: Display>(&self, report: &Report<M>) -> crate::Result<ExitCode> {
         let Self { no_color, report_format, .. } = self;
         #[cfg(feature = "console-report")]
         console::set_colors_enabled(!no_color);
 
-        let control = Control::with_service(self, configs, services)?;
-        let report = control.assault(evaluator).await?;
         match report_format {
             ReportFormat::NullDevice => {}
             #[cfg(feature = "console-report")]
-            ReportFormat::Console => report.console_report_stdout(self)?, // TODO other than stdout
-        }
-        Ok(report)
+            ReportFormat::Console => report.console_report_stdout(self)?,
+        };
+
+        Ok(report.exit_code(self))
     }
 }
 

@@ -13,7 +13,7 @@ use relentless_dev_server::route;
 
 #[tokio::test]
 async fn test_repeat_config() {
-    let mut relentless = Relentless {
+    let relentless = Relentless {
         file: vec!["tests/config/feature/repeat.yaml".into()],
         report_format: ReportFormat::NullDevice,
         no_color: true,
@@ -25,7 +25,6 @@ async fn test_repeat_config() {
     let report = relentless.assault_with::<_, Body, Body, _>(configs, vec![services], &DefaultEvaluator).await.unwrap();
 
     let mut buf = Vec::new();
-    relentless.report_format = ReportFormat::Console; // TODO remove
     report.console_report(&relentless, &mut ReportWriter::new(0, &mut buf)).unwrap();
     let out = String::from_utf8_lossy(&buf);
 
