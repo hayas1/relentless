@@ -23,7 +23,8 @@ async fn test_example_yaml_config() {
     ]
     .into_iter()
     .collect();
-    let report = relentless.assault_with::<_, Body, Body, _>(configs, vec![services], &DefaultEvaluator).await.unwrap();
+    let report =
+        relentless.assault_with::<_, Body, Body, _>(configs, &mut vec![services], &DefaultEvaluator).await.unwrap();
 
     assert!(report.allow(false));
 }
@@ -44,7 +45,8 @@ async fn test_basic_yaml_config() {
     ]
     .into_iter()
     .collect();
-    let report = relentless.assault_with::<_, Body, Body, _>(configs, vec![services], &DefaultEvaluator).await.unwrap();
+    let report =
+        relentless.assault_with::<_, Body, Body, _>(configs, &mut vec![services], &DefaultEvaluator).await.unwrap();
 
     assert!(report.allow(false));
 }
@@ -65,7 +67,8 @@ async fn test_basic_toml_config() {
     ]
     .into_iter()
     .collect();
-    let report = relentless.assault_with::<_, Body, Body, _>(configs, vec![services], &DefaultEvaluator).await.unwrap();
+    let report =
+        relentless.assault_with::<_, Body, Body, _>(configs, &mut vec![services], &DefaultEvaluator).await.unwrap();
 
     assert!(report.allow(false));
 }
