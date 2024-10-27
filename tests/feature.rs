@@ -3,16 +3,19 @@ use axum::body::Body;
 use relentless::{
     command::{Relentless, ReportFormat},
     evaluate::DefaultEvaluator,
-    report::{ConsoleCaseReport, ConsoleReport, ReportWriter, Reportable},
+    report::{
+        console_report::{ConsoleCaseReport, ConsoleReport, ReportWriter},
+        Reportable,
+    },
 };
 
 use relentless_dev_server::route;
 
 #[tokio::test]
 async fn test_repeat_config() {
-    let relentless = Relentless {
+    let mut relentless = Relentless {
         file: vec!["tests/config/feature/repeat.yaml".into()],
-        report_format: ReportFormat::Console,
+        report_format: ReportFormat::NullDevice,
         no_color: true,
         ..Default::default()
     };
@@ -22,6 +25,7 @@ async fn test_repeat_config() {
     let report = relentless.assault_with::<_, Body, Body, _>(configs, vec![services], &DefaultEvaluator).await.unwrap();
 
     let mut buf = Vec::new();
+    relentless.report_format = ReportFormat::Console; // TODO remove
     report.console_report(&relentless, &mut ReportWriter::new(0, &mut buf)).unwrap();
     let out = String::from_utf8_lossy(&buf);
 
