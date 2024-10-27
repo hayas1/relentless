@@ -12,7 +12,7 @@ use crate::{
     config::{http_serde_priv, Config, Destinations},
     error::{IntoContext, MultiWrap, RunCommandError, Wrap, WrappedResult},
     evaluate::Evaluator,
-    report::Report,
+    report::{console_report::ReportWriter, Report},
     service::FromBodyStructure,
     worker::Control,
 };
@@ -162,6 +162,9 @@ impl Relentless {
     }
 
     pub fn report<M: Display>(&self, report: &Report<M>) -> crate::Result<ExitCode> {
+        self.report_with(report, std::io::stdout())
+    }
+    pub fn report_with<M: Display, W: Write>(&self, report: &Report<M>, mut write: W) -> crate::Result<ExitCode> {
         let Self { no_color, report_format, .. } = self;
         #[cfg(feature = "console-report")]
         console::set_colors_enabled(!no_color);
@@ -169,7 +172,7 @@ impl Relentless {
         match report_format {
             ReportFormat::NullDevice => {}
             #[cfg(feature = "console-report")]
-            ReportFormat::Console => report.console_report_stdout(self)?,
+            ReportFormat::Console => report.console_report(self, &mut ReportWriter::new(0, &mut write))?,
         };
 
         Ok(report.exit_code(self))

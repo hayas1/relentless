@@ -1,31 +1,24 @@
 #![cfg(all(feature = "json", feature = "yaml", feature = "console-report"))]
 use axum::body::Body;
 use relentless::{
-    command::{Relentless, ReportFormat},
+    command::Relentless,
     evaluate::DefaultEvaluator,
-    report::{
-        console_report::{ConsoleCaseReport, ConsoleReport, ReportWriter},
-        Reportable,
-    },
+    report::{console_report::ConsoleCaseReport, Reportable},
 };
 
 use relentless_dev_server::route;
 
 #[tokio::test]
 async fn test_repeat_config() {
-    let relentless = Relentless {
-        file: vec!["tests/config/feature/repeat.yaml".into()],
-        report_format: ReportFormat::NullDevice,
-        no_color: true,
-        ..Default::default()
-    };
+    let relentless =
+        Relentless { file: vec!["tests/config/feature/repeat.yaml".into()], no_color: true, ..Default::default() };
     let configs = relentless.configs().unwrap();
     let test_api = route::app_with(Default::default());
     let services = [("test-api".to_string(), test_api)].into_iter().collect();
     let report = relentless.assault_with::<_, Body, Body, _>(configs, vec![services], &DefaultEvaluator).await.unwrap();
 
     let mut buf = Vec::new();
-    report.console_report(&relentless, &mut ReportWriter::new(0, &mut buf)).unwrap();
+    relentless.report_with(&report, &mut buf).unwrap();
     let out = String::from_utf8_lossy(&buf);
 
     for line in [
