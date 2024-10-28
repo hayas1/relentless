@@ -20,17 +20,17 @@ default-http-client = ["reqwest"]
 
 
 [dependencies]
-tokio = { version = "1.40.0", features = ["full"] }
+tokio = { version = "1.41.0", features = ["full"] }
 tower = { version = "0.5.0", features = ["timeout", "util"] }
-reqwest = { version = "0.12.8", optional = true }
+reqwest = { version = "0.12.9", optional = true }
 http = "1.1.0"
 http-serde = "2.1.1"
 http-body = "1.0.1"
 http-body-util = "0.1.2"
-bytes = "1.7.2"
+bytes = "1.8.0"
 
-thiserror = "1.0.63"
-serde = { version = "1.0.210", features = ["derive"] }
+thiserror = "1.0.65"
+serde = { version = "1.0.214", features = ["derive"] }
 serde_json = { version = "1.0.132", optional = true }
 serde_yaml = { version = "0.9.34", optional = true }
 toml = { version = "0.8.19", optional = true }
