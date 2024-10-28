@@ -48,6 +48,7 @@ async fn test_basic_yaml_config() {
     let report =
         relentless.assault_with::<_, Body, Body, _>(configs, &mut vec![services], &DefaultEvaluator).await.unwrap();
 
+    // assert_eq!(relentless.file.len(), report.sub_reportable().len()); // TODO zip cause only 1 call
     assert!(report.allow(false));
 }
 
@@ -70,5 +71,6 @@ async fn test_basic_toml_config() {
     let report =
         relentless.assault_with::<_, Body, Body, _>(configs, &mut vec![services], &DefaultEvaluator).await.unwrap();
 
+    // assert_eq!(relentless.file.len(), report.sub_reportable().len()); // TODO zip cause only 1 call
     assert!(report.allow(false));
 }
