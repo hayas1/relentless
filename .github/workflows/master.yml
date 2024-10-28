@@ -18,6 +18,15 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@stable
+    - name: Cargo home
+      id: cargo-home
+      run: echo "path=${CARGO_HOME:-~/.cargo}" >>"$GITHUB_OUTPUT"
+    - uses: actions/cache@v4
+      with:
+        path: |
+          target
+          ${{ steps.cargo-home.outputs.path }}
+        key: cargo-${{ hashFiles('**/Cargo.toml') }}
 
     - name: Release test for develop server
       run: cargo test --release --manifest-path dev/server/Cargo.toml
@@ -69,11 +78,24 @@ jobs:
     timeout-minutes: 10
     steps:
     - uses: actions/checkout@v4
+    - uses: dtolnay/rust-toolchain@stable
+    - name: Cargo home
+      id: cargo-home
+      run: echo "path=${CARGO_HOME:-~/.cargo}" >>"$GITHUB_OUTPUT"
+    - uses: actions/cache@v4
+      with:
+        path: |
+          target
+          ${{ steps.cargo-home.outputs.path }}
+        key: cargo-${{ hashFiles('**/Cargo.toml') }}
+    - name: Release build
+      run: cargo build --release --features=cli
     - name: Push tag
       run: |
         git tag ${{ needs.build.outputs.expected-git-tag }}
         git push origin ${{ needs.build.outputs.expected-git-tag }}
     - name: Release draft
+      id: create-release
       uses: actions/create-release@v1 # archived
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -81,3 +103,12 @@ jobs:
         tag_name: ${{ needs.build.outputs.expected-git-tag }}
         release_name: ${{ needs.build.outputs.expected-git-tag }}
         draft: true
+    - name: Upload Release Asset
+      uses: actions/upload-release-asset@v1 # archived
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create-release.outputs.upload_url }}
+        asset_path: ./target/release/relentless
+        asset_name: relentless
+        asset_content_type: application/octet-stream
