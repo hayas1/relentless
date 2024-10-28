@@ -4,7 +4,7 @@ use http_body_util::BodyExt;
 use relentless::{
     command::Relentless,
     evaluate::DefaultEvaluator,
-    report::{console_report::ConsoleCaseReport, Reportable},
+    report::{console_report::CaseConsoleReport, Reportable},
 };
 
 use relentless_dev_server::route::{self, counter::CounterResponse};
@@ -23,10 +23,10 @@ async fn test_repeat_config() {
     let out = String::from_utf8_lossy(&buf);
 
     for line in [
-        format!("{} /counter/increment {}10/10", ConsoleCaseReport::PASS_EMOJI, ConsoleCaseReport::REPEAT_EMOJI),
-        format!("{} /counter/increment/10 {}10/10", ConsoleCaseReport::PASS_EMOJI, ConsoleCaseReport::REPEAT_EMOJI),
-        format!("{} /counter/decrement {}10/10", ConsoleCaseReport::PASS_EMOJI, ConsoleCaseReport::REPEAT_EMOJI),
-        format!("{} /counter/decrement/10 {}1/1", ConsoleCaseReport::PASS_EMOJI, ConsoleCaseReport::REPEAT_EMOJI),
+        format!("{} /counter/increment {}10/10", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
+        format!("{} /counter/increment/10 {}10/10", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
+        format!("{} /counter/decrement {}10/10", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
+        format!("{} /counter/decrement/10 {}1/1", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
     ] {
         assert!(out.contains(&line));
     }

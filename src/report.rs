@@ -124,9 +124,8 @@ pub mod console_report {
         }
     }
 
-    pub enum ConsoleWorkerReport {}
-
-    impl ConsoleWorkerReport {
+    pub enum WorkerConsoleReport {}
+    impl WorkerConsoleReport {
         pub const NAME_DEFAULT: &'_ str = "testcases";
         pub const NAME_EMOJI: console::Emoji<'_, '_> = console::Emoji("🚀", "");
         pub const DESTINATION_EMOJI: console::Emoji<'_, '_> = console::Emoji("🌐", ":");
@@ -145,21 +144,21 @@ pub mod console_report {
             writeln!(
                 w,
                 "{} {} {}",
-                ConsoleWorkerReport::NAME_EMOJI,
-                name.as_ref().unwrap_or(&ConsoleWorkerReport::NAME_DEFAULT.to_string()),
-                ConsoleWorkerReport::NAME_EMOJI
+                WorkerConsoleReport::NAME_EMOJI,
+                name.as_ref().unwrap_or(&WorkerConsoleReport::NAME_DEFAULT.to_string()),
+                WorkerConsoleReport::NAME_EMOJI
             )?;
 
             w.scope(|w| {
                 for (name, destination) in destinations {
-                    write!(w, "{}{} ", name, ConsoleWorkerReport::DESTINATION_EMOJI)?;
+                    write!(w, "{}{} ", name, WorkerConsoleReport::DESTINATION_EMOJI)?;
                     match self.config.base().destinations.get(&name) {
                         Some(base) if base != &destination => {
                             writeln!(
                                 w,
                                 "{} {} {}",
                                 **base,
-                                ConsoleWorkerReport::OVERWRITE_DESTINATION_EMOJI,
+                                WorkerConsoleReport::OVERWRITE_DESTINATION_EMOJI,
                                 *destination
                             )?;
                         }
@@ -183,9 +182,8 @@ pub mod console_report {
         }
     }
 
-    pub enum ConsoleCaseReport {}
-
-    impl ConsoleCaseReport {
+    pub enum CaseConsoleReport {}
+    impl CaseConsoleReport {
         pub const PASS_EMOJI: console::Emoji<'_, '_> = console::Emoji("✅", "PASS");
         pub const FAIL_EMOJI: console::Emoji<'_, '_> = console::Emoji("❌", "FAIL");
         pub const REPEAT_EMOJI: console::Emoji<'_, '_> = console::Emoji("🔁", "");
@@ -203,14 +201,14 @@ pub mod console_report {
         ) -> Result<(), Self::Error> {
             let Testcase { description, target, setting, .. } = self.testcases.coalesce();
 
-            let side = if self.pass() { ConsoleCaseReport::PASS_EMOJI } else { ConsoleCaseReport::FAIL_EMOJI };
+            let side = if self.pass() { CaseConsoleReport::PASS_EMOJI } else { CaseConsoleReport::FAIL_EMOJI };
             let target = console::style(&target);
             write!(w, "{} {} ", side, if self.pass() { target.green() } else { target.red() })?;
             if let Repeat(Some(ref repeat)) = setting.repeat {
-                write!(w, "{}{}/{} ", ConsoleCaseReport::REPEAT_EMOJI, self.passed, repeat)?;
+                write!(w, "{}{}/{} ", CaseConsoleReport::REPEAT_EMOJI, self.passed, repeat)?;
             }
             if let Some(ref description) = description {
-                writeln!(w, "{} {}", ConsoleCaseReport::DESCRIPTION_EMOJI, description)?;
+                writeln!(w, "{} {}", CaseConsoleReport::DESCRIPTION_EMOJI, description)?;
             } else {
                 writeln!(w)?;
             }
@@ -219,7 +217,7 @@ pub mod console_report {
                     writeln!(
                         w,
                         "{} {}",
-                        ConsoleCaseReport::ALLOW_EMOJI,
+                        CaseConsoleReport::ALLOW_EMOJI,
                         console::style("this testcase is allowed").green()
                     )
                 })?;
@@ -229,7 +227,7 @@ pub mod console_report {
                     writeln!(
                         w,
                         "{} {}",
-                        ConsoleCaseReport::MESSAGE_EMOJI,
+                        CaseConsoleReport::MESSAGE_EMOJI,
                         console::style("message was found").yellow()
                     )?;
                     w.scope(|w| {
