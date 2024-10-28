@@ -41,3 +41,44 @@ async fn test_repeat_config() {
     let count: CounterResponse<u64> = serde_json::from_slice(&response.collect().await.unwrap().to_bytes()).unwrap();
     assert_eq!(count.count, 90);
 }
+
+#[tokio::test]
+async fn test_validate_config() {
+    let relentless =
+        Relentless { file: vec!["tests/config/feature/validate.yaml".into()], no_color: true, ..Default::default() };
+    let configs = relentless.configs().unwrap();
+    let mut services = vec![[("test-api".to_string(), route::app_with(Default::default()))].into_iter().collect()];
+    let report = relentless.assault_with::<_, Body, Body, _>(configs, &mut services, &DefaultEvaluator).await.unwrap();
+
+    let mut buf = Vec::new();
+    relentless.report_with(&report, &mut buf).unwrap();
+    let out = String::from_utf8_lossy(&buf);
+
+    assert!(out.contains(&format!("{} /echo/json?foo=hoge&bar=fuga&baz=piyo", CaseConsoleReport::PASS_EMOJI,)));
+    assert!(report.pass());
+}
+
+#[tokio::test]
+async fn test_fail_validate_config() {
+    let relentless = Relentless {
+        file: vec!["tests/config/feature/fail_validate.yaml".into()],
+        no_color: true,
+        ..Default::default()
+    };
+    let configs = relentless.configs().unwrap();
+    let mut services = vec![[("test-api".to_string(), route::app_with(Default::default()))].into_iter().collect()];
+    let report = relentless.assault_with::<_, Body, Body, _>(configs, &mut services, &DefaultEvaluator).await.unwrap();
+
+    let mut buf = Vec::new();
+    relentless.report_with(&report, &mut buf).unwrap();
+    let out = String::from_utf8_lossy(&buf);
+
+    for line in [
+        format!("{} /echo/json?foo=hoge&bar=fuga&baz=piyo", CaseConsoleReport::FAIL_EMOJI),
+        format!("  {} message was found", CaseConsoleReport::MESSAGE_EMOJI),
+        format!("    operation '{}' failed at path '{}': value did not match", "/0", ""),
+    ] {
+        assert!(out.contains(&line));
+    }
+    assert!(!report.pass());
+}

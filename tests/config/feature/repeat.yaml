@@ -1,6 +1,4 @@
-
-
-name: test config for repeat feature
+name: test config for repeat
 destinations:
   test-api: http://localhost:3000
 setting:
