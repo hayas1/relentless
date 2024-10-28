@@ -1,0 +1,8 @@
+name: test config for allow
+destinations:
+  test-api: http://localhost:3000
+
+testcases:
+  - target: /health/disabled
+    attr:
+      allow: true

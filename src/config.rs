@@ -649,18 +649,4 @@ mod tests {
             },
         );
     }
-
-    #[test]
-    #[cfg(all(feature = "yaml", feature = "json"))]
-    fn test_read_valid_and_invalid_config_files() {
-        for valid in glob::glob("tests/config/valid/**/*.yaml").unwrap() {
-            // TODO assert
-            let _config = Config::read(valid.unwrap()).unwrap();
-        }
-
-        for invalid in glob::glob("tests/config/invalid/**/*.yaml").unwrap() {
-            // TODO assert
-            let _err = Config::read(invalid.unwrap()).unwrap_err();
-        }
-    }
 }

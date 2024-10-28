@@ -1,10 +1,10 @@
-name: Run Example Http Server
+name: Run Develop Http Server
 
 inputs:
   manifest-path:
-    description: Manifest path to Cargo.toml of the example http server
+    description: Manifest path to Cargo.toml of the develop http server
     required: false
-    default: examples/server/http/Cargo.toml
+    default: dev/server/Cargo.toml
   port:
     description: Port to listen on
     required: false
@@ -35,7 +35,7 @@ runs:
           ${{ steps.cargo-home.outputs.path }}
         key: cargo-${{ hashFiles('**/Cargo.toml') }}
 
-    - name: Run example http server
+    - name: Run develop http server
       shell: bash
       env:
         PORT: ${{ inputs.port }}

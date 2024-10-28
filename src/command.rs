@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use tower::Service;
 
 #[cfg(feature = "console-report")]
-use crate::report::ConsoleReport;
+use crate::report::console_report::{ConsoleReport, ReportWriter};
 use crate::{
     config::{http_serde_priv, Config, Destinations},
     error::{IntoContext, MultiWrap, RunCommandError, Wrap, WrappedResult},
@@ -33,8 +33,9 @@ pub async fn execute() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sy
         unimplemented!("`--rps` is not implemented yet");
     }
 
-    let ret = cmd.assault().await?;
-    Ok(ret.exit_code(cmd))
+    let rep = cmd.assault().await?;
+    cmd.report(&rep)?;
+    Ok(rep.exit_code(&cmd))
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -61,7 +62,7 @@ pub struct Relentless {
     #[cfg_attr(feature = "cli", arg(long))]
     pub no_color: bool,
 
-    /// report nothing
+    /// format of report
     #[cfg_attr(feature = "cli", arg(short, long), clap(value_enum, default_value_t))]
     pub report_format: ReportFormat,
 
@@ -79,8 +80,11 @@ pub struct Relentless {
 #[cfg_attr(feature = "cli", derive(ValueEnum))]
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum ReportFormat {
+    /// without report
     #[cfg_attr(not(feature = "console-report"), default)]
     NullDevice,
+
+    /// report to console
     #[cfg(feature = "console-report")]
     #[cfg_attr(feature = "console-report", default)]
     Console,
@@ -129,15 +133,15 @@ impl Relentless {
     #[cfg(all(feature = "default-http-client", feature = "cli"))]
     pub async fn assault(&self) -> crate::Result<Report<crate::error::EvaluateError>> {
         let configs = self.configs_filtered(std::io::stderr())?;
-        let clients = Control::default_http_clients(self, &configs).await?;
-        let report = self.assault_with(configs, clients, &crate::evaluate::DefaultEvaluator).await?;
+        let mut clients = Control::default_http_clients(self, &configs).await?;
+        let report = self.assault_with(configs, &mut clients, &crate::evaluate::DefaultEvaluator).await?;
         Ok(report)
     }
     /// TODO document
     pub async fn assault_with<S, ReqB, ResB, E>(
         &self,
         configs: Vec<Config>,
-        services: Vec<Destinations<S>>,
+        services: &mut Vec<Destinations<S>>,
         evaluator: &E,
     ) -> crate::Result<Report<E::Message>>
     where
@@ -152,18 +156,26 @@ impl Relentless {
         E: Evaluator<http::Response<ResB>>,
         E::Message: Display,
     {
+        let control = Control::with_service(self, configs, services)?;
+        let report = control.assault(evaluator).await?;
+        Ok(report)
+    }
+
+    pub fn report<M: Display>(&self, report: &Report<M>) -> crate::Result<ExitCode> {
+        self.report_with(report, std::io::stdout())
+    }
+    pub fn report_with<M: Display, W: Write>(&self, report: &Report<M>, mut write: W) -> crate::Result<ExitCode> {
         let Self { no_color, report_format, .. } = self;
         #[cfg(feature = "console-report")]
         console::set_colors_enabled(!no_color);
 
-        let control = Control::with_service(self, configs, services)?;
-        let report = control.assault(evaluator).await?;
         match report_format {
             ReportFormat::NullDevice => {}
             #[cfg(feature = "console-report")]
-            ReportFormat::Console => report.console_report_stdout(self)?, // TODO other than stdout
-        }
-        Ok(report)
+            ReportFormat::Console => report.console_report(self, &mut ReportWriter::new(0, &mut write))?,
+        };
+
+        Ok(report.exit_code(self))
     }
 }
 
@@ -260,23 +272,25 @@ mod tests {
     #[cfg(all(feature = "yaml", feature = "json"))]
     fn test_read_configs_filtered() {
         let cmd = Relentless {
-            file: glob::glob("tests/config/*valid/**/*.yaml").unwrap().collect::<Result<Vec<_>, _>>().unwrap(),
+            file: glob::glob("tests/config/parse/*.yaml").unwrap().collect::<Result<Vec<_>, _>>().unwrap(),
+            report_format: ReportFormat::NullDevice,
             ..Default::default()
         };
         let mut buf = Vec::new();
         let configs = cmd.configs_filtered(&mut buf).unwrap();
-        assert_eq!(configs.len(), glob::glob("tests/config/valid/**/*.yaml").unwrap().filter(Result::is_ok).count());
+        assert_eq!(configs.len(), glob::glob("tests/config/parse/valid_*.yaml").unwrap().filter(Result::is_ok).count());
 
         let warn = String::from_utf8_lossy(&buf);
-        assert!(warn.contains("tests/config/invalid/invalid_config.yaml"));
-        assert_eq!(
-            warn,
-            [
-                r#"tests/config/invalid/invalid_config.yaml:"#,
+        assert!(warn.contains("tests/config/parse/invalid_simple_string.yaml"));
+        assert!(warn.contains("tests/config/parse/invalid_different_struct.yaml"));
+        // TODO better test for error message
+        assert!(warn.contains(
+            &[
+                r#"tests/config/parse/invalid_simple_string.yaml:"#,
                 r#"invalid type: string "simple string yaml", expected struct Config"#,
                 r#""#,
             ]
             .join("\n")
-        )
+        ));
     }
 }

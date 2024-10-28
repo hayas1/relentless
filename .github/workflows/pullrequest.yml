@@ -26,12 +26,14 @@ jobs:
           ${{ steps.cargo-home.outputs.path }}
         key: cargo-${{ hashFiles('**/Cargo.toml') }}
 
-    - run: cargo test --verbose --manifest-path examples/server/http/Cargo.toml
-    - run: cargo fmt --check --manifest-path examples/server/http/Cargo.toml
-    - run: cargo clippy --tests --manifest-path examples/server/http/Cargo.toml -- --deny warnings
+    - run: cargo test --verbose --manifest-path dev/server/Cargo.toml
+    - run: cargo fmt --check --manifest-path dev/server/Cargo.toml
+    - run: cargo clippy --tests --manifest-path dev/server/Cargo.toml -- --deny warnings
 
     - run: cargo test --verbose
     - run: cargo test --verbose --no-default-features
+    - run: cargo test --verbose --no-default-features --features=json
+    - run: cargo test --verbose --no-default-features --features=yaml
     - run: cargo test --verbose --no-default-features --features=json --features=yaml
     - run: cargo test --verbose --no-default-features --features=json --features=yaml --features=cli
     - run: cargo fmt --check
@@ -62,12 +64,12 @@ jobs:
           ${{ steps.cargo-home.outputs.path }}
         key: cargo-${{ hashFiles('**/Cargo.toml') }}
 
-    - name: Run example http server (actual)
-      uses: ./.github/actions/example-http-server
+    - name: Run develop http server (actual)
+      uses: ./.github/actions/run-develop-server
       with:
         port: 3001
-    - name: Run example http server (expect)
-      uses: ./.github/actions/example-http-server
+    - name: Run develop http server (expect)
+      uses: ./.github/actions/run-develop-server
       with:
         port: 3000
 

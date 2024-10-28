@@ -124,8 +124,9 @@ pub async fn parse_body(b: Body) -> Result<Value> {
 mod tests {
     use axum::{
         body::Body,
-        http::{HeaderName, HeaderValue, Request, StatusCode},
+        http::{header::CONTENT_TYPE, HeaderValue, Request, StatusCode},
     };
+    use mime::{APPLICATION_JSON, APPLICATION_WWW_FORM_URLENCODED};
     use serde_json::json;
 
     use crate::route::{app_with, tests::call_with_assert};
@@ -182,7 +183,7 @@ mod tests {
         let req = Request::builder()
             .method(Method::POST)
             .uri("http://localhost:3000/information/post/qs/to?type=txt")
-            .header("content-type", "application/x-www-form-urlencoded")
+            .header(CONTENT_TYPE, APPLICATION_WWW_FORM_URLENCODED.as_ref())
             .body(Body::from("body=body"))
             .unwrap();
         call_with_assert(
@@ -197,12 +198,9 @@ mod tests {
                 path: "/information/post/qs/to".to_string(),
                 query: json!({ "type": "txt" }).as_object().unwrap().clone(),
                 version: Version::HTTP_11,
-                headers: vec![(
-                    HeaderName::from_static("content-type"),
-                    HeaderValue::from_static("application/x-www-form-urlencoded"),
-                )]
-                .into_iter()
-                .collect(),
+                headers: vec![(CONTENT_TYPE, HeaderValue::from_static(APPLICATION_WWW_FORM_URLENCODED.as_ref()))]
+                    .into_iter()
+                    .collect(),
                 body: json!({"body": "body"}),
                 ..Default::default()
             },
@@ -212,7 +210,7 @@ mod tests {
         let req = Request::builder()
             .method(Method::POST)
             .uri("http://localhost:3000/information/post/json/to")
-            .header("content-type", "application/json")
+            .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
             .body(Body::from(r#"{"name": "json", "key": [1, 2, 3]}"#))
             .unwrap();
         call_with_assert(
@@ -227,7 +225,7 @@ mod tests {
                 path: "/information/post/json/to".to_string(),
                 query: json!({}).as_object().unwrap().clone(),
                 version: Version::HTTP_11,
-                headers: vec![(HeaderName::from_static("content-type"), HeaderValue::from_static("application/json"))]
+                headers: vec![(CONTENT_TYPE, HeaderValue::from_static(APPLICATION_JSON.as_ref()))]
                     .into_iter()
                     .collect(),
                 body: json!({"name": "json", "key": [1, 2, 3]}),

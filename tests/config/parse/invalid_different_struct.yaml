@@ -1,0 +1,9 @@
+naming: invalid
+destination:
+  anyone: http://localhost:3000
+
+testcase:
+  - targets:
+      - /
+      - /health
+      - /healthz

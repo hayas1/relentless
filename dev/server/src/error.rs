@@ -166,3 +166,55 @@ pub mod counter {
         }
     }
 }
+
+pub mod random {
+    use crate::route::random::DistRangeParam;
+
+    use super::*;
+
+    #[derive(Error, Debug, Clone, PartialEq, Eq)]
+    pub enum RandomError<T: Display> {
+        #[error("`{0}` is empty range")]
+        EmptyRange(DistRangeParam<T>),
+    }
+
+    impl<T: Display + Debug + Send + Sync + 'static> IntoResponse for RandomError<T> {
+        fn into_response(self) -> Response {
+            AppErrorDetail::<kind::BadRequest, _>::detail_display(self).into_response()
+        }
+    }
+}
+
+pub mod echo {
+    use serde_json::Value;
+
+    use super::*;
+
+    #[derive(Error, Debug, Clone, PartialEq, Eq)]
+    pub enum EchoError {
+        #[error(transparent)]
+        JsonizeError(#[from] JsonizeError),
+    }
+    impl IntoResponse for EchoError {
+        fn into_response(self) -> Response {
+            AppErrorDetail::<kind::BadRequest, _>::detail_display(self).into_response()
+        }
+    }
+
+    #[derive(Error, Debug, Clone, PartialEq, Eq)]
+    pub enum JsonizeError {
+        #[error("conflict in {0:?}, already {1} but want {2}")]
+        Conflict(String, Value, Value),
+        #[error("cannot parse value as integer: {0}")]
+        CannotParseInt(#[from] std::num::ParseIntError),
+        #[error("cannot parse value as float: {0}")]
+        CannotParseFloat(#[from] std::num::ParseFloatError),
+        #[error("unknown function: {0}")]
+        UnknownFunction(String),
+    }
+    impl IntoResponse for JsonizeError {
+        fn into_response(self) -> Response {
+            AppErrorDetail::<kind::BadRequest, _>::detail_display(self).into_response()
+        }
+    }
+}

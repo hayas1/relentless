@@ -1,6 +1,8 @@
 pub mod counter;
+pub mod echo;
 pub mod health;
 pub mod information;
+pub mod random;
 pub mod root;
 pub mod wait;
 
@@ -36,9 +38,11 @@ pub fn router(state: AppState) -> Router<()> {
         .route("/", get(root::root))
         .nest("/health", health::route_health())
         .route("/healthz", get(health::health))
+        .nest("/echo", echo::route_echo())
+        .nest("/information", information::route_information())
         .nest("/counter", counter::route_counter())
         .nest("/wait", wait::route_wait())
-        .nest("/information", information::route_information())
+        .nest("/random", random::route_random())
         .fallback(not_found)
         .layer(middleware::from_fn_with_state(state.clone(), logging))
         .with_state(state)
@@ -66,12 +70,25 @@ mod tests {
     use std::fmt::Debug;
 
     use axum::{
-        body::{self, Body, HttpBody},
+        body::{self, Body, Bytes, HttpBody},
         http::{Request, StatusCode},
         response::Response,
     };
     use serde::de::DeserializeOwned;
     use tower::Service;
+
+    pub async fn call_bytes<S>(app: &mut S, req: Request<Body>) -> (StatusCode, Bytes)
+    where
+        S: Service<Request<Body>, Response = Response<Body>>,
+        S::Error: Debug,
+        Box<dyn std::error::Error + Send + Sync + 'static>: From<S::Error>,
+    {
+        let res = app.call(req).await.unwrap();
+        let status = res.status();
+        let size = res.size_hint().upper().unwrap_or(res.size_hint().lower()) as usize;
+        let body = body::to_bytes(res.into_body(), size).await.unwrap();
+        (status, body)
+    }
 
     pub async fn call<S, T>(app: &mut S, req: Request<Body>) -> (StatusCode, T)
     where
@@ -80,10 +97,7 @@ mod tests {
         Box<dyn std::error::Error + Send + Sync + 'static>: From<S::Error>,
         T: DeserializeOwned,
     {
-        let res = app.call(req).await.unwrap();
-        let status = res.status();
-        let size = res.size_hint().upper().unwrap_or(res.size_hint().lower()) as usize;
-        let body = body::to_bytes(res.into_body(), size).await.unwrap();
+        let (status, body) = call_bytes(app, req).await;
         let des = serde_json::from_slice::<T>(&body).unwrap();
         (status, des)
     }
@@ -98,5 +112,21 @@ mod tests {
         let (actual_status, actual_body): (_, T) = call(app, req).await;
         assert_eq!(actual_status, expected_status);
         assert_eq!(actual_body, expected_body);
+    }
+
+    pub async fn call_with_assert_ne_body<S, T>(
+        app: &mut S,
+        req: Request<Body>,
+        expected_status: StatusCode,
+        expected_body: T,
+    ) where
+        S: Service<Request<Body>, Response = Response<Body>>,
+        S::Error: Debug,
+        Box<dyn std::error::Error + Send + Sync + 'static>: From<S::Error>,
+        T: DeserializeOwned + Eq + std::fmt::Debug,
+    {
+        let (actual_status, actual_body): (_, T) = call(app, req).await;
+        assert_eq!(actual_status, expected_status);
+        assert_ne!(actual_body, expected_body);
     }
 }

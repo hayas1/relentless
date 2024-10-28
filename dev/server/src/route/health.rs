@@ -76,3 +76,80 @@ pub async fn disabled() -> Result<()> {
         Health { status: StatusCode::SERVICE_UNAVAILABLE },
     ))?
 }
+
+#[cfg(test)]
+mod tests {
+
+    use axum::{body::Body, http::Request};
+
+    use crate::{
+        error::{kind::Kind, ErrorResponseInner},
+        route::{
+            app_with,
+            tests::{call_bytes, call_with_assert},
+        },
+    };
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_health() {
+        let mut app = app_with(Default::default());
+
+        let (status, body) = call_bytes(&mut app, Request::builder().uri("/health").body(Body::empty()).unwrap()).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(&body[..], b"ok");
+    }
+
+    #[tokio::test]
+    async fn test_healthz() {
+        let mut app = app_with(Default::default());
+
+        let (status, body) =
+            call_bytes(&mut app, Request::builder().uri("/healthz").body(Body::empty()).unwrap()).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(&body[..], b"ok");
+    }
+
+    #[tokio::test]
+    async fn test_health_rich() {
+        let mut app = app_with(Default::default());
+
+        call_with_assert(
+            &mut app,
+            Request::builder().uri("/health/rich").body(Body::empty()).unwrap(),
+            StatusCode::OK,
+            Health { status: StatusCode::OK },
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn test_health_heavy() {
+        let mut app = app_with(Default::default());
+
+        call_with_assert(
+            &mut app,
+            Request::builder().uri("/health/heavy").body(Body::empty()).unwrap(),
+            StatusCode::TOO_MANY_REQUESTS,
+            Health { status: StatusCode::TOO_MANY_REQUESTS },
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn test_health_disabled() {
+        let mut app = app_with(Default::default());
+
+        call_with_assert(
+            &mut app,
+            Request::builder().uri("/health/disabled").body(Body::empty()).unwrap(),
+            StatusCode::SERVICE_UNAVAILABLE,
+            ErrorResponseInner {
+                msg: Retriable::msg().to_string(),
+                detail: Health { status: StatusCode::SERVICE_UNAVAILABLE },
+            },
+        )
+        .await;
+    }
+}

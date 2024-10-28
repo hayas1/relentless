@@ -16,7 +16,7 @@ use http_body::Body;
 use tower::{Service, ServiceExt};
 
 /// TODO document
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Control<'a, S, ReqB, ResB, E> {
     _cmd: &'a Relentless,
     workers: Vec<Worker<'a, S, ReqB, ResB, E>>, // TODO all worker do not have same clients type ?
@@ -63,7 +63,7 @@ where
     pub fn with_service(
         cmd: &'a Relentless,
         configs: Vec<Config>,
-        services: Vec<Destinations<S>>,
+        services: &'a mut Vec<Destinations<S>>,
     ) -> WrappedResult<Self> {
         let mut workers = Vec::new();
         for (config, service) in configs.iter().zip(services) {
@@ -98,11 +98,11 @@ where
 }
 
 /// TODO document
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Worker<'a, S, ReqB, ResB, E> {
     _cmd: &'a Relentless,
     config: Coalesced<WorkerConfig, Destinations<http_serde_priv::Uri>>,
-    clients: Destinations<S>,
+    clients: &'a mut Destinations<S>,
     phantom: PhantomData<(ReqB, ResB, E)>,
 }
 impl<S, ReqB, ResB, E> Worker<'_, S, ReqB, ResB, E> {
@@ -122,7 +122,7 @@ where
     S::Error: std::error::Error + Sync + Send + 'static,
     E: Evaluator<http::Response<ResB>>,
 {
-    pub fn new(cmd: &'a Relentless, config: WorkerConfig, clients: Destinations<S>) -> WrappedResult<Self> {
+    pub fn new(cmd: &'a Relentless, config: WorkerConfig, clients: &'a mut Destinations<S>) -> WrappedResult<Self> {
         let config = Coalesced::tuple(config, cmd.destinations()?);
         let phantom = PhantomData;
         Ok(Self { _cmd: cmd, config, clients, phantom })
@@ -133,13 +133,13 @@ where
         cases: Vec<Case<S, ReqB, ResB>>,
         evaluator: &E,
     ) -> WrappedResult<WorkerReport<E::Message>> {
-        let Self { config, mut clients, .. } = self;
+        let Self { config, clients, .. } = self;
 
         let mut processes = Vec::new();
         for case in cases {
             // TODO do not await here, use stream
             let destinations = config.coalesce().destinations;
-            processes.push((case.testcases.clone(), case.process(&destinations, &mut clients).await));
+            processes.push((case.testcases.clone(), case.process(&destinations, clients).await));
         }
 
         let mut report = Vec::new();
