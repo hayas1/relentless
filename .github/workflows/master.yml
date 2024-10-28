@@ -25,9 +25,9 @@ jobs:
     - name: Release test
       run: cargo test --release
     - name: Release test without cli feature
-      run: cargo test --verbose --features=json --features=yaml
+      run: cargo test --verbose --no-default-features --features=json --features=yaml
     - name: Release test with cli feature
-      run: cargo test --verbose --features=json --features=yaml --features=cli
+      run: cargo test --verbose --no-default-features --features=json --features=yaml --features=cli
     - name: Run doc
       run: cargo doc --no-deps
     - name: Coverage
