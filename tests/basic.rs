@@ -23,9 +23,12 @@ async fn test_example_yaml_config() {
     ]
     .into_iter()
     .collect();
-    let report =
-        relentless.assault_with::<_, Body, Body, _>(configs, &mut vec![services], &DefaultEvaluator).await.unwrap();
+    let report = relentless
+        .assault_with::<_, Body, Body, _>(configs, &mut vec![services; relentless.file.len()], &DefaultEvaluator)
+        .await
+        .unwrap();
 
+    assert_eq!(relentless.file.len(), report.sub_reportable().len());
     assert!(report.allow(false));
 }
 
@@ -45,10 +48,12 @@ async fn test_basic_yaml_config() {
     ]
     .into_iter()
     .collect();
-    let report =
-        relentless.assault_with::<_, Body, Body, _>(configs, &mut vec![services], &DefaultEvaluator).await.unwrap();
+    let report = relentless
+        .assault_with::<_, Body, Body, _>(configs, &mut vec![services; relentless.file.len()], &DefaultEvaluator)
+        .await
+        .unwrap();
 
-    // assert_eq!(relentless.file.len(), report.sub_reportable().len()); // TODO zip cause only 1 call
+    assert_eq!(relentless.file.len(), report.sub_reportable().len());
     assert!(report.allow(false));
 }
 
@@ -68,9 +73,11 @@ async fn test_basic_toml_config() {
     ]
     .into_iter()
     .collect();
-    let report =
-        relentless.assault_with::<_, Body, Body, _>(configs, &mut vec![services], &DefaultEvaluator).await.unwrap();
+    let report = relentless
+        .assault_with::<_, Body, Body, _>(configs, &mut vec![services; relentless.file.len()], &DefaultEvaluator)
+        .await
+        .unwrap();
 
-    // assert_eq!(relentless.file.len(), report.sub_reportable().len()); // TODO zip cause only 1 call
+    assert_eq!(relentless.file.len(), report.sub_reportable().len());
     assert!(report.allow(false));
 }
