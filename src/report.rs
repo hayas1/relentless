@@ -50,13 +50,11 @@ impl<T> Reportable for WorkerReport<T> {
 pub struct CaseReport<T> {
     testcases: Coalesced<Testcase, Setting>,
     passed: usize,
-    pass: bool,
     messages: MultiWrap<T>,
 }
 impl<T> CaseReport<T> {
     pub fn new(testcases: Coalesced<Testcase, Setting>, passed: usize, messages: MultiWrap<T>) -> Self {
-        let pass = passed == testcases.coalesce().setting.repeat.times();
-        Self { testcases, passed, pass, messages }
+        Self { testcases, passed, messages }
     }
 }
 impl<T> Reportable for CaseReport<T> {
@@ -64,7 +62,7 @@ impl<T> Reportable for CaseReport<T> {
         Vec::new()
     }
     fn pass(&self) -> bool {
-        self.pass
+        self.passed == self.testcases.coalesce().setting.repeat.times()
     }
     fn allow(&self, strict: bool) -> bool {
         let allowed = self.testcases.coalesce().attr.allow;
