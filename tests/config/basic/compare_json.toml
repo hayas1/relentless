@@ -31,10 +31,10 @@ description = "patch datetime and hostname"
 setting.evaluate.body.json.patch = [
     { op = "replace", path = "/datetime", value = "2024-10-10T00:00:00Z" },
     { op = "remove", path = "/hostname" },
-    # { op = "replace", path = "/headers/host", value = "127.0.0.1:3000" },
+    { op = "replace", path = "/headers/host", value = "127.0.0.1:3000" },
     { op = "test", path = "/path", value = "/information" },
 ]
-setting.evaluate.body.json.patch-fail = "error"
+setting.evaluate.body.json.patch-fail = "allow"
 
 [[testcases]]
 target = "/information"

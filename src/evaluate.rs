@@ -164,7 +164,7 @@ impl DefaultEvaluator {
             Some(EvaluateTo::Destinations(patch)) => patch.get(name).unwrap_or(&default_patch),
             None => &default_patch,
         };
-        json_patch::patch(value, patch)
+        json_patch::patch_unsafe(value, patch)
     }
 
     pub fn json_compare(cfg: &JsonEvaluate, (va, vb): (&Value, &Value), msg: &mut Vec<EvaluateError>) -> bool {
