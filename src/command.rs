@@ -12,7 +12,7 @@ use crate::{
     config::{http_serde_priv, Config, Destinations},
     error::{IntoContext, MultiWrap, RunCommandError, Wrap, WrappedResult},
     evaluate::Evaluator,
-    report::Report,
+    report::{Report, Reportable},
     service::FromBodyStructure,
     worker::Control,
 };
@@ -35,7 +35,7 @@ pub async fn execute() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sy
 
     let rep = cmd.assault().await?;
     cmd.report(&rep)?;
-    Ok(rep.exit_code(&cmd))
+    Ok(cmd.exit_code(&rep))
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -176,6 +176,16 @@ impl Relentless {
         };
 
         Ok(report.exit_code(self))
+    }
+
+    pub fn pass<T>(&self, report: &Report<T>) -> bool {
+        report.pass()
+    }
+    pub fn allow<T>(&self, report: &Report<T>) -> bool {
+        report.allow(self.strict)
+    }
+    pub fn exit_code<T>(self, report: &Report<T>) -> ExitCode {
+        report.exit_code(&self)
     }
 }
 

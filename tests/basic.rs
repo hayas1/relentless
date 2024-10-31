@@ -29,7 +29,7 @@ async fn test_example_yaml_config() {
         .unwrap();
 
     assert_eq!(relentless.file.len(), report.sub_reportable().len());
-    assert!(report.allow(false));
+    assert!(relentless.allow(&report));
 }
 
 #[tokio::test]
@@ -54,7 +54,7 @@ async fn test_basic_yaml_config() {
         .unwrap();
 
     assert_eq!(relentless.file.len(), report.sub_reportable().len());
-    assert!(report.allow(false));
+    assert!(relentless.allow(&report));
 }
 
 #[tokio::test]
@@ -79,5 +79,5 @@ async fn test_basic_toml_config() {
         .unwrap();
 
     assert_eq!(relentless.file.len(), report.sub_reportable().len());
-    assert!(report.allow(false));
+    assert!(relentless.allow(&report));
 }
