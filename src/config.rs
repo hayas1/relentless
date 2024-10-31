@@ -78,7 +78,7 @@ impl DerefMut for Repeat {
 }
 impl Repeat {
     pub fn range(&self) -> std::ops::Range<usize> {
-        0..self.0.unwrap_or(1)
+        0..self.times()
     }
     pub fn times(&self) -> usize {
         self.0.unwrap_or(1)
