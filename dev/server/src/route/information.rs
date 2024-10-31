@@ -79,7 +79,7 @@ pub async fn information(
 ) -> Result<Json<InformationResponse>> {
     let datetime = if !cfg!(test) { Some(Utc::now()) } else { None }; // TODO should we use cfg! ?
     let scheme = None; // TODO cannot get scheme in axum handler now https://github.com/tokio-rs/axum/pull/2507
-    let (Parts { method, uri: _, version, headers, .. }, b) = request.into_parts();
+    let (Parts { method, version, headers, .. }, b) = request.into_parts();
     let path = uri.path().to_string();
     let query = parse_query(uri.query().unwrap_or_default())?;
     let body = parse_body(b).await?;
