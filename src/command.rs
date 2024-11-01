@@ -133,15 +133,15 @@ impl Relentless {
     #[cfg(all(feature = "default-http-client", feature = "cli"))]
     pub async fn assault(&self) -> crate::Result<Report<crate::error::EvaluateError>> {
         let configs = self.configs_filtered(std::io::stderr())?;
-        let mut clients = Control::default_http_clients(self, &configs).await?;
-        let report = self.assault_with(configs, &mut clients, &crate::evaluate::DefaultEvaluator).await?;
+        let mut client = Control::default_http_client().await?;
+        let report = self.assault_with(configs, &mut client, &crate::evaluate::DefaultEvaluator).await?;
         Ok(report)
     }
     /// TODO document
     pub async fn assault_with<S, ReqB, ResB, E>(
         &self,
         configs: Vec<Config>,
-        services: &mut Vec<Destinations<S>>,
+        service: &mut S,
         evaluator: &E,
     ) -> crate::Result<Report<E::Message>>
     where
@@ -156,7 +156,7 @@ impl Relentless {
         E: Evaluator<http::Response<ResB>>,
         E::Message: Display,
     {
-        let control = Control::with_service(self, configs, services)?;
+        let control = Control::with_service(self, configs, service)?;
         let report = control.assault(evaluator).await?;
         Ok(report)
     }

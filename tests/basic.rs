@@ -16,17 +16,8 @@ async fn test_example_yaml_config() {
         ..Default::default()
     };
     let configs = relentless.configs().unwrap();
-    let services = [
-        ("test-api".to_string(), route::app_with(Default::default())),
-        ("expect".to_string(), route::app_with(Default::default())),
-        ("actual".to_string(), route::app_with(Default::default())),
-    ]
-    .into_iter()
-    .collect();
-    let report = relentless
-        .assault_with::<_, Body, Body, _>(configs, &mut vec![services; relentless.file.len()], &DefaultEvaluator)
-        .await
-        .unwrap();
+    let mut service = route::app_with(Default::default());
+    let report = relentless.assault_with::<_, Body, Body, _>(configs, &mut service, &DefaultEvaluator).await.unwrap();
 
     assert_eq!(relentless.file.len(), report.sub_reportable().len());
     assert!(relentless.allow(&report));
@@ -41,17 +32,8 @@ async fn test_basic_yaml_config() {
         ..Default::default()
     };
     let configs = relentless.configs().unwrap();
-    let services = [
-        ("test-api".to_string(), route::app_with(Default::default())),
-        ("expect".to_string(), route::app_with(Default::default())),
-        ("actual".to_string(), route::app_with(Default::default())),
-    ]
-    .into_iter()
-    .collect();
-    let report = relentless
-        .assault_with::<_, Body, Body, _>(configs, &mut vec![services; relentless.file.len()], &DefaultEvaluator)
-        .await
-        .unwrap();
+    let mut service = route::app_with(Default::default());
+    let report = relentless.assault_with::<_, Body, Body, _>(configs, &mut service, &DefaultEvaluator).await.unwrap();
 
     assert_eq!(relentless.file.len(), report.sub_reportable().len());
     assert!(relentless.allow(&report));
@@ -66,17 +48,8 @@ async fn test_basic_toml_config() {
         ..Default::default()
     };
     let configs = relentless.configs().unwrap();
-    let services = [
-        ("test-api".to_string(), route::app_with(Default::default())),
-        ("expect".to_string(), route::app_with(Default::default())),
-        ("actual".to_string(), route::app_with(Default::default())),
-    ]
-    .into_iter()
-    .collect();
-    let report = relentless
-        .assault_with::<_, Body, Body, _>(configs, &mut vec![services; relentless.file.len()], &DefaultEvaluator)
-        .await
-        .unwrap();
+    let mut service = route::app_with(Default::default());
+    let report = relentless.assault_with::<_, Body, Body, _>(configs, &mut service, &DefaultEvaluator).await.unwrap();
 
     assert_eq!(relentless.file.len(), report.sub_reportable().len());
     assert!(relentless.allow(&report));
