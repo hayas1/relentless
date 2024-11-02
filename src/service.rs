@@ -60,6 +60,46 @@ where
     }
 }
 
+pub mod origin_router {
+    use std::{collections::HashMap, marker::PhantomData, task::Poll};
+
+    use http::uri::Authority;
+    use tower::Service;
+
+    pub struct OriginRouter<S, B> {
+        map: HashMap<Authority, S>,
+        phantom: PhantomData<B>,
+    }
+    impl<S, B> OriginRouter<S, B> {
+        pub fn new(map: HashMap<Authority, S>) -> Self {
+            Self { map, phantom: PhantomData }
+        }
+    }
+    impl<B, Req: AsRef<http::Request<B>>, S: Service<Req>> Service<Req> for OriginRouter<S, B> {
+        type Response = S::Response;
+        type Error = S::Error;
+        type Future = S::Future;
+
+        fn poll_ready(&mut self, cx: &mut std::task::Context<'_>) -> Poll<Result<(), Self::Error>> {
+            match self.map.values_mut().try_fold(true, |sum, s| Ok(sum && matches!(s.poll_ready(cx)?, Poll::Ready(()))))
+            {
+                Ok(true) => Poll::Ready(Ok(())),
+                Ok(false) => Poll::Pending,
+                Err(e) => Poll::Ready(Err(e)),
+            }
+        }
+
+        fn call(&mut self, req: Req) -> Self::Future {
+            let request: &http::Request<B> = req.as_ref();
+            if let Some(s) = self.map.get_mut(request.uri().authority().unwrap()) {
+                s.call(req)
+            } else {
+                todo!("404")
+            }
+        }
+    }
+}
+
 pub struct BytesBody(BoxBody<Bytes, crate::Error>);
 impl Body for BytesBody {
     type Data = Bytes;
