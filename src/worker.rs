@@ -5,7 +5,7 @@ use crate::service::DefaultHttpClient;
 use crate::{
     command::Relentless,
     config::{http_serde_priv, Coalesced, Config, Destinations, RequestInfo, Setting, Testcase, WorkerConfig},
-    error::WrappedResult,
+    error::{Wrap, WrappedResult},
     evaluate::{DefaultEvaluator, Evaluator},
     report::{CaseReport, Report, WorkerReport},
     service::FromBodyStructure,
@@ -37,7 +37,7 @@ where
     ResB::Data: Send + 'static,
     ResB::Error: std::error::Error + Sync + Send + 'static,
     S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + 'static,
-    S::Error: std::error::Error + Sync + Send + 'static,
+    Wrap: From<S::Error> + Send + 'static,
     E: Evaluator<http::Response<ResB>>,
 {
     /// TODO document
@@ -96,7 +96,7 @@ where
     ResB::Data: Send + 'static,
     ResB::Error: std::error::Error + Sync + Send + 'static,
     S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + 'static,
-    S::Error: std::error::Error + Sync + Send + 'static,
+    Wrap: From<S::Error> + Send + 'static,
     E: Evaluator<http::Response<ResB>>,
 {
     pub fn new(cmd: &'a Relentless, config: WorkerConfig) -> WrappedResult<Self> {
@@ -163,7 +163,7 @@ where
     ResB::Data: Send + 'static,
     ResB::Error: std::error::Error + Sync + Send + 'static,
     S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + 'static,
-    S::Error: std::error::Error + Sync + Send + 'static,
+    Wrap: From<S::Error> + Send + 'static,
 {
     pub fn new(worker_config: &WorkerConfig, testcases: Testcase) -> Self {
         let testcase = Coalesced::tuple(testcases, worker_config.setting.clone());
