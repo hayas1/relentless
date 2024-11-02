@@ -14,7 +14,7 @@ testcases:
       allow: true
   - target: /health/rich
   - target: /information
-    description: ignore datetime and hostname
+    description: ignore datetime and hostname and uri
     setting:
       evaluate:
         body:
@@ -23,12 +23,13 @@ testcases:
             - /datetime
             - /hostname
             - /headers/host
+            - /uri
   - target: /information
     description: do not ignore datetime and hostname (must be failed, so attr allowed)
     attr:
       allow: true
   - target: /information
-    description: patch datetime and hostname
+    description: patch datetime and hostname and uri
     setting:
       evaluate:
         body:
@@ -36,6 +37,7 @@ testcases:
             patch:
             - {"op": "replace", "path": "/datetime", "value": "2024-10-10T00:00:00Z"}
             - {"op": "remove", "path": "/hostname"}
+            - {"op": "remove", "path": "/uri"}
             - {"op": "replace", "path": "/headers/host", "value": "127.0.0.1:3000"}
             - {"op": "test", "path": "/path", "value": "/information"}
             patch-fail: allow
