@@ -61,10 +61,12 @@ where
 }
 
 pub mod origin_router {
-    use std::{collections::HashMap, marker::PhantomData, task::Poll};
+    use std::{collections::HashMap, future::Future, marker::PhantomData, pin::Pin, task::Poll};
 
     use http::uri::Authority;
     use tower::Service;
+
+    use crate::error::{AssaultError, Wrap};
 
     pub struct OriginRouter<S, B> {
         map: HashMap<Authority, S>,
@@ -75,10 +77,16 @@ pub mod origin_router {
             Self { map, phantom: PhantomData }
         }
     }
-    impl<B, Req: From<http::Request<B>> + Into<http::Request<B>>, S: Service<Req>> Service<Req> for OriginRouter<S, B> {
+    impl<B, Req, S> Service<Req> for OriginRouter<S, B>
+    where
+        Req: From<http::Request<B>> + Into<http::Request<B>>,
+        S: Service<Req>,
+        S::Future: Send + 'static,
+        Wrap: From<S::Error> + Send + 'static,
+    {
         type Response = S::Response;
-        type Error = S::Error;
-        type Future = S::Future;
+        type Error = Wrap;
+        type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
 
         fn poll_ready(&mut self, cx: &mut std::task::Context<'_>) -> Poll<Result<(), Self::Error>> {
             match self.map.values_mut().try_fold(true, |sum, s| Ok(sum && matches!(s.poll_ready(cx)?, Poll::Ready(()))))
@@ -92,9 +100,10 @@ pub mod origin_router {
         fn call(&mut self, req: Req) -> Self::Future {
             let request: http::Request<B> = req.into();
             if let Some(s) = self.map.get_mut(request.uri().authority().unwrap()) {
-                s.call(request.into())
+                let fut = s.call(request.into());
+                Box::pin(async { Ok(fut.await?) })
             } else {
-                todo!("404")
+                Box::pin(async { Err(AssaultError::CannotSpecifyService)? })
             }
         }
     }

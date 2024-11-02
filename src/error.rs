@@ -290,7 +290,10 @@ pub enum RunCommandError {
 }
 
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
-pub enum AssaultError {}
+pub enum AssaultError {
+    #[error("cannot specify service")]
+    CannotSpecifyService,
+}
 
 #[derive(Error, Debug)]
 pub enum EvaluateError {
