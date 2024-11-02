@@ -151,7 +151,7 @@ impl Relentless {
         ResB: Body + Send + 'static,
         ResB::Data: Send + 'static,
         ResB::Error: std::error::Error + Sync + Send + 'static,
-        S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + Sync + 'static,
+        S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + 'static,
         S::Error: std::error::Error + Sync + Send + 'static,
         E: Evaluator<http::Response<ResB>>,
         E::Message: Display,

@@ -36,7 +36,7 @@ where
     ResB: Body + Send + 'static,
     ResB::Data: Send + 'static,
     ResB::Error: std::error::Error + Sync + Send + 'static,
-    S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + Sync + 'static,
+    S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + 'static,
     S::Error: std::error::Error + Sync + Send + 'static,
     E: Evaluator<http::Response<ResB>>,
 {
@@ -95,7 +95,7 @@ where
     ResB: Body + Send + 'static,
     ResB::Data: Send + 'static,
     ResB::Error: std::error::Error + Sync + Send + 'static,
-    S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + Sync + 'static,
+    S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + 'static,
     S::Error: std::error::Error + Sync + Send + 'static,
     E: Evaluator<http::Response<ResB>>,
 {
@@ -162,7 +162,7 @@ where
     ResB: Body + Send + 'static,
     ResB::Data: Send + 'static,
     ResB::Error: std::error::Error + Sync + Send + 'static,
-    S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + Sync + 'static,
+    S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + 'static,
     S::Error: std::error::Error + Sync + Send + 'static,
 {
     pub fn new(worker_config: &WorkerConfig, testcases: Testcase) -> Self {
