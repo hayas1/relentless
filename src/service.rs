@@ -75,7 +75,7 @@ pub mod origin_router {
             Self { map, phantom: PhantomData }
         }
     }
-    impl<B, Req: AsRef<http::Request<B>>, S: Service<Req>> Service<Req> for OriginRouter<S, B> {
+    impl<B, Req: From<http::Request<B>> + Into<http::Request<B>>, S: Service<Req>> Service<Req> for OriginRouter<S, B> {
         type Response = S::Response;
         type Error = S::Error;
         type Future = S::Future;
@@ -90,9 +90,9 @@ pub mod origin_router {
         }
 
         fn call(&mut self, req: Req) -> Self::Future {
-            let request: &http::Request<B> = req.as_ref();
+            let request: http::Request<B> = req.into();
             if let Some(s) = self.map.get_mut(request.uri().authority().unwrap()) {
-                s.call(req)
+                s.call(request.into())
             } else {
                 todo!("404")
             }
