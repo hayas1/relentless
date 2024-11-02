@@ -99,7 +99,7 @@ pub mod origin_router {
 
         fn call(&mut self, req: Req) -> Self::Future {
             let request: http::Request<B> = req.into();
-            if let Some(s) = self.map.get_mut(request.uri().authority().unwrap()) {
+            if let Some(s) = request.uri().authority().and_then(|a| self.map.get_mut(a)) {
                 let fut = s.call(request.into());
                 Box::pin(async { Ok(fut.await?) })
             } else {
