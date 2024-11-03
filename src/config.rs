@@ -5,11 +5,18 @@ use std::{
     time::Duration,
 };
 
-use http::{header::CONTENT_TYPE, HeaderMap};
+use http::{
+    header::{CONTENT_LENGTH, CONTENT_TYPE},
+    HeaderMap,
+};
+use http_body::Body;
 use mime::{APPLICATION_JSON, TEXT_PLAIN};
 use serde::{Deserialize, Serialize};
 
-use crate::error::{RunCommandError, WrappedResult};
+use crate::{
+    error::{RunCommandError, WrappedResult},
+    service::FromBodyStructure,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
@@ -66,17 +73,22 @@ pub enum BodyStructure {
     Json(HashMap<String, String>),
 }
 impl BodyStructure {
+    pub fn body_with_headers<ReqB: FromBodyStructure + Body>(self) -> WrappedResult<(ReqB, HeaderMap)> {
+        let mut headers = HeaderMap::new();
+        self.set_headers(&mut headers)?;
+        let body = ReqB::from_body_structure(self);
+        body.size_hint().exact().filter(|size| *size > 0).map(|size| headers.insert(CONTENT_LENGTH, size.into())); // TODO remove ?
+        Ok((body, headers))
+    }
     pub fn set_headers(&self, headers: &mut HeaderMap) -> WrappedResult<()> {
         match self {
             BodyStructure::Empty => {}
             BodyStructure::PlainText(_) => {
                 headers.insert(CONTENT_TYPE, TEXT_PLAIN.as_ref().parse().unwrap());
-                // TODO headers.insert(CONTENT_LENGTH, text.len().to_string().parse()?);
             }
             #[cfg(feature = "json")]
             BodyStructure::Json(_) => {
                 headers.insert(CONTENT_TYPE, APPLICATION_JSON.as_ref().parse().unwrap());
-                // TODO headers.insert(CONTENT_LENGTH, json.len().to_string().parse()?);
             }
         };
         Ok(())

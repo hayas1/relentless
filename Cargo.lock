@@ -1220,6 +1220,7 @@ dependencies = [
  "httptest",
  "json-patch",
  "jsonptr",
+ "mime",
  "regex",
  "relentless-dev-server",
  "reqwest",
