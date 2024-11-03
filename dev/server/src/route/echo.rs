@@ -19,7 +19,7 @@ use crate::{
 pub fn route_echo() -> Router<AppState> {
     Router::new()
         .route("/", get(empty))
-        .route("/", post(body))
+        .route("/body", post(body))
         .route("/text/*rest", any(text))
         .route("/path/*rest", any(path))
         .route("/method", any(method))
@@ -198,7 +198,7 @@ mod tests {
 
         let (status, body) = call_bytes(
             &mut app,
-            Request::builder().uri("/echo/").method(Method::POST).body(Body::from("hello world")).unwrap(),
+            Request::builder().uri("/echo/body").method(Method::POST).body(Body::from("hello world")).unwrap(),
         )
         .await;
         assert_eq!(status, StatusCode::OK);
