@@ -189,6 +189,7 @@ impl FromBodyStructure for BytesBody {
     fn from_body_structure(val: BodyStructure) -> Self {
         match val {
             BodyStructure::Empty => BytesBody(http_body_util::Empty::new().map_err(Wrap::error).boxed()),
+            #[cfg(feature = "json")]
             BodyStructure::Json(body) => BytesBody(
                 http_body_util::Full::new(Bytes::from(serde_json::to_vec(&body).unwrap())).map_err(Wrap::error).boxed(),
             ),
@@ -206,6 +207,7 @@ where
     fn from_body_structure(body: BodyStructure) -> Self {
         match body {
             BodyStructure::Empty => Default::default(),
+            #[cfg(feature = "json")]
             BodyStructure::Json(_) => Bytes::from(serde_json::to_vec(&body).unwrap()).into(),
         }
     }
