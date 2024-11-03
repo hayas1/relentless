@@ -37,7 +37,7 @@ where
     ResB::Data: Send + 'static,
     ResB::Error: std::error::Error + Sync + Send + 'static,
     S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + 'static,
-    Wrap: From<S::Error> + Send + 'static,
+    Wrap: From<S::Error>,
     E: Evaluator<http::Response<ResB>>,
 {
     /// TODO document
@@ -96,7 +96,7 @@ where
     ResB::Data: Send + 'static,
     ResB::Error: std::error::Error + Sync + Send + 'static,
     S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + 'static,
-    Wrap: From<S::Error> + Send + 'static,
+    Wrap: From<S::Error>,
     E: Evaluator<http::Response<ResB>>,
 {
     pub fn new(cmd: &'a Relentless, config: WorkerConfig) -> WrappedResult<Self> {
@@ -163,7 +163,7 @@ where
     ResB::Data: Send + 'static,
     ResB::Error: std::error::Error + Sync + Send + 'static,
     S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + 'static,
-    Wrap: From<S::Error> + Send + 'static,
+    Wrap: From<S::Error>,
 {
     pub fn new(worker_config: &WorkerConfig, testcases: Testcase) -> Self {
         let testcase = Coalesced::tuple(testcases, worker_config.setting.clone());
