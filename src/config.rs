@@ -59,7 +59,7 @@ pub struct RequestInfo {
 pub enum BodyStructure {
     #[default]
     Empty,
-    Text(String),
+    PlainText(String),
     #[cfg(feature = "json")]
     Json(HashMap<String, String>),
 }
