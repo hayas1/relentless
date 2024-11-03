@@ -119,7 +119,9 @@ pub enum BodyEvaluate {
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
-pub struct PlainTextEvaluate {}
+pub struct PlainTextEvaluate {
+    pub regex: Option<String>,
+}
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg(feature = "json")]

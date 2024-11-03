@@ -1,6 +1,7 @@
 use bytes::Bytes;
 use http_body::Body;
 use http_body_util::BodyExt;
+use regex::Regex;
 #[cfg(feature = "json")]
 use serde_json::Value;
 
@@ -105,7 +106,12 @@ impl DefaultEvaluator {
     pub fn acceptable_body(cfg: &BodyEvaluate, body: &Destinations<Bytes>, msg: &mut Vec<EvaluateError>) -> bool {
         match cfg {
             BodyEvaluate::Equal => Self::assault_or_compare(body, |_| true),
-            BodyEvaluate::PlainText(_) => Self::assault_or_compare(body, |_| true), // TODO regex?
+            BodyEvaluate::PlainText(e) => Self::assault_or_compare(body, |(_, b)| match &e.regex {
+                Some(regex) => {
+                    Regex::new(regex).map(|re| re.is_match(String::from_utf8_lossy(b).as_ref())).unwrap_or(false)
+                }
+                None => true,
+            }), // TODO regex?
             #[cfg(feature = "json")]
             BodyEvaluate::Json(e) => Self::json_acceptable(e, body, msg),
         }
