@@ -1,7 +1,6 @@
 use std::{
     collections::HashMap,
     fs::{read_to_string, File},
-    ops::{Deref, DerefMut},
     path::Path,
     time::Duration,
 };
@@ -65,20 +64,15 @@ pub enum BodyStructure {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct Repeat(pub Option<usize>);
-impl Deref for Repeat {
-    type Target = Option<usize>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-impl DerefMut for Repeat {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+impl Coalesce for Repeat {
+    type Other = Self;
+    fn coalesce(self, other: &Self::Other) -> Self {
+        Self(self.0.or(other.0))
     }
 }
 impl Repeat {
     pub fn range(&self) -> std::ops::Range<usize> {
-        0..self.0.unwrap_or(1)
+        0..self.times()
     }
     pub fn times(&self) -> usize {
         self.0.unwrap_or(1)
@@ -217,7 +211,7 @@ impl Coalesce for Setting {
         Self {
             request: self.request.coalesce(&other.request),
             template: if self.template.is_empty() { other.clone().template } else { self.template },
-            repeat: Repeat(self.repeat.or(*other.repeat)),
+            repeat: self.repeat.coalesce(&other.repeat),
             timeout: self.timeout.or(other.timeout),
             evaluate: self.evaluate.coalesce(&other.evaluate),
         }

@@ -12,7 +12,7 @@ use crate::{
     config::{http_serde_priv, Config, Destinations},
     error::{IntoContext, MultiWrap, RunCommandError, Wrap, WrappedResult},
     evaluate::Evaluator,
-    report::Report,
+    report::{Report, Reportable},
     service::FromBodyStructure,
     worker::Control,
 };
@@ -35,7 +35,7 @@ pub async fn execute() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sy
 
     let rep = cmd.assault().await?;
     cmd.report(&rep)?;
-    Ok(rep.exit_code(&cmd))
+    Ok(cmd.exit_code(&rep))
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -133,15 +133,15 @@ impl Relentless {
     #[cfg(all(feature = "default-http-client", feature = "cli"))]
     pub async fn assault(&self) -> crate::Result<Report<crate::error::EvaluateError>> {
         let configs = self.configs_filtered(std::io::stderr())?;
-        let mut clients = Control::default_http_clients(self, &configs).await?;
-        let report = self.assault_with(configs, &mut clients, &crate::evaluate::DefaultEvaluator).await?;
+        let mut client = Control::default_http_client().await?;
+        let report = self.assault_with(configs, &mut client, &crate::evaluate::DefaultEvaluator).await?;
         Ok(report)
     }
     /// TODO document
     pub async fn assault_with<S, ReqB, ResB, E>(
         &self,
         configs: Vec<Config>,
-        services: &mut Vec<Destinations<S>>,
+        service: &mut S,
         evaluator: &E,
     ) -> crate::Result<Report<E::Message>>
     where
@@ -151,12 +151,12 @@ impl Relentless {
         ResB: Body + Send + 'static,
         ResB::Data: Send + 'static,
         ResB::Error: std::error::Error + Sync + Send + 'static,
-        S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + Sync + 'static,
-        S::Error: std::error::Error + Sync + Send + 'static,
+        S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + 'static,
+        Wrap: From<S::Error>,
         E: Evaluator<http::Response<ResB>>,
         E::Message: Display,
     {
-        let control = Control::with_service(self, configs, services)?;
+        let control = Control::with_service(self, configs, service)?;
         let report = control.assault(evaluator).await?;
         Ok(report)
     }
@@ -176,6 +176,16 @@ impl Relentless {
         };
 
         Ok(report.exit_code(self))
+    }
+
+    pub fn pass<T>(&self, report: &Report<T>) -> bool {
+        report.pass()
+    }
+    pub fn allow<T>(&self, report: &Report<T>) -> bool {
+        report.allow(self.strict)
+    }
+    pub fn exit_code<T>(self, report: &Report<T>) -> ExitCode {
+        report.exit_code(&self)
     }
 }
 
