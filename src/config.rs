@@ -50,7 +50,7 @@ pub struct RequestInfo {
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub method: Option<http_serde_priv::Method>,
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
-    pub header: Option<http_serde_priv::HeaderMap>,
+    pub headers: Option<http_serde_priv::HeaderMap>,
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub body: Option<BodyStructure>,
 }
@@ -222,7 +222,7 @@ impl Coalesce for RequestInfo {
     fn coalesce(self, other: &Self) -> Self {
         Self {
             method: self.method.or(other.method.clone()),
-            header: self.header.or(other.header.clone()),
+            headers: self.headers.or(other.headers.clone()),
             body: self.body.or(other.body.clone()),
         }
     }

@@ -46,7 +46,7 @@ async fn test_validate_config() {
     relentless.report_with(&report, &mut buf).unwrap();
     let out = String::from_utf8_lossy(&buf);
 
-    assert!(out.contains(&format!("{} /echo/json?foo=hoge&bar=fuga&baz=piyo", CaseConsoleReport::PASS_EMOJI,)));
+    assert!(out.contains(&format!("{} /echo/json?foo=hoge&bar=fuga&baz=piyo", CaseConsoleReport::PASS_EMOJI)));
     assert!(relentless.pass(&report));
     assert!(relentless.allow(&report));
 }
@@ -89,8 +89,6 @@ async fn test_allow_config() {
     relentless.report_with(&report, &mut buf).unwrap();
     let out = String::from_utf8_lossy(&buf);
 
-    println!("{}", out);
-
     for line in [
         format!("{} /health/disabled", CaseConsoleReport::FAIL_EMOJI),
         format!("  {} this testcase is allowed", CaseConsoleReport::ALLOW_EMOJI),
@@ -101,4 +99,49 @@ async fn test_allow_config() {
     }
     assert!(!relentless.pass(&report));
     assert!(relentless.allow(&report));
+}
+
+#[tokio::test]
+async fn test_headers_config() {
+    let relentless =
+        Relentless { file: vec!["tests/config/feature/headers.yaml".into()], no_color: true, ..Default::default() };
+    let configs = relentless.configs().unwrap();
+    let mut service = route::app_with(Default::default());
+    let report = relentless.assault_with::<_, Body, Body, _>(configs, &mut service, &DefaultEvaluator).await.unwrap();
+
+    let mut buf = Vec::new();
+    relentless.report_with(&report, &mut buf).unwrap();
+    let out = String::from_utf8_lossy(&buf);
+
+    assert!(out.contains(&format!("{} /echo/headers", CaseConsoleReport::PASS_EMOJI)));
+    assert!(relentless.pass(&report));
+    assert!(relentless.allow(&report));
+}
+
+#[tokio::test]
+async fn test_fail_headers_config() {
+    let relentless = Relentless {
+        file: vec!["tests/config/feature/fail_validate_headers.yaml".into()],
+        no_color: true,
+        ..Default::default()
+    };
+    let configs = relentless.configs().unwrap();
+    let mut service = route::app_with(Default::default());
+    let report = relentless.assault_with::<_, Body, Body, _>(configs, &mut service, &DefaultEvaluator).await.unwrap();
+
+    let mut buf = Vec::new();
+    relentless.report_with(&report, &mut buf).unwrap();
+    let out = String::from_utf8_lossy(&buf);
+
+    for line in [
+        format!("{} /echo/headers", CaseConsoleReport::FAIL_EMOJI),
+        format!("  {} message was found", CaseConsoleReport::MESSAGE_EMOJI),
+        format!("    operation '{}' failed at path '{}': value did not match", "/0", ""),
+    ] {
+        assert!(out.contains(&line));
+    }
+
+    assert!(out.contains(&format!("{} /echo/headers", CaseConsoleReport::FAIL_EMOJI)));
+    assert!(!relentless.pass(&report));
+    assert!(!relentless.allow(&report));
 }
