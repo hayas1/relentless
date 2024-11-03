@@ -3,10 +3,12 @@ destinations:
   test-api: http://localhost:3000
 
 testcases:
-  - target: /echo/body
+  - target: /echo/json
     setting:
       request:
         method: POST
+        headers:
+          content-type: application/json # TODO auto ?
         body:
           foo: hoge
           bar: fuga
