@@ -55,10 +55,11 @@ pub struct RequestInfo {
     pub body: Option<BodyStructure>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(deny_unknown_fields, rename_all = "kebab-case")]
+#[serde(deny_unknown_fields, rename_all = "kebab-case", untagged)]
 pub enum BodyStructure {
     #[default]
     Empty,
+    Json(HashMap<String, String>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
