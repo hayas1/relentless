@@ -68,6 +68,7 @@ pub mod origin_router {
 
     use crate::error::{AssaultError, Wrap};
 
+    // TODO deref ?
     pub struct OriginRouter<S, B> {
         map: HashMap<Authority, S>,
         phantom: PhantomData<B>,
