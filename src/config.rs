@@ -10,7 +10,7 @@ use http::{
     HeaderMap,
 };
 use http_body::Body;
-use mime::{APPLICATION_JSON, TEXT_PLAIN};
+use mime::{Mime, APPLICATION_JSON, TEXT_PLAIN};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -75,23 +75,18 @@ pub enum BodyStructure {
 impl BodyStructure {
     pub fn body_with_headers<ReqB: FromBodyStructure + Body>(self) -> WrappedResult<(ReqB, HeaderMap)> {
         let mut headers = HeaderMap::new();
-        self.set_headers(&mut headers)?;
+        self.content_type().map(|t| headers.insert(CONTENT_TYPE, t.as_ref().parse().unwrap()));
         let body = ReqB::from_body_structure(self);
         body.size_hint().exact().filter(|size| *size > 0).map(|size| headers.insert(CONTENT_LENGTH, size.into())); // TODO remove ?
         Ok((body, headers))
     }
-    pub fn set_headers(&self, headers: &mut HeaderMap) -> WrappedResult<()> {
+    pub fn content_type(&self) -> Option<Mime> {
         match self {
-            BodyStructure::Empty => {}
-            BodyStructure::PlainText(_) => {
-                headers.insert(CONTENT_TYPE, TEXT_PLAIN.as_ref().parse().unwrap());
-            }
+            BodyStructure::Empty => None,
+            BodyStructure::PlainText(_) => Some(TEXT_PLAIN),
             #[cfg(feature = "json")]
-            BodyStructure::Json(_) => {
-                headers.insert(CONTENT_TYPE, APPLICATION_JSON.as_ref().parse().unwrap());
-            }
-        };
-        Ok(())
+            BodyStructure::Json(_) => Some(APPLICATION_JSON),
+        }
     }
 }
 
