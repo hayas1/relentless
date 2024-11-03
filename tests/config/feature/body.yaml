@@ -16,8 +16,6 @@ testcases:
     setting:
       request:
         method: POST
-        headers:
-          content-type: application/json # TODO auto ?
         body:
           foo: hoge
           bar: fuga

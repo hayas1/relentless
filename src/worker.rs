@@ -230,7 +230,11 @@ where
             .method(method.as_ref().map(|m| (**m).clone()).unwrap_or_default())
             .body(ReqB::from_body_structure(body.clone().unwrap_or_default()))
             .unwrap();
-        *request.headers_mut() = headers.as_ref().map(|h| (**h).clone()).unwrap_or_default();
+        let header_map = request.headers_mut();
+        *header_map = headers.as_ref().map(|h| (**h).clone()).unwrap_or_default();
+        if let Some(b) = body.as_ref() {
+            b.set_headers(header_map)?;
+        }
         Ok(request)
     }
 }

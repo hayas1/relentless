@@ -5,6 +5,8 @@ use std::{
     time::Duration,
 };
 
+use http::{header::CONTENT_TYPE, HeaderMap};
+use mime::{APPLICATION_JSON, TEXT_PLAIN};
 use serde::{Deserialize, Serialize};
 
 use crate::error::{RunCommandError, WrappedResult};
@@ -62,6 +64,23 @@ pub enum BodyStructure {
     PlainText(String),
     #[cfg(feature = "json")]
     Json(HashMap<String, String>),
+}
+impl BodyStructure {
+    pub fn set_headers(&self, headers: &mut HeaderMap) -> WrappedResult<()> {
+        match self {
+            BodyStructure::Empty => {}
+            BodyStructure::PlainText(_) => {
+                headers.insert(CONTENT_TYPE, TEXT_PLAIN.as_ref().parse().unwrap());
+                // TODO headers.insert(CONTENT_LENGTH, text.len().to_string().parse()?);
+            }
+            #[cfg(feature = "json")]
+            BodyStructure::Json(_) => {
+                headers.insert(CONTENT_TYPE, APPLICATION_JSON.as_ref().parse().unwrap());
+                // TODO headers.insert(CONTENT_LENGTH, json.len().to_string().parse()?);
+            }
+        };
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
