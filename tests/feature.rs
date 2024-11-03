@@ -156,7 +156,12 @@ async fn test_body_config() {
     relentless.report_with(&report, &mut buf).unwrap();
     let out = String::from_utf8_lossy(&buf);
 
-    assert!(out.contains(&format!("{} /echo/json", CaseConsoleReport::PASS_EMOJI)));
+    for line in [
+        format!("{} /echo/body", CaseConsoleReport::PASS_EMOJI),
+        format!("{} /echo/json", CaseConsoleReport::PASS_EMOJI),
+    ] {
+        assert!(out.contains(&line));
+    }
     assert!(relentless.pass(&report));
     assert!(relentless.allow(&report));
 }
