@@ -24,9 +24,8 @@ pub fn route_echo() -> Router<AppState> {
         .route("/path/*rest", any(path))
         .route("/method", any(method))
         .route("/headers", any(headers))
-        .route("/json", get(Jsonizer::dot_splitted_handler::<false>))
+        .route("/json", get(Jsonizer::dot_splitted_handler::<false>).post(json_body))
         .route("/json/rich", get(Jsonizer::dot_splitted_handler::<true>))
-        .route("/json", post(json_body))
 }
 
 #[tracing::instrument]
