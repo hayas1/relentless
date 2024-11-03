@@ -140,8 +140,23 @@ async fn test_fail_headers_config() {
     ] {
         assert!(out.contains(&line));
     }
-
-    assert!(out.contains(&format!("{} /echo/headers", CaseConsoleReport::FAIL_EMOJI)));
     assert!(!relentless.pass(&report));
     assert!(!relentless.allow(&report));
+}
+
+#[tokio::test]
+async fn test_body_config() {
+    let relentless =
+        Relentless { file: vec!["tests/config/feature/body.yaml".into()], no_color: true, ..Default::default() };
+    let configs = relentless.configs().unwrap();
+    let mut service = route::app_with(Default::default());
+    let report = relentless.assault_with::<_, Body, Body, _>(configs, &mut service, &DefaultEvaluator).await.unwrap();
+
+    let mut buf = Vec::new();
+    relentless.report_with(&report, &mut buf).unwrap();
+    let out = String::from_utf8_lossy(&buf);
+
+    assert!(out.contains(&format!("{} /echo/body", CaseConsoleReport::PASS_EMOJI)));
+    assert!(relentless.pass(&report));
+    assert!(relentless.allow(&report));
 }

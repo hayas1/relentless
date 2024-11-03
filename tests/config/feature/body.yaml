@@ -1,0 +1,23 @@
+name: test config for body
+destinations:
+  test-api: http://localhost:3000
+
+testcases:
+  - target: /echo/body
+    setting:
+      request:
+        method: POST
+        body:
+          foo: hoge
+          bar: fuga
+          baz: piyo
+      evaluate:
+        body:
+          json:
+            patch:
+              - op: test
+                path: ""
+                value:
+                  foo: hoge
+                  bar: fuga
+                  baz: piyo
