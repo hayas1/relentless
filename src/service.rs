@@ -47,8 +47,8 @@ where
         self.client.poll_ready(cx)
     }
 
-    fn call(&mut self, req: http::Request<ReqB>) -> Self::Future {
-        match req.try_into() {
+    fn call(&mut self, request: http::Request<ReqB>) -> Self::Future {
+        match request.try_into() {
             Ok(req) => {
                 let fut = self.client.call(req);
                 Box::pin(async {
