@@ -211,7 +211,7 @@ pub trait FromBodyStructure {
 }
 impl<T> FromBodyStructure for T
 where
-    T: Body + From<Bytes> + Default, // TODO other than Default
+    T: Body + From<Bytes> + Default,
 {
     fn from_body_structure(body: BodyStructure) -> Self {
         match body {
