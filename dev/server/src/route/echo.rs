@@ -95,11 +95,11 @@ impl Jsonizer {
                 if let Ok(idx) = p.parse::<usize>() {
                     let mut null = Value::Array(vec![Value::Null; idx + 1]);
                     std::mem::swap(v, &mut null);
-                    Ok(v.as_array_mut().unwrap().get_mut(idx).unwrap())
+                    Ok(v.as_array_mut().and_then(|arr| arr.get_mut(idx)).unwrap_or_else(|| unreachable!()))
                 } else {
                     let mut null = Value::Object(Default::default());
                     std::mem::swap(v, &mut null);
-                    Ok(v.as_object_mut().unwrap().entry(p.to_string()).or_insert(null))
+                    Ok(v.as_object_mut().unwrap_or_else(|| unreachable!()).entry(p.to_string()).or_insert(null))
                 }
             }
             val => {

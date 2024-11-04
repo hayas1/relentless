@@ -75,7 +75,8 @@ pub enum BodyStructure {
 impl BodyStructure {
     pub fn body_with_headers<ReqB: FromBodyStructure + Body>(self) -> WrappedResult<(ReqB, HeaderMap)> {
         let mut headers = HeaderMap::new();
-        self.content_type().map(|t| headers.insert(CONTENT_TYPE, t.as_ref().parse().unwrap()));
+        self.content_type()
+            .map(|t| headers.insert(CONTENT_TYPE, t.as_ref().parse().unwrap_or_else(|_| unreachable!())));
         let body = ReqB::from_body_structure(self);
         body.size_hint().exact().filter(|size| *size > 0).map(|size| headers.insert(CONTENT_LENGTH, size.into())); // TODO remove ?
         Ok((body, headers))

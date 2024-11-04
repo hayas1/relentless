@@ -210,8 +210,7 @@ where
                 let requests = repeat
                     .range()
                     .map(|_| Self::http_request(destination, target, request))
-                    .collect::<Result<Vec<_>, _>>()
-                    .unwrap(); // TODO
+                    .collect::<Result<Vec<_>, _>>()?;
                 Ok((name.to_string(), requests))
             })
             .collect()
@@ -224,12 +223,12 @@ where
         request_info: &RequestInfo,
     ) -> WrappedResult<http::Request<ReqB>> {
         let RequestInfo { method, headers, body, .. } = &request_info;
-        let uri = http::uri::Builder::from(destination.clone()).path_and_query(target).build().unwrap();
+        let uri = http::uri::Builder::from(destination.clone()).path_and_query(target).build()?;
         let applied_method = method.as_ref().map(|m| (**m).clone()).unwrap_or_default();
         let assigned_headers = headers.as_ref().map(|h| (**h).clone()).unwrap_or_default();
         let (actual_body, additional_headers) = body.clone().unwrap_or_default().body_with_headers()?;
 
-        let mut request = http::Request::builder().uri(uri).method(applied_method).body(actual_body).unwrap();
+        let mut request = http::Request::builder().uri(uri).method(applied_method).body(actual_body)?;
         let header_map = request.headers_mut();
         header_map.extend(assigned_headers);
         header_map.extend(additional_headers);
