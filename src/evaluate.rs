@@ -111,7 +111,7 @@ impl DefaultEvaluator {
                     Regex::new(regex).map(|re| re.is_match(String::from_utf8_lossy(b).as_ref())).unwrap_or(false)
                 }
                 None => true,
-            }), // TODO regex?
+            }),
             #[cfg(feature = "json")]
             BodyEvaluate::Json(e) => Self::json_acceptable(e, body, msg),
         }
