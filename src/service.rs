@@ -48,15 +48,19 @@ where
     }
 
     fn call(&mut self, req: http::Request<ReqB>) -> Self::Future {
-        let req = req.try_into().unwrap(); // TODO handle error
-        let fut = self.client.call(req);
-        Box::pin(async {
-            fut.await.map(|res| {
-                let b = http::Response::<reqwest::Body>::from(res);
-                let (parts, incoming) = b.into_parts();
-                http::Response::from_parts(parts, incoming.into())
-            })
-        })
+        match req.try_into() {
+            Ok(req) => {
+                let fut = self.client.call(req);
+                Box::pin(async {
+                    fut.await.map(|res| {
+                        let b = http::Response::<reqwest::Body>::from(res);
+                        let (parts, incoming) = b.into_parts();
+                        http::Response::from_parts(parts, incoming.into())
+                    })
+                })
+            }
+            Err(e) => Box::pin(async { Err(e) }),
+        }
     }
 }
 
