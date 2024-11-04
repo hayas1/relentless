@@ -30,3 +30,16 @@ testcases:
                   foo: hoge
                   bar: fuga
                   baz: piyo
+  - target: /echo/json
+    description: json without Content-Type will return 415 Unsupported Media Type
+    setting:
+      request:
+        no-additional-headers: true
+        method: POST
+        body:
+          foo: hoge
+          bar: fuga
+          baz: piyo
+      evaluate:
+        status:
+          expect: 415

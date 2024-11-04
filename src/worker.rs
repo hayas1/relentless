@@ -222,7 +222,7 @@ where
         target: &str,
         request_info: &RequestInfo,
     ) -> WrappedResult<http::Request<ReqB>> {
-        let RequestInfo { method, headers, body, .. } = &request_info;
+        let RequestInfo { no_additional_headers, method, headers, body } = &request_info;
         let uri = http::uri::Builder::from(destination.clone()).path_and_query(target).build()?;
         let applied_method = method.as_ref().map(|m| (**m).clone()).unwrap_or_default();
         let assigned_headers = headers.as_ref().map(|h| (**h).clone()).unwrap_or_default();
@@ -231,7 +231,9 @@ where
         let mut request = http::Request::builder().uri(uri).method(applied_method).body(actual_body)?;
         let header_map = request.headers_mut();
         header_map.extend(assigned_headers);
-        header_map.extend(additional_headers);
+        if !no_additional_headers {
+            header_map.extend(additional_headers);
+        }
         Ok(request)
     }
 }

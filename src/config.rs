@@ -57,6 +57,8 @@ pub struct Setting {
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct RequestInfo {
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
+    pub no_additional_headers: bool,
+    #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub method: Option<http_serde_priv::Method>,
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub headers: Option<http_serde_priv::HeaderMap>,
@@ -253,6 +255,7 @@ impl Coalesce for RequestInfo {
     type Other = Self;
     fn coalesce(self, other: &Self) -> Self {
         Self {
+            no_additional_headers: self.no_additional_headers || other.no_additional_headers,
             method: self.method.or(other.method.clone()),
             headers: self.headers.or(other.headers.clone()),
             body: self.body.or(other.body.clone()),

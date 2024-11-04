@@ -159,6 +159,12 @@ async fn test_body_config() {
     for line in [
         format!("{} /echo/body", CaseConsoleReport::PASS_EMOJI),
         format!("{} /echo/json", CaseConsoleReport::PASS_EMOJI),
+        format!(
+            "{} /echo/json {} {}",
+            CaseConsoleReport::PASS_EMOJI,
+            CaseConsoleReport::DESCRIPTION_EMOJI,
+            "json without Content-Type will return 415 Unsupported Media Type"
+        ),
     ] {
         assert!(out.contains(&line));
     }
