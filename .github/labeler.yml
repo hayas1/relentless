@@ -1,44 +1,46 @@
+# Managed by terraform. https://github.com/hayas1/tfgh
+
 feature:
-   - head-branch:
-      - '^feat/'
-      - '^feature/'
+  - head-branch:
+    - '^feat/'
+    - '^feature/'
 
 breaking:
-   - head-branch:
-      - '^breaking/'
+  - head-branch:
+    - '^breaking/'
 
 bugfix:
-   - head-branch:
-      - '^fix/'
-      - '^bugfix/'
-      - '^modify/'
+  - head-branch:
+    - '^fix/'
+    - '^bugfix/'
+    - '^modify/'
 
 refactor:
-   - head-branch:
-      - '^refactor/'
+  - head-branch:
+    - '^refactor/'
 
 documentation:
-   - changed-files:
-      - any-glob-to-any-file:
-        - '**/README.md'
-   - head-branch:
-      - '^doc/'
-      - '^docs/'
-      - '^documentation/'
+  - changed-files:
+    - any-glob-to-any-file:
+      - '**/README.md'
+  - head-branch:
+    - '^doc/'
+    - '^docs/'
+    - '^documentation/'
 
 deps:
-   - head-branch:
-      - '^dep/'
-      - '^deps/'
-      - '^dependencies/'
+  - head-branch:
+    - '^dep/'
+    - '^deps/'
+    - '^dependencies/'
 
 maintenance:
-   - changed-files:
-      - any-glob-to-any-file:
-        - '.github/**'
-   - head-branch:
-      - '^maintenance/'
-      - '^ci/'
-      - '^workflow/'
-      - '^chore/'
+  - changed-files:
+    - any-glob-to-any-file:
+      - '.github/**'
+  - head-branch:
+    - '^maintenance/'
+    - '^ci/'
+    - '^workflow/'
+    - '^chore/'
 
