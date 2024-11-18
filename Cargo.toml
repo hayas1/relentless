@@ -30,24 +30,24 @@ http-body-util = "0.1.2"
 bytes = "1.8.0"
 
 thiserror = "1.0.65"
-serde = { version = "1.0.214", features = ["derive"] }
-serde_json = { version = "1.0.132", optional = true }
+serde = { version = "1.0.215", features = ["derive"] }
+serde_json = { version = "1.0.133", optional = true }
 serde_yaml = { version = "0.9.34", optional = true }
 toml = { version = "0.8.19", optional = true }
 json-patch = { version = "3.0.1", optional = true }
 jsonptr = { version = "0.6.3", optional = true }
 
-clap = { version = "4.5.20", features = ["derive"], optional = true }
+clap = { version = "4.5.21", features = ["derive"], optional = true }
 console = { version = "0.15.8", optional = true }
 
 
 [dev-dependencies]
 relentless-dev-server = { path = "dev/server" }
-axum = "0.7.5"
+axum = "0.7.9"
 glob = "0.3.1"
 httptest = "0.16.1"
 assert-json-diff = "2.0.2"
-serde_json = "1.0.132"
+serde_json = "1.0.133"
 
 [workspace]
 members = ["dev/server"]
