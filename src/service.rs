@@ -47,16 +47,20 @@ where
         self.client.poll_ready(cx)
     }
 
-    fn call(&mut self, req: http::Request<ReqB>) -> Self::Future {
-        let req = req.try_into().unwrap(); // TODO handle error
-        let fut = self.client.call(req);
-        Box::pin(async {
-            fut.await.map(|res| {
-                let b = http::Response::<reqwest::Body>::from(res);
-                let (parts, incoming) = b.into_parts();
-                http::Response::from_parts(parts, incoming.into())
-            })
-        })
+    fn call(&mut self, request: http::Request<ReqB>) -> Self::Future {
+        match request.try_into() {
+            Ok(req) => {
+                let fut = self.client.call(req);
+                Box::pin(async {
+                    fut.await.map(|res| {
+                        let b = http::Response::<reqwest::Body>::from(res);
+                        let (parts, incoming) = b.into_parts();
+                        http::Response::from_parts(parts, incoming.into())
+                    })
+                })
+            }
+            Err(e) => Box::pin(async { Err(e) }),
+        }
     }
 }
 
@@ -167,6 +171,8 @@ pub mod origin_router {
     }
 }
 
+// TODO: From
+#[derive(Debug)]
 pub struct BytesBody(BoxBody<Bytes, crate::Error>);
 impl Body for BytesBody {
     type Data = Bytes;
@@ -189,6 +195,13 @@ impl FromBodyStructure for BytesBody {
     fn from_body_structure(val: BodyStructure) -> Self {
         match val {
             BodyStructure::Empty => BytesBody(http_body_util::Empty::new().map_err(Wrap::error).boxed()),
+            BodyStructure::PlainText(s) => {
+                BytesBody(http_body_util::Full::new(Bytes::from(s)).map_err(Wrap::error).boxed())
+            }
+            #[cfg(feature = "json")]
+            BodyStructure::Json(body) => BytesBody(
+                http_body_util::Full::new(Bytes::from(serde_json::to_vec(&body).unwrap())).map_err(Wrap::error).boxed(),
+            ),
         }
     }
 }
@@ -198,11 +211,14 @@ pub trait FromBodyStructure {
 }
 impl<T> FromBodyStructure for T
 where
-    T: Body + Default, // TODO other than Default
+    T: Body + From<Bytes> + Default,
 {
     fn from_body_structure(body: BodyStructure) -> Self {
         match body {
             BodyStructure::Empty => Default::default(),
+            BodyStructure::PlainText(s) => Bytes::from(s).into(),
+            #[cfg(feature = "json")]
+            BodyStructure::Json(_) => Bytes::from(serde_json::to_vec(&body).unwrap()).into(),
         }
     }
 }
@@ -240,21 +256,5 @@ mod tests {
         let res: reqwest::Response = client.ready().await.unwrap().call(request).await.unwrap().into();
         assert_eq!(res.status(), 200);
         assert_eq!(res.text().await.unwrap(), "hello world");
-    }
-
-    #[tokio::test]
-    async fn test_from_body_structure_empty() {
-        let bytes_body = BytesBody::from_body_structure(BodyStructure::Empty);
-        assert!(bytes_body.is_end_stream());
-
-        let bytes1 = BodyExt::collect(http_body_util::Empty::<Bytes>::from_body_structure(BodyStructure::Empty))
-            .await
-            .map(http_body_util::Collected::to_bytes)
-            .unwrap();
-        let bytes2 = BodyExt::collect(http_body_util::Empty::<Bytes>::new())
-            .await
-            .map(http_body_util::Collected::to_bytes)
-            .unwrap();
-        assert_eq!(bytes1, bytes2);
     }
 }

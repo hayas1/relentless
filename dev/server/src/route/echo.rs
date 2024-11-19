@@ -19,14 +19,13 @@ use crate::{
 pub fn route_echo() -> Router<AppState> {
     Router::new()
         .route("/", get(empty))
-        .route("/", post(body))
+        .route("/body", post(body))
         .route("/text/*rest", any(text))
         .route("/path/*rest", any(path))
         .route("/method", any(method))
         .route("/headers", any(headers))
-        .route("/json", get(Jsonizer::dot_splitted_handler::<false>))
+        .route("/json", get(Jsonizer::dot_splitted_handler::<false>).post(json_body))
         .route("/json/rich", get(Jsonizer::dot_splitted_handler::<true>))
-        .route("/json", post(json_body))
 }
 
 #[tracing::instrument]
@@ -96,11 +95,11 @@ impl Jsonizer {
                 if let Ok(idx) = p.parse::<usize>() {
                     let mut null = Value::Array(vec![Value::Null; idx + 1]);
                     std::mem::swap(v, &mut null);
-                    Ok(v.as_array_mut().unwrap().get_mut(idx).unwrap())
+                    Ok(v.as_array_mut().and_then(|arr| arr.get_mut(idx)).unwrap_or_else(|| unreachable!()))
                 } else {
                     let mut null = Value::Object(Default::default());
                     std::mem::swap(v, &mut null);
-                    Ok(v.as_object_mut().unwrap().entry(p.to_string()).or_insert(null))
+                    Ok(v.as_object_mut().unwrap_or_else(|| unreachable!()).entry(p.to_string()).or_insert(null))
                 }
             }
             val => {
@@ -198,7 +197,7 @@ mod tests {
 
         let (status, body) = call_bytes(
             &mut app,
-            Request::builder().uri("/echo/").method(Method::POST).body(Body::from("hello world")).unwrap(),
+            Request::builder().uri("/echo/body").method(Method::POST).body(Body::from("hello world")).unwrap(),
         )
         .await;
         assert_eq!(status, StatusCode::OK);

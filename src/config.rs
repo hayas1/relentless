@@ -5,9 +5,18 @@ use std::{
     time::Duration,
 };
 
+use http::{
+    header::{CONTENT_LENGTH, CONTENT_TYPE},
+    HeaderMap,
+};
+use http_body::Body;
+use mime::{Mime, APPLICATION_JSON, TEXT_PLAIN};
 use serde::{Deserialize, Serialize};
 
-use crate::error::{RunCommandError, WrappedResult};
+use crate::{
+    error::{RunCommandError, WrappedResult},
+    service::FromBodyStructure,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
@@ -48,17 +57,40 @@ pub struct Setting {
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct RequestInfo {
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
+    pub no_additional_headers: bool,
+    #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub method: Option<http_serde_priv::Method>,
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
-    pub header: Option<http_serde_priv::HeaderMap>,
+    pub headers: Option<http_serde_priv::HeaderMap>,
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub body: Option<BodyStructure>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(deny_unknown_fields, rename_all = "kebab-case")]
+#[serde(deny_unknown_fields, rename_all = "kebab-case", untagged)]
 pub enum BodyStructure {
     #[default]
     Empty,
+    PlainText(String),
+    #[cfg(feature = "json")]
+    Json(HashMap<String, String>),
+}
+impl BodyStructure {
+    pub fn body_with_headers<ReqB: FromBodyStructure + Body>(self) -> WrappedResult<(ReqB, HeaderMap)> {
+        let mut headers = HeaderMap::new();
+        self.content_type()
+            .map(|t| headers.insert(CONTENT_TYPE, t.as_ref().parse().unwrap_or_else(|_| unreachable!())));
+        let body = ReqB::from_body_structure(self);
+        body.size_hint().exact().filter(|size| *size > 0).map(|size| headers.insert(CONTENT_LENGTH, size.into())); // TODO remove ?
+        Ok((body, headers))
+    }
+    pub fn content_type(&self) -> Option<Mime> {
+        match self {
+            BodyStructure::Empty => None,
+            BodyStructure::PlainText(_) => Some(TEXT_PLAIN),
+            #[cfg(feature = "json")]
+            BodyStructure::Json(_) => Some(APPLICATION_JSON),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -116,7 +148,9 @@ pub enum BodyEvaluate {
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
-pub struct PlainTextEvaluate {}
+pub struct PlainTextEvaluate {
+    pub regex: Option<String>,
+}
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg(feature = "json")]
@@ -221,8 +255,9 @@ impl Coalesce for RequestInfo {
     type Other = Self;
     fn coalesce(self, other: &Self) -> Self {
         Self {
+            no_additional_headers: self.no_additional_headers || other.no_additional_headers,
             method: self.method.or(other.method.clone()),
-            header: self.header.or(other.header.clone()),
+            headers: self.headers.or(other.headers.clone()),
             body: self.body.or(other.body.clone()),
         }
     }
