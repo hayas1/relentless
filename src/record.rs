@@ -24,13 +24,15 @@ where
     type Error = std::io::Error;
     fn record<W: std::io::Write>(&self, w: &mut W) -> Result<(), Self::Error> {
         let (method, uri, version) = (self.method(), self.uri(), self.version());
-        let headers = self.headers();
-        let body = self.body();
         writeln!(w, "{} {} {:?}", method, uri, version)?;
+
+        let headers = self.headers();
         for (header, value) in headers.iter() {
             writeln!(w, "{}: {:?}", header, value)?;
         }
         writeln!(w)?;
+
+        let body = self.body();
         write!(w, "{:?}", body)?;
         Ok(())
     }
