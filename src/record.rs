@@ -46,13 +46,14 @@ where
 #[cfg(test)]
 mod tests {
     use bytes::Bytes;
+    use http::Method;
 
     use super::*;
 
     #[tokio::test]
     async fn test_empty_body() {
         let request = http::Request::builder()
-            .method("GET")
+            .method(Method::GET)
             .uri("http://localhost:3000")
             .body(http_body_util::Empty::<Bytes>::new())
             .unwrap();
