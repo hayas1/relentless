@@ -6,12 +6,24 @@ use http_body_util::{BodyExt, Collected};
 #[allow(async_fn_in_trait)] // TODO #[warn(async_fn_in_trait)] by default
 pub trait Recordable {
     type Error;
+    async fn record_raw<W: std::io::Write>(&self, w: &mut W) -> Result<(), Self::Error>;
     async fn record<W: std::io::Write>(&self, w: &mut W) -> Result<(), Self::Error> {
         self.record_raw(w).await
     }
-    async fn record_raw<W: std::io::Write>(&self, w: &mut W) -> Result<(), Self::Error>;
+
     async fn record_file(&self, file: &mut File) -> Result<(), Self::Error> {
         self.record(file).await
+    }
+    async fn record_file_raw(&self, file: &mut File) -> Result<(), Self::Error> {
+        self.record_raw(file).await
+    }
+
+    async fn record_path_raw<P>(&self, path: P) -> Result<(), Self::Error>
+    where
+        P: AsRef<Path>,
+        Self::Error: From<std::io::Error>,
+    {
+        self.record_file_raw(&mut File::create(path.as_ref())?).await
     }
     async fn record_path<P>(&self, path: P) -> Result<(), Self::Error>
     where
