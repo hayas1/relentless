@@ -50,7 +50,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_record() {
+    async fn test_empty_body() {
         let request = http::Request::builder()
             .method("GET")
             .uri("http://localhost:3000")
