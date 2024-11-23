@@ -1,7 +1,7 @@
 use std::{fs::File, path::Path};
 
 use http_body::Body;
-use http_body_util::BodyExt;
+use http_body_util::{BodyExt, Collected};
 
 #[allow(async_fn_in_trait)] // TODO #[warn(async_fn_in_trait)] by default
 pub trait Recordable {
@@ -35,7 +35,7 @@ where
         writeln!(w)?;
 
         let body = self.body().clone();
-        if let Ok(b) = BodyExt::collect(body).await.map(http_body_util::Collected::to_bytes) {
+        if let Ok(b) = BodyExt::collect(body).await.map(Collected::to_bytes) {
             write!(w, "{}", String::from_utf8_lossy(&b))?;
         }
 

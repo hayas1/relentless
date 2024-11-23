@@ -1,6 +1,6 @@
 use bytes::Bytes;
 use http_body::Body;
-use http_body_util::BodyExt;
+use http_body_util::{BodyExt, Collected};
 use regex::Regex;
 #[cfg(feature = "json")]
 use serde_json::Value;
@@ -47,7 +47,7 @@ impl DefaultEvaluator {
         let (mut s, mut h, mut b) = (Destinations::new(), Destinations::new(), Destinations::new());
         for (name, r) in res {
             let (http::response::Parts { status, headers, .. }, body) = r.into_parts();
-            let bytes = match BodyExt::collect(body).await.map(http_body_util::Collected::to_bytes) {
+            let bytes = match BodyExt::collect(body).await.map(Collected::to_bytes) {
                 Ok(b) => b,
                 Err(e) => {
                     msg.push(EvaluateError::FailToCollectBody(e.into()));

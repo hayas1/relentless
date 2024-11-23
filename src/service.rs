@@ -117,7 +117,7 @@ pub mod origin_router {
     #[cfg(test)]
     mod tests {
 
-        use http_body_util::{BodyExt, Empty};
+        use http_body_util::{BodyExt, Collected, Empty};
         use relentless_dev_server::route::{self, counter::CounterResponse};
 
         use super::*;
@@ -137,16 +137,14 @@ pub mod origin_router {
                 http::Request::builder().uri("http://localhost:3000/counter/increment").body(Empty::new()).unwrap();
             let response1 = service.call(request1).await.unwrap();
             assert_eq!(response1.status(), 200);
-            let bytes1 =
-                BodyExt::collect(response1.into_body()).await.map(http_body_util::Collected::to_bytes).unwrap();
+            let bytes1 = BodyExt::collect(response1.into_body()).await.map(Collected::to_bytes).unwrap();
             let count1: CounterResponse<i64> = serde_json::from_slice(&bytes1).unwrap();
             assert_eq!(count1, CounterResponse { count: 1 });
 
             let request2 = http::Request::builder().uri("http://localhost:3001/counter").body(Empty::new()).unwrap();
             let response2 = service.call(request2).await.unwrap();
             assert_eq!(response2.status(), 200);
-            let bytes2 =
-                BodyExt::collect(response2.into_body()).await.map(http_body_util::Collected::to_bytes).unwrap();
+            let bytes2 = BodyExt::collect(response2.into_body()).await.map(Collected::to_bytes).unwrap();
             let count2: CounterResponse<i64> = serde_json::from_slice(&bytes2).unwrap();
             assert_eq!(count2, CounterResponse { count: 0 });
         }
@@ -160,7 +158,7 @@ pub mod origin_router {
             let response = service.call(request).await.unwrap();
             assert_eq!(response.status(), 200);
             assert_eq!(
-                &BodyExt::collect(response.into_body()).await.map(http_body_util::Collected::to_bytes).unwrap()[..],
+                &BodyExt::collect(response.into_body()).await.map(Collected::to_bytes).unwrap()[..],
                 b"Hello World"
             );
 
