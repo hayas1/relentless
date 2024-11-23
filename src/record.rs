@@ -4,28 +4,28 @@ use http_body::Body;
 use http_body_util::{BodyExt, Collected};
 
 #[allow(async_fn_in_trait)] // TODO #[warn(async_fn_in_trait)] by default
-pub trait Recordable {
+pub trait Recordable: Sized {
     type Error;
-    async fn record_raw<W: std::io::Write>(&self, w: &mut W) -> Result<(), Self::Error>;
-    async fn record<W: std::io::Write>(&self, w: &mut W) -> Result<(), Self::Error> {
+    async fn record_raw<W: std::io::Write>(self, w: &mut W) -> Result<(), Self::Error>;
+    async fn record<W: std::io::Write>(self, w: &mut W) -> Result<(), Self::Error> {
         self.record_raw(w).await
     }
 
-    async fn record_file(&self, file: &mut File) -> Result<(), Self::Error> {
+    async fn record_file(self, file: &mut File) -> Result<(), Self::Error> {
         self.record(file).await
     }
-    async fn record_file_raw(&self, file: &mut File) -> Result<(), Self::Error> {
+    async fn record_file_raw(self, file: &mut File) -> Result<(), Self::Error> {
         self.record_raw(file).await
     }
 
-    async fn record_path_raw<P>(&self, path: P) -> Result<(), Self::Error>
+    async fn record_path_raw<P>(self, path: P) -> Result<(), Self::Error>
     where
         P: AsRef<Path>,
         Self::Error: From<std::io::Error>,
     {
         self.record_file_raw(&mut File::create(path.as_ref())?).await
     }
-    async fn record_path<P>(&self, path: P) -> Result<(), Self::Error>
+    async fn record_path<P>(self, path: P) -> Result<(), Self::Error>
     where
         P: AsRef<Path>,
         Self::Error: From<std::io::Error>,
@@ -36,24 +36,21 @@ pub trait Recordable {
 
 impl<B> Recordable for http::Request<B>
 where
-    B: Body + Clone,
+    B: Body,
 {
     type Error = std::io::Error;
-    async fn record<W: std::io::Write>(&self, _w: &mut W) -> Result<(), Self::Error> {
+    async fn record<W: std::io::Write>(self, _w: &mut W) -> Result<(), Self::Error> {
         // TODO from content-type
         unimplemented!("json");
     }
-    async fn record_raw<W: std::io::Write>(&self, w: &mut W) -> Result<(), Self::Error> {
-        let (method, uri, version) = (self.method(), self.uri(), self.version());
-        writeln!(w, "{} {} {:?}", method, uri, version)?;
+    async fn record_raw<W: std::io::Write>(self, w: &mut W) -> Result<(), Self::Error> {
+        let (http::request::Parts { method, uri, version, headers, .. }, body) = self.into_parts();
 
-        let headers = self.headers();
+        writeln!(w, "{} {} {:?}", method, uri, version)?;
         for (header, value) in headers.iter() {
             writeln!(w, "{}: {:?}", header, value)?;
         }
         writeln!(w)?;
-
-        let body = self.body().clone();
         if let Ok(b) = BodyExt::collect(body).await.map(Collected::to_bytes) {
             write!(w, "{}", String::from_utf8_lossy(&b))?;
         }
@@ -64,24 +61,21 @@ where
 
 impl<B> Recordable for http::Response<B>
 where
-    B: Body + Clone,
+    B: Body,
 {
     type Error = std::io::Error;
-    async fn record<W: std::io::Write>(&self, _w: &mut W) -> Result<(), Self::Error> {
+    async fn record<W: std::io::Write>(self, _w: &mut W) -> Result<(), Self::Error> {
         // TODO from content-type
         unimplemented!("json");
     }
-    async fn record_raw<W: std::io::Write>(&self, w: &mut W) -> Result<(), Self::Error> {
-        let (version, status) = (self.version(), self.status());
-        writeln!(w, "{:?} {}", version, status)?;
+    async fn record_raw<W: std::io::Write>(self, w: &mut W) -> Result<(), Self::Error> {
+        let (http::response::Parts { version, status, headers, .. }, body) = self.into_parts();
 
-        let headers = self.headers();
+        writeln!(w, "{:?} {}", version, status)?;
         for (header, value) in headers.iter() {
             writeln!(w, "{}: {:?}", header, value)?;
         }
         writeln!(w)?;
-
-        let body = self.body().clone();
         if let Ok(b) = BodyExt::collect(body).await.map(Collected::to_bytes) {
             write!(w, "{}", String::from_utf8_lossy(&b))?;
         }
