@@ -28,7 +28,7 @@ where
         let (Parts { method, uri, version, headers, .. }, body) = self.clone().into_parts();
         writeln!(w, "{} {} {:?}", method, uri, version)?;
         for (header, value) in headers.iter() {
-            writeln!(w, "{}: {}", header, value.to_str().unwrap())?;
+            writeln!(w, "{}: {:?}", header, value)?;
         }
         writeln!(w, "{}", body)?;
         Ok(())
