@@ -26,11 +26,11 @@ where
     type Error = std::io::Error;
     fn record<W: std::io::Write>(&self, w: &mut W) -> Result<(), Self::Error> {
         let (Parts { method, uri, version, headers, .. }, body) = self.clone().into_parts();
-        writeln!(w, "{} {} {:?}", method, uri, version).map_err(std::io::Error::from)?;
+        writeln!(w, "{} {} {:?}", method, uri, version)?;
         for (header, value) in headers.iter() {
-            writeln!(w, "{}: {}", header, value.to_str().unwrap()).map_err(std::io::Error::from)?;
+            writeln!(w, "{}: {}", header, value.to_str().unwrap())?;
         }
-        writeln!(w, "{}", body).map_err(std::io::Error::from)?;
+        writeln!(w, "{}", body)?;
         Ok(())
     }
 }
