@@ -27,6 +27,10 @@ where
     B: Body + Clone,
 {
     type Error = std::io::Error;
+    async fn record<W: std::io::Write>(&self, _w: &mut W) -> Result<(), Self::Error> {
+        // TODO
+        unimplemented!("json");
+    }
     async fn record_raw<W: std::io::Write>(&self, w: &mut W) -> Result<(), Self::Error> {
         let (method, uri, version) = (self.method(), self.uri(), self.version());
         writeln!(w, "{} {} {:?}", method, uri, version)?;
