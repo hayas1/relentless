@@ -1,4 +1,4 @@
-use std::{fmt::Debug, fs::File, path::Path};
+use std::{fs::File, path::Path};
 
 use http_body::Body;
 use http_body_util::BodyExt;
@@ -6,11 +6,11 @@ use http_body_util::BodyExt;
 #[allow(async_fn_in_trait)] // TODO #[warn(async_fn_in_trait)] by default
 pub trait Recordable {
     type Error;
-    async fn record<W: std::io::Write>(&mut self, w: &mut W) -> Result<(), Self::Error>;
-    async fn record_file(&mut self, file: &mut File) -> Result<(), Self::Error> {
+    async fn record<W: std::io::Write>(&self, w: &mut W) -> Result<(), Self::Error>;
+    async fn record_file(&self, file: &mut File) -> Result<(), Self::Error> {
         self.record(file).await
     }
-    async fn record_path<P>(&mut self, path: P) -> Result<(), Self::Error>
+    async fn record_path<P>(&self, path: P) -> Result<(), Self::Error>
     where
         P: AsRef<Path>,
         Self::Error: From<std::io::Error>,
@@ -21,10 +21,10 @@ pub trait Recordable {
 
 impl<B> Recordable for http::Request<B>
 where
-    B: Body + Debug + Unpin,
+    B: Body + Clone,
 {
     type Error = std::io::Error;
-    async fn record<W: std::io::Write>(&mut self, w: &mut W) -> Result<(), Self::Error> {
+    async fn record<W: std::io::Write>(&self, w: &mut W) -> Result<(), Self::Error> {
         let (method, uri, version) = (self.method(), self.uri(), self.version());
         writeln!(w, "{} {} {:?}", method, uri, version)?;
 
@@ -34,7 +34,7 @@ where
         }
         writeln!(w)?;
 
-        let body = self.body_mut();
+        let body = self.body().clone();
         if let Ok(b) = BodyExt::collect(body).await.map(http_body_util::Collected::to_bytes) {
             write!(w, "{}", String::from_utf8_lossy(&b))?;
         }
@@ -51,7 +51,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_record() {
-        let mut request = http::Request::builder()
+        let request = http::Request::builder()
             .method("GET")
             .uri("http://localhost:3000")
             .body(http_body_util::Empty::<Bytes>::new())
