@@ -64,7 +64,7 @@ pub struct Relentless {
 
     /// output directory
     #[cfg_attr(feature = "cli", arg(short, long))]
-    pub record_dir: Option<PathBuf>,
+    pub output_record: Option<PathBuf>,
 
     /// number of threads
     #[cfg_attr(feature = "cli", arg(short, long))]
