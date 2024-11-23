@@ -6,7 +6,10 @@ use http_body_util::{BodyExt, Collected};
 #[allow(async_fn_in_trait)] // TODO #[warn(async_fn_in_trait)] by default
 pub trait Recordable {
     type Error;
-    async fn record<W: std::io::Write>(&self, w: &mut W) -> Result<(), Self::Error>;
+    async fn record<W: std::io::Write>(&self, w: &mut W) -> Result<(), Self::Error> {
+        self.record_raw(w).await
+    }
+    async fn record_raw<W: std::io::Write>(&self, w: &mut W) -> Result<(), Self::Error>;
     async fn record_file(&self, file: &mut File) -> Result<(), Self::Error> {
         self.record(file).await
     }
@@ -24,7 +27,7 @@ where
     B: Body + Clone,
 {
     type Error = std::io::Error;
-    async fn record<W: std::io::Write>(&self, w: &mut W) -> Result<(), Self::Error> {
+    async fn record_raw<W: std::io::Write>(&self, w: &mut W) -> Result<(), Self::Error> {
         let (method, uri, version) = (self.method(), self.uri(), self.version());
         writeln!(w, "{} {} {:?}", method, uri, version)?;
 
@@ -59,7 +62,7 @@ mod tests {
             .unwrap();
 
         let mut buf = Vec::new();
-        request.record(&mut buf).await.unwrap();
+        request.record_raw(&mut buf).await.unwrap();
         assert_eq!(buf, b"GET http://localhost:3000/ HTTP/1.1\n\n");
     }
 }
