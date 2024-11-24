@@ -189,17 +189,22 @@ impl Body for BytesBody {
         self.0.size_hint()
     }
 }
+impl From<Bytes> for BytesBody {
+    fn from(val: Bytes) -> Self {
+        if val.is_empty() {
+            BytesBody(http_body_util::Empty::new().map_err(Wrap::error).boxed())
+        } else {
+            BytesBody(http_body_util::Full::new(val).map_err(Wrap::error).boxed())
+        }
+    }
+}
 impl FromBodyStructure for BytesBody {
     fn from_body_structure(val: BodyStructure) -> Self {
         match val {
-            BodyStructure::Empty => BytesBody(http_body_util::Empty::new().map_err(Wrap::error).boxed()),
-            BodyStructure::PlainText(s) => {
-                BytesBody(http_body_util::Full::new(Bytes::from(s)).map_err(Wrap::error).boxed())
-            }
+            BodyStructure::Empty => Bytes::new().into(),
+            BodyStructure::PlainText(s) => Bytes::from(s).into(),
             #[cfg(feature = "json")]
-            BodyStructure::Json(body) => BytesBody(
-                http_body_util::Full::new(Bytes::from(serde_json::to_vec(&body).unwrap())).map_err(Wrap::error).boxed(),
-            ),
+            BodyStructure::Json(body) => Bytes::from(serde_json::to_vec(&body).unwrap()).into(),
         }
     }
 }

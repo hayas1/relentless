@@ -1,7 +1,16 @@
-use std::{fs::File, path::Path};
+use std::{
+    fs::File,
+    future::Future,
+    path::Path,
+    pin::Pin,
+    task::{Context, Poll},
+};
 
 use http_body::Body;
 use http_body_util::{BodyExt, Collected};
+use tower::{Layer, Service};
+
+use crate::service::BytesBody;
 
 #[allow(async_fn_in_trait)] // TODO #[warn(async_fn_in_trait)] by default
 pub trait Recordable: Sized {
@@ -81,6 +90,47 @@ where
         }
 
         Ok(())
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct RecordLayer;
+impl<S> Layer<S> for RecordLayer {
+    type Service = RecordService<S>;
+    fn layer(&self, inner: S) -> Self::Service {
+        RecordService { inner }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct RecordService<S> {
+    inner: S,
+}
+impl<S, ReqB, ResB> Service<http::Request<ReqB>> for RecordService<S>
+where
+    ReqB: Body,
+    ResB: Body,
+    S: Service<http::Request<ReqB>, Response = http::Response<ResB>>,
+    S::Future: 'static,
+{
+    type Response = http::Response<BytesBody>; // TODO S::Response ?
+    type Error = S::Error;
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
+
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.inner.poll_ready(cx)
+    }
+    fn call(&mut self, request: http::Request<ReqB>) -> Self::Future {
+        let fut = self.inner.call(request);
+        Box::pin(async move {
+            let response = fut.await?;
+            let (parts, body) = response.into_parts();
+            let bytes = BodyExt::collect(body).await.map(Collected::to_bytes).unwrap_or_else(|_| todo!());
+            let record = http::Response::from_parts(parts.clone(), BytesBody::from(bytes.clone()));
+            record.record_raw(&mut std::io::stdout()).await.unwrap();
+            let resp = http::Response::from_parts(parts, BytesBody::from(bytes));
+            Ok(resp)
+        })
     }
 }
 
