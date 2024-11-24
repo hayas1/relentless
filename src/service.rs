@@ -221,19 +221,6 @@ where
     }
 }
 
-pub trait IntoBytesBody {
-    fn into_bytes_body(self) -> BytesBody;
-}
-impl<T> IntoBytesBody for T
-where
-    T: Body<Data = Bytes> + Send + Sync + 'static,
-    T::Error: std::error::Error + Send + Sync,
-{
-    fn into_bytes_body(self) -> BytesBody {
-        BytesBody(self.map_err(Wrap::error).boxed())
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
