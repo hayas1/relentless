@@ -135,7 +135,7 @@ impl Relentless {
         Ok(report)
     }
     /// TODO document
-    pub async fn assault_with<S, ReqB, ResB, E>(
+    pub async fn assault_with<S, ReqB, E>(
         &self,
         configs: Vec<Config>,
         service: &mut S,
@@ -145,12 +145,9 @@ impl Relentless {
         ReqB: Body + FromBodyStructure + Send + 'static,
         ReqB::Data: Send + 'static,
         ReqB::Error: std::error::Error + Sync + Send + 'static,
-        ResB: Body + Send + 'static,
-        ResB::Data: Send + 'static,
-        ResB::Error: std::error::Error + Sync + Send + 'static,
-        S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + 'static,
+        S: Service<http::Request<ReqB>> + Send + 'static,
         Wrap: From<S::Error>,
-        E: Evaluator<http::Response<ResB>>,
+        E: Evaluator<S::Response>,
         E::Message: Display,
     {
         let control = Control::with_service(self, configs, service)?;
