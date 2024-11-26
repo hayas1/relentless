@@ -11,7 +11,7 @@ use http_body_util::{combinators::BoxBody, BodyExt};
 use tower::Service;
 
 use crate::{
-    config::BodyStructure,
+    config::{BodyStructure, RequestInfo},
     error::{Wrap, WrappedResult},
 };
 
@@ -205,6 +205,32 @@ impl FromBodyStructure for BytesBody {
             #[cfg(feature = "json")]
             BodyStructure::Json(body) => Bytes::from(serde_json::to_vec(&body).unwrap()).into(),
         }
+    }
+}
+
+pub trait FromRequestInfo: Sized {
+    type Error;
+    fn from_request_info(destination: &http::Uri, target: &str, info: &RequestInfo) -> Result<Self, Self::Error>;
+}
+impl<B> FromRequestInfo for http::Request<B>
+where
+    B: FromBodyStructure + Body,
+{
+    type Error = Wrap;
+    fn from_request_info(destination: &http::Uri, target: &str, info: &RequestInfo) -> Result<Self, Self::Error> {
+        let RequestInfo { no_additional_headers, method, headers, body } = &info;
+        let uri = http::uri::Builder::from(destination.clone()).path_and_query(target).build()?;
+        let applied_method = method.as_ref().map(|m| (**m).clone()).unwrap_or_default();
+        let assigned_headers = headers.as_ref().map(|h| (**h).clone()).unwrap_or_default();
+        let (actual_body, additional_headers) = body.clone().unwrap_or_default().body_with_headers()?;
+
+        let mut request = http::Request::builder().uri(uri).method(applied_method).body(actual_body)?;
+        let header_map = request.headers_mut();
+        header_map.extend(assigned_headers);
+        if !no_additional_headers {
+            header_map.extend(additional_headers);
+        }
+        Ok(request)
     }
 }
 

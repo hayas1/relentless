@@ -4,11 +4,11 @@ use std::marker::PhantomData;
 use crate::service::DefaultHttpClient;
 use crate::{
     command::Relentless,
-    config::{http_serde_priv, Coalesced, Config, Destinations, RequestInfo, Setting, Testcase, WorkerConfig},
+    config::{http_serde_priv, Coalesced, Config, Destinations, Setting, Testcase, WorkerConfig},
     error::{Wrap, WrappedResult},
     evaluate::{DefaultEvaluator, Evaluator},
     report::{CaseReport, Report, WorkerReport},
-    service::FromBodyStructure,
+    service::{FromBodyStructure, FromRequestInfo},
 };
 use http_body::Body;
 use tower::{Service, ServiceExt};
@@ -198,31 +198,10 @@ where
             .map(|(name, destination)| {
                 let requests = repeat
                     .range()
-                    .map(|_| Self::http_request(destination, target, request))
+                    .map(|_| http::Request::<ReqB>::from_request_info(destination, target, request))
                     .collect::<Result<Vec<_>, _>>()?;
                 Ok((name.to_string(), requests))
             })
             .collect()
-    }
-
-    // TODO generics
-    pub fn http_request(
-        destination: &http::Uri,
-        target: &str,
-        request_info: &RequestInfo,
-    ) -> WrappedResult<http::Request<ReqB>> {
-        let RequestInfo { no_additional_headers, method, headers, body } = &request_info;
-        let uri = http::uri::Builder::from(destination.clone()).path_and_query(target).build()?;
-        let applied_method = method.as_ref().map(|m| (**m).clone()).unwrap_or_default();
-        let assigned_headers = headers.as_ref().map(|h| (**h).clone()).unwrap_or_default();
-        let (actual_body, additional_headers) = body.clone().unwrap_or_default().body_with_headers()?;
-
-        let mut request = http::Request::builder().uri(uri).method(applied_method).body(actual_body)?;
-        let header_map = request.headers_mut();
-        header_map.extend(assigned_headers);
-        if !no_additional_headers {
-            header_map.extend(additional_headers);
-        }
-        Ok(request)
     }
 }
