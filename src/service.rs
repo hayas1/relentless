@@ -169,7 +169,6 @@ pub mod origin_router {
     }
 }
 
-// TODO: From
 #[derive(Debug)]
 pub struct BytesBody(BoxBody<Bytes, crate::Error>);
 impl Body for BytesBody {
