@@ -15,28 +15,25 @@ use tower::{Service, ServiceExt};
 
 /// TODO document
 #[derive(Debug)]
-pub struct Control<'a, S, ReqB, ResB, E> {
+pub struct Control<'a, S, ReqB, E> {
     _cmd: &'a Relentless,
     workers: Vec<Worker<'a, S, ReqB, E>>, // TODO all worker do not have same clients type ?
     cases: Vec<Vec<Case<S, ReqB>>>,
     client: &'a mut S,
-    phantom: PhantomData<(ReqB, ResB)>,
+    phantom: PhantomData<(ReqB)>,
 }
 #[cfg(feature = "default-http-client")]
-impl Control<'_, DefaultHttpClient<reqwest::Body, reqwest::Body>, reqwest::Body, reqwest::Body, DefaultEvaluator> {
+impl Control<'_, DefaultHttpClient<reqwest::Body, reqwest::Body>, reqwest::Body, DefaultEvaluator> {
     pub async fn default_http_client() -> WrappedResult<DefaultHttpClient<reqwest::Body, reqwest::Body>> {
         DefaultHttpClient::new().await
     }
 }
-impl<'a, S, ReqB, ResB, E> Control<'a, S, ReqB, ResB, E>
+impl<'a, S, ReqB, E> Control<'a, S, ReqB, E>
 where
     ReqB: Body + FromBodyStructure + Send + 'static,
     ReqB::Data: Send + 'static,
     ReqB::Error: std::error::Error + Sync + Send + 'static,
-    ResB: Body + Send + 'static,
-    ResB::Data: Send + 'static,
-    ResB::Error: std::error::Error + Sync + Send + 'static,
-    S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + 'static,
+    S: Service<http::Request<ReqB>> + Send + 'static,
     Wrap: From<S::Error>,
     E: Evaluator<S::Response>,
 {
