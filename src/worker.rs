@@ -18,7 +18,7 @@ use tower::{Service, ServiceExt};
 pub struct Control<'a, S, ReqB, ResB, E> {
     _cmd: &'a Relentless,
     workers: Vec<Worker<'a, S, ReqB, ResB, E>>, // TODO all worker do not have same clients type ?
-    cases: Vec<Vec<Case<S, ReqB, ResB>>>,
+    cases: Vec<Vec<Case<S, ReqB>>>,
     client: &'a mut S,
     phantom: PhantomData<(ReqB, ResB)>,
 }
@@ -107,7 +107,7 @@ where
 
     pub async fn assault(
         self,
-        cases: Vec<Case<S, ReqB, ResB>>,
+        cases: Vec<Case<S, ReqB>>,
         evaluator: &E,
         client: &mut S,
     ) -> WrappedResult<WorkerReport<E::Message>> {
@@ -145,24 +145,21 @@ where
 
 /// TODO document
 #[derive(Debug, Clone)]
-pub struct Case<S, ReqB, ResB> {
+pub struct Case<S, ReqB> {
     testcases: Coalesced<Testcase, Setting>,
-    phantom: PhantomData<(S, ReqB, ResB)>,
+    phantom: PhantomData<(S, ReqB)>,
 }
-impl<S, ReqB, ResB> Case<S, ReqB, ResB> {
+impl<S, ReqB> Case<S, ReqB> {
     pub fn testcase(&self) -> &Testcase {
         self.testcases.base()
     }
 }
-impl<S, ReqB, ResB> Case<S, ReqB, ResB>
+impl<S, ReqB> Case<S, ReqB>
 where
     ReqB: Body + FromBodyStructure + Send + 'static,
     ReqB::Data: Send + 'static,
     ReqB::Error: std::error::Error + Sync + Send + 'static,
-    ResB: Body + Send + 'static,
-    ResB::Data: Send + 'static,
-    ResB::Error: std::error::Error + Sync + Send + 'static,
-    S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + 'static,
+    S: Service<http::Request<ReqB>> + Send + 'static,
     Wrap: From<S::Error>,
 {
     pub fn new(worker_config: &WorkerConfig, testcases: Testcase) -> Self {
@@ -175,7 +172,7 @@ where
         self,
         destinations: &Destinations<http_serde_priv::Uri>,
         client: &mut S,
-    ) -> WrappedResult<Destinations<Vec<http::Response<ResB>>>> {
+    ) -> WrappedResult<Destinations<Vec<S::Response>>> {
         let Testcase { target, setting, .. } = self.testcases.coalesce();
 
         let mut dest = Destinations::new();
