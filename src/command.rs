@@ -13,7 +13,7 @@ use crate::{
     error::{IntoContext, MultiWrap, RunCommandError, Wrap, WrappedResult},
     evaluate::Evaluator,
     report::{Report, Reportable},
-    service::FromBodyStructure,
+    service::{FromBodyStructure, FromRequestInfo},
     worker::Control,
 };
 
@@ -146,7 +146,7 @@ impl Relentless {
         ReqB::Data: Send + 'static,
         ReqB::Error: std::error::Error + Sync + Send + 'static,
         S: Service<http::Request<ReqB>> + Send + 'static,
-        Wrap: From<S::Error>,
+        Wrap: From<<http::Request<ReqB> as FromRequestInfo>::Error> + From<S::Error>,
         E: Evaluator<S::Response>,
         E::Message: Display,
     {

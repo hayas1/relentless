@@ -8,17 +8,16 @@ use crate::{
     error::{Wrap, WrappedResult},
     evaluate::{DefaultEvaluator, Evaluator},
     report::{CaseReport, Report, WorkerReport},
-    service::{FromBodyStructure, FromRequestInfo},
+    service::FromRequestInfo,
 };
-use http_body::Body;
 use tower::{Service, ServiceExt};
 
 /// TODO document
 #[derive(Debug)]
-pub struct Control<'a, S, ReqB, E> {
+pub struct Control<'a, S, Req, E> {
     _cmd: &'a Relentless,
-    workers: Vec<Worker<'a, S, http::Request<ReqB>, E>>, // TODO all worker do not have same clients type ?
-    cases: Vec<Vec<Case<S, http::Request<ReqB>>>>,
+    workers: Vec<Worker<'a, S, Req, E>>, // TODO all worker do not have same clients type ?
+    cases: Vec<Vec<Case<S, Req>>>,
     client: &'a mut S,
 }
 #[cfg(feature = "default-http-client")]
@@ -27,14 +26,12 @@ impl Control<'_, DefaultHttpClient<reqwest::Body, reqwest::Body>, reqwest::Body,
         DefaultHttpClient::new().await
     }
 }
-impl<'a, S, ReqB, E> Control<'a, S, ReqB, E>
+impl<'a, S, Req, E> Control<'a, S, Req, E>
 where
-    ReqB: Body + FromBodyStructure + Send + 'static,
-    ReqB::Data: Send + 'static,
-    ReqB::Error: std::error::Error + Sync + Send + 'static,
-    S: Service<http::Request<ReqB>> + Send + 'static,
+    Req: FromRequestInfo,
+    S: Service<Req> + Send + 'static,
     E: Evaluator<S::Response>,
-    Wrap: From<<http::Request<ReqB> as FromRequestInfo>::Error> + From<S::Error>,
+    Wrap: From<Req::Error> + From<S::Error>,
 {
     /// TODO document
     pub fn with_service(cmd: &'a Relentless, configs: Vec<Config>, service: &'a mut S) -> WrappedResult<Self> {
@@ -48,7 +45,7 @@ where
     pub fn new(
         cmd: &'a Relentless,
         configs: Vec<Config>,
-        workers: Vec<Worker<'a, S, http::Request<ReqB>, E>>,
+        workers: Vec<Worker<'a, S, Req, E>>,
         client: &'a mut S,
     ) -> Self {
         let cases = configs
