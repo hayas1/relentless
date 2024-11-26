@@ -20,15 +20,15 @@ pub trait Evaluator<Res> {
     async fn evaluate(&self, cfg: &Evaluate, res: Destinations<Res>, msg: &mut Vec<Self::Message>) -> bool;
 }
 pub struct DefaultEvaluator;
-impl<ResB: Body> Evaluator<http::Response<ResB>> for DefaultEvaluator
+impl<B: Body> Evaluator<http::Response<B>> for DefaultEvaluator
 where
-    ResB::Error: std::error::Error + Sync + Send + 'static,
+    B::Error: std::error::Error + Sync + Send + 'static,
 {
     type Message = EvaluateError;
     async fn evaluate(
         &self,
         cfg: &Evaluate,
-        res: Destinations<http::Response<ResB>>,
+        res: Destinations<http::Response<B>>,
         msg: &mut Vec<Self::Message>,
     ) -> bool {
         Self::acceptable_parts(cfg, res, msg).await
@@ -36,13 +36,13 @@ where
 }
 
 impl DefaultEvaluator {
-    pub async fn acceptable_parts<ResB: Body>(
+    pub async fn acceptable_parts<B: Body>(
         cfg: &Evaluate,
-        res: Destinations<http::Response<ResB>>,
+        res: Destinations<http::Response<B>>,
         msg: &mut Vec<EvaluateError>,
     ) -> bool
     where
-        ResB::Error: std::error::Error + Sync + Send + 'static,
+        B::Error: std::error::Error + Sync + Send + 'static,
     {
         let (mut s, mut h, mut b) = (Destinations::new(), Destinations::new(), Destinations::new());
         for (name, r) in res {
