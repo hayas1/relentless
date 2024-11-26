@@ -20,7 +20,6 @@ pub struct Control<'a, S, ReqB, E> {
     workers: Vec<Worker<'a, S, ReqB, E>>, // TODO all worker do not have same clients type ?
     cases: Vec<Vec<Case<S, ReqB>>>,
     client: &'a mut S,
-    phantom: PhantomData<(ReqB)>,
 }
 #[cfg(feature = "default-http-client")]
 impl Control<'_, DefaultHttpClient<reqwest::Body, reqwest::Body>, reqwest::Body, DefaultEvaluator> {
@@ -56,8 +55,7 @@ where
             .iter()
             .map(|c| c.testcases.clone().into_iter().map(|t| Case::new(&c.worker_config, t)).collect())
             .collect();
-        let phantom = PhantomData;
-        Self { _cmd: cmd, workers, cases, phantom, client }
+        Self { _cmd: cmd, workers, cases, client }
     }
     /// TODO document
     pub async fn assault(self, evaluator: &E) -> WrappedResult<Report<E::Message>> {
