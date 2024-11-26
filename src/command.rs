@@ -2,7 +2,6 @@ use std::{fmt::Display, io::Write, path::PathBuf, process::ExitCode};
 
 #[cfg(feature = "cli")]
 use clap::{Parser, ValueEnum};
-use http_body::Body;
 use serde::{Deserialize, Serialize};
 use tower::Service;
 
@@ -13,7 +12,7 @@ use crate::{
     error::{IntoContext, MultiWrap, RunCommandError, Wrap, WrappedResult},
     evaluate::Evaluator,
     report::{Report, Reportable},
-    service::{FromBodyStructure, FromRequestInfo},
+    service::FromRequestInfo,
     worker::Control,
 };
 
@@ -135,20 +134,17 @@ impl Relentless {
         Ok(report)
     }
     /// TODO document
-    pub async fn assault_with<S, ReqB, E>(
+    pub async fn assault_with<S, Req, E>(
         &self,
         configs: Vec<Config>,
         service: &mut S,
         evaluator: &E,
     ) -> crate::Result<Report<E::Message>>
     where
-        ReqB: Body + FromBodyStructure + Send + 'static,
-        ReqB::Data: Send + 'static,
-        ReqB::Error: std::error::Error + Sync + Send + 'static,
-        S: Service<http::Request<ReqB>> + Send + 'static,
-        Wrap: From<<http::Request<ReqB> as FromRequestInfo>::Error> + From<S::Error>,
+        Req: FromRequestInfo,
+        S: Service<Req> + Send + 'static,
         E: Evaluator<S::Response>,
-        E::Message: Display,
+        Wrap: From<Req::Error> + From<S::Error>,
     {
         let control = Control::with_service(self, configs, service)?;
         let report = control.assault(evaluator).await?;
