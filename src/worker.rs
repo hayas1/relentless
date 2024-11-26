@@ -18,7 +18,7 @@ use tower::{Service, ServiceExt};
 pub struct Control<'a, S, ReqB, E> {
     _cmd: &'a Relentless,
     workers: Vec<Worker<'a, S, ReqB, E>>, // TODO all worker do not have same clients type ?
-    cases: Vec<Vec<Case<S, ReqB>>>,
+    cases: Vec<Vec<Case<S, http::Request<ReqB>>>>,
     client: &'a mut S,
 }
 #[cfg(feature = "default-http-client")]
@@ -33,8 +33,8 @@ where
     ReqB::Data: Send + 'static,
     ReqB::Error: std::error::Error + Sync + Send + 'static,
     S: Service<http::Request<ReqB>> + Send + 'static,
-    Wrap: From<S::Error>,
     E: Evaluator<S::Response>,
+    Wrap: From<<http::Request<ReqB> as FromRequestInfo>::Error> + From<S::Error>,
 {
     /// TODO document
     pub fn with_service(cmd: &'a Relentless, configs: Vec<Config>, service: &'a mut S) -> WrappedResult<Self> {
@@ -88,8 +88,8 @@ where
     ReqB::Data: Send + 'static,
     ReqB::Error: std::error::Error + Sync + Send + 'static,
     S: Service<http::Request<ReqB>> + Send + 'static,
-    Wrap: From<S::Error>,
     E: Evaluator<S::Response>,
+    Wrap: From<<http::Request<ReqB> as FromRequestInfo>::Error> + From<S::Error>,
 {
     pub fn new(cmd: &'a Relentless, config: WorkerConfig) -> WrappedResult<Self> {
         let config = Coalesced::tuple(config, cmd.destinations()?);
@@ -99,7 +99,7 @@ where
 
     pub async fn assault(
         self,
-        cases: Vec<Case<S, ReqB>>,
+        cases: Vec<Case<S, http::Request<ReqB>>>,
         evaluator: &E,
         client: &mut S,
     ) -> WrappedResult<WorkerReport<E::Message>> {
@@ -137,22 +137,20 @@ where
 
 /// TODO document
 #[derive(Debug, Clone)]
-pub struct Case<S, ReqB> {
+pub struct Case<S, Req> {
     testcases: Coalesced<Testcase, Setting>,
-    phantom: PhantomData<(S, ReqB)>,
+    phantom: PhantomData<(S, Req)>,
 }
-impl<S, ReqB> Case<S, ReqB> {
+impl<S, Req> Case<S, Req> {
     pub fn testcase(&self) -> &Testcase {
         self.testcases.base()
     }
 }
-impl<S, ReqB> Case<S, ReqB>
+impl<S, Req> Case<S, Req>
 where
-    ReqB: Body + FromBodyStructure + Send + 'static,
-    ReqB::Data: Send + 'static,
-    ReqB::Error: std::error::Error + Sync + Send + 'static,
-    S: Service<http::Request<ReqB>> + Send + 'static,
-    Wrap: From<S::Error>,
+    Req: FromRequestInfo,
+    S: Service<Req> + Send + 'static,
+    Wrap: From<Req::Error> + From<S::Error>,
 {
     pub fn new(worker_config: &WorkerConfig, testcases: Testcase) -> Self {
         let testcase = Coalesced::tuple(testcases, worker_config.setting.clone());
@@ -183,7 +181,7 @@ where
         destinations: &Destinations<http_serde_priv::Uri>,
         target: &str,
         setting: &Setting,
-    ) -> WrappedResult<Destinations<Vec<http::Request<ReqB>>>> {
+    ) -> WrappedResult<Destinations<Vec<Req>>> {
         let Setting { request, template, repeat, timeout, .. } = setting;
 
         if !template.is_empty() {
@@ -198,7 +196,7 @@ where
             .map(|(name, destination)| {
                 let requests = repeat
                     .range()
-                    .map(|_| http::Request::<ReqB>::from_request_info(destination, target, request))
+                    .map(|_| Req::from_request_info(destination, target, request))
                     .collect::<Result<Vec<_>, _>>()?;
                 Ok((name.to_string(), requests))
             })
