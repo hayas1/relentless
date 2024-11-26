@@ -209,18 +209,18 @@ impl FromBodyStructure for BytesBody {
 }
 
 pub trait FromBodyStructure {
-    fn from_body_structure(val: BodyStructure) -> Self;
+    fn from_body_structure(structure: BodyStructure) -> Self;
 }
 impl<T> FromBodyStructure for T
 where
     T: Body + From<Bytes> + Default,
 {
-    fn from_body_structure(body: BodyStructure) -> Self {
-        match body {
+    fn from_body_structure(structure: BodyStructure) -> Self {
+        match structure {
             BodyStructure::Empty => Default::default(),
             BodyStructure::PlainText(s) => Bytes::from(s).into(),
             #[cfg(feature = "json")]
-            BodyStructure::Json(_) => Bytes::from(serde_json::to_vec(&body).unwrap()).into(),
+            BodyStructure::Json(_) => Bytes::from(serde_json::to_vec(&structure).unwrap()).into(),
         }
     }
 }
