@@ -17,7 +17,7 @@ use tower::{Service, ServiceExt};
 #[derive(Debug)]
 pub struct Control<'a, S, ReqB, ResB, E> {
     _cmd: &'a Relentless,
-    workers: Vec<Worker<'a, S, ReqB, ResB, E>>, // TODO all worker do not have same clients type ?
+    workers: Vec<Worker<'a, S, ReqB, E>>, // TODO all worker do not have same clients type ?
     cases: Vec<Vec<Case<S, ReqB>>>,
     client: &'a mut S,
     phantom: PhantomData<(ReqB, ResB)>,
@@ -38,7 +38,7 @@ where
     ResB::Error: std::error::Error + Sync + Send + 'static,
     S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + 'static,
     Wrap: From<S::Error>,
-    E: Evaluator<http::Response<ResB>>,
+    E: Evaluator<S::Response>,
 {
     /// TODO document
     pub fn with_service(cmd: &'a Relentless, configs: Vec<Config>, service: &'a mut S) -> WrappedResult<Self> {
@@ -52,7 +52,7 @@ where
     pub fn new(
         cmd: &'a Relentless,
         configs: Vec<Config>,
-        workers: Vec<Worker<'a, S, ReqB, ResB, E>>,
+        workers: Vec<Worker<'a, S, ReqB, E>>,
         client: &'a mut S,
     ) -> Self {
         let cases = configs
@@ -77,27 +77,24 @@ where
 
 /// TODO document
 #[derive(Debug)]
-pub struct Worker<'a, S, ReqB, ResB, E> {
+pub struct Worker<'a, S, ReqB, E> {
     _cmd: &'a Relentless,
     config: Coalesced<WorkerConfig, Destinations<http_serde_priv::Uri>>,
-    phantom: PhantomData<(ReqB, ResB, S, E)>,
+    phantom: PhantomData<(ReqB, S, E)>,
 }
-impl<S, ReqB, ResB, E> Worker<'_, S, ReqB, ResB, E> {
+impl<S, ReqB, E> Worker<'_, S, ReqB, E> {
     pub fn config(&self) -> WorkerConfig {
         self.config.coalesce()
     }
 }
-impl<'a, S, ReqB, ResB, E> Worker<'a, S, ReqB, ResB, E>
+impl<'a, S, ReqB, E> Worker<'a, S, ReqB, E>
 where
     ReqB: Body + FromBodyStructure + Send + 'static,
     ReqB::Data: Send + 'static,
     ReqB::Error: std::error::Error + Sync + Send + 'static,
-    ResB: Body + Send + 'static,
-    ResB::Data: Send + 'static,
-    ResB::Error: std::error::Error + Sync + Send + 'static,
-    S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + 'static,
+    S: Service<http::Request<ReqB>> + Send + 'static,
     Wrap: From<S::Error>,
-    E: Evaluator<http::Response<ResB>>,
+    E: Evaluator<S::Response>,
 {
     pub fn new(cmd: &'a Relentless, config: WorkerConfig) -> WrappedResult<Self> {
         let config = Coalesced::tuple(config, cmd.destinations()?);
