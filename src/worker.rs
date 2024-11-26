@@ -17,7 +17,7 @@ use tower::{Service, ServiceExt};
 #[derive(Debug)]
 pub struct Control<'a, S, ReqB, E> {
     _cmd: &'a Relentless,
-    workers: Vec<Worker<'a, S, ReqB, E>>, // TODO all worker do not have same clients type ?
+    workers: Vec<Worker<'a, S, http::Request<ReqB>, E>>, // TODO all worker do not have same clients type ?
     cases: Vec<Vec<Case<S, http::Request<ReqB>>>>,
     client: &'a mut S,
 }
@@ -48,7 +48,7 @@ where
     pub fn new(
         cmd: &'a Relentless,
         configs: Vec<Config>,
-        workers: Vec<Worker<'a, S, ReqB, E>>,
+        workers: Vec<Worker<'a, S, http::Request<ReqB>, E>>,
         client: &'a mut S,
     ) -> Self {
         let cases = configs
@@ -72,24 +72,22 @@ where
 
 /// TODO document
 #[derive(Debug)]
-pub struct Worker<'a, S, ReqB, E> {
+pub struct Worker<'a, S, Req, E> {
     _cmd: &'a Relentless,
     config: Coalesced<WorkerConfig, Destinations<http_serde_priv::Uri>>,
-    phantom: PhantomData<(ReqB, S, E)>,
+    phantom: PhantomData<(Req, S, E)>,
 }
-impl<S, ReqB, E> Worker<'_, S, ReqB, E> {
+impl<S, Req, E> Worker<'_, S, Req, E> {
     pub fn config(&self) -> WorkerConfig {
         self.config.coalesce()
     }
 }
-impl<'a, S, ReqB, E> Worker<'a, S, ReqB, E>
+impl<'a, S, Req, E> Worker<'a, S, Req, E>
 where
-    ReqB: Body + FromBodyStructure + Send + 'static,
-    ReqB::Data: Send + 'static,
-    ReqB::Error: std::error::Error + Sync + Send + 'static,
-    S: Service<http::Request<ReqB>> + Send + 'static,
+    Req: FromRequestInfo,
+    S: Service<Req> + Send + 'static,
     E: Evaluator<S::Response>,
-    Wrap: From<<http::Request<ReqB> as FromRequestInfo>::Error> + From<S::Error>,
+    Wrap: From<Req::Error> + From<S::Error>,
 {
     pub fn new(cmd: &'a Relentless, config: WorkerConfig) -> WrappedResult<Self> {
         let config = Coalesced::tuple(config, cmd.destinations()?);
@@ -99,7 +97,7 @@ where
 
     pub async fn assault(
         self,
-        cases: Vec<Case<S, http::Request<ReqB>>>,
+        cases: Vec<Case<S, Req>>,
         evaluator: &E,
         client: &mut S,
     ) -> WrappedResult<WorkerReport<E::Message>> {
