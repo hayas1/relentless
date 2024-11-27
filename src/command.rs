@@ -3,7 +3,7 @@ use std::{fmt::Display, io::Write, path::PathBuf, process::ExitCode};
 #[cfg(feature = "cli")]
 use clap::{Parser, ValueEnum};
 use serde::{Deserialize, Serialize};
-use tower::Service;
+use tower::{Service, ServiceBuilder};
 
 #[cfg(feature = "console-report")]
 use crate::report::console_report::{ConsoleReport, ReportWriter};
@@ -11,6 +11,7 @@ use crate::{
     config::{http_serde_priv, Config, Destinations},
     error::{IntoContext, MultiWrap, RunCommandError, Wrap, WrappedResult},
     evaluate::Evaluator,
+    record::{RecordLayer, RecordService},
     report::{Report, Reportable},
     service::FromRequestInfo,
     worker::Control,
@@ -125,12 +126,31 @@ impl Relentless {
         }
     }
 
+    // TODO S::Response and RecordService<S>::Response have to be the same type
+    pub fn build_service<S, Req>(
+        &self,
+        service: S,
+    ) -> Box<
+        dyn Service<
+                Req,
+                Response = <RecordService<S> as Service<Req>>::Response,
+                Error = <RecordService<S> as Service<Req>>::Error,
+                Future = <RecordService<S> as Service<Req>>::Future,
+            > + Send,
+    >
+    where
+        S: Service<Req> + Send + 'static,
+        RecordService<S>: Service<Req>,
+    {
+        Box::new(ServiceBuilder::new().layer(RecordLayer).service(service))
+    }
+
     /// TODO document
     #[cfg(all(feature = "default-http-client", feature = "cli"))]
     pub async fn assault(&self) -> crate::Result<Report<crate::error::EvaluateError>> {
         let configs = self.configs_filtered(std::io::stderr())?;
-        let mut client = Control::default_http_client().await?;
-        let report = self.assault_with(configs, &mut client, &crate::evaluate::DefaultEvaluator).await?;
+        let mut service = self.build_service(Control::default_http_client().await?);
+        let report = self.assault_with(configs, &mut service, &crate::evaluate::DefaultEvaluator).await?;
         Ok(report)
     }
     /// TODO document
