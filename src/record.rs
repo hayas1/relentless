@@ -7,11 +7,10 @@ use std::{
     task::{Context, Poll},
 };
 
+use bytes::Bytes;
 use http_body::Body;
 use http_body_util::{BodyExt, Collected};
 use tower::{Layer, Service};
-
-use crate::service::BytesBody;
 
 #[allow(async_fn_in_trait)] // TODO #[warn(async_fn_in_trait)] by default
 pub trait Recordable: Sized {
@@ -118,12 +117,12 @@ pub struct RecordService<S> {
 }
 impl<S, ReqB, ResB> Service<http::Request<ReqB>> for RecordService<S>
 where
-    ReqB: Body,
-    ResB: Body,
+    ReqB: Body + From<Bytes>,
+    ResB: Body + From<Bytes>,
     S: Service<http::Request<ReqB>, Response = http::Response<ResB>>,
     S::Future: 'static,
 {
-    type Response = http::Response<BytesBody>; // TODO S::Response ?
+    type Response = S::Response; // TODO S::Response ?
     type Error = S::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
 
@@ -131,11 +130,11 @@ where
         self.inner.poll_ready(cx)
     }
     fn call(&mut self, request: http::Request<ReqB>) -> Self::Future {
+        // TODO error handling
         let (_path_req, path_res) = if let Some(output) = &self.path {
             // TODO path will be uri ... (if implement template, it will not be in path)
             // TODO timestamp or repeated number
             // TODO join path (absolute) https://github.com/rust-lang/rust/issues/16507
-            // TODO error handling
             let dir = output.join(request.uri().to_string());
             std::fs::create_dir_all(&dir).unwrap();
             writeln!(File::create(dir.join(".gitignore")).unwrap(), "*").unwrap();
@@ -145,16 +144,16 @@ where
             (PathBuf::from("/dev/null"), PathBuf::from("/dev/null"))
         };
 
-        // TODO record request (but body will be BytesBody...)
+        // TODO record request
 
         let fut = self.inner.call(request);
         Box::pin(async move {
             let response = fut.await?;
             let (parts, body) = response.into_parts();
             let bytes = BodyExt::collect(body).await.map(Collected::to_bytes).unwrap_or_else(|_| todo!());
-            let record = http::Response::from_parts(parts.clone(), BytesBody::from(bytes.clone()));
+            let record = http::Response::from_parts(parts.clone(), ResB::from(bytes.clone()));
             record.record_path_raw(&path_res).await.unwrap(); // TODO error handling
-            let resp = http::Response::from_parts(parts, BytesBody::from(bytes));
+            let resp = http::Response::from_parts(parts, ResB::from(bytes));
             Ok(resp)
         })
     }
