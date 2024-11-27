@@ -11,7 +11,7 @@ use http_body_util::{combinators::BoxBody, BodyExt};
 use tower::Service;
 
 use crate::{
-    config::BodyStructure,
+    config::{BodyStructure, RequestInfo},
     error::{Wrap, WrappedResult},
 };
 
@@ -169,7 +169,6 @@ pub mod origin_router {
     }
 }
 
-// TODO: From
 #[derive(Debug)]
 pub struct BytesBody(BoxBody<Bytes, crate::Error>);
 impl Body for BytesBody {
@@ -209,19 +208,45 @@ impl FromBodyStructure for BytesBody {
     }
 }
 
+pub trait FromRequestInfo: Sized {
+    type Error;
+    fn from_request_info(destination: &http::Uri, target: &str, info: &RequestInfo) -> Result<Self, Self::Error>;
+}
+impl<B> FromRequestInfo for http::Request<B>
+where
+    B: FromBodyStructure + Body,
+{
+    type Error = Wrap;
+    fn from_request_info(destination: &http::Uri, target: &str, info: &RequestInfo) -> Result<Self, Self::Error> {
+        let RequestInfo { no_additional_headers, method, headers, body } = &info;
+        let uri = http::uri::Builder::from(destination.clone()).path_and_query(target).build()?;
+        let applied_method = method.as_ref().map(|m| (**m).clone()).unwrap_or_default();
+        let assigned_headers = headers.as_ref().map(|h| (**h).clone()).unwrap_or_default();
+        let (actual_body, additional_headers) = body.clone().unwrap_or_default().body_with_headers()?;
+
+        let mut request = http::Request::builder().uri(uri).method(applied_method).body(actual_body)?;
+        let header_map = request.headers_mut();
+        header_map.extend(assigned_headers);
+        if !no_additional_headers {
+            header_map.extend(additional_headers);
+        }
+        Ok(request)
+    }
+}
+
 pub trait FromBodyStructure {
-    fn from_body_structure(val: BodyStructure) -> Self;
+    fn from_body_structure(structure: BodyStructure) -> Self;
 }
 impl<T> FromBodyStructure for T
 where
     T: Body + From<Bytes> + Default,
 {
-    fn from_body_structure(body: BodyStructure) -> Self {
-        match body {
+    fn from_body_structure(structure: BodyStructure) -> Self {
+        match structure {
             BodyStructure::Empty => Default::default(),
             BodyStructure::PlainText(s) => Bytes::from(s).into(),
             #[cfg(feature = "json")]
-            BodyStructure::Json(_) => Bytes::from(serde_json::to_vec(&body).unwrap()).into(),
+            BodyStructure::Json(_) => Bytes::from(serde_json::to_vec(&structure).unwrap()).into(),
         }
     }
 }
