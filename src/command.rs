@@ -142,7 +142,7 @@ impl Relentless {
         S: Service<Req> + Send + 'static,
         RecordService<S>: Service<Req>,
     {
-        Box::new(ServiceBuilder::new().layer(RecordLayer).service(service))
+        Box::new(ServiceBuilder::new().layer(RecordLayer::new(self.output_record.clone())).service(service))
     }
 
     /// TODO document

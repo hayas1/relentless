@@ -1,7 +1,7 @@
 use std::{
     fs::File,
     future::Future,
-    path::Path,
+    path::{Path, PathBuf},
     pin::Pin,
     task::{Context, Poll},
 };
@@ -94,16 +94,25 @@ where
 }
 
 #[derive(Debug, Clone)]
-pub struct RecordLayer;
+pub struct RecordLayer {
+    path: Option<PathBuf>, // TODO do not use Option
+}
+impl RecordLayer {
+    pub fn new(path: Option<PathBuf>) -> Self {
+        Self { path }
+    }
+}
 impl<S> Layer<S> for RecordLayer {
     type Service = RecordService<S>;
     fn layer(&self, inner: S) -> Self::Service {
-        RecordService { inner }
+        let path = self.path.clone().unwrap_or("/dev/null".into());
+        RecordService { path, inner }
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct RecordService<S> {
+    path: PathBuf,
     inner: S,
 }
 impl<S, ReqB, ResB> Service<http::Request<ReqB>> for RecordService<S>
@@ -121,13 +130,16 @@ where
         self.inner.poll_ready(cx)
     }
     fn call(&mut self, request: http::Request<ReqB>) -> Self::Future {
+        let path = self.path.clone();
+        // TODO record request (but body will be BytesBody...)
+
         let fut = self.inner.call(request);
         Box::pin(async move {
             let response = fut.await?;
             let (parts, body) = response.into_parts();
             let bytes = BodyExt::collect(body).await.map(Collected::to_bytes).unwrap_or_else(|_| todo!());
             let record = http::Response::from_parts(parts.clone(), BytesBody::from(bytes.clone()));
-            record.record_raw(&mut std::io::stdout()).await.unwrap();
+            record.record_path_raw(path).await.unwrap(); // XXX ALL RESPONSES WILL BE RECORD TO SAME FILE
             let resp = http::Response::from_parts(parts, BytesBody::from(bytes));
             Ok(resp)
         })
