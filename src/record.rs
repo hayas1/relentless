@@ -122,7 +122,7 @@ where
     S: Service<http::Request<ReqB>, Response = http::Response<ResB>>,
     S::Future: 'static,
 {
-    type Response = S::Response; // TODO S::Response ?
+    type Response = S::Response;
     type Error = S::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
 

@@ -126,7 +126,7 @@ impl Relentless {
         }
     }
 
-    // TODO S::Response and RecordService<S>::Response have to be the same type
+    // TODO S::Response and RecordService<S>::Response have to be the same type ?
     pub fn build_service<S, Req>(
         &self,
         service: S,
