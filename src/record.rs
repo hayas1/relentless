@@ -28,25 +28,11 @@ pub trait Recordable: Sized {
         self.record_raw(file).await
     }
 
-    fn prepare_dir<P>(path: P) -> Result<(), Self::Error>
-    where
-        P: AsRef<Path>,
-        Self::Error: From<std::io::Error>,
-    {
-        let file = path.as_ref();
-        if let Some(dir) = file.parent() {
-            std::fs::create_dir_all(dir)?;
-            writeln!(File::create(dir.join(".gitignore"))?, "*")?; // TODO hard coded
-        }
-        Ok(())
-    }
-
     async fn record_path_raw<P>(self, path: P) -> Result<(), Self::Error>
     where
         P: AsRef<Path>,
         Self::Error: From<std::io::Error>,
     {
-        Self::prepare_dir(path.as_ref())?;
         self.record_file_raw(&mut File::create(path.as_ref())?).await
     }
     async fn record_path<P>(self, path: P) -> Result<(), Self::Error>
@@ -54,7 +40,6 @@ pub trait Recordable: Sized {
         P: AsRef<Path>,
         Self::Error: From<std::io::Error>,
     {
-        Self::prepare_dir(path.as_ref())?;
         self.record_file(&mut File::create(path.as_ref())?).await
     }
 }
@@ -121,14 +106,14 @@ impl RecordLayer {
 impl<S> Layer<S> for RecordLayer {
     type Service = RecordService<S>;
     fn layer(&self, inner: S) -> Self::Service {
-        let path = self.path.clone().unwrap_or("/dev/null".into());
+        let path = self.path.clone();
         RecordService { path, inner }
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct RecordService<S> {
-    path: PathBuf,
+    path: Option<PathBuf>,
     inner: S,
 }
 impl<S, ReqB, ResB> Service<http::Request<ReqB>> for RecordService<S>
@@ -146,10 +131,19 @@ where
         self.inner.poll_ready(cx)
     }
     fn call(&mut self, request: http::Request<ReqB>) -> Self::Future {
-        // TODO path will be uri ... (if implement template, it will not be in path)
-        // TODO timestamp or repeated number
-        // TODO join path (absolute) https://github.com/rust-lang/rust/issues/16507
-        let dir = self.path.join(request.uri().to_string()); // TODO error handling
+        let (_path_req, path_res) = if let Some(output) = &self.path {
+            // TODO path will be uri ... (if implement template, it will not be in path)
+            // TODO timestamp or repeated number
+            // TODO join path (absolute) https://github.com/rust-lang/rust/issues/16507
+            // TODO error handling
+            let dir = output.join(request.uri().to_string());
+            std::fs::create_dir_all(&dir).unwrap();
+            writeln!(File::create(dir.join(".gitignore")).unwrap(), "*").unwrap();
+            (dir.join("request.txt"), dir.join("response.txt"))
+        } else {
+            // TODO hard coded ...
+            (PathBuf::from("/dev/null"), PathBuf::from("/dev/null"))
+        };
 
         // TODO record request (but body will be BytesBody...)
 
@@ -159,7 +153,7 @@ where
             let (parts, body) = response.into_parts();
             let bytes = BodyExt::collect(body).await.map(Collected::to_bytes).unwrap_or_else(|_| todo!());
             let record = http::Response::from_parts(parts.clone(), BytesBody::from(bytes.clone()));
-            record.record_path_raw(dir.join("response.txt")).await.unwrap(); // TODO error handling
+            record.record_path_raw(&path_res).await.unwrap(); // TODO error handling
             let resp = http::Response::from_parts(parts, BytesBody::from(bytes));
             Ok(resp)
         })
