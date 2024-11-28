@@ -19,6 +19,10 @@ async fn test_record_config() {
     assert!(relentless.pass(&report));
     assert!(relentless.allow(&report));
 
+    let gitignore_path = "tests/record_test_directory/.gitignore";
+    let gitignore_content = std::fs::read_to_string(gitignore_path).unwrap();
+    assert_eq!(gitignore_content, "*\n");
+
     let request_path = "tests/record_test_directory/http:/localhost:3000/echo/body/request.txt";
     let request_record = std::fs::read_to_string(request_path).unwrap();
     assert_eq!(
