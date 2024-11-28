@@ -13,7 +13,7 @@ async fn test_repeat_config() {
     let configs = relentless.configs().unwrap();
     let mut service = route::app_with(Default::default());
     let report =
-        relentless.assault_with::<_, http::Request<Body>, _>(configs, &mut service, &DefaultEvaluator).await.unwrap();
+        relentless.assault_with::<_, Request<Body>, _>(configs, &mut service, &DefaultEvaluator).await.unwrap();
 
     let mut buf = Vec::new();
     relentless.report_with(&report, &mut buf).unwrap();
@@ -42,7 +42,7 @@ async fn test_validate_config() {
     let configs = relentless.configs().unwrap();
     let mut service = route::app_with(Default::default());
     let report =
-        relentless.assault_with::<_, http::Request<Body>, _>(configs, &mut service, &DefaultEvaluator).await.unwrap();
+        relentless.assault_with::<_, Request<Body>, _>(configs, &mut service, &DefaultEvaluator).await.unwrap();
 
     let mut buf = Vec::new();
     relentless.report_with(&report, &mut buf).unwrap();
@@ -63,7 +63,7 @@ async fn test_fail_validate_config() {
     let configs = relentless.configs().unwrap();
     let mut service = route::app_with(Default::default());
     let report =
-        relentless.assault_with::<_, http::Request<Body>, _>(configs, &mut service, &DefaultEvaluator).await.unwrap();
+        relentless.assault_with::<_, Request<Body>, _>(configs, &mut service, &DefaultEvaluator).await.unwrap();
 
     let mut buf = Vec::new();
     relentless.report_with(&report, &mut buf).unwrap();
@@ -87,7 +87,7 @@ async fn test_allow_config() {
     let configs = relentless.configs().unwrap();
     let mut service = route::app_with(Default::default());
     let report =
-        relentless.assault_with::<_, http::Request<Body>, _>(configs, &mut service, &DefaultEvaluator).await.unwrap();
+        relentless.assault_with::<_, Request<Body>, _>(configs, &mut service, &DefaultEvaluator).await.unwrap();
 
     let mut buf = Vec::new();
     relentless.report_with(&report, &mut buf).unwrap();
@@ -112,7 +112,7 @@ async fn test_headers_config() {
     let configs = relentless.configs().unwrap();
     let mut service = route::app_with(Default::default());
     let report =
-        relentless.assault_with::<_, http::Request<Body>, _>(configs, &mut service, &DefaultEvaluator).await.unwrap();
+        relentless.assault_with::<_, Request<Body>, _>(configs, &mut service, &DefaultEvaluator).await.unwrap();
 
     let mut buf = Vec::new();
     relentless.report_with(&report, &mut buf).unwrap();
@@ -133,7 +133,7 @@ async fn test_fail_headers_config() {
     let configs = relentless.configs().unwrap();
     let mut service = route::app_with(Default::default());
     let report =
-        relentless.assault_with::<_, http::Request<Body>, _>(configs, &mut service, &DefaultEvaluator).await.unwrap();
+        relentless.assault_with::<_, Request<Body>, _>(configs, &mut service, &DefaultEvaluator).await.unwrap();
 
     let mut buf = Vec::new();
     relentless.report_with(&report, &mut buf).unwrap();
@@ -157,7 +157,7 @@ async fn test_body_config() {
     let configs = relentless.configs().unwrap();
     let mut service = route::app_with(Default::default());
     let report =
-        relentless.assault_with::<_, http::Request<Body>, _>(configs, &mut service, &DefaultEvaluator).await.unwrap();
+        relentless.assault_with::<_, Request<Body>, _>(configs, &mut service, &DefaultEvaluator).await.unwrap();
 
     let mut buf = Vec::new();
     relentless.report_with(&report, &mut buf).unwrap();
