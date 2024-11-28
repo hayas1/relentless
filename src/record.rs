@@ -2,7 +2,7 @@ use std::{
     fs::File,
     future::Future,
     io::Write,
-    path::{Path, PathBuf},
+    path::PathBuf,
     pin::Pin,
     task::{Context, Poll},
 };
@@ -18,28 +18,6 @@ pub trait Recordable: Sized {
     async fn record_raw<W: std::io::Write>(self, w: &mut W) -> Result<(), Self::Error>;
     async fn record<W: std::io::Write>(self, w: &mut W) -> Result<(), Self::Error> {
         self.record_raw(w).await
-    }
-
-    async fn record_file(self, file: &mut File) -> Result<(), Self::Error> {
-        self.record(file).await
-    }
-    async fn record_file_raw(self, file: &mut File) -> Result<(), Self::Error> {
-        self.record_raw(file).await
-    }
-
-    async fn record_path_raw<P>(self, path: P) -> Result<(), Self::Error>
-    where
-        P: AsRef<Path>,
-        Self::Error: From<std::io::Error>,
-    {
-        self.record_file_raw(&mut File::create(path.as_ref())?).await
-    }
-    async fn record_path<P>(self, path: P) -> Result<(), Self::Error>
-    where
-        P: AsRef<Path>,
-        Self::Error: From<std::io::Error>,
-    {
-        self.record_file(&mut File::create(path.as_ref())?).await
     }
 }
 
@@ -95,7 +73,7 @@ where
 
 #[derive(Debug, Clone)]
 pub struct RecordLayer {
-    path: Option<PathBuf>, // TODO do not use Option
+    path: Option<PathBuf>,
 }
 impl RecordLayer {
     pub fn new(path: Option<PathBuf>) -> Self {
@@ -130,36 +108,38 @@ where
         self.inner.poll_ready(cx)
     }
     fn call(&mut self, request: http::Request<ReqB>) -> Self::Future {
-        // TODO error handling
-        let (path_req, path_res) = if let Some(output) = &self.path {
+        let paths = (|p: Option<&PathBuf>| {
             // TODO path will be uri ... (if implement template, it will not be in path)
             // TODO timestamp or repeated number
             // TODO join path (absolute) https://github.com/rust-lang/rust/issues/16507
-            let dir = output.join(request.uri().to_string());
-            std::fs::create_dir_all(&dir).unwrap();
-            writeln!(File::create(dir.join(".gitignore")).unwrap(), "*").unwrap();
-            (dir.join("request.txt"), dir.join("response.txt"))
+            let dir = p?.join(request.uri().to_string());
+            std::fs::create_dir_all(&dir).ok()?;
+            writeln!(File::create(p?.join(".gitignore")).ok()?, "*").ok()?; // TODO hardcode...
+            Some((File::create(dir.join("request.txt")).ok()?, File::create(dir.join("response.txt")).ok()?))
+        })(self.path.as_ref());
+
+        if let Some((mut file_req, mut file_res)) = paths {
+            let mut cloned_inner = self.inner.clone();
+            Box::pin(async move {
+                // once consume body for record, and reconstruct for request
+                let (req_parts, req_body) = request.into_parts();
+                let req_bytes = BodyExt::collect(req_body).await.map(Collected::to_bytes).unwrap_or_else(|_| todo!());
+                let recordable_req = http::Request::from_parts(req_parts.clone(), ReqB::from(req_bytes.clone()));
+                recordable_req.record_raw(&mut file_req).await.unwrap(); // TODO error handling
+                let req = http::Request::from_parts(req_parts, ReqB::from(req_bytes));
+
+                // once consume body for record, and reconstruct for response
+                let res = cloned_inner.call(req).await?;
+                let (res_parts, res_body) = res.into_parts();
+                let res_bytes = BodyExt::collect(res_body).await.map(Collected::to_bytes).unwrap_or_else(|_| todo!());
+                let recordable_res = http::Response::from_parts(res_parts.clone(), ResB::from(res_bytes.clone()));
+                recordable_res.record_raw(&mut file_res).await.unwrap(); // TODO error handling
+                let response = http::Response::from_parts(res_parts, ResB::from(res_bytes));
+                Ok(response)
+            })
         } else {
-            // TODO hard coded ...
-            (PathBuf::from("/dev/null"), PathBuf::from("/dev/null"))
-        };
-
-        let mut cloned_inner = self.inner.clone();
-        Box::pin(async move {
-            let (req_parts, req_body) = request.into_parts();
-            let req_bytes = BodyExt::collect(req_body).await.map(Collected::to_bytes).unwrap_or_else(|_| todo!());
-            let recordable_req = http::Request::from_parts(req_parts.clone(), ReqB::from(req_bytes.clone()));
-            recordable_req.record_path_raw(&path_req).await.unwrap(); // TODO error handling
-            let req = http::Request::from_parts(req_parts, ReqB::from(req_bytes));
-
-            let res = cloned_inner.call(req).await?;
-            let (res_parts, res_body) = res.into_parts();
-            let res_bytes = BodyExt::collect(res_body).await.map(Collected::to_bytes).unwrap_or_else(|_| todo!());
-            let recordable_res = http::Response::from_parts(res_parts.clone(), ResB::from(res_bytes.clone()));
-            recordable_res.record_path_raw(&path_res).await.unwrap(); // TODO error handling
-            let response = http::Response::from_parts(res_parts, ResB::from(res_bytes));
-            Ok(response)
-        })
+            Box::pin(self.inner.call(request))
+        }
     }
 }
 
