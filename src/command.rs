@@ -62,7 +62,7 @@ pub struct Relentless {
     #[cfg_attr(feature = "cli", arg(short, long), clap(value_enum, default_value_t))]
     pub report_format: ReportFormat,
 
-    /// [EXPERIMENTAL] output directory
+    /// *EXPERIMENTAL* output directory
     #[cfg_attr(feature = "cli", arg(short, long))]
     pub output_record: Option<PathBuf>,
 
