@@ -1,0 +1,15 @@
+name: test config for record
+destinations:
+  test-api: http://localhost:3000
+
+testcases:
+  - target: /echo/
+  - target: /echo/body
+    setting:
+      request:
+        method: POST
+        body: hello world
+      evaluate:
+        body:
+          plain-text:
+            regex: hello world
