@@ -25,6 +25,14 @@ pub struct DefaultHttpClient<ReqB, ResB> {
     phantom: PhantomData<(ReqB, ResB)>,
 }
 #[cfg(feature = "default-http-client")]
+impl<ReqB, ResB> Clone for DefaultHttpClient<ReqB, ResB> {
+    fn clone(&self) -> Self {
+        // derive(Clone) do not implement Clone when ReqB or ResB are not implement Clone
+        // https://github.com/rust-lang/rust/issues/26925
+        Self { client: self.client.clone(), phantom: PhantomData }
+    }
+}
+#[cfg(feature = "default-http-client")]
 impl<ReqB, ResB> DefaultHttpClient<ReqB, ResB> {
     pub async fn new() -> WrappedResult<Self> {
         // TODO use hyper ? continue to use reqwest's rich client?
