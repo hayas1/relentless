@@ -12,6 +12,8 @@ use http_body::Body;
 use http_body_util::{BodyExt, Collected};
 use tower::{Layer, Service};
 
+use crate::error::Wrap;
+
 #[allow(async_fn_in_trait)] // TODO #[warn(async_fn_in_trait)] by default
 pub trait Recordable: Sized {
     type Error;
@@ -99,13 +101,14 @@ where
     ResB: Body + From<Bytes>,
     S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Clone + 'static,
     S::Future: 'static,
+    Wrap: From<S::Error> + From<ReqB::Error> + From<ResB::Error>,
 {
     type Response = S::Response;
-    type Error = S::Error;
+    type Error = Wrap;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.inner.poll_ready(cx)
+        self.inner.poll_ready(cx).map_err(Wrap::from)
     }
     fn call(&mut self, request: http::Request<ReqB>) -> Self::Future {
         let paths = (|p: Option<&PathBuf>| {
@@ -123,22 +126,23 @@ where
             Box::pin(async move {
                 // once consume body for record, and reconstruct for request
                 let (req_parts, req_body) = request.into_parts();
-                let req_bytes = BodyExt::collect(req_body).await.map(Collected::to_bytes).unwrap_or_else(|_| todo!());
+                let req_bytes = BodyExt::collect(req_body).await.map(Collected::to_bytes)?;
                 let recordable_req = http::Request::from_parts(req_parts.clone(), ReqB::from(req_bytes.clone()));
-                recordable_req.record_raw(&mut file_req).await.unwrap(); // TODO error handling
+                recordable_req.record_raw(&mut file_req).await?;
                 let req = http::Request::from_parts(req_parts, ReqB::from(req_bytes));
 
                 // once consume body for record, and reconstruct for response
                 let res = cloned_inner.call(req).await?;
                 let (res_parts, res_body) = res.into_parts();
-                let res_bytes = BodyExt::collect(res_body).await.map(Collected::to_bytes).unwrap_or_else(|_| todo!());
+                let res_bytes = BodyExt::collect(res_body).await.map(Collected::to_bytes)?;
                 let recordable_res = http::Response::from_parts(res_parts.clone(), ResB::from(res_bytes.clone()));
-                recordable_res.record_raw(&mut file_res).await.unwrap(); // TODO error handling
+                recordable_res.record_raw(&mut file_res).await?;
                 let response = http::Response::from_parts(res_parts, ResB::from(res_bytes));
                 Ok(response)
             })
         } else {
-            Box::pin(self.inner.call(request))
+            let fut = self.inner.call(request);
+            Box::pin(async move { Ok(fut.await?) })
         }
     }
 }
