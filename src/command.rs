@@ -126,23 +126,13 @@ impl Relentless {
         }
     }
 
-    // TODO S::Response and RecordService<S>::Response have to be the same type ?
-    pub fn build_service<S, Req>(
-        &self,
-        service: S,
-    ) -> Box<
-        dyn Service<
-                Req,
-                Response = <RecordService<S> as Service<Req>>::Response,
-                Error = <RecordService<S> as Service<Req>>::Error,
-                Future = <RecordService<S> as Service<Req>>::Future,
-            > + Send,
-    >
+    /// TODO document
+    // TODO return type should be `impl Service<Req>` ?
+    pub fn build_service<S, Req>(&self, service: S) -> RecordService<S>
     where
-        S: Service<Req> + Send + 'static,
-        RecordService<S>: Service<Req>,
+        S: Service<Req>,
     {
-        Box::new(ServiceBuilder::new().layer(RecordLayer::new(self.output_record.clone())).service(service))
+        ServiceBuilder::new().layer(RecordLayer::new(self.output_record.clone())).service(service)
     }
 
     /// TODO document
