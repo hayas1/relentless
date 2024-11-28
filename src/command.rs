@@ -132,6 +132,7 @@ impl Relentless {
     where
         S: Service<Req>,
     {
+        // TODO use option_layer ?
         ServiceBuilder::new().layer(RecordLayer::new(self.output_record.clone())).service(service)
     }
 
