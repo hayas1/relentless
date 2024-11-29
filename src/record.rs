@@ -8,6 +8,7 @@ use std::{
 };
 
 use bytes::Bytes;
+use http::header::CONTENT_TYPE;
 use http_body::Body;
 use http_body_util::{BodyExt, Collected};
 use tower::{Layer, Service};
@@ -18,6 +19,9 @@ use crate::error::Wrap;
 pub trait Recordable: Sized {
     type Error;
     async fn record_raw<W: std::io::Write>(self, w: &mut W) -> Result<(), Self::Error>;
+    fn extension(&self) -> &'static str {
+        "txt"
+    }
     async fn record<W: std::io::Write>(self, w: &mut W) -> Result<(), Self::Error> {
         self.record_raw(w).await
     }
@@ -28,9 +32,20 @@ where
     B: Body,
 {
     type Error = std::io::Error;
-    async fn record<W: std::io::Write>(self, _w: &mut W) -> Result<(), Self::Error> {
-        // TODO from content-type
-        unimplemented!("json");
+    fn extension(&self) -> &'static str {
+        if let Some(content_type) = self.headers().get(CONTENT_TYPE) {
+            if content_type == mime::APPLICATION_JSON.as_ref() {
+                "json"
+            } else {
+                "txt"
+            }
+        } else {
+            "txt"
+        }
+    }
+    async fn record<W: std::io::Write>(self, w: &mut W) -> Result<(), Self::Error> {
+        let body = BodyExt::collect(self.into_body()).await.map(Collected::to_bytes).unwrap_or_default();
+        write!(w, "{}", String::from_utf8_lossy(&body))
     }
     async fn record_raw<W: std::io::Write>(self, w: &mut W) -> Result<(), Self::Error> {
         let (http::request::Parts { method, uri, version, headers, .. }, body) = self.into_parts();
@@ -53,9 +68,20 @@ where
     B: Body,
 {
     type Error = std::io::Error;
-    async fn record<W: std::io::Write>(self, _w: &mut W) -> Result<(), Self::Error> {
-        // TODO from content-type
-        unimplemented!("json");
+    fn extension(&self) -> &'static str {
+        if let Some(content_type) = self.headers().get(CONTENT_TYPE) {
+            if content_type == mime::APPLICATION_JSON.as_ref() {
+                "json"
+            } else {
+                "txt"
+            }
+        } else {
+            "txt"
+        }
+    }
+    async fn record<W: std::io::Write>(self, w: &mut W) -> Result<(), Self::Error> {
+        let body = BodyExt::collect(self.into_body()).await.map(Collected::to_bytes).unwrap_or_default();
+        write!(w, "{}", String::from_utf8_lossy(&body))
     }
     async fn record_raw<W: std::io::Write>(self, w: &mut W) -> Result<(), Self::Error> {
         let (http::response::Parts { version, status, headers, .. }, body) = self.into_parts();
@@ -118,25 +144,31 @@ where
             let dir = p?.join(request.uri().to_string());
             std::fs::create_dir_all(&dir).ok()?;
             writeln!(File::create(p?.join(".gitignore")).ok()?, "*").ok()?; // TODO hardcode...
-            Some((File::create(dir.join("request.txt")).ok()?, File::create(dir.join("response.txt")).ok()?))
+            Some(((dir.join("raw_request"), dir.join("request")), (dir.join("raw_response"), dir.join("response"))))
         })(self.path.as_ref());
 
-        if let Some((mut file_req, mut file_res)) = paths {
+        if let Some(((path_raw_req, path_req), (path_raw_res, path_res))) = paths {
             let mut cloned_inner = self.inner.clone();
             Box::pin(async move {
                 // once consume body for record, and reconstruct for request
                 let (req_parts, req_body) = request.into_parts();
                 let req_bytes = BodyExt::collect(req_body).await.map(Collected::to_bytes)?;
+                let recordable_raw_req = http::Request::from_parts(req_parts.clone(), ReqB::from(req_bytes.clone()));
+                recordable_raw_req.record_raw(&mut File::create(path_raw_req.with_extension("txt"))?).await?;
                 let recordable_req = http::Request::from_parts(req_parts.clone(), ReqB::from(req_bytes.clone()));
-                recordable_req.record_raw(&mut file_req).await?;
+                let req_record_extension = recordable_req.extension();
+                recordable_req.record(&mut File::create(path_req.with_extension(req_record_extension))?).await?;
                 let req = http::Request::from_parts(req_parts, ReqB::from(req_bytes));
 
                 // once consume body for record, and reconstruct for response
                 let res = cloned_inner.call(req).await?;
                 let (res_parts, res_body) = res.into_parts();
                 let res_bytes = BodyExt::collect(res_body).await.map(Collected::to_bytes)?;
-                let recordable_res = http::Response::from_parts(res_parts.clone(), ResB::from(res_bytes.clone()));
-                recordable_res.record_raw(&mut file_res).await?;
+                let recordable_raw_res = http::Response::from_parts(res_parts.clone(), ResB::from(res_bytes.clone()));
+                recordable_raw_res.record_raw(&mut File::create(path_raw_res.with_extension("txt"))?).await?;
+                let recordable_res = http::Response::from_parts(res_parts.clone(), ReqB::from(res_bytes.clone()));
+                let res_record_extension = recordable_res.extension();
+                recordable_res.record(&mut File::create(path_res.with_extension(res_record_extension))?).await?;
                 let response = http::Response::from_parts(res_parts, ResB::from(res_bytes));
                 Ok(response)
             })
