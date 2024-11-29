@@ -11,7 +11,7 @@ use http_body_util::{combinators::BoxBody, BodyExt};
 use tower::Service;
 
 use crate::{
-    config::BodyStructure,
+    config::{BodyStructure, RequestInfo},
     error::{Wrap, WrappedResult},
 };
 
@@ -23,6 +23,14 @@ pub const APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARG
 pub struct DefaultHttpClient<ReqB, ResB> {
     client: reqwest::Client,
     phantom: PhantomData<(ReqB, ResB)>,
+}
+#[cfg(feature = "default-http-client")]
+impl<ReqB, ResB> Clone for DefaultHttpClient<ReqB, ResB> {
+    fn clone(&self) -> Self {
+        // derive(Clone) do not implement Clone when ReqB or ResB are not implement Clone
+        // https://github.com/rust-lang/rust/issues/26925
+        Self { client: self.client.clone(), phantom: PhantomData }
+    }
 }
 #[cfg(feature = "default-http-client")]
 impl<ReqB, ResB> DefaultHttpClient<ReqB, ResB> {
@@ -117,7 +125,7 @@ pub mod origin_router {
     #[cfg(test)]
     mod tests {
 
-        use http_body_util::{BodyExt, Empty};
+        use http_body_util::{BodyExt, Collected, Empty};
         use relentless_dev_server::route::{self, counter::CounterResponse};
 
         use super::*;
@@ -137,16 +145,14 @@ pub mod origin_router {
                 http::Request::builder().uri("http://localhost:3000/counter/increment").body(Empty::new()).unwrap();
             let response1 = service.call(request1).await.unwrap();
             assert_eq!(response1.status(), 200);
-            let bytes1 =
-                BodyExt::collect(response1.into_body()).await.map(http_body_util::Collected::to_bytes).unwrap();
+            let bytes1 = BodyExt::collect(response1.into_body()).await.map(Collected::to_bytes).unwrap();
             let count1: CounterResponse<i64> = serde_json::from_slice(&bytes1).unwrap();
             assert_eq!(count1, CounterResponse { count: 1 });
 
             let request2 = http::Request::builder().uri("http://localhost:3001/counter").body(Empty::new()).unwrap();
             let response2 = service.call(request2).await.unwrap();
             assert_eq!(response2.status(), 200);
-            let bytes2 =
-                BodyExt::collect(response2.into_body()).await.map(http_body_util::Collected::to_bytes).unwrap();
+            let bytes2 = BodyExt::collect(response2.into_body()).await.map(Collected::to_bytes).unwrap();
             let count2: CounterResponse<i64> = serde_json::from_slice(&bytes2).unwrap();
             assert_eq!(count2, CounterResponse { count: 0 });
         }
@@ -160,7 +166,7 @@ pub mod origin_router {
             let response = service.call(request).await.unwrap();
             assert_eq!(response.status(), 200);
             assert_eq!(
-                &BodyExt::collect(response.into_body()).await.map(http_body_util::Collected::to_bytes).unwrap()[..],
+                &BodyExt::collect(response.into_body()).await.map(Collected::to_bytes).unwrap()[..],
                 b"Hello World"
             );
 
@@ -171,7 +177,7 @@ pub mod origin_router {
     }
 }
 
-// TODO: From
+// TODO delete BytesBody ?
 #[derive(Debug)]
 pub struct BytesBody(BoxBody<Bytes, crate::Error>);
 impl Body for BytesBody {
@@ -191,48 +197,66 @@ impl Body for BytesBody {
         self.0.size_hint()
     }
 }
+impl From<Bytes> for BytesBody {
+    fn from(val: Bytes) -> Self {
+        if val.is_empty() {
+            BytesBody(http_body_util::Empty::new().map_err(Wrap::error).boxed())
+        } else {
+            BytesBody(http_body_util::Full::new(val).map_err(Wrap::error).boxed())
+        }
+    }
+}
 impl FromBodyStructure for BytesBody {
     fn from_body_structure(val: BodyStructure) -> Self {
         match val {
-            BodyStructure::Empty => BytesBody(http_body_util::Empty::new().map_err(Wrap::error).boxed()),
-            BodyStructure::PlainText(s) => {
-                BytesBody(http_body_util::Full::new(Bytes::from(s)).map_err(Wrap::error).boxed())
-            }
+            BodyStructure::Empty => Bytes::new().into(),
+            BodyStructure::PlainText(s) => Bytes::from(s).into(),
             #[cfg(feature = "json")]
-            BodyStructure::Json(body) => BytesBody(
-                http_body_util::Full::new(Bytes::from(serde_json::to_vec(&body).unwrap())).map_err(Wrap::error).boxed(),
-            ),
+            BodyStructure::Json(body) => Bytes::from(serde_json::to_vec(&body).unwrap()).into(),
         }
     }
 }
 
+pub trait FromRequestInfo: Sized {
+    type Error;
+    fn from_request_info(destination: &http::Uri, target: &str, info: &RequestInfo) -> Result<Self, Self::Error>;
+}
+impl<B> FromRequestInfo for http::Request<B>
+where
+    B: FromBodyStructure + Body,
+{
+    type Error = Wrap;
+    fn from_request_info(destination: &http::Uri, target: &str, info: &RequestInfo) -> Result<Self, Self::Error> {
+        let RequestInfo { no_additional_headers, method, headers, body } = &info;
+        let uri = http::uri::Builder::from(destination.clone()).path_and_query(target).build()?;
+        let applied_method = method.as_ref().map(|m| (**m).clone()).unwrap_or_default();
+        let assigned_headers = headers.as_ref().map(|h| (**h).clone()).unwrap_or_default();
+        let (actual_body, additional_headers) = body.clone().unwrap_or_default().body_with_headers()?;
+
+        let mut request = http::Request::builder().uri(uri).method(applied_method).body(actual_body)?;
+        let header_map = request.headers_mut();
+        header_map.extend(assigned_headers);
+        if !no_additional_headers {
+            header_map.extend(additional_headers);
+        }
+        Ok(request)
+    }
+}
+
 pub trait FromBodyStructure {
-    fn from_body_structure(val: BodyStructure) -> Self;
+    fn from_body_structure(structure: BodyStructure) -> Self;
 }
 impl<T> FromBodyStructure for T
 where
     T: Body + From<Bytes> + Default,
 {
-    fn from_body_structure(body: BodyStructure) -> Self {
-        match body {
+    fn from_body_structure(structure: BodyStructure) -> Self {
+        match structure {
             BodyStructure::Empty => Default::default(),
             BodyStructure::PlainText(s) => Bytes::from(s).into(),
             #[cfg(feature = "json")]
-            BodyStructure::Json(_) => Bytes::from(serde_json::to_vec(&body).unwrap()).into(),
+            BodyStructure::Json(_) => Bytes::from(serde_json::to_vec(&structure).unwrap()).into(),
         }
-    }
-}
-
-pub trait IntoBytesBody {
-    fn into_bytes_body(self) -> BytesBody;
-}
-impl<T> IntoBytesBody for T
-where
-    T: Body<Data = Bytes> + Send + Sync + 'static,
-    T::Error: std::error::Error + Send + Sync,
-{
-    fn into_bytes_body(self) -> BytesBody {
-        BytesBody(self.map_err(Wrap::error).boxed())
     }
 }
 

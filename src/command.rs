@@ -2,9 +2,8 @@ use std::{fmt::Display, io::Write, path::PathBuf, process::ExitCode};
 
 #[cfg(feature = "cli")]
 use clap::{Parser, ValueEnum};
-use http_body::Body;
 use serde::{Deserialize, Serialize};
-use tower::Service;
+use tower::{Service, ServiceBuilder};
 
 #[cfg(feature = "console-report")]
 use crate::report::console_report::{ConsoleReport, ReportWriter};
@@ -12,8 +11,9 @@ use crate::{
     config::{http_serde_priv, Config, Destinations},
     error::{IntoContext, MultiWrap, RunCommandError, Wrap, WrappedResult},
     evaluate::Evaluator,
+    record::{RecordLayer, RecordService},
     report::{Report, Reportable},
-    service::FromBodyStructure,
+    service::FromRequestInfo,
     worker::Control,
 };
 
@@ -21,11 +21,7 @@ use crate::{
 pub async fn execute() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sync>> {
     let cmd = Relentless::parse();
 
-    let Relentless { output_dir, number_of_threads, rps, .. } = &cmd;
-    if output_dir.is_some() {
-        // TODO record in filesystem, HTML report format
-        unimplemented!("`--output-dir` is not implemented yet");
-    }
+    let Relentless { number_of_threads, rps, .. } = &cmd;
     if number_of_threads.is_some() {
         unimplemented!("`--number-of-threads` is not implemented yet");
     }
@@ -66,8 +62,9 @@ pub struct Relentless {
     #[cfg_attr(feature = "cli", arg(short, long), clap(value_enum, default_value_t))]
     pub report_format: ReportFormat,
 
-    /// output directory
-    pub output_dir: Option<PathBuf>,
+    /// *EXPERIMENTAL* output directory
+    #[cfg_attr(feature = "cli", arg(short, long))]
+    pub output_record: Option<PathBuf>,
 
     /// number of threads
     #[cfg_attr(feature = "cli", arg(short, long))]
@@ -130,31 +127,35 @@ impl Relentless {
     }
 
     /// TODO document
+    // TODO return type should be `impl Service<Req>` ?
+    pub fn build_service<S, Req>(&self, service: S) -> RecordService<S>
+    where
+        S: Service<Req>,
+    {
+        // TODO use option_layer ?
+        ServiceBuilder::new().layer(RecordLayer::new(self.output_record.clone())).service(service)
+    }
+
+    /// TODO document
     #[cfg(all(feature = "default-http-client", feature = "cli"))]
     pub async fn assault(&self) -> crate::Result<Report<crate::error::EvaluateError>> {
         let configs = self.configs_filtered(std::io::stderr())?;
-        let mut client = Control::default_http_client().await?;
-        let report = self.assault_with(configs, &mut client, &crate::evaluate::DefaultEvaluator).await?;
+        let mut service = self.build_service(Control::default_http_client().await?);
+        let report = self.assault_with(configs, &mut service, &crate::evaluate::DefaultEvaluator).await?;
         Ok(report)
     }
     /// TODO document
-    pub async fn assault_with<S, ReqB, ResB, E>(
+    pub async fn assault_with<S, Req, E>(
         &self,
         configs: Vec<Config>,
         service: &mut S,
         evaluator: &E,
     ) -> crate::Result<Report<E::Message>>
     where
-        ReqB: Body + FromBodyStructure + Send + 'static,
-        ReqB::Data: Send + 'static,
-        ReqB::Error: std::error::Error + Sync + Send + 'static,
-        ResB: Body + Send + 'static,
-        ResB::Data: Send + 'static,
-        ResB::Error: std::error::Error + Sync + Send + 'static,
-        S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + 'static,
-        Wrap: From<S::Error>,
-        E: Evaluator<http::Response<ResB>>,
-        E::Message: Display,
+        Req: FromRequestInfo,
+        S: Service<Req> + Send + 'static,
+        E: Evaluator<S::Response>,
+        Wrap: From<Req::Error> + From<S::Error>,
     {
         let control = Control::with_service(self, configs, service)?;
         let report = control.assault(evaluator).await?;

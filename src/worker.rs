@@ -4,41 +4,34 @@ use std::marker::PhantomData;
 use crate::service::DefaultHttpClient;
 use crate::{
     command::Relentless,
-    config::{http_serde_priv, Coalesced, Config, Destinations, RequestInfo, Setting, Testcase, WorkerConfig},
+    config::{http_serde_priv, Coalesced, Config, Destinations, Setting, Testcase, WorkerConfig},
     error::{Wrap, WrappedResult},
     evaluate::{DefaultEvaluator, Evaluator},
     report::{CaseReport, Report, WorkerReport},
-    service::FromBodyStructure,
+    service::FromRequestInfo,
 };
-use http_body::Body;
 use tower::{Service, ServiceExt};
 
 /// TODO document
 #[derive(Debug)]
-pub struct Control<'a, S, ReqB, ResB, E> {
+pub struct Control<'a, S, Req, E> {
     _cmd: &'a Relentless,
-    workers: Vec<Worker<'a, S, ReqB, ResB, E>>, // TODO all worker do not have same clients type ?
-    cases: Vec<Vec<Case<S, ReqB, ResB>>>,
+    workers: Vec<Worker<'a, S, Req, E>>, // TODO all worker do not have same clients type ?
+    cases: Vec<Vec<Case<S, Req>>>,
     client: &'a mut S,
-    phantom: PhantomData<(ReqB, ResB)>,
 }
 #[cfg(feature = "default-http-client")]
-impl Control<'_, DefaultHttpClient<reqwest::Body, reqwest::Body>, reqwest::Body, reqwest::Body, DefaultEvaluator> {
+impl Control<'_, DefaultHttpClient<reqwest::Body, reqwest::Body>, reqwest::Body, DefaultEvaluator> {
     pub async fn default_http_client() -> WrappedResult<DefaultHttpClient<reqwest::Body, reqwest::Body>> {
         DefaultHttpClient::new().await
     }
 }
-impl<'a, S, ReqB, ResB, E> Control<'a, S, ReqB, ResB, E>
+impl<'a, S, Req, E> Control<'a, S, Req, E>
 where
-    ReqB: Body + FromBodyStructure + Send + 'static,
-    ReqB::Data: Send + 'static,
-    ReqB::Error: std::error::Error + Sync + Send + 'static,
-    ResB: Body + Send + 'static,
-    ResB::Data: Send + 'static,
-    ResB::Error: std::error::Error + Sync + Send + 'static,
-    S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + 'static,
-    Wrap: From<S::Error>,
-    E: Evaluator<http::Response<ResB>>,
+    Req: FromRequestInfo,
+    S: Service<Req> + Send + 'static,
+    E: Evaluator<S::Response>,
+    Wrap: From<Req::Error> + From<S::Error>,
 {
     /// TODO document
     pub fn with_service(cmd: &'a Relentless, configs: Vec<Config>, service: &'a mut S) -> WrappedResult<Self> {
@@ -52,15 +45,14 @@ where
     pub fn new(
         cmd: &'a Relentless,
         configs: Vec<Config>,
-        workers: Vec<Worker<'a, S, ReqB, ResB, E>>,
+        workers: Vec<Worker<'a, S, Req, E>>,
         client: &'a mut S,
     ) -> Self {
         let cases = configs
             .iter()
             .map(|c| c.testcases.clone().into_iter().map(|t| Case::new(&c.worker_config, t)).collect())
             .collect();
-        let phantom = PhantomData;
-        Self { _cmd: cmd, workers, cases, phantom, client }
+        Self { _cmd: cmd, workers, cases, client }
     }
     /// TODO document
     pub async fn assault(self, evaluator: &E) -> WrappedResult<Report<E::Message>> {
@@ -77,27 +69,22 @@ where
 
 /// TODO document
 #[derive(Debug)]
-pub struct Worker<'a, S, ReqB, ResB, E> {
+pub struct Worker<'a, S, Req, E> {
     _cmd: &'a Relentless,
     config: Coalesced<WorkerConfig, Destinations<http_serde_priv::Uri>>,
-    phantom: PhantomData<(ReqB, ResB, S, E)>,
+    phantom: PhantomData<(Req, S, E)>,
 }
-impl<S, ReqB, ResB, E> Worker<'_, S, ReqB, ResB, E> {
+impl<S, Req, E> Worker<'_, S, Req, E> {
     pub fn config(&self) -> WorkerConfig {
         self.config.coalesce()
     }
 }
-impl<'a, S, ReqB, ResB, E> Worker<'a, S, ReqB, ResB, E>
+impl<'a, S, Req, E> Worker<'a, S, Req, E>
 where
-    ReqB: Body + FromBodyStructure + Send + 'static,
-    ReqB::Data: Send + 'static,
-    ReqB::Error: std::error::Error + Sync + Send + 'static,
-    ResB: Body + Send + 'static,
-    ResB::Data: Send + 'static,
-    ResB::Error: std::error::Error + Sync + Send + 'static,
-    S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + 'static,
-    Wrap: From<S::Error>,
-    E: Evaluator<http::Response<ResB>>,
+    Req: FromRequestInfo,
+    S: Service<Req> + Send + 'static,
+    E: Evaluator<S::Response>,
+    Wrap: From<Req::Error> + From<S::Error>,
 {
     pub fn new(cmd: &'a Relentless, config: WorkerConfig) -> WrappedResult<Self> {
         let config = Coalesced::tuple(config, cmd.destinations()?);
@@ -107,7 +94,7 @@ where
 
     pub async fn assault(
         self,
-        cases: Vec<Case<S, ReqB, ResB>>,
+        cases: Vec<Case<S, Req>>,
         evaluator: &E,
         client: &mut S,
     ) -> WrappedResult<WorkerReport<E::Message>> {
@@ -145,25 +132,20 @@ where
 
 /// TODO document
 #[derive(Debug, Clone)]
-pub struct Case<S, ReqB, ResB> {
+pub struct Case<S, Req> {
     testcases: Coalesced<Testcase, Setting>,
-    phantom: PhantomData<(S, ReqB, ResB)>,
+    phantom: PhantomData<(S, Req)>,
 }
-impl<S, ReqB, ResB> Case<S, ReqB, ResB> {
+impl<S, Req> Case<S, Req> {
     pub fn testcase(&self) -> &Testcase {
         self.testcases.base()
     }
 }
-impl<S, ReqB, ResB> Case<S, ReqB, ResB>
+impl<S, Req> Case<S, Req>
 where
-    ReqB: Body + FromBodyStructure + Send + 'static,
-    ReqB::Data: Send + 'static,
-    ReqB::Error: std::error::Error + Sync + Send + 'static,
-    ResB: Body + Send + 'static,
-    ResB::Data: Send + 'static,
-    ResB::Error: std::error::Error + Sync + Send + 'static,
-    S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send + 'static,
-    Wrap: From<S::Error>,
+    Req: FromRequestInfo,
+    S: Service<Req> + Send + 'static,
+    Wrap: From<Req::Error> + From<S::Error>,
 {
     pub fn new(worker_config: &WorkerConfig, testcases: Testcase) -> Self {
         let testcase = Coalesced::tuple(testcases, worker_config.setting.clone());
@@ -175,7 +157,7 @@ where
         self,
         destinations: &Destinations<http_serde_priv::Uri>,
         client: &mut S,
-    ) -> WrappedResult<Destinations<Vec<http::Response<ResB>>>> {
+    ) -> WrappedResult<Destinations<Vec<S::Response>>> {
         let Testcase { target, setting, .. } = self.testcases.coalesce();
 
         let mut dest = Destinations::new();
@@ -194,7 +176,7 @@ where
         destinations: &Destinations<http_serde_priv::Uri>,
         target: &str,
         setting: &Setting,
-    ) -> WrappedResult<Destinations<Vec<http::Request<ReqB>>>> {
+    ) -> WrappedResult<Destinations<Vec<Req>>> {
         let Setting { request, template, repeat, timeout, .. } = setting;
 
         if !template.is_empty() {
@@ -209,31 +191,10 @@ where
             .map(|(name, destination)| {
                 let requests = repeat
                     .range()
-                    .map(|_| Self::http_request(destination, target, request))
+                    .map(|_| Req::from_request_info(destination, target, request))
                     .collect::<Result<Vec<_>, _>>()?;
                 Ok((name.to_string(), requests))
             })
             .collect()
-    }
-
-    // TODO generics
-    pub fn http_request(
-        destination: &http::Uri,
-        target: &str,
-        request_info: &RequestInfo,
-    ) -> WrappedResult<http::Request<ReqB>> {
-        let RequestInfo { no_additional_headers, method, headers, body } = &request_info;
-        let uri = http::uri::Builder::from(destination.clone()).path_and_query(target).build()?;
-        let applied_method = method.as_ref().map(|m| (**m).clone()).unwrap_or_default();
-        let assigned_headers = headers.as_ref().map(|h| (**h).clone()).unwrap_or_default();
-        let (actual_body, additional_headers) = body.clone().unwrap_or_default().body_with_headers()?;
-
-        let mut request = http::Request::builder().uri(uri).method(applied_method).body(actual_body)?;
-        let header_map = request.headers_mut();
-        header_map.extend(assigned_headers);
-        if !no_additional_headers {
-            header_map.extend(additional_headers);
-        }
-        Ok(request)
     }
 }

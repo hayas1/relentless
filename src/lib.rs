@@ -65,6 +65,7 @@ pub mod command;
 pub mod config;
 pub mod error;
 pub mod evaluate;
+pub mod record;
 pub mod report;
 pub mod service;
 pub mod worker;
