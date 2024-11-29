@@ -1,8 +1,6 @@
 use std::{
     fmt::{Debug, Display},
-    future::Future,
     ops::{Bound, RangeBounds},
-    pin::Pin,
 };
 
 use axum::{extract::Query, response::Result, routing::get, Json, Router};
@@ -16,6 +14,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::{error::random::RandomError, state::AppState};
+
+use super::PinResponseFuture;
 
 pub fn route_random() -> Router<AppState> {
     Router::new()
@@ -39,9 +39,7 @@ pub fn route_random() -> Router<AppState> {
     // .fallback() // TODO
 }
 
-pub type RandomResponseFuture<R> = Pin<Box<dyn Future<Output = R> + Send>>;
-
-pub fn random_handler<T, D>(distribution: D) -> impl FnOnce() -> RandomResponseFuture<Result<String>> + Clone
+pub fn random_handler<T, D>(distribution: D) -> impl FnOnce() -> PinResponseFuture<Result<String>> + Clone
 where
     T: Display + Clone + Send + 'static,
     D: Distribution<T> + Clone + Send + 'static,
@@ -60,9 +58,7 @@ pub struct RandomString {
     pub len: Option<usize>,
 }
 impl RandomString {
-    pub fn handler<D>(
-        distribution: D,
-    ) -> impl FnOnce(Query<RandomString>) -> RandomResponseFuture<Result<String>> + Clone
+    pub fn handler<D>(distribution: D) -> impl FnOnce(Query<RandomString>) -> PinResponseFuture<Result<String>> + Clone
     where
         D: DistString + Clone + Send + 'static,
     {
@@ -89,7 +85,7 @@ impl RandomResponse {
         int_distribution: DI,
         float_distribution: DF,
         distribution_string: DS,
-    ) -> impl FnOnce(Query<RandomString>) -> RandomResponseFuture<Result<Json<Self>>> + Clone
+    ) -> impl FnOnce(Query<RandomString>) -> PinResponseFuture<Result<Json<Self>>> + Clone
     where
         DI: Distribution<i64> + Clone + Send + 'static,
         DF: Distribution<f64> + Clone + Send + 'static,
@@ -146,7 +142,7 @@ pub trait DistRange<T>: Distribution<T> {
         R: RangeBounds<T>,
         Self: Sized;
 
-    fn handler() -> impl FnOnce(Query<DistRangeParam<T>>) -> RandomResponseFuture<Result<String>> + Clone
+    fn handler() -> impl FnOnce(Query<DistRangeParam<T>>) -> PinResponseFuture<Result<String>> + Clone
     where
         Self: DistRange<T> + Sized,
         T: Display + Debug + Clone + Send + Sync + 'static,

@@ -1,10 +1,12 @@
-use std::{future::Future, pin::Pin, time::Duration};
+use std::time::Duration;
 
 use axum::{extract::Path, response::Result, routing::get, Json, Router};
 use serde::{Deserialize, Serialize};
 use tokio::time::sleep;
 
 use crate::state::AppState;
+
+use super::PinResponseFuture;
 
 pub fn route_wait() -> Router<AppState> {
     Router::new()
@@ -28,9 +30,7 @@ pub enum DurationUnit {
     Nanoseconds,
 }
 impl DurationUnit {
-    pub fn handler(
-        self,
-    ) -> impl FnOnce(Path<u64>) -> Pin<Box<dyn Future<Output = Result<Json<WaitResponse>>> + Send>> + Clone {
+    pub fn handler(self) -> impl FnOnce(Path<u64>) -> PinResponseFuture<Result<Json<WaitResponse>>> + Clone {
         // return type ref: https://github.com/tokio-rs/axum/pull/1082/files#diff-93eb961c85da77636607a224513f085faf7876f5a9f7091c13e05939aa5de33cR61-R62
         move |Path(duration): Path<u64>| {
             let d = match self {

@@ -6,7 +6,7 @@ pub mod random;
 pub mod root;
 pub mod wait;
 
-use std::net::SocketAddr;
+use std::{future::Future, net::SocketAddr, pin::Pin};
 
 use axum::{
     body::{Body, HttpBody},
@@ -25,6 +25,8 @@ use crate::{
     error::{kind::NotFound, AppErrorDetail, Logged},
     state::AppState,
 };
+
+pub type PinResponseFuture<R> = Pin<Box<dyn Future<Output = R> + Send>>;
 
 pub fn app_with(env: Env) -> NormalizePath<Router<()>> {
     let state = AppState { env, ..Default::default() };
