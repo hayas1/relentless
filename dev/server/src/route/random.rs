@@ -39,9 +39,9 @@ pub fn route_random() -> Router<AppState> {
     // .fallback() // TODO
 }
 
-pub fn random_handler<T, D>(
-    distribution: D,
-) -> impl FnOnce() -> Pin<Box<dyn Future<Output = Result<String>> + Send>> + Clone
+pub type RandomResponseFuture<R> = Pin<Box<dyn Future<Output = R> + Send>>;
+
+pub fn random_handler<T, D>(distribution: D) -> impl FnOnce() -> RandomResponseFuture<Result<String>> + Clone
 where
     T: Display + Clone + Send + 'static,
     D: Distribution<T> + Clone + Send + 'static,
@@ -62,7 +62,7 @@ pub struct RandomString {
 impl RandomString {
     pub fn handler<D>(
         distribution: D,
-    ) -> impl FnOnce(Query<RandomString>) -> Pin<Box<dyn Future<Output = Result<String>> + Send>> + Clone
+    ) -> impl FnOnce(Query<RandomString>) -> RandomResponseFuture<Result<String>> + Clone
     where
         D: DistString + Clone + Send + 'static,
     {
@@ -89,7 +89,7 @@ impl RandomResponse {
         int_distribution: DI,
         float_distribution: DF,
         distribution_string: DS,
-    ) -> impl FnOnce(Query<RandomString>) -> Pin<Box<dyn Future<Output = Result<Json<Self>>> + Send>> + Clone
+    ) -> impl FnOnce(Query<RandomString>) -> RandomResponseFuture<Result<Json<Self>>> + Clone
     where
         DI: Distribution<i64> + Clone + Send + 'static,
         DF: Distribution<f64> + Clone + Send + 'static,
@@ -146,7 +146,7 @@ pub trait DistRange<T>: Distribution<T> {
         R: RangeBounds<T>,
         Self: Sized;
 
-    fn handler() -> impl FnOnce(Query<DistRangeParam<T>>) -> Pin<Box<dyn Future<Output = Result<String>> + Send>> + Clone
+    fn handler() -> impl FnOnce(Query<DistRangeParam<T>>) -> RandomResponseFuture<Result<String>> + Clone
     where
         Self: DistRange<T> + Sized,
         T: Display + Debug + Clone + Send + Sync + 'static,
