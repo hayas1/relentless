@@ -15,6 +15,7 @@ use tower::{Layer, Service};
 
 use crate::error::Wrap;
 
+// ##### TODO record to sqlite or duckdb #####
 #[allow(async_fn_in_trait)] // TODO #[warn(async_fn_in_trait)] by default
 pub trait Recordable: Sized {
     type Error;
