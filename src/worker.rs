@@ -177,13 +177,10 @@ where
         target: &str,
         setting: &Setting,
     ) -> WrappedResult<Destinations<Vec<Req>>> {
-        let Setting { request, template, repeat, timeout, .. } = setting;
+        let Setting { request, template, repeat, .. } = setting;
 
         if !template.is_empty() {
             unimplemented!("template is not implemented yet");
-        }
-        if timeout.is_some() {
-            unimplemented!("timeout is not implemented yet");
         }
 
         destinations
