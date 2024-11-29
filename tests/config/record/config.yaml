@@ -13,3 +13,4 @@ testcases:
         body:
           plain-text:
             regex: hello world
+  - target: /health/rich
