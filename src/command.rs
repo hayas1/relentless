@@ -6,7 +6,8 @@ use serde::{Deserialize, Serialize};
 use tower::{Service, ServiceBuilder};
 
 #[cfg(feature = "console-report")]
-use crate::report::console_report::{ConsoleReport, ReportWriter};
+use crate::report::console_report::ConsoleReport;
+use crate::report::ReportWriter;
 use crate::{
     config::{http_serde_priv, Config, Destinations},
     error::{IntoContext, MultiWrap, RunCommandError, Wrap, WrappedResult},

@@ -1,5 +1,7 @@
+use std::fmt::{Display, Formatter};
 use std::process::ExitCode;
 
+use crate::error::Wrap;
 use crate::{
     command::{Relentless, ReportFormat},
     config::{http_serde_priv, Coalesced, Destinations, Setting, Testcase, WorkerConfig},
@@ -93,9 +95,73 @@ pub trait Reportable {
     }
 }
 
+pub struct ReportWriter<W> {
+    pub indent: usize,
+    pub buf: W,
+    pub at_start_line: bool,
+}
+impl ReportWriter<std::io::BufWriter<std::io::Stdout>> {
+    pub fn with_stdout(indent: usize) -> Self {
+        let buf = std::io::BufWriter::new(std::io::stdout());
+        Self::new(indent, buf)
+    }
+}
+impl<W> ReportWriter<W> {
+    pub fn new(indent: usize, buf: W) -> Self {
+        let at_start_line = true;
+        Self { indent, buf, at_start_line }
+    }
+    pub fn indent(&self) -> String {
+        "  ".repeat(self.indent)
+    }
+    pub fn increment(&mut self) {
+        self.indent += 1;
+    }
+    pub fn decrement(&mut self) {
+        self.indent -= 1;
+    }
+    pub fn scope<F, R, E>(&mut self, f: F) -> Result<R, E>
+    where
+        F: FnOnce(&mut Self) -> Result<R, E>,
+        Wrap: From<E>, // TODO remove wrap constraints
+    {
+        self.increment();
+        let ret = f(self)?;
+        self.decrement();
+        Ok(ret)
+    }
+}
+impl<W: std::io::Write> std::fmt::Write for ReportWriter<W> {
+    fn write_str(&mut self, s: &str) -> std::fmt::Result {
+        // TODO better indent implementation ?
+        if s.contains('\n') {
+            for line in s.lines() {
+                if self.at_start_line {
+                    write!(self.buf, "{}", self.indent()).map_err(|_| std::fmt::Error)?;
+                    self.at_start_line = false;
+                }
+                writeln!(self.buf, "{}", line).map_err(|_| std::fmt::Error)?;
+                self.at_start_line = true;
+            }
+        } else {
+            if self.at_start_line {
+                write!(self.buf, "{}", self.indent()).map_err(|_| std::fmt::Error)?;
+                self.at_start_line = false;
+            }
+            write!(self.buf, "{}", s).map_err(|_| std::fmt::Error)?;
+        }
+        Ok(())
+    }
+}
+impl<W: Display> Display for ReportWriter<W> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.buf)
+    }
+}
+
 #[cfg(feature = "console-report")]
 pub mod console_report {
-    use std::fmt::{Display, Formatter, Write as _};
+    use std::fmt::{Display, Write as _};
 
     use crate::{
         command::Relentless,
@@ -103,7 +169,19 @@ pub mod console_report {
         error::Wrap,
     };
 
-    use super::{CaseReport, Report, Reportable, WorkerReport};
+    use super::{CaseReport, Report, ReportWriter, Reportable, WorkerReport};
+
+    pub trait ConsoleReport: Reportable {
+        type Error;
+        fn console_report<W: std::io::Write>(
+            &self,
+            cmd: &Relentless,
+            w: &mut ReportWriter<W>,
+        ) -> Result<(), Self::Error>;
+        fn console_report_stdout(&self, cmd: &Relentless) -> Result<(), Self::Error> {
+            self.console_report(cmd, &mut ReportWriter::with_stdout(0))
+        }
+    }
 
     impl<T: Display> ConsoleReport for Report<T> {
         type Error = crate::Error;
@@ -235,81 +313,6 @@ pub mod console_report {
                 })?;
             }
             Ok(())
-        }
-    }
-
-    pub trait ConsoleReport: Reportable {
-        type Error;
-        fn console_report<W: std::io::Write>(
-            &self,
-            cmd: &Relentless,
-            w: &mut ReportWriter<W>,
-        ) -> Result<(), Self::Error>;
-        fn console_report_stdout(&self, cmd: &Relentless) -> Result<(), Self::Error> {
-            self.console_report(cmd, &mut ReportWriter::with_stdout(0))
-        }
-    }
-    pub struct ReportWriter<W> {
-        pub indent: usize,
-        pub buf: W,
-        pub at_start_line: bool,
-    }
-    impl ReportWriter<std::io::BufWriter<std::io::Stdout>> {
-        pub fn with_stdout(indent: usize) -> Self {
-            let buf = std::io::BufWriter::new(std::io::stdout());
-            Self::new(indent, buf)
-        }
-    }
-    impl<W> ReportWriter<W> {
-        pub fn new(indent: usize, buf: W) -> Self {
-            let at_start_line = true;
-            Self { indent, buf, at_start_line }
-        }
-        pub fn indent(&self) -> String {
-            "  ".repeat(self.indent)
-        }
-        pub fn increment(&mut self) {
-            self.indent += 1;
-        }
-        pub fn decrement(&mut self) {
-            self.indent -= 1;
-        }
-        pub fn scope<F, R, E>(&mut self, f: F) -> Result<R, E>
-        where
-            F: FnOnce(&mut Self) -> Result<R, E>,
-            Wrap: From<E>, // TODO remove wrap constraints
-        {
-            self.increment();
-            let ret = f(self)?;
-            self.decrement();
-            Ok(ret)
-        }
-    }
-    impl<W: std::io::Write> std::fmt::Write for ReportWriter<W> {
-        fn write_str(&mut self, s: &str) -> std::fmt::Result {
-            // TODO better indent implementation ?
-            if s.contains('\n') {
-                for line in s.lines() {
-                    if self.at_start_line {
-                        write!(self.buf, "{}", self.indent()).map_err(|_| std::fmt::Error)?;
-                        self.at_start_line = false;
-                    }
-                    writeln!(self.buf, "{}", line).map_err(|_| std::fmt::Error)?;
-                    self.at_start_line = true;
-                }
-            } else {
-                if self.at_start_line {
-                    write!(self.buf, "{}", self.indent()).map_err(|_| std::fmt::Error)?;
-                    self.at_start_line = false;
-                }
-                write!(self.buf, "{}", s).map_err(|_| std::fmt::Error)?;
-            }
-            Ok(())
-        }
-    }
-    impl<W: Display> Display for ReportWriter<W> {
-        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-            write!(f, "{}", self.buf)
         }
     }
 }
