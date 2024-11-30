@@ -85,6 +85,9 @@ pub enum ReportFormat {
     #[cfg(feature = "console-report")]
     #[cfg_attr(feature = "console-report", default)]
     Console,
+
+    /// report to markdown
+    GitHubMarkdown,
 }
 
 impl Relentless {
@@ -173,9 +176,10 @@ impl Relentless {
         console::set_colors_enabled(!no_color);
 
         match report_format {
-            ReportFormat::NullDevice => {}
+            ReportFormat::NullDevice => (),
             #[cfg(feature = "console-report")]
             ReportFormat::Console => report.console_report(self, &mut ReportWriter::new(0, &mut write))?,
+            ReportFormat::GitHubMarkdown => todo!(),
         };
 
         Ok(report.exit_code(self))
