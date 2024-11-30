@@ -1,6 +1,7 @@
 use std::{
     fmt::{Debug, Display},
     ops::{Deref, DerefMut},
+    time::Duration,
 };
 
 use thiserror::Error;
@@ -303,6 +304,9 @@ pub enum AssaultError {
 
 #[derive(Error, Debug)]
 pub enum EvaluateError {
+    #[error("request timeout: {}s", .0.as_secs_f64())]
+    RequestTimeout(Duration),
+
     #[error("fail to collect body: {0}")]
     FailToCollectBody(Wrap),
     #[error("status is not acceptable")]

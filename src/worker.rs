@@ -6,11 +6,14 @@ use crate::{
     command::Relentless,
     config::{http_serde_priv, Coalesced, Config, Destinations, Setting, Testcase, WorkerConfig},
     error::{Wrap, WrappedResult},
-    evaluate::{DefaultEvaluator, Evaluator},
+    evaluate::{DefaultEvaluator, Evaluator, RequestResult},
     report::{CaseReport, Report, WorkerReport},
     service::FromRequestInfo,
 };
-use tower::{timeout::TimeoutLayer, Service, ServiceBuilder, ServiceExt};
+use tower::{
+    timeout::{error::Elapsed, TimeoutLayer},
+    Service, ServiceBuilder, ServiceExt,
+};
 
 /// TODO document
 #[derive(Debug)]
@@ -163,7 +166,7 @@ where
         self,
         destinations: &Destinations<http_serde_priv::Uri>,
         client: &mut S,
-    ) -> WrappedResult<Destinations<Vec<S::Response>>> {
+    ) -> WrappedResult<Destinations<Vec<RequestResult<S::Response>>>> {
         let Testcase { target, setting, .. } = self.testcases.coalesce();
 
         let mut dest = Destinations::new();
@@ -174,8 +177,17 @@ where
         for (name, repeated) in Self::requests(destinations, &target, &setting)? {
             let mut responses = Vec::new();
             for req in repeated {
-                let res = timeout.ready().await.map_err(Wrap::new)?.call(req).await.map_err(Wrap::new)?;
-                responses.push(res);
+                let result = timeout.ready().await.map_err(Wrap::new)?.call(req).await;
+                match result {
+                    Ok(res) => responses.push(RequestResult::Response(res)),
+                    Err(err) => {
+                        if err.is::<Elapsed>() {
+                            responses.push(RequestResult::Timeout(setting.timeout.unwrap_or_else(|| unreachable!())));
+                        } else {
+                            Err(Wrap::new(err))?;
+                        }
+                    }
+                }
             }
             dest.insert(name, responses);
         }

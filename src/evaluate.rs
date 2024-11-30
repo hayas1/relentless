@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use bytes::Bytes;
 use http_body::Body;
 use http_body_util::{BodyExt, Collected};
@@ -14,10 +16,20 @@ use crate::{
     error::WrappedResult,
 };
 
+pub enum RequestResult<Res> {
+    Response(Res),
+    Timeout(Duration),
+}
+
 #[allow(async_fn_in_trait)] // TODO #[warn(async_fn_in_trait)] by default
 pub trait Evaluator<Res> {
     type Message;
-    async fn evaluate(&self, cfg: &Evaluate, res: Destinations<Res>, msg: &mut Vec<Self::Message>) -> bool;
+    async fn evaluate(
+        &self,
+        cfg: &Evaluate,
+        res: Destinations<RequestResult<Res>>,
+        msg: &mut Vec<Self::Message>,
+    ) -> bool;
 }
 pub struct DefaultEvaluator;
 impl<B: Body> Evaluator<http::Response<B>> for DefaultEvaluator
@@ -28,7 +40,7 @@ where
     async fn evaluate(
         &self,
         cfg: &Evaluate,
-        res: Destinations<http::Response<B>>,
+        res: Destinations<RequestResult<http::Response<B>>>,
         msg: &mut Vec<Self::Message>,
     ) -> bool {
         Self::acceptable_parts(cfg, res, msg).await
@@ -38,7 +50,7 @@ where
 impl DefaultEvaluator {
     pub async fn acceptable_parts<B: Body>(
         cfg: &Evaluate,
-        res: Destinations<http::Response<B>>,
+        res: Destinations<RequestResult<http::Response<B>>>,
         msg: &mut Vec<EvaluateError>,
     ) -> bool
     where
@@ -46,7 +58,14 @@ impl DefaultEvaluator {
     {
         let (mut s, mut h, mut b) = (Destinations::new(), Destinations::new(), Destinations::new());
         for (name, r) in res {
-            let (http::response::Parts { status, headers, .. }, body) = r.into_parts();
+            let response = match r {
+                RequestResult::Response(r) => r,
+                RequestResult::Timeout(d) => {
+                    msg.push(EvaluateError::RequestTimeout(d));
+                    return false;
+                }
+            };
+            let (http::response::Parts { status, headers, .. }, body) = response.into_parts();
             let bytes = match BodyExt::collect(body).await.map(Collected::to_bytes) {
                 Ok(b) => b,
                 Err(e) => {
@@ -208,7 +227,7 @@ mod tests {
 
         let ok =
             http::Response::builder().status(http::StatusCode::OK).body(http_body_util::Empty::<Bytes>::new()).unwrap();
-        let responses = Destinations::from_iter(vec![("test".to_string(), ok)]);
+        let responses = Destinations::from_iter(vec![("test".to_string(), RequestResult::Response(ok))]);
         let mut msg = Vec::new();
         let result = evaluator.evaluate(&Default::default(), responses, &mut msg).await;
         assert!(result);
@@ -218,7 +237,7 @@ mod tests {
             .status(http::StatusCode::SERVICE_UNAVAILABLE)
             .body(http_body_util::Empty::<Bytes>::new())
             .unwrap();
-        let responses = Destinations::from_iter(vec![("test".to_string(), unavailable)]);
+        let responses = Destinations::from_iter(vec![("test".to_string(), RequestResult::Response(unavailable))]);
         let mut msg = Vec::new();
         let result = evaluator.evaluate(&Default::default(), responses, &mut msg).await;
         assert!(!result);
