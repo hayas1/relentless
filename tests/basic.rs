@@ -55,7 +55,7 @@ async fn test_basic_toml_config() {
     let relentless = Relentless {
         file: glob::glob("tests/config/basic/*.toml").unwrap().collect::<Result<Vec<_>, _>>().unwrap(),
         destination: vec![("actual".to_string(), "http://localhost:3001".to_string())],
-        report_format: ReportFormat::Console,
+        report_format: ReportFormat::NullDevice,
         ..Default::default()
     };
     let configs = relentless.configs().unwrap();
