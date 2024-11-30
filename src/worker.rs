@@ -6,11 +6,14 @@ use crate::{
     command::Relentless,
     config::{http_serde_priv, Coalesced, Config, Destinations, Setting, Testcase, WorkerConfig},
     error::{Wrap, WrappedResult},
-    evaluate::{DefaultEvaluator, Evaluator},
+    evaluate::{DefaultEvaluator, Evaluator, RequestResult},
     report::{CaseReport, Report, WorkerReport},
     service::FromRequestInfo,
 };
-use tower::{Service, ServiceExt};
+use tower::{
+    timeout::{error::Elapsed, TimeoutLayer},
+    Service, ServiceBuilder, ServiceExt,
+};
 
 /// TODO document
 #[derive(Debug)]
@@ -30,6 +33,8 @@ impl<'a, S, Req, E> Control<'a, S, Req, E>
 where
     Req: FromRequestInfo,
     S: Service<Req> + Send + 'static,
+    S::Error: std::error::Error + Send + Sync + 'static,
+    S::Future: Send + 'static,
     E: Evaluator<S::Response>,
     Wrap: From<Req::Error> + From<S::Error>,
 {
@@ -83,6 +88,8 @@ impl<'a, S, Req, E> Worker<'a, S, Req, E>
 where
     Req: FromRequestInfo,
     S: Service<Req> + Send + 'static,
+    S::Error: std::error::Error + Send + Sync + 'static,
+    S::Future: Send + 'static,
     E: Evaluator<S::Response>,
     Wrap: From<Req::Error> + From<S::Error>,
 {
@@ -145,6 +152,8 @@ impl<S, Req> Case<S, Req>
 where
     Req: FromRequestInfo,
     S: Service<Req> + Send + 'static,
+    S::Error: std::error::Error + Send + Sync + 'static,
+    S::Future: Send + 'static,
     Wrap: From<Req::Error> + From<S::Error>,
 {
     pub fn new(worker_config: &WorkerConfig, testcases: Testcase) -> Self {
@@ -157,15 +166,28 @@ where
         self,
         destinations: &Destinations<http_serde_priv::Uri>,
         client: &mut S,
-    ) -> WrappedResult<Destinations<Vec<S::Response>>> {
+    ) -> WrappedResult<Destinations<Vec<RequestResult<S::Response>>>> {
         let Testcase { target, setting, .. } = self.testcases.coalesce();
 
         let mut dest = Destinations::new();
+        let mut timeout = ServiceBuilder::new()
+            .option_layer(setting.timeout.map(TimeoutLayer::new))
+            .map_err(Into::<tower::BoxError>::into) // https://github.com/tower-rs/tower/issues/665
+            .service(client);
         for (name, repeated) in Self::requests(destinations, &target, &setting)? {
             let mut responses = Vec::new();
             for req in repeated {
-                let res = client.ready().await?.call(req).await?;
-                responses.push(res);
+                let result = timeout.ready().await.map_err(Wrap::new)?.call(req).await;
+                match result {
+                    Ok(res) => responses.push(RequestResult::Response(res)),
+                    Err(err) => {
+                        if err.is::<Elapsed>() {
+                            responses.push(RequestResult::Timeout(setting.timeout.unwrap_or_else(|| unreachable!())));
+                        } else {
+                            Err(Wrap::new(err))?;
+                        }
+                    }
+                }
             }
             dest.insert(name, responses);
         }
@@ -177,13 +199,10 @@ where
         target: &str,
         setting: &Setting,
     ) -> WrappedResult<Destinations<Vec<Req>>> {
-        let Setting { request, template, repeat, timeout, .. } = setting;
+        let Setting { request, template, repeat, .. } = setting;
 
         if !template.is_empty() {
             unimplemented!("template is not implemented yet");
-        }
-        if timeout.is_some() {
-            unimplemented!("timeout is not implemented yet");
         }
 
         destinations

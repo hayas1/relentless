@@ -178,3 +178,29 @@ async fn test_body_config() {
     assert!(relentless.pass(&report));
     assert!(relentless.allow(&report));
 }
+
+#[tokio::test]
+async fn test_timeout_config() {
+    let relentless =
+        Relentless { file: vec!["tests/config/feature/timeout.yaml".into()], no_color: true, ..Default::default() };
+    let configs = relentless.configs().unwrap();
+    let mut service = route::app_with(Default::default());
+    let report =
+        relentless.assault_with::<_, Request<Body>, _>(configs, &mut service, &DefaultEvaluator).await.unwrap();
+
+    let mut buf = Vec::new();
+    relentless.report_with(&report, &mut buf).unwrap();
+    let out = String::from_utf8_lossy(&buf);
+
+    for line in [
+        format!("{} /wait/500/ms", CaseConsoleReport::PASS_EMOJI),
+        format!("{} /wait/3/s", CaseConsoleReport::FAIL_EMOJI),
+        format!("  {} this testcase is allowed", CaseConsoleReport::ALLOW_EMOJI),
+        format!("  {} message was found", CaseConsoleReport::MESSAGE_EMOJI),
+        format!("    request timeout: {}", "1.5s"),
+    ] {
+        assert!(out.contains(&line));
+    }
+    assert!(!relentless.pass(&report));
+    assert!(relentless.allow(&report));
+}

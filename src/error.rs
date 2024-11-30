@@ -1,6 +1,7 @@
 use std::{
     fmt::{Debug, Display},
     ops::{Deref, DerefMut},
+    time::Duration,
 };
 
 use thiserror::Error;
@@ -27,6 +28,12 @@ impl<T> From<Context<T>> for RelentlessError {
     }
 }
 impl RelentlessError {
+    pub fn wrap<E>(e: E) -> Self
+    where
+        Wrap: From<E>,
+    {
+        Self::from(Wrap::from(e))
+    }
     pub fn is<E: std::error::Error + Send + Sync + 'static>(&self) -> bool {
         self.source.is::<E>()
     }
@@ -297,6 +304,9 @@ pub enum AssaultError {
 
 #[derive(Error, Debug)]
 pub enum EvaluateError {
+    #[error("request timeout: {}s", .0.as_secs_f64())]
+    RequestTimeout(Duration),
+
     #[error("fail to collect body: {0}")]
     FailToCollectBody(Wrap),
     #[error("status is not acceptable")]

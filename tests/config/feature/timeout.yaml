@@ -1,0 +1,17 @@
+name: test config for timeout
+destinations:
+  test-api: http://localhost:3000
+
+testcases:
+  - target: /wait/500/ms
+    setting:
+      timeout:
+        secs: 1
+        nanos: 0
+  - target: /wait/3/s
+    setting:
+      timeout:
+        secs: 1
+        nanos: 500000000
+    attr:
+      allow: true
