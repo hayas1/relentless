@@ -49,7 +49,7 @@ where
 {
     type Response = http::Response<ResB>;
     type Error = reqwest::Error;
-    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.client.poll_ready(cx)
@@ -99,12 +99,13 @@ pub mod origin_router {
         Wrap: From<S::Error> + Send + 'static,
     {
         type Response = S::Response;
-        type Error = Wrap;
-        type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
+        type Error = crate::Error;
+        type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
         fn poll_ready(&mut self, cx: &mut std::task::Context<'_>) -> Poll<Result<(), Self::Error>> {
-            match self.map.values_mut().try_fold(true, |sum, s| Ok(sum && matches!(s.poll_ready(cx)?, Poll::Ready(()))))
-            {
+            match self.map.values_mut().try_fold(true, |sum, s| {
+                Ok(sum && matches!(s.poll_ready(cx).map_err(crate::Error::wrap)?, Poll::Ready(())))
+            }) {
                 Ok(true) => Poll::Ready(Ok(())),
                 Ok(false) => Poll::Pending,
                 Err(e) => Poll::Ready(Err(e)),
@@ -115,9 +116,9 @@ pub mod origin_router {
             let request: http::Request<B> = req.into();
             if let Some(s) = request.uri().authority().and_then(|a| self.map.get_mut(a)) {
                 let fut = s.call(request.into());
-                Box::pin(async { Ok(fut.await?) })
+                Box::pin(async { fut.await.map_err(crate::Error::wrap) })
             } else {
-                Box::pin(async { Err(AssaultError::CannotSpecifyService)? })
+                Box::pin(async { Err(Wrap::error(AssaultError::CannotSpecifyService)) })
             }
         }
     }
