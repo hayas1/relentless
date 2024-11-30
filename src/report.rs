@@ -178,9 +178,6 @@ pub mod console_report {
             cmd: &Relentless,
             w: &mut ReportWriter<W>,
         ) -> Result<(), Self::Error>;
-        fn console_report_stdout(&self, cmd: &Relentless) -> Result<(), Self::Error> {
-            self.console_report(cmd, &mut ReportWriter::with_stdout(0))
-        }
     }
 
     impl<T: Display> ConsoleReport for Report<T> {
