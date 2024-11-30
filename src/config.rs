@@ -48,7 +48,7 @@ pub struct Setting {
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub repeat: Repeat,
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
-    pub timeout: Option<Duration>,
+    pub timeout: Option<Duration>, // TODO parse from string? https://crates.io/crates/humantime ?
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
     pub evaluate: Evaluate,
