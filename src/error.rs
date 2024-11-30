@@ -27,6 +27,12 @@ impl<T> From<Context<T>> for RelentlessError {
     }
 }
 impl RelentlessError {
+    pub fn wrap<E>(e: E) -> Self
+    where
+        Wrap: From<E>,
+    {
+        Self::from(Wrap::from(e))
+    }
     pub fn is<E: std::error::Error + Send + Sync + 'static>(&self) -> bool {
         self.source.is::<E>()
     }

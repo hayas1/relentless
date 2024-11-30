@@ -154,6 +154,8 @@ impl Relentless {
     where
         Req: FromRequestInfo,
         S: Service<Req> + Send + 'static,
+        S::Error: std::error::Error + Send + Sync + 'static,
+        S::Future: Send + 'static,
         E: Evaluator<S::Response>,
         Wrap: From<Req::Error> + From<S::Error>,
     {

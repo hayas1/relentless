@@ -10,7 +10,7 @@ use crate::{
     report::{CaseReport, Report, WorkerReport},
     service::FromRequestInfo,
 };
-use tower::{Service, ServiceExt};
+use tower::{timeout::TimeoutLayer, Service, ServiceBuilder, ServiceExt};
 
 /// TODO document
 #[derive(Debug)]
@@ -30,6 +30,8 @@ impl<'a, S, Req, E> Control<'a, S, Req, E>
 where
     Req: FromRequestInfo,
     S: Service<Req> + Send + 'static,
+    S::Error: std::error::Error + Send + Sync + 'static,
+    S::Future: Send + 'static,
     E: Evaluator<S::Response>,
     Wrap: From<Req::Error> + From<S::Error>,
 {
@@ -83,6 +85,8 @@ impl<'a, S, Req, E> Worker<'a, S, Req, E>
 where
     Req: FromRequestInfo,
     S: Service<Req> + Send + 'static,
+    S::Error: std::error::Error + Send + Sync + 'static,
+    S::Future: Send + 'static,
     E: Evaluator<S::Response>,
     Wrap: From<Req::Error> + From<S::Error>,
 {
@@ -145,6 +149,8 @@ impl<S, Req> Case<S, Req>
 where
     Req: FromRequestInfo,
     S: Service<Req> + Send + 'static,
+    S::Error: std::error::Error + Send + Sync + 'static,
+    S::Future: Send + 'static,
     Wrap: From<Req::Error> + From<S::Error>,
 {
     pub fn new(worker_config: &WorkerConfig, testcases: Testcase) -> Self {
@@ -161,10 +167,14 @@ where
         let Testcase { target, setting, .. } = self.testcases.coalesce();
 
         let mut dest = Destinations::new();
+        let mut timeout = ServiceBuilder::new()
+            .option_layer(setting.timeout.map(TimeoutLayer::new))
+            .map_err(Into::<tower::BoxError>::into) // https://github.com/tower-rs/tower/issues/665
+            .service(client);
         for (name, repeated) in Self::requests(destinations, &target, &setting)? {
             let mut responses = Vec::new();
             for req in repeated {
-                let res = client.ready().await?.call(req).await?;
+                let res = timeout.ready().await.map_err(Wrap::new)?.call(req).await.map_err(Wrap::new)?;
                 responses.push(res);
             }
             dest.insert(name, responses);
