@@ -30,6 +30,11 @@ impl DerefMut for Template {
         &mut self.vars
     }
 }
+impl<R: ToString, L: ToString> FromIterator<(R, L)> for Template {
+    fn from_iter<I: IntoIterator<Item = (R, L)>>(iter: I) -> Self {
+        Self { vars: iter.into_iter().map(|(var, val)| (var.to_string(), val.to_string())).collect() }
+    }
+}
 
 impl Template {
     pub fn new() -> Self {
@@ -104,5 +109,22 @@ mod tests {
                 Variable::Environment("SECRET".to_string()),
             ]
         );
+    }
+
+    #[test]
+    fn test_template_render() {
+        let template: Template = vec![("foo", "hoge"), ("bar", "fuga"), ("baz", "piyo")].into_iter().collect();
+        std::env::set_var("SECRET", "VERY_SENSITIVE_VALUE");
+        let rendered = template.render("${foo} bar ${baz} ${env:SECRET}").unwrap();
+        assert_eq!(rendered, "hoge bar piyo VERY_SENSITIVE_VALUE".to_string());
+    }
+
+    #[test]
+    fn test_template_render_with_undefined() {
+        let template: Template = vec![("foo", "hoge"), ("bar", "fuga"), ("baz", "piyo")].into_iter().collect();
+        let error = template.render("hoge ${fuga} piyo").unwrap_err();
+        if let Some(TemplateError::VariableNotDefined(var)) = error.downcast_ref::<TemplateError>() {
+            assert_eq!(var, "fuga");
+        }
     }
 }
