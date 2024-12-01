@@ -68,6 +68,7 @@ pub mod evaluate;
 pub mod record;
 pub mod report;
 pub mod service;
+pub mod template;
 pub mod worker;
 
 pub use {error::RelentlessError as Error, error::RelentlessResult as Result};
