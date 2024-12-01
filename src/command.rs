@@ -6,7 +6,8 @@ use serde::{Deserialize, Serialize};
 use tower::{Service, ServiceBuilder};
 
 #[cfg(feature = "console-report")]
-use crate::report::console_report::{ConsoleReport, ReportWriter};
+use crate::report::console_report::ConsoleReport;
+use crate::report::{github_markdown_report::GithubMarkdownReport, ReportWriter};
 use crate::{
     config::{http_serde_priv, Config, Destinations},
     error::{IntoContext, MultiWrap, RunCommandError, Wrap, WrappedResult},
@@ -85,6 +86,9 @@ pub enum ReportFormat {
     #[cfg(feature = "console-report")]
     #[cfg_attr(feature = "console-report", default)]
     Console,
+
+    /// report to markdown
+    GithubMarkdown,
 }
 
 impl Relentless {
@@ -173,9 +177,12 @@ impl Relentless {
         console::set_colors_enabled(!no_color);
 
         match report_format {
-            ReportFormat::NullDevice => {}
+            ReportFormat::NullDevice => (),
             #[cfg(feature = "console-report")]
             ReportFormat::Console => report.console_report(self, &mut ReportWriter::new(0, &mut write))?,
+            ReportFormat::GithubMarkdown => {
+                report.github_markdown_report(self, &mut ReportWriter::new(0, &mut write))?
+            }
         };
 
         Ok(report.exit_code(self))
