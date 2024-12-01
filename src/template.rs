@@ -59,10 +59,8 @@ impl Variable {
 
     pub fn assign(&self, defined: &Template) -> WrappedResult<String> {
         match self {
-            Self::Literal(text) => Ok(text.to_string()),
-            Self::Defined(key) => {
-                Ok(defined.get(key).ok_or(TemplateError::VariableNotDefined(key.to_string())).map(|v| v.to_string())?)
-            }
+            Self::Literal(text) => Ok(text.clone()),
+            Self::Defined(key) => Ok(defined.get(key).ok_or(TemplateError::VariableNotDefined(key.clone()))?.clone()),
             Self::Environment(key) => Ok(std::env::var(key)?),
         }
     }
