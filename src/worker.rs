@@ -9,6 +9,7 @@ use crate::{
     evaluate::{DefaultEvaluator, Evaluator, RequestResult},
     report::{CaseReport, Report, WorkerReport},
     service::FromRequestInfo,
+    template::Template,
 };
 use tower::{
     timeout::{error::Elapsed, TimeoutLayer},
@@ -201,16 +202,22 @@ where
     ) -> WrappedResult<Destinations<Vec<Req>>> {
         let Setting { request, template, repeat, .. } = setting;
 
-        if !template.is_empty() {
-            unimplemented!("template is not implemented yet");
+        // TODO make Destinations as struct
+        let mut transpose = Destinations::new();
+        for (var, t) in template {
+            for (dest, val) in t.iter() {
+                transpose.entry(dest.clone()).or_insert(Template::new()).insert(var.clone(), val.clone());
+            }
         }
 
         destinations
             .iter()
             .map(|(name, destination)| {
+                let empty_template = Template::new();
+                let rendered_target = transpose.get(name).unwrap_or(&empty_template).render(target)?;
                 let requests = repeat
                     .range()
-                    .map(|_| Req::from_request_info(destination, target, request))
+                    .map(|_| Req::from_request_info(destination, &rendered_target, request))
                     .collect::<Result<Vec<_>, _>>()?;
                 Ok((name.to_string(), requests))
             })

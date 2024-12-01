@@ -297,6 +297,14 @@ pub enum RunCommandError {
 }
 
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
+pub enum TemplateError {
+    #[error("{0}")]
+    NomParseError(String),
+    #[error("variable `{0}` is not defined")]
+    VariableNotDefined(String),
+}
+
+#[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum AssaultError {
     #[error("cannot specify service")]
     CannotSpecifyService,
