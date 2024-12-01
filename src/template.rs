@@ -1,5 +1,6 @@
 use std::{
     collections::HashMap,
+    convert::Infallible,
     ops::{Deref, DerefMut},
 };
 
@@ -72,18 +73,18 @@ impl Variable {
 
     pub fn parse_environment_variable(input: &str) -> IResult<&str, Self> {
         map_res(delimited(alt((tag("${ENV:"), tag("${env:"))), take_until("}"), tag("}")), |key: &str| {
-            Ok::<_, ()>(Self::Environment(key.to_string()))
+            Ok::<_, Infallible>(Self::Environment(key.to_string()))
         })(input)
     }
 
     pub fn parse_variable(input: &str) -> IResult<&str, Self> {
         map_res(delimited(tag("${"), take_until("}"), tag("}")), |key: &str| {
-            Ok::<_, ()>(Self::Defined(key.to_string()))
+            Ok::<_, Infallible>(Self::Defined(key.to_string()))
         })(input)
     }
 
     pub fn parse_literal(input: &str) -> IResult<&str, Self> {
-        map_res(is_not("${"), |text: &str| Ok::<_, ()>(Self::Literal(text.to_string())))(input)
+        map_res(is_not("${"), |text: &str| Ok::<_, Infallible>(Self::Literal(text.to_string())))(input)
     }
 
     pub fn parse(input: &str) -> IResult<&str, Vec<Self>> {
