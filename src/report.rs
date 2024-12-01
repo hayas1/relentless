@@ -439,11 +439,17 @@ pub mod github_markdown_report {
             if !self.messages.is_empty() {
                 w.scope(|w| {
                     writeln!(w, "<details>")?;
-                    writeln!(w, "<summary> {} message was found </summary>", CaseGithubMarkdownReport::MESSAGE_EMOJI)?;
-                    writeln!(w)?;
-                    writeln!(w, "```")?;
-                    writeln!(w, "{}", &self.messages)?;
-                    writeln!(w, "```")?;
+                    w.scope(|w| {
+                        writeln!(
+                            w,
+                            "<summary> {} message was found </summary>",
+                            CaseGithubMarkdownReport::MESSAGE_EMOJI
+                        )?;
+                        writeln!(w)?;
+                        writeln!(w, "```")?;
+                        writeln!(w, "{}", &self.messages)?;
+                        writeln!(w, "```")
+                    })?;
                     writeln!(w, "</details>")
                 })?;
             }
