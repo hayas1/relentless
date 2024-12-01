@@ -385,9 +385,67 @@ impl Format {
 }
 
 pub mod destinations {
-    use std::collections::HashMap;
+    use std::{
+        collections::{
+            hash_map::{IntoIter, IntoKeys, IntoValues},
+            HashMap,
+        },
+        ops::{Deref, DerefMut},
+    };
 
-    pub type Destinations<T> = HashMap<String, T>;
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+    pub struct Destinations<T>(HashMap<String, T>);
+    impl<T> Default for Destinations<T> {
+        fn default() -> Self {
+            // derive(Default) do not implement Default when T are not implement Default
+            // https://github.com/rust-lang/rust/issues/26925
+            Self(HashMap::new())
+        }
+    }
+    impl<T> Deref for Destinations<T> {
+        type Target = HashMap<String, T>;
+        fn deref(&self) -> &Self::Target {
+            &self.0
+        }
+    }
+    impl<T> DerefMut for Destinations<T> {
+        fn deref_mut(&mut self) -> &mut Self::Target {
+            &mut self.0
+        }
+    }
+    impl<T> FromIterator<(String, T)> for Destinations<T> {
+        fn from_iter<I: IntoIterator<Item = (String, T)>>(iter: I) -> Self {
+            Self(iter.into_iter().collect())
+        }
+    }
+    impl<T> IntoIterator for Destinations<T> {
+        type Item = (String, T);
+        type IntoIter = IntoIter<String, T>;
+        fn into_iter(self) -> Self::IntoIter {
+            self.0.into_iter()
+        }
+    }
+    impl<T> From<HashMap<String, T>> for Destinations<T> {
+        fn from(dest: HashMap<String, T>) -> Self {
+            Self(dest)
+        }
+    }
+
+    impl<T> Destinations<T> {
+        pub fn new() -> Self {
+            Default::default()
+        }
+
+        pub fn into_keys(self) -> IntoKeys<String, T> {
+            self.0.into_keys()
+        }
+
+        pub fn into_values(self) -> IntoValues<String, T> {
+            self.0.into_values()
+        }
+    }
 }
 
 // `http` do not support serde https://github.com/hyperium/http/pull/631
@@ -575,7 +633,7 @@ mod tests {
                             //     )
                             //     .unwrap(),
                             // )),
-                            patch: Some(EvaluateTo::Destinations(Destinations::from([
+                            patch: Some(EvaluateTo::Destinations(Destinations::from_iter([
                                 (
                                     "actual".to_string(),
                                     serde_json::from_value(serde_json::json!([{"op": "remove", "path": "/datetime"}]))
@@ -668,7 +726,7 @@ mod tests {
             Evaluate {
                 body: BodyEvaluate::Json(JsonEvaluate {
                     ignore: vec![],
-                    patch: Some(EvaluateTo::Destinations(Destinations::from([
+                    patch: Some(EvaluateTo::Destinations(Destinations::from_iter([
                         (
                             "actual".to_string(),
                             serde_json::from_value(serde_json::json!([{"op": "remove", "path": "/datetime"}])).unwrap(),
