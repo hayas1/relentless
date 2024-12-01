@@ -5,6 +5,7 @@ use std::{
     time::Duration,
 };
 
+use destinations::Destinations;
 use http::{
     header::{CONTENT_LENGTH, CONTENT_TYPE},
     HeaderMap,
@@ -37,7 +38,6 @@ pub struct WorkerConfig {
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub setting: Setting,
 }
-pub type Destinations<T> = HashMap<String, T>;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct Setting {
@@ -382,6 +382,12 @@ impl Format {
             }
         }
     }
+}
+
+pub mod destinations {
+    use std::collections::HashMap;
+
+    pub type Destinations<T> = HashMap<String, T>;
 }
 
 // `http` do not support serde https://github.com/hyperium/http/pull/631

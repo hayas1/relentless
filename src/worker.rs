@@ -4,7 +4,7 @@ use std::marker::PhantomData;
 use crate::service::DefaultHttpClient;
 use crate::{
     command::Relentless,
-    config::{http_serde_priv, Coalesced, Config, Destinations, Setting, Testcase, WorkerConfig},
+    config::{destinations::Destinations, http_serde_priv, Coalesced, Config, Setting, Testcase, WorkerConfig},
     error::{Wrap, WrappedResult},
     evaluate::{DefaultEvaluator, Evaluator, RequestResult},
     report::{CaseReport, Report, WorkerReport},
