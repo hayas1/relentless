@@ -7,7 +7,7 @@ use tower::{Service, ServiceBuilder};
 
 #[cfg(feature = "console-report")]
 use crate::report::console_report::ConsoleReport;
-use crate::report::ReportWriter;
+use crate::report::{github_markdown_report::GithubMarkdownReport, ReportWriter};
 use crate::{
     config::{http_serde_priv, Config, Destinations},
     error::{IntoContext, MultiWrap, RunCommandError, Wrap, WrappedResult},
@@ -88,7 +88,7 @@ pub enum ReportFormat {
     Console,
 
     /// report to markdown
-    GitHubMarkdown,
+    GithubMarkdown,
 }
 
 impl Relentless {
@@ -180,7 +180,9 @@ impl Relentless {
             ReportFormat::NullDevice => (),
             #[cfg(feature = "console-report")]
             ReportFormat::Console => report.console_report(self, &mut ReportWriter::new(0, &mut write))?,
-            ReportFormat::GitHubMarkdown => todo!(),
+            ReportFormat::GithubMarkdown => {
+                report.github_markdown_report(self, &mut ReportWriter::new(0, &mut write))?
+            }
         };
 
         Ok(report.exit_code(self))
