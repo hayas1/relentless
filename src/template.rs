@@ -6,7 +6,8 @@ use std::{
 
 use nom::{
     branch::alt,
-    bytes::complete::{is_not, tag, take_until},
+    bytes::complete::{is_not, tag},
+    character::complete::alphanumeric1,
     combinator::map_res,
     multi::many0,
     sequence::delimited,
@@ -72,13 +73,13 @@ impl Variable {
     }
 
     pub fn parse_environment_variable(input: &str) -> IResult<&str, Self> {
-        map_res(delimited(alt((tag("${ENV:"), tag("${env:"))), take_until("}"), tag("}")), |key: &str| {
+        map_res(delimited(alt((tag("${ENV:"), tag("${env:"))), alphanumeric1, tag("}")), |key: &str| {
             Ok::<_, Infallible>(Self::Environment(key.to_string()))
         })(input)
     }
 
     pub fn parse_variable(input: &str) -> IResult<&str, Self> {
-        map_res(delimited(tag("${"), take_until("}"), tag("}")), |key: &str| {
+        map_res(delimited(tag("${"), alphanumeric1, tag("}")), |key: &str| {
             Ok::<_, Infallible>(Self::Defined(key.to_string()))
         })(input)
     }
@@ -128,4 +129,12 @@ mod tests {
             assert_eq!(var, "fuga");
         }
     }
+
+    // TODO error handling
+    // #[test]
+    // fn test_template_render_with_invalid() {
+    //     let template: Template = vec![("foo", "hoge"), ("bar", "fuga"), ("baz", "piyo")].into_iter().collect();
+    //     let error = template.render("foo ${bar baz").unwrap_err();
+    //     println!("{}", error);
+    // }
 }
