@@ -446,6 +446,45 @@ pub mod destinations {
             self.0.into_values()
         }
     }
+    pub trait Transpose {
+        type Output;
+        fn transpose(self) -> Self::Output;
+    }
+    impl<I, T> Transpose for Destinations<I>
+    where
+        I: IntoIterator<Item = T>,
+    {
+        type Output = Vec<Destinations<T>>;
+        fn transpose(self) -> Self::Output {
+            let mut t = Vec::new();
+            for (k, it) in self {
+                for (i, v) in it.into_iter().enumerate() {
+                    if t.len() <= i {
+                        t.push(Destinations::from_iter([(k.clone(), v)]));
+                    } else {
+                        t[i].insert(k.clone(), v);
+                    }
+                }
+            }
+            t
+        }
+    }
+
+    // impl<I, T> Transpose for I
+    // where
+    //     I: IntoIterator<Item = Destinations<T>>,
+    // {
+    //     type Output = Destinations<Vec<T>>;
+    //     fn transpose(self) -> Self::Output {
+    //         let mut t = Destinations::new();
+    //         for d in self {
+    //             for (k, v) in d {
+    //                 t.entry(k).or_insert_with(Vec::new).push(v);
+    //             }
+    //         }
+    //         t
+    //     }
+    // }
 }
 
 // `http` do not support serde https://github.com/hyperium/http/pull/631
