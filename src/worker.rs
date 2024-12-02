@@ -196,19 +196,12 @@ where
     ) -> WrappedResult<Destinations<Vec<Req>>> {
         let Setting { request, template, repeat, .. } = setting;
 
-        // TODO make Destinations as struct
-        let mut transpose = Destinations::new();
-        for (var, t) in template {
-            for (dest, val) in t.iter() {
-                transpose.entry(dest.clone()).or_insert(Template::new()).insert(var.clone(), val.clone());
-            }
-        }
-
+        let templates = Template::destinations(template.clone());
         destinations
             .iter()
             .map(|(name, destination)| {
                 let empty_template = Template::new();
-                let rendered_target = transpose.get(name).unwrap_or(&empty_template).render(target)?;
+                let rendered_target = templates.get(name).unwrap_or(&empty_template).render(target)?;
                 let requests = repeat
                     .range()
                     .map(|_| Req::from_request_info(destination, &rendered_target, request))

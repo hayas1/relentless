@@ -390,6 +390,7 @@ pub mod destinations {
             hash_map::{IntoIter, IntoKeys, IntoValues},
             HashMap,
         },
+        hash::Hash,
         ops::{Deref, DerefMut},
     };
 
@@ -480,6 +481,38 @@ pub mod destinations {
     //         for d in self {
     //             for (k, v) in d {
     //                 t.entry(k).or_insert_with(Vec::new).push(v);
+    //             }
+    //         }
+    //         t
+    //     }
+    // }
+
+    impl<K, V> Transpose for HashMap<K, Destinations<V>>
+    where
+        K: Hash + Eq + Clone,
+    {
+        type Output = Destinations<HashMap<K, V>>;
+        fn transpose(self) -> Self::Output {
+            let mut t = Destinations::new();
+            for (k, d) in self {
+                for (dest, v) in d {
+                    t.entry(dest).or_insert_with(HashMap::new).insert(k.clone(), v);
+                }
+            }
+            t
+        }
+    }
+    // impl<I, K, V> Transpose for I
+    // where
+    //     I: IntoIterator<Item = (K, Destinations<V>)>,
+    //     K: Hash + Eq + Clone,
+    // {
+    //     type Output = Destinations<HashMap<K, V>>;
+    //     fn transpose(self) -> Self::Output {
+    //         let mut t = Destinations::new();
+    //         for (k, d) in self {
+    //             for (dest, v) in d {
+    //                 t.entry(dest).or_insert_with(HashMap::new).insert(k.clone(), v);
     //             }
     //         }
     //         t
