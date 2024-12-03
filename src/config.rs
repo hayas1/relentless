@@ -224,11 +224,11 @@ impl<T: Clone> Coalesce for Destinations<T> {
     type Other = HashMap<String, T>;
     fn coalesce(self, other: &Self::Other) -> Self {
         // TODO Coalesce trait should be renamed because override usage may be inverse of coalesce
-        let mut map = self.clone();
+        let mut destinations = self.clone();
         for (name, dest) in other {
-            map.entry(name.to_string()).and_modify(|d| *d = dest.clone());
+            destinations.entry(name.to_string()).and_modify(|d| *d = dest.clone());
         }
-        map
+        destinations
     }
 }
 
