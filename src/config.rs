@@ -451,10 +451,7 @@ pub mod destinations {
         type Output;
         fn transpose(self) -> Self::Output;
     }
-    impl<I, T> Transpose for Destinations<I>
-    where
-        I: IntoIterator<Item = T>,
-    {
+    impl<T> Transpose for Destinations<Vec<T>> {
         type Output = Vec<Destinations<T>>;
         fn transpose(self) -> Self::Output {
             let mut t = Vec::new();
@@ -470,23 +467,34 @@ pub mod destinations {
             t
         }
     }
+    impl<T> Transpose for Vec<Destinations<T>> {
+        type Output = Destinations<Vec<T>>;
+        fn transpose(self) -> Self::Output {
+            let mut t = Destinations::new();
+            for d in self {
+                for (k, v) in d {
+                    t.entry(k).or_insert_with(Vec::new).push(v);
+                }
+            }
+            t
+        }
+    }
 
-    // impl<I, T> Transpose for I
-    // where
-    //     I: IntoIterator<Item = Destinations<T>>,
-    // {
-    //     type Output = Destinations<Vec<T>>;
-    //     fn transpose(self) -> Self::Output {
-    //         let mut t = Destinations::new();
-    //         for d in self {
-    //             for (k, v) in d {
-    //                 t.entry(k).or_insert_with(Vec::new).push(v);
-    //             }
-    //         }
-    //         t
-    //     }
-    // }
-
+    impl<K, V> Transpose for Destinations<HashMap<K, V>>
+    where
+        K: Hash + Eq + Clone,
+    {
+        type Output = HashMap<K, Destinations<V>>;
+        fn transpose(self) -> Self::Output {
+            let mut t = HashMap::new();
+            for (k, v) in self {
+                for (dest, i) in v {
+                    t.entry(dest).or_insert_with(Destinations::new).insert(k.clone(), i);
+                }
+            }
+            t
+        }
+    }
     impl<K, V> Transpose for HashMap<K, Destinations<V>>
     where
         K: Hash + Eq + Clone,
@@ -502,22 +510,6 @@ pub mod destinations {
             t
         }
     }
-    // impl<I, K, V> Transpose for I
-    // where
-    //     I: IntoIterator<Item = (K, Destinations<V>)>,
-    //     K: Hash + Eq + Clone,
-    // {
-    //     type Output = Destinations<HashMap<K, V>>;
-    //     fn transpose(self) -> Self::Output {
-    //         let mut t = Destinations::new();
-    //         for (k, d) in self {
-    //             for (dest, v) in d {
-    //                 t.entry(dest).or_insert_with(HashMap::new).insert(k.clone(), v);
-    //             }
-    //         }
-    //         t
-    //     }
-    // }
 }
 
 // `http` do not support serde https://github.com/hyperium/http/pull/631
