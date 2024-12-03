@@ -196,12 +196,12 @@ where
     ) -> WrappedResult<Destinations<Vec<Req>>> {
         let Setting { request, template, repeat, .. } = setting;
 
-        let empty_template = Template::new();
         let templates = Template::destinations(template.clone());
         destinations
             .iter()
             .map(|(name, destination)| {
-                let rendered_target = templates.get(name).unwrap_or(&empty_template).render(target)?;
+                let rendered_target =
+                    templates.get(name).map(|t| t.render(target)).unwrap_or(Ok(target.to_string()))?;
                 let requests = repeat
                     .range()
                     .map(|_| Req::from_request_info(destination, &rendered_target, request))
