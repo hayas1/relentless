@@ -433,6 +433,11 @@ pub mod destinations {
             Self(dest)
         }
     }
+    impl<T> From<Destinations<T>> for HashMap<String, T> {
+        fn from(dest: Destinations<T>) -> Self {
+            dest.0
+        }
+    }
 
     impl<T> Destinations<T> {
         pub fn new() -> Self {
