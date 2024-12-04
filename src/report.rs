@@ -4,7 +4,7 @@ use std::process::ExitCode;
 use crate::error::Wrap;
 use crate::{
     command::{Relentless, ReportFormat},
-    config::{http_serde_priv, Coalesced, Destinations, Setting, Testcase, WorkerConfig},
+    config::{destinations::Destinations, http_serde_priv, Coalesced, Setting, Testcase, WorkerConfig},
     error::MultiWrap,
 };
 

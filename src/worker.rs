@@ -4,7 +4,10 @@ use std::marker::PhantomData;
 use crate::service::DefaultHttpClient;
 use crate::{
     command::Relentless,
-    config::{http_serde_priv, Coalesced, Config, Destinations, Setting, Testcase, WorkerConfig},
+    config::{
+        destinations::{Destinations, Transpose},
+        http_serde_priv, Coalesced, Config, Setting, Testcase, WorkerConfig,
+    },
     error::{Wrap, WrappedResult},
     evaluate::{DefaultEvaluator, Evaluator, RequestResult},
     report::{CaseReport, Report, WorkerReport},
@@ -117,21 +120,12 @@ where
 
         let mut report = Vec::new();
         for (testcase, process) in processes {
-            let Testcase { setting, .. } = testcase.coalesce();
-            let Setting { repeat, evaluate, .. } = &setting;
-            let mut passed = 0;
-            let mut t = repeat.range().map(|_| Destinations::new()).collect::<Vec<_>>();
-            for (name, repeated) in process? {
-                for (i, res) in repeated.into_iter().enumerate() {
-                    t[i].insert(name.clone(), res);
-                }
-            }
-            let mut v = Vec::new();
-            for res in t {
+            let Setting { evaluate, .. } = &testcase.coalesce().setting;
+            let (mut passed, mut v) = (0, Vec::new());
+            for res in process?.transpose() {
                 let pass = evaluator.evaluate(evaluate, res, &mut v).await;
                 passed += pass as usize;
             }
-
             report.push(CaseReport::new(testcase, passed, v.into_iter().collect()));
         }
         Ok(WorkerReport::new(config, report))
@@ -202,19 +196,12 @@ where
     ) -> WrappedResult<Destinations<Vec<Req>>> {
         let Setting { request, template, repeat, .. } = setting;
 
-        // TODO make Destinations as struct
-        let mut transpose = Destinations::new();
-        for (var, t) in template {
-            for (dest, val) in t.iter() {
-                transpose.entry(dest.clone()).or_insert(Template::new()).insert(var.clone(), val.clone());
-            }
-        }
-
+        let templates = Template::destinations(template.clone());
         destinations
             .iter()
             .map(|(name, destination)| {
-                let empty_template = Template::new();
-                let rendered_target = transpose.get(name).unwrap_or(&empty_template).render(target)?;
+                let rendered_target =
+                    templates.get(name).map(|t| t.render(target)).unwrap_or(Ok(target.to_string()))?;
                 let requests = repeat
                     .range()
                     .map(|_| Req::from_request_info(destination, &rendered_target, request))

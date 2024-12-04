@@ -5,6 +5,7 @@ use std::{
     time::Duration,
 };
 
+use destinations::Destinations;
 use http::{
     header::{CONTENT_LENGTH, CONTENT_TYPE},
     HeaderMap,
@@ -37,7 +38,6 @@ pub struct WorkerConfig {
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub setting: Setting,
 }
-pub type Destinations<T> = HashMap<String, T>;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct Setting {
@@ -224,11 +224,11 @@ impl<T: Clone> Coalesce for Destinations<T> {
     type Other = HashMap<String, T>;
     fn coalesce(self, other: &Self::Other) -> Self {
         // TODO Coalesce trait should be renamed because override usage may be inverse of coalesce
-        let mut map = self.clone();
+        let mut destinations = self.clone();
         for (name, dest) in other {
-            map.entry(name.to_string()).and_modify(|d| *d = dest.clone());
+            destinations.entry(name.to_string()).and_modify(|d| *d = dest.clone());
         }
-        map
+        destinations
     }
 }
 
@@ -380,6 +380,139 @@ impl Format {
                 use crate::error::WithContext;
                 Err(RunCommandError::UndefinedSerializeFormat).context(content.to_string())?
             }
+        }
+    }
+}
+
+pub mod destinations {
+    use std::{
+        collections::{
+            hash_map::{IntoIter, IntoKeys, IntoValues},
+            HashMap,
+        },
+        hash::Hash,
+        ops::{Deref, DerefMut},
+    };
+
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+    pub struct Destinations<T>(HashMap<String, T>);
+    impl<T> Default for Destinations<T> {
+        fn default() -> Self {
+            // derive(Default) do not implement Default when T are not implement Default
+            // https://github.com/rust-lang/rust/issues/26925
+            Self(HashMap::new())
+        }
+    }
+    impl<T> Deref for Destinations<T> {
+        type Target = HashMap<String, T>;
+        fn deref(&self) -> &Self::Target {
+            &self.0
+        }
+    }
+    impl<T> DerefMut for Destinations<T> {
+        fn deref_mut(&mut self) -> &mut Self::Target {
+            &mut self.0
+        }
+    }
+    impl<T> FromIterator<(String, T)> for Destinations<T> {
+        fn from_iter<I: IntoIterator<Item = (String, T)>>(iter: I) -> Self {
+            Self(iter.into_iter().collect())
+        }
+    }
+    impl<T> IntoIterator for Destinations<T> {
+        type Item = (String, T);
+        type IntoIter = IntoIter<String, T>;
+        fn into_iter(self) -> Self::IntoIter {
+            self.0.into_iter()
+        }
+    }
+    impl<T> From<HashMap<String, T>> for Destinations<T> {
+        fn from(dest: HashMap<String, T>) -> Self {
+            Self(dest)
+        }
+    }
+    impl<T> From<Destinations<T>> for HashMap<String, T> {
+        fn from(dest: Destinations<T>) -> Self {
+            dest.0
+        }
+    }
+
+    impl<T> Destinations<T> {
+        pub fn new() -> Self {
+            Default::default()
+        }
+
+        pub fn into_keys(self) -> IntoKeys<String, T> {
+            self.0.into_keys()
+        }
+
+        pub fn into_values(self) -> IntoValues<String, T> {
+            self.0.into_values()
+        }
+    }
+    pub trait Transpose {
+        type Output;
+        fn transpose(self) -> Self::Output;
+    }
+    impl<T> Transpose for Destinations<Vec<T>> {
+        type Output = Vec<Destinations<T>>;
+        fn transpose(self) -> Self::Output {
+            let mut t = Vec::new();
+            for (k, it) in self {
+                for (i, v) in it.into_iter().enumerate() {
+                    if t.len() <= i {
+                        t.push(Destinations::from_iter([(k.clone(), v)]));
+                    } else {
+                        t[i].insert(k.clone(), v);
+                    }
+                }
+            }
+            t
+        }
+    }
+    impl<T> Transpose for Vec<Destinations<T>> {
+        type Output = Destinations<Vec<T>>;
+        fn transpose(self) -> Self::Output {
+            let mut t = Destinations::new();
+            for d in self {
+                for (k, v) in d {
+                    t.entry(k).or_insert_with(Vec::new).push(v);
+                }
+            }
+            t
+        }
+    }
+
+    impl<K, V> Transpose for Destinations<HashMap<K, V>>
+    where
+        K: Hash + Eq + Clone,
+    {
+        type Output = HashMap<K, Destinations<V>>;
+        fn transpose(self) -> Self::Output {
+            let mut t = HashMap::new();
+            for (k, v) in self {
+                for (dest, i) in v {
+                    t.entry(dest).or_insert_with(Destinations::new).insert(k.clone(), i);
+                }
+            }
+            t
+        }
+    }
+    impl<K, V> Transpose for HashMap<K, Destinations<V>>
+    where
+        K: Hash + Eq + Clone,
+    {
+        type Output = Destinations<HashMap<K, V>>;
+        fn transpose(self) -> Self::Output {
+            let mut t = Destinations::new();
+            for (k, d) in self {
+                for (dest, v) in d {
+                    t.entry(dest).or_insert_with(HashMap::new).insert(k.clone(), v);
+                }
+            }
+            t
         }
     }
 }
@@ -569,7 +702,7 @@ mod tests {
                             //     )
                             //     .unwrap(),
                             // )),
-                            patch: Some(EvaluateTo::Destinations(Destinations::from([
+                            patch: Some(EvaluateTo::Destinations(Destinations::from_iter([
                                 (
                                     "actual".to_string(),
                                     serde_json::from_value(serde_json::json!([{"op": "remove", "path": "/datetime"}]))
@@ -662,7 +795,7 @@ mod tests {
             Evaluate {
                 body: BodyEvaluate::Json(JsonEvaluate {
                     ignore: vec![],
-                    patch: Some(EvaluateTo::Destinations(Destinations::from([
+                    patch: Some(EvaluateTo::Destinations(Destinations::from_iter([
                         (
                             "actual".to_string(),
                             serde_json::from_value(serde_json::json!([{"op": "remove", "path": "/datetime"}])).unwrap(),

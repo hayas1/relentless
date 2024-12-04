@@ -12,7 +12,7 @@ use crate::config::JsonEvaluate;
 use crate::config::{Evaluate, EvaluateTo, Severity};
 use crate::error::EvaluateError;
 use crate::{
-    config::{BodyEvaluate, Destinations, HeaderEvaluate, StatusEvaluate},
+    config::{destinations::Destinations, BodyEvaluate, HeaderEvaluate, StatusEvaluate},
     error::WrappedResult,
 };
 

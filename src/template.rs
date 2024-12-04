@@ -14,7 +14,10 @@ use nom::{
     IResult,
 };
 
-use crate::error::{TemplateError, WrappedResult};
+use crate::{
+    config::destinations::{Destinations, Transpose},
+    error::{TemplateError, WrappedResult},
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Template {
@@ -41,6 +44,10 @@ impl<R: ToString, L: ToString> FromIterator<(R, L)> for Template {
 impl Template {
     pub fn new() -> Self {
         Default::default()
+    }
+
+    pub fn destinations(templates: HashMap<String, Destinations<String>>) -> Destinations<Self> {
+        templates.transpose().into_iter().map(|(name, t)| (name, t.into_iter().collect())).collect()
     }
 
     pub fn render(&self, input: &str) -> WrappedResult<String> {
