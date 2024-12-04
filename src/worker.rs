@@ -12,7 +12,6 @@ use crate::{
     evaluate::{DefaultEvaluator, Evaluator, RequestResult},
     report::{CaseReport, Report, WorkerReport},
     service::FromRequestInfo,
-    template::Template,
 };
 use tower::{
     timeout::{error::Elapsed, TimeoutLayer},
@@ -196,12 +195,10 @@ where
     ) -> WrappedResult<Destinations<Vec<Req>>> {
         let Setting { request, template, repeat, .. } = setting;
 
-        let templates = Template::destinations(template.clone());
         destinations
             .iter()
             .map(|(name, destination)| {
-                let rendered_target =
-                    templates.get(name).map(|t| t.render(target)).unwrap_or(Ok(target.to_string()))?;
+                let rendered_target = template.get(name).map(|t| t.render(target)).unwrap_or(Ok(target.to_string()))?;
                 let requests = repeat
                     .range()
                     .map(|_| Req::from_request_info(destination, &rendered_target, request))

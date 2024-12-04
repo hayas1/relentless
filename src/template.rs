@@ -13,13 +13,11 @@ use nom::{
     sequence::delimited,
     IResult,
 };
+use serde::{Deserialize, Serialize};
 
-use crate::{
-    config::destinations::{Destinations, Transpose},
-    error::{TemplateError, WrappedResult},
-};
+use crate::error::{TemplateError, WrappedResult};
 
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct Template {
     vars: HashMap<String, String>,
 }
@@ -35,6 +33,13 @@ impl DerefMut for Template {
         &mut self.vars
     }
 }
+impl IntoIterator for Template {
+    type Item = (String, String);
+    type IntoIter = std::collections::hash_map::IntoIter<String, String>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.vars.into_iter()
+    }
+}
 impl<R: ToString, L: ToString> FromIterator<(R, L)> for Template {
     fn from_iter<I: IntoIterator<Item = (R, L)>>(iter: I) -> Self {
         Self { vars: iter.into_iter().map(|(var, val)| (var.to_string(), val.to_string())).collect() }
@@ -46,10 +51,6 @@ impl Template {
         Default::default()
     }
 
-    pub fn destinations(templates: HashMap<String, Destinations<String>>) -> Destinations<Self> {
-        templates.transpose().into_iter().map(|(name, t)| (name, t.into_iter().collect())).collect()
-    }
-
     pub fn render(&self, input: &str) -> WrappedResult<String> {
         let variables = Variable::split(input)?;
         let assigned = variables.iter().map(|v| v.assign(self)).collect::<Result<Vec<_>, _>>()?;
@@ -57,7 +58,7 @@ impl Template {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Variable {
     Literal(String),
     Defined(String),
