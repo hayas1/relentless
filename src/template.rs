@@ -62,6 +62,7 @@ impl Template {
 pub enum Variable {
     Literal(String),
     Defined(String),
+    // TODO Capture(String),
     // #[cfg(feature = "console")]
     // TODO Input(String),
     // TODO File(String),
