@@ -388,7 +388,7 @@ impl Format {
 pub mod destinations {
     use std::{
         collections::{
-            hash_map::{IntoIter, IntoKeys, IntoValues},
+            hash_map::{IntoIter as HashMapIter, IntoKeys, IntoValues},
             HashMap,
         },
         hash::Hash,
@@ -424,7 +424,7 @@ pub mod destinations {
     }
     impl<T> IntoIterator for Destinations<T> {
         type Item = (String, T);
-        type IntoIter = IntoIter<String, T>;
+        type IntoIter = HashMapIter<String, T>;
         fn into_iter(self) -> Self::IntoIter {
             self.0.into_iter()
         }

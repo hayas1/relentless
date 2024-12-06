@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{hash_map::IntoIter as HashMapIter, HashMap},
     convert::Infallible,
     ops::{Deref, DerefMut},
 };
@@ -35,7 +35,7 @@ impl DerefMut for Template {
 }
 impl IntoIterator for Template {
     type Item = (String, String);
-    type IntoIter = std::collections::hash_map::IntoIter<String, String>;
+    type IntoIter = HashMapIter<String, String>;
     fn into_iter(self) -> Self::IntoIter {
         self.vars.into_iter()
     }
