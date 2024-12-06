@@ -13,3 +13,14 @@ testcases:
           server2: server2
     attr:
       allow: true
+  - target: /echo/body
+    setting:
+      template:
+        var:
+          server1: server1
+          server2: server2
+      request:
+        method: POST
+        body: hello ${var}
+    attr:
+      allow: true
