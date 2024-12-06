@@ -210,10 +210,10 @@ impl From<Bytes> for BytesBody {
     }
 }
 impl FromBodyStructure for BytesBody {
-    fn from_body_structure(val: BodyStructure) -> Self {
+    fn from_body_structure(val: BodyStructure, template: &Template) -> Self {
         match val {
             BodyStructure::Empty => Bytes::new().into(),
-            BodyStructure::PlainText(s) => Bytes::from(s).into(),
+            BodyStructure::PlainText(s) => Bytes::from(template.render(&s).unwrap_or(s)).into(),
             #[cfg(feature = "json")]
             BodyStructure::Json(body) => Bytes::from(serde_json::to_vec(&body).unwrap()).into(),
         }
@@ -245,7 +245,7 @@ where
         let unwrapped_method = method.as_ref().map(|m| (**m).clone()).unwrap_or_default();
         let unwrapped_headers: HeaderMap = headers.as_ref().map(|h| (**h).clone()).unwrap_or_default();
         // .into_iter().map(|(k, v)| (k, template.render_as_string(v))).collect(); // TODO template with header
-        let (actual_body, additional_headers) = body.clone().unwrap_or_default().body_with_headers()?;
+        let (actual_body, additional_headers) = body.clone().unwrap_or_default().body_with_headers(template)?;
 
         let mut request = http::Request::builder().uri(uri).method(unwrapped_method).body(actual_body)?;
         let header_map = request.headers_mut();
@@ -258,16 +258,16 @@ where
 }
 
 pub trait FromBodyStructure {
-    fn from_body_structure(structure: BodyStructure) -> Self;
+    fn from_body_structure(structure: BodyStructure, template: &Template) -> Self;
 }
 impl<T> FromBodyStructure for T
 where
     T: Body + From<Bytes> + Default,
 {
-    fn from_body_structure(structure: BodyStructure) -> Self {
+    fn from_body_structure(structure: BodyStructure, template: &Template) -> Self {
         match structure {
             BodyStructure::Empty => Default::default(),
-            BodyStructure::PlainText(s) => Bytes::from(s).into(),
+            BodyStructure::PlainText(s) => Bytes::from(template.render(&s).unwrap_or(s)).into(),
             #[cfg(feature = "json")]
             BodyStructure::Json(_) => Bytes::from(serde_json::to_vec(&structure).unwrap()).into(),
         }
