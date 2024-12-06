@@ -2,6 +2,7 @@ use std::{
     collections::{hash_map::IntoIter as HashMapIter, HashMap},
     convert::Infallible,
     ops::{Deref, DerefMut},
+    str::FromStr,
 };
 
 use nom::{
@@ -15,7 +16,7 @@ use nom::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::error::{TemplateError, WrappedResult};
+use crate::error::{TemplateError, Wrap, WrappedResult};
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct Template {
@@ -55,6 +56,14 @@ impl Template {
         let variables = Variable::split(input)?;
         let assigned = variables.iter().map(|v| v.assign(self)).collect::<Result<Vec<_>, _>>()?;
         Ok(assigned.join(""))
+    }
+
+    pub fn render_as_string<T>(&self, input: T) -> WrappedResult<T>
+    where
+        T: AsRef<[u8]> + FromStr,
+        Wrap: From<T::Err>,
+    {
+        Ok(T::from_str(&self.render(&String::from_utf8_lossy(input.as_ref()))?)?)
     }
 }
 

@@ -12,6 +12,7 @@ use crate::{
     evaluate::{DefaultEvaluator, Evaluator, RequestResult},
     report::{CaseReport, Report, WorkerReport},
     service::FromRequestInfo,
+    template::Template,
 };
 use tower::{
     timeout::{error::Elapsed, TimeoutLayer},
@@ -198,10 +199,11 @@ where
         destinations
             .iter()
             .map(|(name, destination)| {
-                let rendered_target = template.get(name).map(|t| t.render(target)).unwrap_or(Ok(target.to_string()))?;
+                let default_empty = Template::new();
+                let template = template.get(name).unwrap_or(&default_empty);
                 let requests = repeat
                     .range()
-                    .map(|_| Req::from_request_info(destination, &rendered_target, request))
+                    .map(|_| Req::from_request_info(template, destination, target, request))
                     .collect::<Result<Vec<_>, _>>()?;
                 Ok((name.to_string(), requests))
             })
