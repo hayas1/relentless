@@ -146,7 +146,7 @@ pub enum HeaderEvaluate {
 pub enum BodyEvaluate {
     #[default]
     Equal,
-    PlainText(PlainTextEvaluate),
+    PlainText(EvaluateTo<PlainTextEvaluate>),
     #[cfg(feature = "json")]
     Json(JsonEvaluate),
 }
