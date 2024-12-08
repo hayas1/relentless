@@ -29,5 +29,3 @@ testcases:
               regex: hello server1
             server2:
               regex: hello server2
-    attr:
-      allow: true # TODO bugfix
