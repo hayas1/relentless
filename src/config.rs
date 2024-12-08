@@ -42,8 +42,8 @@ pub struct WorkerConfig {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct Setting {
-    #[serde(default, skip_serializing_if = "IsDefault::is_default", flatten)]
-    pub protocol: Protocol,
+    #[serde(flatten, skip_serializing_if = "IsDefault::is_default")]
+    pub protocol: Option<Protocol>, // serde(default, flatten) will cause error https://github.com/serde-rs/serde/issues/1626
 
     #[serde(default, skip_serializing_if = "IsDefault::is_default", with = "destinations::transpose_template_serde")]
     pub template: Destinations<Template>,
@@ -62,11 +62,6 @@ pub enum Protocol {
         #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
         evaluate: HttpEvaluate,
     },
-}
-impl Default for Protocol {
-    fn default() -> Self {
-        Self::Http { request: Default::default(), evaluate: Default::default() }
-    }
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
@@ -261,7 +256,7 @@ impl Coalesce for Setting {
     type Other = Self;
     fn coalesce(self, other: &Self) -> Self {
         Self {
-            protocol: self.protocol.coalesce(&other.protocol),
+            protocol: self.protocol.or(other.protocol.clone()),
             template: if self.template.is_empty() { other.clone().template } else { self.template },
             repeat: self.repeat.coalesce(&other.repeat),
             timeout: self.timeout.or(other.timeout),
@@ -770,10 +765,10 @@ mod tests {
             worker_config: WorkerConfig {
                 name: Some("example".to_string()),
                 setting: Setting {
-                    protocol: Protocol::Http {
+                    protocol: Some(Protocol::Http {
                         request: Default::default(),
                         evaluate: HttpEvaluate { header: HeaderEvaluate::Ignore, ..Default::default() },
-                    },
+                    }),
                     ..Default::default()
                 },
                 ..Default::default()
@@ -782,7 +777,7 @@ mod tests {
                 description: Some("test description".to_string()),
                 target: "/information".to_string(),
                 setting: Setting {
-                    protocol: Protocol::Http {
+                    protocol: Some(Protocol::Http {
                         request: Default::default(),
                         evaluate: HttpEvaluate {
                             body: BodyEvaluate::Json(JsonEvaluate {
@@ -813,7 +808,7 @@ mod tests {
                             }),
                             ..Default::default()
                         },
-                    },
+                    }),
                     ..Default::default()
                 },
                 attr: Attribute { allow: true },
@@ -850,7 +845,7 @@ mod tests {
         let config = Config::read_str(all_yaml, Format::Yaml).unwrap();
         assert_eq!(
             config.testcases[0].setting.protocol,
-            Protocol::Http {
+            Some(Protocol::Http {
                 request: Default::default(),
                 evaluate: HttpEvaluate {
                     body: BodyEvaluate::Json(JsonEvaluate {
@@ -865,7 +860,7 @@ mod tests {
                     }),
                     ..Default::default()
                 },
-            },
+            }),
         );
 
         let destinations_yaml = r#"
@@ -893,7 +888,7 @@ mod tests {
         let config = Config::read_str(destinations_yaml, Format::Yaml).unwrap();
         assert_eq!(
             config.testcases[0].setting.protocol,
-            Protocol::Http {
+            Some(Protocol::Http {
                 request: Default::default(),
                 evaluate: HttpEvaluate {
                     body: BodyEvaluate::Json(JsonEvaluate {
@@ -914,7 +909,7 @@ mod tests {
                     }),
                     ..Default::default()
                 },
-            },
+            }),
         );
     }
 }

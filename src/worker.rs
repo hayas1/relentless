@@ -123,9 +123,7 @@ where
             let Setting { protocol, .. } = &testcase.coalesce().setting;
             let (mut passed, mut v) = (0, Vec::new());
             for res in process?.transpose() {
-                let pass = evaluator
-                    .evaluate(E::evaluate_config(protocol).unwrap_or_else(|| todo!("protocol")), res, &mut v)
-                    .await;
+                let pass = evaluator.evaluate(E::evaluate_config(protocol.as_ref()), res, &mut v).await;
                 passed += pass as usize;
             }
             report.push(CaseReport::new(testcase, passed, v.into_iter().collect()));
@@ -198,19 +196,21 @@ where
     ) -> WrappedResult<Destinations<Vec<Req>>> {
         let Setting { protocol: service, template, repeat, .. } = setting;
 
-        match service {
-            Protocol::Http { request, .. } => destinations
-                .iter()
-                .map(|(name, destination)| {
-                    let default_empty = Template::new();
-                    let template = template.get(name).unwrap_or(&default_empty);
-                    let requests = repeat
-                        .range()
-                        .map(|_| Req::from_request_info(template, destination, target, request))
-                        .collect::<Result<Vec<_>, _>>()?;
-                    Ok((name.to_string(), requests))
-                })
-                .collect(),
-        }
+        let request_info = match service {
+            Some(Protocol::Http { request, .. }) => request,
+            None => &Default::default(),
+        };
+        destinations
+            .iter()
+            .map(|(name, destination)| {
+                let default_empty = Template::new();
+                let template = template.get(name).unwrap_or(&default_empty);
+                let requests = repeat
+                    .range()
+                    .map(|_| Req::from_request_info(template, destination, target, request_info))
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok((name.to_string(), requests))
+            })
+            .collect()
     }
 }

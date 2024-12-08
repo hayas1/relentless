@@ -27,12 +27,12 @@ pub trait Evaluator<Res> {
     type Message;
     async fn evaluate(
         &self,
-        cfg: &Self::EvaluateConfig,
+        cfg: Option<&Self::EvaluateConfig>,
         res: Destinations<RequestResult<Res>>,
         msg: &mut Vec<Self::Message>,
     ) -> bool;
 
-    fn evaluate_config(protocol: &Protocol) -> Option<&Self::EvaluateConfig>; // TODO remove this method
+    fn evaluate_config(protocol: Option<&Protocol>) -> Option<&Self::EvaluateConfig>; // TODO remove this method
 }
 pub struct DefaultEvaluator;
 impl<B: Body> Evaluator<http::Response<B>> for DefaultEvaluator
@@ -43,16 +43,18 @@ where
     type Message = EvaluateError;
     async fn evaluate(
         &self,
-        cfg: &HttpEvaluate,
+        cfg: Option<&HttpEvaluate>,
         res: Destinations<RequestResult<http::Response<B>>>,
         msg: &mut Vec<Self::Message>,
     ) -> bool {
-        Self::acceptable_parts(cfg, res, msg).await
+        let default_config = Default::default();
+        Self::acceptable_parts(cfg.unwrap_or(&default_config), res, msg).await
     }
 
-    fn evaluate_config(protocol: &Protocol) -> Option<&Self::EvaluateConfig> {
+    fn evaluate_config(protocol: Option<&Protocol>) -> Option<&Self::EvaluateConfig> {
         match protocol {
-            Protocol::Http { evaluate, .. } => Some(evaluate),
+            Some(Protocol::Http { evaluate, .. }) => Some(evaluate),
+            None => None,
         }
     }
 }
@@ -247,7 +249,7 @@ mod tests {
             http::Response::builder().status(http::StatusCode::OK).body(http_body_util::Empty::<Bytes>::new()).unwrap();
         let responses = Destinations::from_iter(vec![("test".to_string(), RequestResult::Response(ok))]);
         let mut msg = Vec::new();
-        let result = evaluator.evaluate(&Default::default(), responses, &mut msg).await;
+        let result = evaluator.evaluate(Some(&Default::default()), responses, &mut msg).await;
         assert!(result);
         assert!(msg.is_empty());
 
@@ -257,7 +259,7 @@ mod tests {
             .unwrap();
         let responses = Destinations::from_iter(vec![("test".to_string(), RequestResult::Response(unavailable))]);
         let mut msg = Vec::new();
-        let result = evaluator.evaluate(&Default::default(), responses, &mut msg).await;
+        let result = evaluator.evaluate(Some(&Default::default()), responses, &mut msg).await;
         assert!(!result);
         assert!(matches!(msg[0], EvaluateError::UnacceptableStatus));
     }
