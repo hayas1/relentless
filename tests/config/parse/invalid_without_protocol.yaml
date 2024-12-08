@@ -1,0 +1,14 @@
+name: request protocol must be specified
+destinations:
+  test-api: http://localhost:3000
+
+testcases:
+  - target: /echo/body
+    setting:
+      request:
+        method: POST
+        body: hello world
+      evaluate:
+        body:
+          plaintext:
+            regex: hello world
