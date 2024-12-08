@@ -300,6 +300,8 @@ pub enum RunCommandError {
 pub enum TemplateError {
     #[error("{0}")]
     NomParseError(String),
+    #[error("remaining template: {0}")]
+    RemainingTemplate(String),
     #[error("variable `{0}` is not defined")]
     VariableNotDefined(String),
 }

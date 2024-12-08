@@ -80,7 +80,11 @@ pub enum Variable {
 
 impl Variable {
     pub fn split(input: &str) -> WrappedResult<Vec<Self>> {
-        Ok(Self::parse(input).map_err(|e| TemplateError::NomParseError(e.to_string()))?.1)
+        let (remain, parsed) = Self::parse(input).map_err(|e| TemplateError::NomParseError(e.to_string()))?;
+        remain
+            .is_empty() // TODO check is_empty by nom's function?
+            .then_some(parsed)
+            .ok_or_else(|| TemplateError::RemainingTemplate(remain.to_string()).into())
     }
 
     pub fn assign(&self, defined: &Template) -> WrappedResult<String> {
@@ -149,11 +153,13 @@ mod tests {
         }
     }
 
-    // TODO error handling
-    // #[test]
-    // fn test_template_render_with_invalid() {
-    //     let template: Template = vec![("foo", "hoge"), ("bar", "fuga"), ("baz", "piyo")].into_iter().collect();
-    //     let error = template.render("foo ${bar baz").unwrap_err();
-    //     println!("{}", error);
-    // }
+    #[test]
+    fn test_template_render_with_invalid() {
+        let template: Template = vec![("foo", "hoge"), ("bar", "fuga"), ("baz", "piyo")].into_iter().collect();
+        let error = template.render("foo ${bar baz").unwrap_err();
+        assert_eq!(
+            error.downcast_ref::<TemplateError>().unwrap(),
+            &TemplateError::RemainingTemplate("${bar baz".to_string())
+        );
+    }
 }
