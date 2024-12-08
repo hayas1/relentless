@@ -43,7 +43,7 @@ pub struct WorkerConfig {
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct Setting {
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
-    pub request: RequestInfo,
+    pub request: HttpRequest,
     #[serde(default, skip_serializing_if = "IsDefault::is_default", with = "destinations::transpose_template_serde")]
     pub template: Destinations<Template>,
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
@@ -52,11 +52,11 @@ pub struct Setting {
     pub timeout: Option<Duration>, // TODO parse from string? https://crates.io/crates/humantime ?
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
-    pub evaluate: Evaluate,
+    pub evaluate: HttpEvaluate,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
-pub struct RequestInfo {
+pub struct HttpRequest {
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub no_additional_headers: bool,
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
@@ -117,7 +117,7 @@ impl Repeat {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
-pub struct Evaluate {
+pub struct HttpEvaluate {
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub status: StatusEvaluate,
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
@@ -255,7 +255,7 @@ impl Coalesce for Setting {
         }
     }
 }
-impl Coalesce for RequestInfo {
+impl Coalesce for HttpRequest {
     type Other = Self;
     fn coalesce(self, other: &Self) -> Self {
         Self {
@@ -266,7 +266,7 @@ impl Coalesce for RequestInfo {
         }
     }
 }
-impl Coalesce for Evaluate {
+impl Coalesce for HttpEvaluate {
     type Other = Self;
     fn coalesce(self, other: &Self) -> Self {
         Self {
@@ -743,7 +743,7 @@ mod tests {
             worker_config: WorkerConfig {
                 name: Some("example".to_string()),
                 setting: Setting {
-                    evaluate: Evaluate { header: HeaderEvaluate::Ignore, ..Default::default() },
+                    evaluate: HttpEvaluate { header: HeaderEvaluate::Ignore, ..Default::default() },
                     ..Default::default()
                 },
                 ..Default::default()
@@ -752,7 +752,7 @@ mod tests {
                 description: Some("test description".to_string()),
                 target: "/information".to_string(),
                 setting: Setting {
-                    evaluate: Evaluate {
+                    evaluate: HttpEvaluate {
                         body: BodyEvaluate::Json(JsonEvaluate {
                             ignore: vec!["/datetime".to_string()],
                             // patch: Some(PatchTo::All(
@@ -812,7 +812,7 @@ mod tests {
         let config = Config::read_str(all_yaml, Format::Yaml).unwrap();
         assert_eq!(
             config.testcases[0].setting.evaluate,
-            Evaluate {
+            HttpEvaluate {
                 body: BodyEvaluate::Json(JsonEvaluate {
                     ignore: vec![],
                     patch: Some(EvaluateTo::All(
@@ -851,7 +851,7 @@ mod tests {
         let config = Config::read_str(destinations_yaml, Format::Yaml).unwrap();
         assert_eq!(
             config.testcases[0].setting.evaluate,
-            Evaluate {
+            HttpEvaluate {
                 body: BodyEvaluate::Json(JsonEvaluate {
                     ignore: vec![],
                     patch: Some(EvaluateTo::Destinations(Destinations::from_iter([
