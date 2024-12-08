@@ -120,12 +120,12 @@ where
 
         let mut report = Vec::new();
         for (testcase, process) in processes {
-            let Setting { protocol: service, .. } = &testcase.coalesce().setting;
+            let Setting { protocol, .. } = &testcase.coalesce().setting;
             let (mut passed, mut v) = (0, Vec::new());
             for res in process?.transpose() {
-                let pass = match service {
-                    Protocol::Http { evaluate, .. } => evaluator.evaluate(evaluate, res, &mut v).await,
-                };
+                let pass = evaluator
+                    .evaluate(E::evaluate_config(protocol).unwrap_or_else(|| todo!("protocol")), res, &mut v)
+                    .await;
                 passed += pass as usize;
             }
             report.push(CaseReport::new(testcase, passed, v.into_iter().collect()));

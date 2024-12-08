@@ -9,7 +9,7 @@ use serde_json::Value;
 
 #[cfg(feature = "json")]
 use crate::config::JsonEvaluate;
-use crate::config::{EvaluateTo, HttpEvaluate, Severity};
+use crate::config::{EvaluateTo, HttpEvaluate, Protocol, Severity};
 use crate::error::EvaluateError;
 use crate::{
     config::{destinations::Destinations, BodyEvaluate, HeaderEvaluate, StatusEvaluate},
@@ -23,19 +23,23 @@ pub enum RequestResult<Res> {
 
 #[allow(async_fn_in_trait)] // TODO #[warn(async_fn_in_trait)] by default
 pub trait Evaluator<Res> {
+    type EvaluateConfig;
     type Message;
     async fn evaluate(
         &self,
-        cfg: &HttpEvaluate,
+        cfg: &Self::EvaluateConfig,
         res: Destinations<RequestResult<Res>>,
         msg: &mut Vec<Self::Message>,
     ) -> bool;
+
+    fn evaluate_config(protocol: &Protocol) -> Option<&Self::EvaluateConfig>; // TODO remove this method
 }
 pub struct DefaultEvaluator;
 impl<B: Body> Evaluator<http::Response<B>> for DefaultEvaluator
 where
     B::Error: std::error::Error + Sync + Send + 'static,
 {
+    type EvaluateConfig = HttpEvaluate;
     type Message = EvaluateError;
     async fn evaluate(
         &self,
@@ -44,6 +48,12 @@ where
         msg: &mut Vec<Self::Message>,
     ) -> bool {
         Self::acceptable_parts(cfg, res, msg).await
+    }
+
+    fn evaluate_config(protocol: &Protocol) -> Option<&Self::EvaluateConfig> {
+        match protocol {
+            Protocol::Http { evaluate, .. } => Some(evaluate),
+        }
     }
 }
 
