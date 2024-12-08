@@ -5,41 +5,44 @@ destinations:
 testcases:
   - target: /echo/body
     setting:
-      request:
-        method: POST
-        body: hello world
-      evaluate:
-        body:
-          plaintext:
-            regex: hello world
+      http:
+        request:
+          method: POST
+          body: hello world
+        evaluate:
+          body:
+            plaintext:
+              regex: hello world
   - target: /echo/json
     setting:
-      request:
-        method: POST
-        body:
-          foo: hoge
-          bar: fuga
-          baz: piyo
-      evaluate:
-        body:
-          json:
-            patch:
-              - op: test
-                path: ""
-                value:
-                  foo: hoge
-                  bar: fuga
-                  baz: piyo
+      http:
+        request:
+          method: POST
+          body:
+            foo: hoge
+            bar: fuga
+            baz: piyo
+        evaluate:
+          body:
+            json:
+              patch:
+                - op: test
+                  path: ""
+                  value:
+                    foo: hoge
+                    bar: fuga
+                    baz: piyo
   - target: /echo/json
     description: json without Content-Type will return 415 Unsupported Media Type
     setting:
-      request:
-        no-additional-headers: true
-        method: POST
-        body:
-          foo: hoge
-          bar: fuga
-          baz: piyo
-      evaluate:
-        status:
-          expect: 415
+      http:
+        request:
+          no-additional-headers: true
+          method: POST
+          body:
+            foo: hoge
+            bar: fuga
+            baz: piyo
+        evaluate:
+          status:
+            expect: 415

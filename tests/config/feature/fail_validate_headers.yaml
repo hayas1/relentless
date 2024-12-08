@@ -5,19 +5,20 @@ destinations:
 testcases:
   - target: /echo/headers
     setting:
-      request:
-        headers:
-          foo: hoge
-          bar: fuga
-          baz: piyo
-      evaluate:
-        body:
-          json:
-            patch:
-              - op: test
-                path: ""
-                value:
-                  - foo: hoge
-                  - bar: fuga
-                  - baz: piyo
-                  - qux: hogera
+      http:
+        request:
+          headers:
+            foo: hoge
+            bar: fuga
+            baz: piyo
+        evaluate:
+          body:
+            json:
+              patch:
+                - op: test
+                  path: ""
+                  value:
+                    - foo: hoge
+                    - bar: fuga
+                    - baz: piyo
+                    - qux: hogera

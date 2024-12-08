@@ -12,7 +12,7 @@ use http_body_util::{combinators::BoxBody, BodyExt};
 use tower::Service;
 
 use crate::{
-    config::{BodyStructure, RequestInfo},
+    config::{BodyStructure, HttpRequest},
     error::{Wrap, WrappedResult},
     template::Template,
 };
@@ -226,7 +226,7 @@ pub trait FromRequestInfo: Sized {
         template: &Template,
         destination: &http::Uri,
         target: &str,
-        info: &RequestInfo,
+        info: &HttpRequest,
     ) -> Result<Self, Self::Error>;
 }
 impl<B> FromRequestInfo for http::Request<B>
@@ -238,9 +238,9 @@ where
         template: &Template,
         destination: &http::Uri,
         target: &str,
-        info: &RequestInfo,
+        info: &HttpRequest,
     ) -> Result<Self, Self::Error> {
-        let RequestInfo { no_additional_headers, method, headers, body } = &info;
+        let HttpRequest { no_additional_headers, method, headers, body } = &info;
         let uri = http::uri::Builder::from(destination.clone()).path_and_query(template.render(target)?).build()?;
         let unwrapped_method = method.as_ref().map(|m| (**m).clone()).unwrap_or_default();
         let unwrapped_headers: HeaderMap = headers.as_ref().map(|h| (**h).clone()).unwrap_or_default();

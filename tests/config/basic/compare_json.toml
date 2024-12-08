@@ -5,7 +5,7 @@ actual = "http://localhost:3000"
 expect = "http://localhost:3000"
 
 [setting]
-evaluate = { header = "ignore" }
+http = { evaluate = { header = "ignore" } }
 
 [[testcases]]
 target = "/counter/increment"
@@ -18,7 +18,7 @@ target = "/health/rich"
 [[testcases]]
 target = "/information"
 description = "ignore datetime and hostname and uri"
-setting.evaluate.body.json.ignore = [
+setting.http.evaluate.body.json.ignore = [
     "/datetime",
     "/hostname",
     "/headers/host",
@@ -33,19 +33,19 @@ attr = { allow = true }
 [[testcases]]
 target = "/information"
 description = "patch datetime and hostname and uri"
-setting.evaluate.body.json.patch = [
+setting.http.evaluate.body.json.patch = [
     { op = "replace", path = "/datetime", value = "2024-10-10T00:00:00Z" },
     { op = "remove", path = "/hostname" },
     { op = "remove", path = "/uri" },
     { op = "replace", path = "/headers/host", value = "127.0.0.1:3000" },
     { op = "test", path = "/path", value = "/information" },
 ]
-setting.evaluate.body.json.patch-fail = "allow"
+setting.http.evaluate.body.json.patch-fail = "allow"
 
 [[testcases]]
 target = "/information"
 description = "remove actual datetime only (must be failed, so attr allowed)"
-setting.evaluate.body.json.patch = { actual = [
+setting.http.evaluate.body.json.patch = { actual = [
     { op = "remove", path = "/datetime" },
 ] }
 attr = { allow = true }

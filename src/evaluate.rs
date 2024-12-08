@@ -9,7 +9,7 @@ use serde_json::Value;
 
 #[cfg(feature = "json")]
 use crate::config::JsonEvaluate;
-use crate::config::{Evaluate, EvaluateTo, Severity};
+use crate::config::{EvaluateTo, HttpEvaluate, Protocol, Severity};
 use crate::error::EvaluateError;
 use crate::{
     config::{destinations::Destinations, BodyEvaluate, HeaderEvaluate, StatusEvaluate},
@@ -23,33 +23,45 @@ pub enum RequestResult<Res> {
 
 #[allow(async_fn_in_trait)] // TODO #[warn(async_fn_in_trait)] by default
 pub trait Evaluator<Res> {
+    type EvaluateConfig;
     type Message;
     async fn evaluate(
         &self,
-        cfg: &Evaluate,
+        cfg: Option<&Self::EvaluateConfig>,
         res: Destinations<RequestResult<Res>>,
         msg: &mut Vec<Self::Message>,
     ) -> bool;
+
+    fn evaluate_config(protocol: Option<&Protocol>) -> Option<&Self::EvaluateConfig>; // TODO remove this method
 }
 pub struct DefaultEvaluator;
 impl<B: Body> Evaluator<http::Response<B>> for DefaultEvaluator
 where
     B::Error: std::error::Error + Sync + Send + 'static,
 {
+    type EvaluateConfig = HttpEvaluate;
     type Message = EvaluateError;
     async fn evaluate(
         &self,
-        cfg: &Evaluate,
+        cfg: Option<&HttpEvaluate>,
         res: Destinations<RequestResult<http::Response<B>>>,
         msg: &mut Vec<Self::Message>,
     ) -> bool {
-        Self::acceptable_parts(cfg, res, msg).await
+        let default_config = Default::default();
+        Self::acceptable_parts(cfg.unwrap_or(&default_config), res, msg).await
+    }
+
+    fn evaluate_config(protocol: Option<&Protocol>) -> Option<&Self::EvaluateConfig> {
+        match protocol {
+            Some(Protocol::Http { evaluate, .. }) => Some(evaluate),
+            None => None,
+        }
     }
 }
 
 impl DefaultEvaluator {
     pub async fn acceptable_parts<B: Body>(
-        cfg: &Evaluate,
+        cfg: &HttpEvaluate,
         res: Destinations<RequestResult<http::Response<B>>>,
         msg: &mut Vec<EvaluateError>,
     ) -> bool
@@ -237,7 +249,7 @@ mod tests {
             http::Response::builder().status(http::StatusCode::OK).body(http_body_util::Empty::<Bytes>::new()).unwrap();
         let responses = Destinations::from_iter(vec![("test".to_string(), RequestResult::Response(ok))]);
         let mut msg = Vec::new();
-        let result = evaluator.evaluate(&Default::default(), responses, &mut msg).await;
+        let result = evaluator.evaluate(Some(&Default::default()), responses, &mut msg).await;
         assert!(result);
         assert!(msg.is_empty());
 
@@ -247,7 +259,7 @@ mod tests {
             .unwrap();
         let responses = Destinations::from_iter(vec![("test".to_string(), RequestResult::Response(unavailable))]);
         let mut msg = Vec::new();
-        let result = evaluator.evaluate(&Default::default(), responses, &mut msg).await;
+        let result = evaluator.evaluate(Some(&Default::default()), responses, &mut msg).await;
         assert!(!result);
         assert!(matches!(msg[0], EvaluateError::UnacceptableStatus));
     }
