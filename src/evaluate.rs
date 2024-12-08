@@ -108,7 +108,7 @@ impl DefaultEvaluator {
         msg: &mut Vec<EvaluateError>,
     ) -> bool {
         let acceptable = match cfg {
-            HeaderEvaluate::Equal => Self::assault_or_compare(headers, |_| true),
+            HeaderEvaluate::AnyOrEqual => Self::assault_or_compare(headers, |_| true),
             HeaderEvaluate::Expect(EvaluateTo::All(header)) => Self::validate_all(headers, |(_, h)| h == &**header),
             HeaderEvaluate::Expect(EvaluateTo::Destinations(header)) => {
                 // TODO subset ?
@@ -124,15 +124,15 @@ impl DefaultEvaluator {
 
     pub fn acceptable_body(cfg: &BodyEvaluate, body: &Destinations<Bytes>, msg: &mut Vec<EvaluateError>) -> bool {
         match cfg {
-            BodyEvaluate::Equal => Self::assault_or_compare(body, |_| true),
-            BodyEvaluate::PlainText(EvaluateTo::All(p)) => Self::validate_all(body, |(_, b)| match &p.regex {
+            BodyEvaluate::AnyOrEqual => Self::assault_or_compare(body, |_| true),
+            BodyEvaluate::Plaintext(EvaluateTo::All(p)) => Self::validate_all(body, |(_, b)| match &p.regex {
                 Some(regex) => {
                     Regex::new(regex).map(|re| re.is_match(String::from_utf8_lossy(b).as_ref())).unwrap_or(false)
                 }
                 None => true,
             }),
-            BodyEvaluate::PlainText(EvaluateTo::Destinations(dest)) => {
-                Self::assault_or_compare(dest, |(d, p)| match &p.regex {
+            BodyEvaluate::Plaintext(EvaluateTo::Destinations(dest)) => {
+                Self::validate_all(dest, |(d, p)| match &p.regex {
                     Some(regex) => Regex::new(regex)
                         .map(|re| re.is_match(String::from_utf8_lossy(body[d].as_ref()).as_ref()))
                         .unwrap_or(false),

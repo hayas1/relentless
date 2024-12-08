@@ -10,7 +10,7 @@ testcases:
         body: hello world
       evaluate:
         body:
-          plain-text:
+          plaintext:
             regex: hello world
   - target: /echo/json
     setting:

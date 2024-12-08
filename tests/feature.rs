@@ -221,8 +221,7 @@ async fn test_template_config() {
     for line in [
         format!("{} /echo/path/${{var}}", CaseConsoleReport::FAIL_EMOJI),
         format!("  {} this testcase is allowed", CaseConsoleReport::ALLOW_EMOJI),
-        format!("{} /echo/body", CaseConsoleReport::FAIL_EMOJI),
-        format!("  {} this testcase is allowed", CaseConsoleReport::ALLOW_EMOJI),
+        format!("{} /echo/body", CaseConsoleReport::PASS_EMOJI),
     ] {
         assert!(out.contains(&line));
     }
