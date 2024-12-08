@@ -5,13 +5,14 @@ destinations:
 testcases:
   - target: /echo/json?foo=hoge&bar=fuga&baz=piyo
     setting:
-      evaluate:
-        body:
-          json:
-            patch:
-              - op: test
-                path: ""
-                value:
-                  foo: hoge
-                  bar: fuga
-                  baz: piyo
+      http:
+        evaluate:
+          body:
+            json:
+              patch:
+                - op: test
+                  path: ""
+                  value:
+                    foo: hoge
+                    bar: fuga
+                    baz: piyo

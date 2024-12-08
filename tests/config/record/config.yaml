@@ -6,11 +6,12 @@ testcases:
   - target: /echo/
   - target: /echo/body
     setting:
-      request:
-        method: POST
-        body: hello world
-      evaluate:
-        body:
-          plaintext:
-            regex: hello world
+      http:
+        request:
+          method: POST
+          body: hello world
+        evaluate:
+          body:
+            plaintext:
+              regex: hello world
   - target: /health/rich
