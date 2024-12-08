@@ -30,4 +30,4 @@ testcases:
             server2:
               regex: hello server2
     attr:
-      allow: true
+      allow: true # TODO bugfix
