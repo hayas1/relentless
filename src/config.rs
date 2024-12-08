@@ -137,7 +137,7 @@ pub enum StatusEvaluate {
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub enum HeaderEvaluate {
     #[default]
-    Equal,
+    AnyOrEqual,
     Expect(EvaluateTo<http_serde_priv::HeaderMap>),
     Ignore,
 }
@@ -145,7 +145,7 @@ pub enum HeaderEvaluate {
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub enum BodyEvaluate {
     #[default]
-    Equal,
+    AnyOrEqual,
     PlainText(EvaluateTo<PlainTextEvaluate>),
     #[cfg(feature = "json")]
     Json(JsonEvaluate),
