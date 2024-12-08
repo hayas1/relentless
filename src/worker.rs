@@ -4,11 +4,15 @@ use std::marker::PhantomData;
 use crate::service::DefaultHttpClient;
 use crate::{
     command::Relentless,
-    config::{http_serde_priv, Coalesced, Config, Destinations, Setting, Testcase, WorkerConfig},
+    config::{
+        destinations::{Destinations, Transpose},
+        http_serde_priv, Coalesced, Config, Setting, Testcase, WorkerConfig,
+    },
     error::{Wrap, WrappedResult},
     evaluate::{DefaultEvaluator, Evaluator, RequestResult},
     report::{CaseReport, Report, WorkerReport},
     service::FromRequestInfo,
+    template::Template,
 };
 use tower::{
     timeout::{error::Elapsed, TimeoutLayer},
@@ -116,21 +120,12 @@ where
 
         let mut report = Vec::new();
         for (testcase, process) in processes {
-            let Testcase { setting, .. } = testcase.coalesce();
-            let Setting { repeat, evaluate, .. } = &setting;
-            let mut passed = 0;
-            let mut t = repeat.range().map(|_| Destinations::new()).collect::<Vec<_>>();
-            for (name, repeated) in process? {
-                for (i, res) in repeated.into_iter().enumerate() {
-                    t[i].insert(name.clone(), res);
-                }
-            }
-            let mut v = Vec::new();
-            for res in t {
+            let Setting { evaluate, .. } = &testcase.coalesce().setting;
+            let (mut passed, mut v) = (0, Vec::new());
+            for res in process?.transpose() {
                 let pass = evaluator.evaluate(evaluate, res, &mut v).await;
                 passed += pass as usize;
             }
-
             report.push(CaseReport::new(testcase, passed, v.into_iter().collect()));
         }
         Ok(WorkerReport::new(config, report))
@@ -201,16 +196,14 @@ where
     ) -> WrappedResult<Destinations<Vec<Req>>> {
         let Setting { request, template, repeat, .. } = setting;
 
-        if !template.is_empty() {
-            unimplemented!("template is not implemented yet");
-        }
-
         destinations
             .iter()
             .map(|(name, destination)| {
+                let default_empty = Template::new();
+                let template = template.get(name).unwrap_or(&default_empty);
                 let requests = repeat
                     .range()
-                    .map(|_| Req::from_request_info(destination, target, request))
+                    .map(|_| Req::from_request_info(template, destination, target, request))
                     .collect::<Result<Vec<_>, _>>()?;
                 Ok((name.to_string(), requests))
             })

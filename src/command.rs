@@ -9,7 +9,7 @@ use tower::{Service, ServiceBuilder};
 use crate::report::console_report::ConsoleReport;
 use crate::report::{github_markdown_report::GithubMarkdownReport, ReportWriter};
 use crate::{
-    config::{http_serde_priv, Config, Destinations},
+    config::{destinations::Destinations, http_serde_priv, Config},
     error::{IntoContext, MultiWrap, RunCommandError, Wrap, WrappedResult},
     evaluate::Evaluator,
     record::{RecordLayer, RecordService},
