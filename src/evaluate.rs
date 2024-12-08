@@ -132,7 +132,7 @@ impl DefaultEvaluator {
                 None => true,
             }),
             BodyEvaluate::PlainText(EvaluateTo::Destinations(dest)) => {
-                Self::assault_or_compare(dest, |(d, p)| match &p.regex {
+                Self::validate_all(dest, |(d, p)| match &p.regex {
                     Some(regex) => Regex::new(regex)
                         .map(|re| re.is_match(String::from_utf8_lossy(body[d].as_ref()).as_ref()))
                         .unwrap_or(false),
