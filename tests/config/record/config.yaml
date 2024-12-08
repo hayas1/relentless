@@ -11,6 +11,6 @@ testcases:
         body: hello world
       evaluate:
         body:
-          plain-text:
+          plaintext:
             regex: hello world
   - target: /health/rich

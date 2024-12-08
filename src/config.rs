@@ -71,7 +71,7 @@ pub struct RequestInfo {
 pub enum BodyStructure {
     #[default]
     Empty,
-    PlainText(String),
+    Plaintext(String),
     #[cfg(feature = "json")]
     Json(HashMap<String, String>),
 }
@@ -90,7 +90,7 @@ impl BodyStructure {
     pub fn content_type(&self) -> Option<Mime> {
         match self {
             BodyStructure::Empty => None,
-            BodyStructure::PlainText(_) => Some(TEXT_PLAIN),
+            BodyStructure::Plaintext(_) => Some(TEXT_PLAIN),
             #[cfg(feature = "json")]
             BodyStructure::Json(_) => Some(APPLICATION_JSON),
         }
@@ -146,13 +146,13 @@ pub enum HeaderEvaluate {
 pub enum BodyEvaluate {
     #[default]
     AnyOrEqual,
-    PlainText(EvaluateTo<PlainTextEvaluate>),
+    Plaintext(EvaluateTo<PlaintextEvaluate>),
     #[cfg(feature = "json")]
     Json(JsonEvaluate),
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
-pub struct PlainTextEvaluate {
+pub struct PlaintextEvaluate {
     pub regex: Option<String>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]

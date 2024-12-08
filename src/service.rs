@@ -213,7 +213,7 @@ impl FromBodyStructure for BytesBody {
     fn from_body_structure(val: BodyStructure, template: &Template) -> Self {
         match val {
             BodyStructure::Empty => Bytes::new().into(),
-            BodyStructure::PlainText(s) => Bytes::from(template.render(&s).unwrap_or(s)).into(),
+            BodyStructure::Plaintext(s) => Bytes::from(template.render(&s).unwrap_or(s)).into(),
             #[cfg(feature = "json")]
             BodyStructure::Json(body) => Bytes::from(serde_json::to_vec(&body).unwrap()).into(),
         }
@@ -267,7 +267,7 @@ where
     fn from_body_structure(structure: BodyStructure, template: &Template) -> Self {
         match structure {
             BodyStructure::Empty => Default::default(),
-            BodyStructure::PlainText(s) => Bytes::from(template.render(&s).unwrap_or(s)).into(),
+            BodyStructure::Plaintext(s) => Bytes::from(template.render(&s).unwrap_or(s)).into(),
             #[cfg(feature = "json")]
             BodyStructure::Json(_) => Bytes::from(serde_json::to_vec(&structure).unwrap()).into(),
         }

@@ -24,7 +24,7 @@ testcases:
         body: hello ${var}
       evaluate:
         body:
-          plain-text:
+          plaintext:
             server1:
               regex: hello server1
             server2:
