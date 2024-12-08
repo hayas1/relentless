@@ -5,7 +5,7 @@ actual = "http://localhost:3000"
 expect = "http://localhost:3000"
 
 [setting]
-evaluate = { header = "ignore" }
+http = { evaluate = { header = "ignore" } }
 
 [[testcases]]
 target = "/"

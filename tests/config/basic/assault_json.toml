@@ -5,21 +5,21 @@ test-api = "http://localhost:3000"
 
 [setting]
 repeat = 10
-evaluate = { header = "ignore" }
+http = { evaluate = { header = "ignore" } }
 
 [[testcases]]
 target = "/health/rich"
 description = "request to json response endpoint"
-setting = { repeat = 100, evaluate = { body = { json = { patch = [
+setting = { repeat = 100, http = { evaluate = { body = { json = { patch = [
     #  root json pointer is not "/" but ""
     { op = "test", path = "", value = { status = "200 OK", code = 200 } },
-] } } } }
+] } } } } }
 
 [[testcases]]
 target = "/health/rich"
 description = 'test failed ({"status": "200 OK"} but test for {"status": "200 NG"})'
 setting.repeat = 100
-setting.evaluate.body.json.patch = [
+setting.http.evaluate.body.json.patch = [
     { op = "test", path = "/status", value = "200 NG" },
     { op = "test", path = "/code", value = 200 },
 ]
