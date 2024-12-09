@@ -11,10 +11,9 @@ testcases:
   - target: /counter/decrement/10
     setting:
       repeat: 1
-      http:
-        evaluate:
-          body:
-            json:
-              patch:
-                - {"op": "test", "path": "/count", "value": 90}
+      evaluate:
+        body:
+          json:
+            patch:
+              - {"op": "test", "path": "/count", "value": 90}
 
