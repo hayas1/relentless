@@ -6,7 +6,7 @@ use crate::{
     command::Relentless,
     config::{
         destinations::{Destinations, Transpose},
-        http_serde_priv, Coalesced, Config, Protocol, Setting, Testcase, WorkerConfig,
+        http_serde_priv, Coalesced, Config, Setting, Testcase, WorkerConfig,
     },
     error::{Wrap, WrappedResult},
     evaluate::{DefaultEvaluator, Evaluator, RequestResult},
@@ -120,10 +120,10 @@ where
 
         let mut report = Vec::new();
         for (testcase, process) in processes {
-            let Setting { protocol, .. } = &testcase.coalesce().setting;
+            let Setting { evaluate, .. } = &testcase.coalesce().setting;
             let (mut passed, mut v) = (0, Vec::new());
             for res in process?.transpose() {
-                let pass = evaluator.evaluate(E::evaluate_config(protocol.as_ref()), res, &mut v).await;
+                let pass = evaluator.evaluate(evaluate, res, &mut v).await;
                 passed += pass as usize;
             }
             report.push(CaseReport::new(testcase, passed, v.into_iter().collect()));
@@ -194,12 +194,8 @@ where
         target: &str,
         setting: &Setting,
     ) -> WrappedResult<Destinations<Vec<Req>>> {
-        let Setting { protocol, template, repeat, .. } = setting;
+        let Setting { request, template, repeat, .. } = setting;
 
-        let request_info = match protocol {
-            Some(Protocol::Http { request, .. }) => request,
-            None => &Default::default(),
-        };
         destinations
             .iter()
             .map(|(name, destination)| {
@@ -207,7 +203,7 @@ where
                 let template = template.get(name).unwrap_or(&default_empty);
                 let requests = repeat
                     .range()
-                    .map(|_| Req::from_request_info(template, destination, target, request_info))
+                    .map(|_| Req::from_request_info(template, destination, target, request))
                     .collect::<Result<Vec<_>, _>>()?;
                 Ok((name.to_string(), requests))
             })
