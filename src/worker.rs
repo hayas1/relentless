@@ -194,9 +194,9 @@ where
         target: &str,
         setting: &Setting,
     ) -> WrappedResult<Destinations<Vec<Req>>> {
-        let Setting { protocol: service, template, repeat, .. } = setting;
+        let Setting { protocol, template, repeat, .. } = setting;
 
-        let request_info = match service {
+        let request_info = match protocol {
             Some(Protocol::Http { request, .. }) => request,
             None => &Default::default(),
         };
