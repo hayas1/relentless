@@ -3,9 +3,8 @@ destinations:
   test-api: http://localhost:3000
 setting:
   repeat: 10
-  http:
-    evaluate:
-      header: ignore
+  evaluate:
+    header: ignore
 
 
 testcases:
@@ -19,9 +18,8 @@ testcases:
   - target: /health/disabled
     description: this endpoint will respond with 503 service unavailable
     setting:
-      http:
-        request:
-          method: GET
+      request:
+        method: GET
       repeat: 1
     attr:
       allow: true

@@ -3,9 +3,8 @@ destinations:
   actual: http://localhost:3000
   expect: http://localhost:3000
 setting:
-  http:
-    evaluate:
-      header: ignore
+  evaluate:
+    header: ignore
 
 testcases:
   - target: /
