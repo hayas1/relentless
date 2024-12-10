@@ -5,6 +5,7 @@ use clap::{Parser, ValueEnum};
 use serde::{Deserialize, Serialize};
 use tower::{Service, ServiceBuilder};
 
+use crate::config::{Configuration, HttpEvaluate, HttpRequest};
 #[cfg(feature = "console-report")]
 use crate::report::console_report::ConsoleReport;
 use crate::report::{github_markdown_report::GithubMarkdownReport, ReportWriter};
@@ -101,32 +102,36 @@ impl Relentless {
     }
 
     /// TODO document
-    pub fn configs(&self) -> WrappedResult<Vec<Config>> {
+    pub fn configs<R: Configuration, E: Configuration>(&self) -> WrappedResult<Vec<Config<R, E>>> {
         let Self { file, .. } = self;
-        let (ok, err): (_, Vec<_>) = file.iter().map(Config::read).partition(Result::is_ok);
+        let (ok, err): (_, Vec<_>) = file.iter().map(Config::<R, E>::read).partition(Result::is_ok);
         let (configs, errors): (_, MultiWrap) =
             (ok.into_iter().map(Result::unwrap).collect(), err.into_iter().map(Result::unwrap_err).collect());
         if errors.is_empty() {
             Ok(configs)
         } else {
-            Err(errors.context(RunCommandError::CannotReadSomeConfigs(configs)))?
+            todo!()
         }
     }
 
     /// TODO document
-    pub fn configs_filtered<W: Write>(&self, mut write: W) -> WrappedResult<Vec<Config>> {
+    pub fn configs_filtered<W: Write, R: Configuration, E: Configuration>(
+        &self,
+        mut write: W,
+    ) -> WrappedResult<Vec<Config<R, E>>> {
         match self.configs() {
             Ok(configs) => Ok(configs),
-            Err(e) => {
-                if let Some((RunCommandError::CannotReadSomeConfigs(configs), source)) =
-                    e.downcast_context_ref::<_, MultiWrap>()
-                {
-                    writeln!(write, "{}", source)?;
-                    Ok(configs.to_vec())
-                } else {
-                    Err(e)?
-                }
-            }
+            Err(_) => todo!(),
+            // Err(e) => {
+            //     if let Some((RunCommandError::CannotReadSomeConfigs(configs), source)) =
+            //         e.downcast_context_ref::<_, MultiWrap>()
+            //     {
+            //         writeln!(write, "{}", source)?;
+            //         Ok(configs.to_vec())
+            //     } else {
+            //         Err(e)?
+            //     }
+            // }
         }
     }
 
@@ -142,7 +147,7 @@ impl Relentless {
 
     /// TODO document
     #[cfg(all(feature = "default-http-client", feature = "cli"))]
-    pub async fn assault(&self) -> crate::Result<Report<crate::error::EvaluateError>> {
+    pub async fn assault(&self) -> crate::Result<Report<crate::error::EvaluateError, HttpRequest, HttpEvaluate>> {
         let configs = self.configs_filtered(std::io::stderr())?;
         let mut service = self.build_service(Control::default_http_client().await?);
         let report = self.assault_with(configs, &mut service, &crate::evaluate::DefaultEvaluator).await?;
@@ -151,10 +156,10 @@ impl Relentless {
     /// TODO document
     pub async fn assault_with<S, Req, E>(
         &self,
-        configs: Vec<Config>,
+        configs: Vec<Config<HttpRequest, HttpEvaluate>>,
         service: &mut S,
         evaluator: &E,
-    ) -> crate::Result<Report<E::Message>>
+    ) -> crate::Result<Report<E::Message, HttpRequest, HttpEvaluate>>
     where
         Req: FromRequestInfo,
         S: Service<Req> + Send + 'static,
@@ -168,10 +173,14 @@ impl Relentless {
         Ok(report)
     }
 
-    pub fn report<M: Display>(&self, report: &Report<M>) -> crate::Result<ExitCode> {
+    pub fn report<M: Display>(&self, report: &Report<M, HttpRequest, HttpEvaluate>) -> crate::Result<ExitCode> {
         self.report_with(report, std::io::stdout())
     }
-    pub fn report_with<M: Display, W: Write>(&self, report: &Report<M>, mut write: W) -> crate::Result<ExitCode> {
+    pub fn report_with<M: Display, W: Write>(
+        &self,
+        report: &Report<M, HttpRequest, HttpEvaluate>,
+        mut write: W,
+    ) -> crate::Result<ExitCode> {
         let Self { no_color, report_format, .. } = self;
         #[cfg(feature = "console-report")]
         console::set_colors_enabled(!no_color);
@@ -188,13 +197,13 @@ impl Relentless {
         Ok(report.exit_code(self))
     }
 
-    pub fn pass<T>(&self, report: &Report<T>) -> bool {
+    pub fn pass<T>(&self, report: &Report<T, HttpRequest, HttpEvaluate>) -> bool {
         report.pass()
     }
-    pub fn allow<T>(&self, report: &Report<T>) -> bool {
+    pub fn allow<T>(&self, report: &Report<T, HttpRequest, HttpEvaluate>) -> bool {
         report.allow(self.strict)
     }
-    pub fn exit_code<T>(self, report: &Report<T>) -> ExitCode {
+    pub fn exit_code<T>(self, report: &Report<T, HttpRequest, HttpEvaluate>) -> ExitCode {
         report.exit_code(&self)
     }
 }
@@ -297,7 +306,7 @@ mod tests {
             ..Default::default()
         };
         let mut buf = Vec::new();
-        let configs = cmd.configs_filtered(&mut buf).unwrap();
+        let configs = cmd.configs_filtered::<_, HttpRequest, HttpEvaluate>(&mut buf).unwrap();
         assert_eq!(configs.len(), glob::glob("tests/config/parse/valid_*.yaml").unwrap().filter(Result::is_ok).count());
 
         let warn = String::from_utf8_lossy(&buf);

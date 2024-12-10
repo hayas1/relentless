@@ -6,7 +6,7 @@ use std::{
 
 use thiserror::Error;
 
-use crate::config::Config;
+use crate::config::{Config, HttpEvaluate, HttpRequest};
 
 pub type RelentlessResult<T, E = RelentlessError> = Result<T, E>;
 
@@ -290,8 +290,6 @@ pub enum RunCommandError {
     KeyValueFormat(String),
     #[error("`{0}` is unknown extension format")]
     UnknownFormatExtension(String),
-    #[error("cannot read some configs")]
-    CannotReadSomeConfigs(Vec<Config>),
     #[error("cannot specify format")]
     CannotSpecifyFormat,
 }

@@ -6,7 +6,7 @@ use crate::{
     command::Relentless,
     config::{
         destinations::{Destinations, Transpose},
-        http_serde_priv, Coalesced, Config, Setting, Testcase, WorkerConfig,
+        http_serde_priv, Coalesced, Config, Configuration, HttpEvaluate, HttpRequest, Setting, Testcase, WorkerConfig,
     },
     error::{Wrap, WrappedResult},
     evaluate::{DefaultEvaluator, Evaluator, RequestResult},
@@ -21,29 +21,40 @@ use tower::{
 
 /// TODO document
 #[derive(Debug)]
-pub struct Control<'a, S, Req, E> {
+pub struct Control<'a, S, RI, EC, Req, E> {
     _cmd: &'a Relentless,
-    workers: Vec<Worker<'a, S, Req, E>>, // TODO all worker do not have same clients type ?
-    cases: Vec<Vec<Case<S, Req>>>,
+    workers: Vec<Worker<'a, S, RI, EC, Req, E>>, // TODO all worker do not have same clients type ?
+    cases: Vec<Vec<Case<S, RI, EC, Req>>>,
     client: &'a mut S,
 }
 #[cfg(feature = "default-http-client")]
-impl Control<'_, DefaultHttpClient<reqwest::Body, reqwest::Body>, reqwest::Body, DefaultEvaluator> {
+impl
+    Control<
+        '_,
+        DefaultHttpClient<reqwest::Body, reqwest::Body>,
+        HttpRequest,
+        HttpEvaluate,
+        reqwest::Body,
+        DefaultEvaluator,
+    >
+{
     pub async fn default_http_client() -> WrappedResult<DefaultHttpClient<reqwest::Body, reqwest::Body>> {
         DefaultHttpClient::new().await
     }
 }
-impl<'a, S, Req, E> Control<'a, S, Req, E>
+impl<'a, S, RI, EC, Req, E> Control<'a, S, RI, EC, Req, E>
 where
     Req: FromRequestInfo,
     S: Service<Req> + Send + 'static,
     S::Error: std::error::Error + Send + Sync + 'static,
     S::Future: Send + 'static,
+    RI: Configuration,
+    EC: Configuration,
     E: Evaluator<S::Response>,
     Wrap: From<Req::Error> + From<S::Error>,
 {
     /// TODO document
-    pub fn with_service(cmd: &'a Relentless, configs: Vec<Config>, service: &'a mut S) -> WrappedResult<Self> {
+    pub fn with_service(cmd: &'a Relentless, configs: Vec<Config<RI, EC>>, service: &'a mut S) -> WrappedResult<Self> {
         let mut workers = Vec::new();
         for config in &configs {
             workers.push(Worker::new(cmd, config.worker_config.clone())?);
@@ -53,8 +64,8 @@ where
     /// TODO document
     pub fn new(
         cmd: &'a Relentless,
-        configs: Vec<Config>,
-        workers: Vec<Worker<'a, S, Req, E>>,
+        configs: Vec<Config<RI, EC>>,
+        workers: Vec<Worker<'a, S, RI, EC, Req, E>>,
         client: &'a mut S,
     ) -> Self {
         let cases = configs
@@ -64,7 +75,7 @@ where
         Self { _cmd: cmd, workers, cases, client }
     }
     /// TODO document
-    pub async fn assault(self, evaluator: &E) -> WrappedResult<Report<E::Message>> {
+    pub async fn assault(self, evaluator: &E) -> WrappedResult<Report<E::Message, RI, EC>> {
         let Self { workers, cases, .. } = self;
 
         let mut report = Vec::new();
@@ -78,26 +89,32 @@ where
 
 /// TODO document
 #[derive(Debug)]
-pub struct Worker<'a, S, Req, E> {
+pub struct Worker<'a, S, RI, EC, Req, E> {
     _cmd: &'a Relentless,
-    config: Coalesced<WorkerConfig, Destinations<http_serde_priv::Uri>>,
+    config: Coalesced<WorkerConfig<RI, EC>, Destinations<http_serde_priv::Uri>>,
     phantom: PhantomData<(Req, S, E)>,
 }
-impl<S, Req, E> Worker<'_, S, Req, E> {
-    pub fn config(&self) -> WorkerConfig {
+impl<S, RI, EC, Req, E> Worker<'_, RI, EC, S, Req, E>
+where
+    RI: Configuration,
+    EC: Configuration,
+{
+    pub fn config(&self) -> WorkerConfig<RI, EC> {
         self.config.coalesce()
     }
 }
-impl<'a, S, Req, E> Worker<'a, S, Req, E>
+impl<'a, S, RI, EC, Req, E> Worker<'a, S, RI, EC, Req, E>
 where
     Req: FromRequestInfo,
     S: Service<Req> + Send + 'static,
     S::Error: std::error::Error + Send + Sync + 'static,
     S::Future: Send + 'static,
+    RI: Configuration,
+    EC: Configuration,
     E: Evaluator<S::Response>,
     Wrap: From<Req::Error> + From<S::Error>,
 {
-    pub fn new(cmd: &'a Relentless, config: WorkerConfig) -> WrappedResult<Self> {
+    pub fn new(cmd: &'a Relentless, config: WorkerConfig<RI, EC>) -> WrappedResult<Self> {
         let config = Coalesced::tuple(config, cmd.destinations()?);
         let phantom = PhantomData;
         Ok(Self { _cmd: cmd, config, phantom })
@@ -105,10 +122,10 @@ where
 
     pub async fn assault(
         self,
-        cases: Vec<Case<S, Req>>,
+        cases: Vec<Case<S, RI, EC, Req>>,
         evaluator: &E,
         client: &mut S,
-    ) -> WrappedResult<WorkerReport<E::Message>> {
+    ) -> WrappedResult<WorkerReport<E::Message, RI, EC>> {
         let Self { config, .. } = self;
 
         let mut processes = Vec::new();
@@ -134,24 +151,30 @@ where
 
 /// TODO document
 #[derive(Debug, Clone)]
-pub struct Case<S, Req> {
-    testcases: Coalesced<Testcase, Setting>,
+pub struct Case<S, RI, EC, Req> {
+    testcases: Coalesced<Testcase<RI, EC>, Setting<RI, EC>>,
     phantom: PhantomData<(S, Req)>,
 }
-impl<S, Req> Case<S, Req> {
-    pub fn testcase(&self) -> &Testcase {
+impl<S, RI, EC, Req> Case<S, RI, EC, Req>
+where
+    RI: Configuration,
+    EC: Configuration,
+{
+    pub fn testcase(&self) -> &Testcase<RI, EC> {
         self.testcases.base()
     }
 }
-impl<S, Req> Case<S, Req>
+impl<S, RI, EC, Req> Case<S, RI, EC, Req>
 where
     Req: FromRequestInfo,
     S: Service<Req> + Send + 'static,
     S::Error: std::error::Error + Send + Sync + 'static,
     S::Future: Send + 'static,
+    RI: Configuration,
+    EC: Configuration,
     Wrap: From<Req::Error> + From<S::Error>,
 {
-    pub fn new(worker_config: &WorkerConfig, testcases: Testcase) -> Self {
+    pub fn new(worker_config: &WorkerConfig<RI, EC>, testcases: Testcase<RI, EC>) -> Self {
         let testcase = Coalesced::tuple(testcases, worker_config.setting.clone());
         let phantom = PhantomData;
         Self { testcases: testcase, phantom }
@@ -192,7 +215,7 @@ where
     pub fn requests(
         destinations: &Destinations<http_serde_priv::Uri>,
         target: &str,
-        setting: &Setting,
+        setting: &Setting<RI, EC>,
     ) -> WrappedResult<Destinations<Vec<Req>>> {
         let Setting { request, template, repeat, .. } = setting;
 
