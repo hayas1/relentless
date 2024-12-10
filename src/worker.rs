@@ -115,7 +115,7 @@ where
         for case in cases {
             // TODO do not await here, use stream
             let destinations = config.coalesce().destinations;
-            processes.push((case.testcases.clone(), case.process(&destinations, client).await));
+            processes.push((case.testcase.clone(), case.process(&destinations, client).await));
         }
 
         let mut report = Vec::new();
@@ -135,12 +135,12 @@ where
 /// TODO document
 #[derive(Debug, Clone)]
 pub struct Case<S, Req> {
-    testcases: Coalesced<Testcase, Setting>,
+    testcase: Coalesced<Testcase, Setting>,
     phantom: PhantomData<(S, Req)>,
 }
 impl<S, Req> Case<S, Req> {
     pub fn testcase(&self) -> &Testcase {
-        self.testcases.base()
+        self.testcase.base()
     }
 }
 impl<S, Req> Case<S, Req>
@@ -151,10 +151,10 @@ where
     S::Future: Send + 'static,
     Wrap: From<Req::Error> + From<S::Error>,
 {
-    pub fn new(worker_config: &WorkerConfig, testcases: Testcase) -> Self {
-        let testcase = Coalesced::tuple(testcases, worker_config.setting.clone());
+    pub fn new(worker_config: &WorkerConfig, testcase: Testcase) -> Self {
+        let testcase = Coalesced::tuple(testcase, worker_config.setting.clone());
         let phantom = PhantomData;
-        Self { testcases: testcase, phantom }
+        Self { testcase, phantom }
     }
 
     pub async fn process(
@@ -162,7 +162,7 @@ where
         destinations: &Destinations<http_serde_priv::Uri>,
         client: &mut S,
     ) -> WrappedResult<Destinations<Vec<RequestResult<S::Response>>>> {
-        let Testcase { target, setting, .. } = self.testcases.coalesce();
+        let Testcase { target, setting, .. } = self.testcase.coalesce();
 
         let mut dest = Destinations::new();
         let mut timeout = ServiceBuilder::new()
