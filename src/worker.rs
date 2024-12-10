@@ -82,7 +82,7 @@ where
         let mut report = Vec::new();
         for testcase in config.testcases {
             let case = Case::new(self.client);
-            let testcase = Coalesced::tuple(testcase, worker_config.coalesce().setting.clone());
+            let testcase = Coalesced::tuple(testcase, worker_config.coalesce().setting);
 
             let destinations = worker_config.coalesce().destinations;
             // TODO do not await here, use stream
