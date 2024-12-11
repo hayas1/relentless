@@ -6,7 +6,7 @@ use crate::{
     command::Relentless,
     config::{
         destinations::{Destinations, Transpose},
-        http_serde_priv, Coalesced, Config, Configuration, HttpRequest, HttpResponse, Setting, Testcase,
+        http_serde_priv, Coalesce, Coalesced, Config, Configuration, HttpRequest, HttpResponse, Setting, Testcase,
     },
     error::{Wrap, WrappedResult},
     evaluate::{Evaluator, RequestResult},
@@ -33,8 +33,8 @@ impl Control<'_, HttpRequest, HttpResponse, DefaultHttpClient<reqwest::Body, req
 }
 impl<'a, Q, P, S, Req> Control<'a, Q, P, S, Req>
 where
-    Q: Configuration + RequestFactory<Req>,
-    P: Configuration + Evaluator<S::Response>,
+    Q: Configuration + Coalesce + RequestFactory<Req>,
+    P: Configuration + Coalesce + Evaluator<S::Response>,
     S: Service<Req> + Send + 'static,
     S::Error: std::error::Error + Send + Sync + 'static,
     S::Future: Send + 'static,
@@ -68,8 +68,8 @@ pub struct Worker<'a, Q, P, S, Req> {
 }
 impl<'a, Q, P, S, Req> Worker<'a, Q, P, S, Req>
 where
-    Q: Configuration + RequestFactory<Req>,
-    P: Configuration + Evaluator<S::Response>,
+    Q: Configuration + Coalesce + RequestFactory<Req>,
+    P: Configuration + Coalesce + Evaluator<S::Response>,
     S: Service<Req> + Send + 'static,
     S::Error: std::error::Error + Send + Sync + 'static,
     S::Future: Send + 'static,
@@ -106,8 +106,8 @@ pub struct Case<'a, Q, P, S, Req> {
 }
 impl<'a, Q, P, S, Req> Case<'a, Q, P, S, Req>
 where
-    Q: Configuration + RequestFactory<Req>,
-    P: Configuration + Evaluator<S::Response>,
+    Q: Configuration + Coalesce + RequestFactory<Req>,
+    P: Configuration + Coalesce + Evaluator<S::Response>,
     S: Service<Req> + Send + 'static,
     S::Error: std::error::Error + Send + Sync + 'static,
     S::Future: Send + 'static,

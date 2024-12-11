@@ -211,10 +211,7 @@ pub struct Attribute {
 }
 
 // TODO this trait should be divided
-pub trait Configuration:
-    Debug + Clone + PartialEq + Eq + Serialize + DeserializeOwned + Default + Coalesce<Self>
-{
-}
+pub trait Configuration: Debug + Clone + PartialEq + Eq + Serialize + DeserializeOwned + Default {}
 
 pub trait IsDefault: Default + PartialEq<Self> {
     fn is_default(&self) -> bool {
@@ -233,7 +230,7 @@ impl<Q: Configuration, P: Configuration> Config<Q, P> {
         format.deserialize_testcase_str(s)
     }
 }
-impl<Q: Configuration, P: Configuration> Coalesce<Destinations<http_serde_priv::Uri>> for WorkerConfig<Q, P> {
+impl<Q: Coalesce, P: Coalesce> Coalesce<Destinations<http_serde_priv::Uri>> for WorkerConfig<Q, P> {
     fn coalesce(self, other: &Destinations<http_serde_priv::Uri>) -> Self {
         let destinations = self.destinations.coalesce(&other.iter().map(|(k, v)| (k.to_string(), v.clone())).collect());
         Self { destinations, ..self }
@@ -250,17 +247,17 @@ impl<T: Clone> Coalesce<HashMap<String, T>> for Destinations<T> {
     }
 }
 
-impl<Q: Configuration, P: Configuration> Coalesce<Setting<Q, P>> for Testcase<Q, P> {
+impl<Q: Coalesce, P: Coalesce> Coalesce<Setting<Q, P>> for Testcase<Q, P> {
     fn coalesce(self, other: &Setting<Q, P>) -> Self {
         let setting = self.setting.coalesce(other);
         Self { setting, ..self }
     }
 }
-impl<Q: Configuration, P: Configuration> Coalesce for Setting<Q, P> {
+impl<Q: Coalesce, P: Coalesce> Coalesce for Setting<Q, P> {
     fn coalesce(self, other: &Self) -> Self {
         Self {
             request: self.request.coalesce(&other.request),
-            template: if self.template.is_empty() { other.clone().template } else { self.template },
+            template: if self.template.is_empty() { other.template.clone() } else { self.template },
             repeat: self.repeat.coalesce(&other.repeat),
             timeout: self.timeout.or(other.timeout),
             response: self.response.coalesce(&other.response),

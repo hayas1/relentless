@@ -1,7 +1,7 @@
 use std::fmt::{Display, Formatter};
 use std::process::ExitCode;
 
-use crate::config::Configuration;
+use crate::config::Coalesce;
 use crate::error::Wrap;
 use crate::{
     command::{Relentless, ReportFormat},
@@ -14,7 +14,7 @@ use crate::{
 pub struct Report<T, Q, P> {
     report: Vec<WorkerReport<T, Q, P>>,
 }
-impl<T, Q: Configuration, P: Configuration> Report<T, Q, P> {
+impl<T, Q: Clone + Coalesce, P: Clone + Coalesce> Report<T, Q, P> {
     pub fn new(report: Vec<WorkerReport<T, Q, P>>) -> Self {
         Self { report }
     }
@@ -22,7 +22,7 @@ impl<T, Q: Configuration, P: Configuration> Report<T, Q, P> {
         (!self.allow(cmd.strict) as u8).into()
     }
 }
-impl<T, Q: Configuration, P: Configuration> Reportable for Report<T, Q, P> {
+impl<T, Q: Clone + Coalesce, P: Clone + Coalesce> Reportable for Report<T, Q, P> {
     fn sub_reportable(&self) -> Vec<&dyn Reportable> {
         self.report.iter().map(|r| r as _).collect()
     }
@@ -42,7 +42,7 @@ impl<T, Q, P> WorkerReport<T, Q, P> {
         Self { config, report }
     }
 }
-impl<T, Q: Configuration, P: Configuration> Reportable for WorkerReport<T, Q, P> {
+impl<T, Q: Clone + Coalesce, P: Clone + Coalesce> Reportable for WorkerReport<T, Q, P> {
     fn sub_reportable(&self) -> Vec<&dyn Reportable> {
         self.report.iter().map(|r| r as _).collect()
     }
@@ -60,7 +60,7 @@ impl<T, Q, P> CaseReport<T, Q, P> {
         Self { testcase, passed, messages }
     }
 }
-impl<T, Q: Configuration, P: Configuration> Reportable for CaseReport<T, Q, P> {
+impl<T, Q: Clone + Coalesce, P: Clone + Coalesce> Reportable for CaseReport<T, Q, P> {
     fn sub_reportable(&self) -> Vec<&dyn Reportable> {
         Vec::new()
     }
@@ -166,7 +166,7 @@ pub mod console_report {
 
     use crate::{
         command::Relentless,
-        config::{Configuration, Repeat, Testcase, WorkerConfig},
+        config::{Coalesce, Repeat, Testcase, WorkerConfig},
         error::Wrap,
     };
 
@@ -181,7 +181,7 @@ pub mod console_report {
         ) -> Result<(), Self::Error>;
     }
 
-    impl<T: Display, Q: Configuration, P: Configuration> ConsoleReport for Report<T, Q, P> {
+    impl<T: Display, Q: Clone + Coalesce, P: Clone + Coalesce> ConsoleReport for Report<T, Q, P> {
         type Error = crate::Error;
         fn console_report<W: std::io::Write>(
             &self,
@@ -206,7 +206,7 @@ pub mod console_report {
         pub const OVERWRITE_DESTINATION_EMOJI: console::Emoji<'_, '_> = console::Emoji("👉", "->");
     }
 
-    impl<T: Display, Q: Configuration, P: Configuration> ConsoleReport for WorkerReport<T, Q, P> {
+    impl<T: Display, Q: Clone + Coalesce, P: Clone + Coalesce> ConsoleReport for WorkerReport<T, Q, P> {
         type Error = Wrap; // TODO crate::Error ?
         fn console_report<W: std::io::Write>(
             &self,
@@ -266,7 +266,7 @@ pub mod console_report {
         pub const MESSAGE_EMOJI: console::Emoji<'_, '_> = console::Emoji("💬", "");
     }
 
-    impl<T: Display, Q: Configuration, P: Configuration> ConsoleReport for CaseReport<T, Q, P> {
+    impl<T: Display, Q: Clone + Coalesce, P: Clone + Coalesce> ConsoleReport for CaseReport<T, Q, P> {
         type Error = Wrap; // TODO crate::Error ?
         fn console_report<W: std::io::Write>(
             &self,
@@ -320,7 +320,7 @@ pub mod github_markdown_report {
 
     use crate::{
         command::Relentless,
-        config::{Configuration, Repeat, Testcase, WorkerConfig},
+        config::{Coalesce, Repeat, Testcase, WorkerConfig},
         error::Wrap,
     };
 
@@ -335,7 +335,7 @@ pub mod github_markdown_report {
         ) -> Result<(), Self::Error>;
     }
 
-    impl<T: Display, Q: Configuration, P: Configuration> GithubMarkdownReport for Report<T, Q, P> {
+    impl<T: Display, Q: Clone + Coalesce, P: Clone + Coalesce> GithubMarkdownReport for Report<T, Q, P> {
         type Error = crate::Error;
         fn github_markdown_report<W: std::io::Write>(
             &self,
@@ -360,7 +360,7 @@ pub mod github_markdown_report {
         pub const OVERWRITE_DESTINATION_EMOJI: &str = ":point_right:";
     }
 
-    impl<T: Display, Q: Configuration, P: Configuration> GithubMarkdownReport for WorkerReport<T, Q, P> {
+    impl<T: Display, Q: Clone + Coalesce, P: Clone + Coalesce> GithubMarkdownReport for WorkerReport<T, Q, P> {
         type Error = Wrap; // TODO crate::Error ?
         fn github_markdown_report<W: std::io::Write>(
             &self,
@@ -414,7 +414,7 @@ pub mod github_markdown_report {
         pub const MESSAGE_EMOJI: &str = ":speech_balloon:";
     }
 
-    impl<T: Display, Q: Configuration, P: Configuration> GithubMarkdownReport for CaseReport<T, Q, P> {
+    impl<T: Display, Q: Clone + Coalesce, P: Clone + Coalesce> GithubMarkdownReport for CaseReport<T, Q, P> {
         type Error = Wrap; // TODO crate::Error ?
         fn github_markdown_report<W: std::io::Write>(
             &self,
