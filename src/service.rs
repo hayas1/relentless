@@ -8,7 +8,6 @@ use std::{
 use bytes::Bytes;
 use http::HeaderMap;
 use http_body::Body;
-use http_body_util::{combinators::BoxBody, BodyExt};
 use tower::Service;
 
 use crate::{
@@ -176,46 +175,6 @@ pub mod origin_router {
             let request = http::Request::builder().uri("http://localhost:8000").body(Empty::new()).unwrap();
             let err = service.call(request).await.unwrap_err();
             assert!(matches!(err.downcast_ref(), Some(AssaultError::CannotSpecifyService)));
-        }
-    }
-}
-
-// TODO delete BytesBody ?
-#[derive(Debug)]
-pub struct BytesBody(BoxBody<Bytes, crate::Error>);
-impl Body for BytesBody {
-    type Data = Bytes;
-    type Error = crate::Error;
-
-    fn poll_frame(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-    ) -> Poll<Option<Result<http_body::Frame<Self::Data>, Self::Error>>> {
-        Pin::new(&mut self.0).poll_frame(cx)
-    }
-    fn is_end_stream(&self) -> bool {
-        self.0.is_end_stream()
-    }
-    fn size_hint(&self) -> http_body::SizeHint {
-        self.0.size_hint()
-    }
-}
-impl From<Bytes> for BytesBody {
-    fn from(val: Bytes) -> Self {
-        if val.is_empty() {
-            BytesBody(http_body_util::Empty::new().map_err(Wrap::error).boxed())
-        } else {
-            BytesBody(http_body_util::Full::new(val).map_err(Wrap::error).boxed())
-        }
-    }
-}
-impl FromBodyStructure for BytesBody {
-    fn from_body_structure(val: BodyStructure, template: &Template) -> Self {
-        match val {
-            BodyStructure::Empty => Bytes::new().into(),
-            BodyStructure::Plaintext(s) => Bytes::from(template.render(&s).unwrap_or(s)).into(),
-            #[cfg(feature = "json")]
-            BodyStructure::Json(body) => Bytes::from(serde_json::to_vec(&body).unwrap()).into(),
         }
     }
 }
