@@ -11,7 +11,7 @@ use crate::{
     error::{Wrap, WrappedResult},
     evaluate::{DefaultEvaluator, Evaluator, RequestResult},
     report::{CaseReport, Report, WorkerReport},
-    service::IntoRequest,
+    service::RequestFactory,
     template::Template,
 };
 use tower::{
@@ -43,7 +43,7 @@ impl
 }
 impl<'a, Q, P, S, Req, E> Control<'a, Q, P, S, Req, E>
 where
-    Q: Configuration + IntoRequest<Req>,
+    Q: Configuration + RequestFactory<Req>,
     P: Configuration,
     S: Service<Req> + Send + 'static,
     S::Error: std::error::Error + Send + Sync + 'static,
@@ -80,7 +80,7 @@ pub struct Worker<'a, Q, P, S, Req, E> {
 }
 impl<'a, Q, P, S, Req, E> Worker<'a, Q, P, S, Req, E>
 where
-    Q: Configuration + IntoRequest<Req>,
+    Q: Configuration + RequestFactory<Req>,
     P: Configuration,
     S: Service<Req> + Send + 'static,
     S::Error: std::error::Error + Send + Sync + 'static,
@@ -120,7 +120,7 @@ pub struct Case<'a, Q, P, S, Req, E> {
 }
 impl<'a, Q, P, S, Req, E> Case<'a, Q, P, S, Req, E>
 where
-    Q: Configuration + IntoRequest<Req>,
+    Q: Configuration + RequestFactory<Req>,
     P: Configuration,
     S: Service<Req> + Send + 'static,
     S::Error: std::error::Error + Send + Sync + 'static,
@@ -200,7 +200,7 @@ where
                 let template = template.get(name).unwrap_or(&default_empty);
                 let requests = repeat
                     .range()
-                    .map(|_| request.into_request(destination, target, template))
+                    .map(|_| request.produce(destination, target, template))
                     .collect::<Result<Vec<_>, _>>()?;
                 Ok((name.to_string(), requests))
             })

@@ -9,7 +9,7 @@ use crate::config::{HttpRequest, HttpResponse};
 #[cfg(feature = "console-report")]
 use crate::report::console_report::ConsoleReport;
 use crate::report::{github_markdown_report::GithubMarkdownReport, ReportWriter};
-use crate::service::IntoRequest;
+use crate::service::RequestFactory;
 use crate::{
     config::{destinations::Destinations, http_serde_priv, Config},
     error::{IntoContext, MultiWrap, RunCommandError, Wrap, WrappedResult},
@@ -157,12 +157,12 @@ impl Relentless {
         evaluator: &E,
     ) -> crate::Result<Report<E::Message, HttpRequest, HttpResponse>>
     where
-        HttpRequest: IntoRequest<Req>,
+        HttpRequest: RequestFactory<Req>,
         S: Service<Req> + Send + 'static,
         S::Error: std::error::Error + Send + Sync + 'static,
         S::Future: Send + 'static,
         E: Evaluator<HttpResponse, S::Response>,
-        Wrap: From<<HttpRequest as IntoRequest<Req>>::Error> + From<<S as Service<Req>>::Error>,
+        Wrap: From<<HttpRequest as RequestFactory<Req>>::Error> + From<<S as Service<Req>>::Error>,
     {
         let control = Control::new(service, evaluator);
         let report = control.assault(self, configs).await?;

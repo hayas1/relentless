@@ -17,30 +17,6 @@ use crate::{
     template::Template,
 };
 
-pub trait RequestFactory<I, P> {
-    type Error;
-    fn produce(&self, template: &Template, destination: &http::Uri, target: &str, info: &I) -> Result<P, Self::Error>;
-}
-
-#[cfg(feature = "default-http-client")]
-pub struct DefaultHttpFactory;
-#[cfg(feature = "default-http-client")]
-impl<B> RequestFactory<HttpRequest, http::Request<B>> for DefaultHttpFactory
-where
-    B: FromBodyStructure + Body,
-{
-    type Error = Wrap;
-    fn produce(
-        &self,
-        template: &Template,
-        destination: &http::Uri,
-        target: &str,
-        info: &HttpRequest,
-    ) -> Result<http::Request<B>, Self::Error> {
-        http::Request::<B>::from_request_info(template, destination, target, info)
-    }
-}
-
 #[cfg(feature = "default-http-client")]
 pub const APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),);
 
@@ -244,16 +220,16 @@ impl FromBodyStructure for BytesBody {
     }
 }
 
-pub trait IntoRequest<R> {
+pub trait RequestFactory<R> {
     type Error;
-    fn into_request(&self, destination: &http::Uri, target: &str, template: &Template) -> Result<R, Self::Error>;
+    fn produce(&self, destination: &http::Uri, target: &str, template: &Template) -> Result<R, Self::Error>;
 }
-impl<B> IntoRequest<http::Request<B>> for HttpRequest
+impl<B> RequestFactory<http::Request<B>> for HttpRequest
 where
     B: FromBodyStructure + Body,
 {
     type Error = <http::Request<B> as FromRequestInfo>::Error;
-    fn into_request(
+    fn produce(
         &self,
         destination: &http::Uri,
         target: &str,
