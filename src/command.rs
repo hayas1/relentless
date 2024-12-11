@@ -146,7 +146,7 @@ impl Relentless {
     pub async fn assault(&self) -> crate::Result<Report<crate::error::EvaluateError, HttpRequest, HttpResponse>> {
         let configs = self.configs_filtered(std::io::stderr())?;
         let mut service = self.build_service(Control::default_http_client().await?);
-        let report = self.assault_with(configs, &mut service, &crate::evaluate::DefaultEvaluator).await?;
+        let report = self.assault_with(configs, &mut service).await?;
         Ok(report)
     }
     /// TODO document
@@ -154,17 +154,16 @@ impl Relentless {
         &self,
         configs: Vec<Config<HttpRequest, HttpResponse>>,
         service: &mut S,
-        evaluator: &E,
-    ) -> crate::Result<Report<E::Message, HttpRequest, HttpResponse>>
+    ) -> crate::Result<Report<<HttpResponse as Evaluator<S::Response>>::Message, HttpRequest, HttpResponse>>
     where
         HttpRequest: RequestFactory<Req>,
+        HttpResponse: Evaluator<S::Response>,
         S: Service<Req> + Send + 'static,
         S::Error: std::error::Error + Send + Sync + 'static,
         S::Future: Send + 'static,
-        E: Evaluator<HttpResponse, S::Response>,
         Wrap: From<<HttpRequest as RequestFactory<Req>>::Error> + From<<S as Service<Req>>::Error>,
     {
-        let control = Control::new(service, evaluator);
+        let control = Control::new(service);
         let report = control.assault(self, configs).await?;
         Ok(report)
     }
