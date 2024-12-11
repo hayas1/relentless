@@ -53,7 +53,6 @@ pub struct Setting {
     pub timeout: Option<Duration>, // TODO parse from string? https://crates.io/crates/humantime ?
 
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
-    #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
     pub evaluate: HttpEvaluate,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -121,10 +120,13 @@ impl Repeat {
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct HttpEvaluate {
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
+    #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
     pub status: StatusEvaluate,
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
+    #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
     pub header: HeaderEvaluate,
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
+    #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
     pub body: BodyEvaluate,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
