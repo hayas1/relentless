@@ -6,7 +6,7 @@ use crate::{
     command::Relentless,
     config::{
         destinations::{Destinations, Transpose},
-        http_serde_priv, Coalesced, Config, Setting, Testcase,
+        http_serde_priv, Coalesced, Config, HttpResponse, Setting, Testcase,
     },
     error::{Wrap, WrappedResult},
     evaluate::{DefaultEvaluator, Evaluator, RequestResult},
@@ -38,7 +38,7 @@ where
     S: Service<Req> + Send + 'static,
     S::Error: std::error::Error + Send + Sync + 'static,
     S::Future: Send + 'static,
-    E: Evaluator<S::Response>,
+    E: Evaluator<HttpResponse, S::Response>,
     Wrap: From<Req::Error> + From<S::Error>,
 {
     /// TODO document
@@ -70,7 +70,7 @@ where
     S: Service<Req> + Send + 'static,
     S::Error: std::error::Error + Send + Sync + 'static,
     S::Future: Send + 'static,
-    E: Evaluator<S::Response>,
+    E: Evaluator<HttpResponse, S::Response>,
     Wrap: From<Req::Error> + From<S::Error>,
 {
     pub fn new(client: &'a mut S, evaluator: &'a E) -> Self {
@@ -105,7 +105,7 @@ where
     S: Service<Req> + Send + 'static,
     S::Error: std::error::Error + Send + Sync + 'static,
     S::Future: Send + 'static,
-    E: Evaluator<S::Response>,
+    E: Evaluator<HttpResponse, S::Response>,
     Wrap: From<Req::Error> + From<S::Error>,
 {
     pub fn new(client: &'a mut S, evaluator: &'a E) -> Self {

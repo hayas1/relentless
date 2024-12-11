@@ -22,17 +22,12 @@ pub enum RequestResult<Res> {
 }
 
 #[allow(async_fn_in_trait)] // TODO #[warn(async_fn_in_trait)] by default
-pub trait Evaluator<Res> {
+pub trait Evaluator<P, Res> {
     type Message;
-    async fn evaluate(
-        &self,
-        cfg: &HttpResponse,
-        res: Destinations<RequestResult<Res>>,
-        msg: &mut Vec<Self::Message>,
-    ) -> bool;
+    async fn evaluate(&self, cfg: &P, res: Destinations<RequestResult<Res>>, msg: &mut Vec<Self::Message>) -> bool;
 }
 pub struct DefaultEvaluator;
-impl<B: Body> Evaluator<http::Response<B>> for DefaultEvaluator
+impl<B: Body> Evaluator<HttpResponse, http::Response<B>> for DefaultEvaluator
 where
     B::Error: std::error::Error + Sync + Send + 'static,
 {

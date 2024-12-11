@@ -5,6 +5,7 @@ use clap::{Parser, ValueEnum};
 use serde::{Deserialize, Serialize};
 use tower::{Service, ServiceBuilder};
 
+use crate::config::HttpResponse;
 #[cfg(feature = "console-report")]
 use crate::report::console_report::ConsoleReport;
 use crate::report::{github_markdown_report::GithubMarkdownReport, ReportWriter};
@@ -160,7 +161,7 @@ impl Relentless {
         S: Service<Req> + Send + 'static,
         S::Error: std::error::Error + Send + Sync + 'static,
         S::Future: Send + 'static,
-        E: Evaluator<S::Response>,
+        E: Evaluator<HttpResponse, S::Response>,
         Wrap: From<Req::Error> + From<S::Error>,
     {
         let control = Control::new(service, evaluator);
