@@ -50,7 +50,7 @@ where
         let mut report = Vec::new();
         for config in configs {
             let worker = Worker::new(self.client, self.evaluator);
-            report.push(worker.assault(cmd, config).await?);
+            report.push(worker.assault(cmd, config).await?); // TODO do not await here, use stream
         }
 
         Ok(Report::new(report))
@@ -81,19 +81,11 @@ where
         let worker_config = Coalesced::tuple(config.worker_config, cmd.destinations()?);
         let mut report = Vec::new();
         for testcase in config.testcases {
-            let case = Case::new(self.client);
+            let case = Case::new(self.client, self.evaluator);
             let testcase = Coalesced::tuple(testcase, worker_config.coalesce().setting);
 
             let destinations = worker_config.coalesce().destinations;
-            // TODO do not await here, use stream
-            let responses = case.process(&destinations, testcase.coalesce()).await?;
-
-            let (mut passed, mut v) = (0, Vec::new());
-            for res in responses.transpose() {
-                let pass = self.evaluator.evaluate(&testcase.coalesce().setting.evaluate, res, &mut v).await;
-                passed += pass as usize;
-            }
-            report.push(CaseReport::new(testcase, passed, v.into_iter().collect()));
+            report.push(case.assault(cmd, &destinations, testcase).await?); // TODO do not await here, use stream
         }
 
         Ok(WorkerReport::new(worker_config, report))
@@ -102,23 +94,45 @@ where
 
 /// TODO document
 #[derive(Debug)]
-pub struct Case<'a, S, Req> {
+pub struct Case<'a, S, Req, E> {
     client: &'a mut S,
-    phantom: PhantomData<(S, Req)>,
+    evaluator: &'a E,
+    phantom: PhantomData<(S, Req, E)>,
 }
-impl<'a, S, Req> Case<'a, S, Req>
+impl<'a, S, Req, E> Case<'a, S, Req, E>
 where
     Req: FromRequestInfo,
     S: Service<Req> + Send + 'static,
     S::Error: std::error::Error + Send + Sync + 'static,
     S::Future: Send + 'static,
+    E: Evaluator<S::Response>,
     Wrap: From<Req::Error> + From<S::Error>,
 {
-    pub fn new(client: &'a mut S) -> Self {
-        Self { client, phantom: PhantomData }
+    pub fn new(client: &'a mut S, evaluator: &'a E) -> Self {
+        Self { client, evaluator, phantom: PhantomData }
     }
 
-    pub async fn process(
+    pub async fn assault(
+        self,
+        cmd: &Relentless,
+        destinations: &Destinations<http_serde_priv::Uri>,
+        testcase: Coalesced<Testcase, Setting>,
+    ) -> WrappedResult<CaseReport<E::Message>> {
+        let _ = cmd;
+        let evaluator = self.evaluator;
+
+        // TODO do not await here, use stream
+        let responses = self.requests(destinations, testcase.coalesce()).await?;
+
+        let (mut passed, mut v) = (0, Vec::new());
+        for res in responses.transpose() {
+            let pass = evaluator.evaluate(&testcase.coalesce().setting.evaluate, res, &mut v).await;
+            passed += pass as usize;
+        }
+        Ok(CaseReport::new(testcase, passed, v.into_iter().collect()))
+    }
+
+    pub async fn requests(
         self,
         destinations: &Destinations<http_serde_priv::Uri>,
         testcase: Testcase,
@@ -130,7 +144,7 @@ where
             .option_layer(setting.timeout.map(TimeoutLayer::new))
             .map_err(Into::<tower::BoxError>::into) // https://github.com/tower-rs/tower/issues/665
             .service(self.client);
-        for (name, repeated) in Self::requests(destinations, &target, &setting)? {
+        for (name, repeated) in Self::setup_requests(destinations, &target, &setting)? {
             let mut responses = Vec::new();
             for req in repeated {
                 let result = timeout.ready().await.map_err(Wrap::new)?.call(req).await;
@@ -150,7 +164,7 @@ where
         Ok(dest)
     }
 
-    pub fn requests(
+    pub fn setup_requests(
         destinations: &Destinations<http_serde_priv::Uri>,
         target: &str,
         setting: &Setting,
