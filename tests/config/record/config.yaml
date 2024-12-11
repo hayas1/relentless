@@ -9,7 +9,7 @@ testcases:
       request:
         method: POST
         body: hello world
-      evaluate:
+      response:
         body:
           plaintext:
             regex: hello world

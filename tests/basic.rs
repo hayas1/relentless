@@ -2,7 +2,6 @@ use axum::body::Body;
 use http::uri::Authority;
 use relentless::{
     command::{Relentless, ReportFormat},
-    evaluate::DefaultEvaluator,
     report::Reportable,
     service::origin_router::OriginRouter,
 };
@@ -19,8 +18,7 @@ async fn test_example_yaml_config() {
     };
     let configs = relentless.configs().unwrap();
     let mut service = route::app_with(Default::default());
-    let report =
-        relentless.assault_with::<_, http::Request<Body>, _>(configs, &mut service, &DefaultEvaluator).await.unwrap();
+    let report = relentless.assault_with::<_, http::Request<Body>>(configs, &mut service).await.unwrap();
 
     assert_eq!(relentless.file.len(), report.sub_reportable().len());
     assert!(relentless.allow(&report));
@@ -35,6 +33,7 @@ fn test_same_basic_yaml_toml_config() {
 
     let yam = Relentless { file: yaml, ..Default::default() };
     let tom = Relentless { file: toml, ..Default::default() };
+    assert_json_diff::assert_json_eq!(yam.configs().unwrap(), tom.configs().unwrap());
     assert_eq!(yam.configs().unwrap(), tom.configs().unwrap());
 }
 
@@ -54,8 +53,7 @@ async fn test_basic_yaml_config() {
             .into_iter()
             .collect(),
     );
-    let report =
-        relentless.assault_with::<_, http::Request<Body>, _>(configs, &mut service, &DefaultEvaluator).await.unwrap();
+    let report = relentless.assault_with::<_, http::Request<Body>>(configs, &mut service).await.unwrap();
 
     assert_eq!(relentless.file.len(), report.sub_reportable().len());
     assert!(relentless.allow(&report));
@@ -77,8 +75,7 @@ async fn test_basic_toml_config() {
             .into_iter()
             .collect(),
     );
-    let report =
-        relentless.assault_with::<_, http::Request<Body>, _>(configs, &mut service, &DefaultEvaluator).await.unwrap();
+    let report = relentless.assault_with::<_, http::Request<Body>>(configs, &mut service).await.unwrap();
 
     relentless.report(&report).unwrap();
     assert_eq!(relentless.file.len(), report.sub_reportable().len());

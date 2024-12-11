@@ -1,5 +1,6 @@
 use std::{
     collections::HashMap,
+    fmt::Debug,
     fs::{read_to_string, File},
     path::Path,
     time::Duration,
@@ -12,7 +13,7 @@ use http::{
 };
 use http_body::Body;
 use mime::{Mime, APPLICATION_JSON, TEXT_PLAIN};
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
     error::{RunCommandError, WrappedResult},
@@ -22,28 +23,31 @@ use crate::{
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
-pub struct Config {
+#[serde(bound = "Q: Configuration, P: Configuration")]
+pub struct Config<Q, P> {
     #[serde(flatten, default, skip_serializing_if = "IsDefault::is_default")]
-    pub worker_config: WorkerConfig,
+    pub worker_config: WorkerConfig<Q, P>,
 
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
-    pub testcases: Vec<Testcase>,
+    pub testcases: Vec<Testcase<Q, P>>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
-pub struct WorkerConfig {
+#[serde(bound = "Q: Configuration, P: Configuration")]
+pub struct WorkerConfig<Q, P> {
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub name: Option<String>,
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub destinations: Destinations<http_serde_priv::Uri>,
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
-    pub setting: Setting,
+    pub setting: Setting<Q, P>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
-pub struct Setting {
+#[serde(bound = "Q: Configuration, P: Configuration")]
+pub struct Setting<Q, P> {
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
-    pub request: HttpRequest,
+    pub request: Q,
 
     #[serde(default, skip_serializing_if = "IsDefault::is_default", with = "destinations::transpose_template_serde")]
     pub template: Destinations<Template>,
@@ -53,8 +57,7 @@ pub struct Setting {
     pub timeout: Option<Duration>, // TODO parse from string? https://crates.io/crates/humantime ?
 
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
-    #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
-    pub evaluate: HttpEvaluate,
+    pub response: P,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
@@ -103,8 +106,7 @@ impl BodyStructure {
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct Repeat(pub Option<usize>);
 impl Coalesce for Repeat {
-    type Other = Self;
-    fn coalesce(self, other: &Self::Other) -> Self {
+    fn coalesce(self, other: &Self) -> Self {
         Self(self.0.or(other.0))
     }
 }
@@ -119,12 +121,15 @@ impl Repeat {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
-pub struct HttpEvaluate {
+pub struct HttpResponse {
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
+    #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
     pub status: StatusEvaluate,
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
+    #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
     pub header: HeaderEvaluate,
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
+    #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
     pub body: BodyEvaluate,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -185,13 +190,14 @@ pub enum Severity {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
-pub struct Testcase {
+#[serde(bound = "Q: Configuration, P: Configuration")]
+pub struct Testcase<Q, P> {
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub description: Option<String>,
     pub target: String,
 
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
-    pub setting: Setting,
+    pub setting: Setting<Q, P>,
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub attr: Attribute,
 }
@@ -202,6 +208,10 @@ pub struct Attribute {
     pub allow: bool,
 }
 
+// TODO this trait should be divided
+pub trait Configuration: Debug + Clone + PartialEq + Eq + Serialize + DeserializeOwned + Default {}
+impl<T> Configuration for T where T: Debug + Clone + PartialEq + Eq + Serialize + DeserializeOwned + Default {}
+
 pub trait IsDefault: Default + PartialEq<Self> {
     fn is_default(&self) -> bool {
         self == &Self::default()
@@ -209,8 +219,8 @@ pub trait IsDefault: Default + PartialEq<Self> {
 }
 impl<T> IsDefault for T where T: Default + PartialEq<T> {}
 
-impl Config {
-    pub fn read<P: AsRef<Path>>(path: P) -> WrappedResult<Self> {
+impl<Q: Configuration, P: Configuration> Config<Q, P> {
+    pub fn read<A: AsRef<Path>>(path: A) -> WrappedResult<Self> {
         Ok(Format::from_path(path.as_ref())?
             .deserialize_testcase(path.as_ref())
             .map_err(|e| e.context(path.as_ref().display().to_string()))?)
@@ -219,16 +229,14 @@ impl Config {
         format.deserialize_testcase_str(s)
     }
 }
-impl Coalesce for WorkerConfig {
-    type Other = Destinations<http_serde_priv::Uri>;
-    fn coalesce(self, other: &Self::Other) -> Self {
+impl<Q: Coalesce, P: Coalesce> Coalesce<Destinations<http_serde_priv::Uri>> for WorkerConfig<Q, P> {
+    fn coalesce(self, other: &Destinations<http_serde_priv::Uri>) -> Self {
         let destinations = self.destinations.coalesce(&other.iter().map(|(k, v)| (k.to_string(), v.clone())).collect());
         Self { destinations, ..self }
     }
 }
-impl<T: Clone> Coalesce for Destinations<T> {
-    type Other = HashMap<String, T>;
-    fn coalesce(self, other: &Self::Other) -> Self {
+impl<T: Clone> Coalesce<HashMap<String, T>> for Destinations<T> {
+    fn coalesce(self, other: &HashMap<String, T>) -> Self {
         // TODO Coalesce trait should be renamed because override usage may be inverse of coalesce
         let mut destinations = self.clone();
         for (name, dest) in other {
@@ -238,27 +246,24 @@ impl<T: Clone> Coalesce for Destinations<T> {
     }
 }
 
-impl Coalesce for Testcase {
-    type Other = Setting;
-    fn coalesce(self, other: &Self::Other) -> Self {
+impl<Q: Coalesce, P: Coalesce> Coalesce<Setting<Q, P>> for Testcase<Q, P> {
+    fn coalesce(self, other: &Setting<Q, P>) -> Self {
         let setting = self.setting.coalesce(other);
         Self { setting, ..self }
     }
 }
-impl Coalesce for Setting {
-    type Other = Self;
+impl<Q: Coalesce, P: Coalesce> Coalesce for Setting<Q, P> {
     fn coalesce(self, other: &Self) -> Self {
         Self {
             request: self.request.coalesce(&other.request),
-            template: if self.template.is_empty() { other.clone().template } else { self.template },
+            template: if self.template.is_empty() { other.template.clone() } else { self.template },
             repeat: self.repeat.coalesce(&other.repeat),
             timeout: self.timeout.or(other.timeout),
-            evaluate: self.evaluate.coalesce(&other.evaluate),
+            response: self.response.coalesce(&other.response),
         }
     }
 }
 impl Coalesce for HttpRequest {
-    type Other = Self;
     fn coalesce(self, other: &Self) -> Self {
         Self {
             no_additional_headers: self.no_additional_headers || other.no_additional_headers,
@@ -268,8 +273,7 @@ impl Coalesce for HttpRequest {
         }
     }
 }
-impl Coalesce for HttpEvaluate {
-    type Other = Self;
+impl Coalesce for HttpResponse {
     fn coalesce(self, other: &Self) -> Self {
         Self {
             status: self.status.coalesce(&other.status),
@@ -279,7 +283,6 @@ impl Coalesce for HttpEvaluate {
     }
 }
 impl Coalesce for StatusEvaluate {
-    type Other = Self;
     fn coalesce(self, other: &Self) -> Self {
         if self.is_default() {
             other.clone()
@@ -289,7 +292,6 @@ impl Coalesce for StatusEvaluate {
     }
 }
 impl Coalesce for HeaderEvaluate {
-    type Other = Self;
     fn coalesce(self, other: &Self) -> Self {
         if self.is_default() {
             other.clone()
@@ -299,7 +301,6 @@ impl Coalesce for HeaderEvaluate {
     }
 }
 impl Coalesce for BodyEvaluate {
-    type Other = Self;
     fn coalesce(self, other: &Self) -> Self {
         if self.is_default() {
             other.clone()
@@ -309,20 +310,19 @@ impl Coalesce for BodyEvaluate {
     }
 }
 
-pub trait Coalesce {
-    type Other;
-    fn coalesce(self, other: &Self::Other) -> Self;
+pub trait Coalesce<O = Self> {
+    fn coalesce(self, other: &O) -> Self;
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-pub struct Coalesced<T, U> {
+pub struct Coalesced<T, O> {
     base: T,
-    coalesced: Vec<U>,
+    coalesced: Vec<O>,
 }
-impl<T: Clone + Coalesce<Other = U>, U> Coalesced<T, U> {
-    pub fn new(base: T, coalesced: Vec<U>) -> Self {
+impl<T: Clone + Coalesce<O>, O> Coalesced<T, O> {
+    pub fn new(base: T, coalesced: Vec<O>) -> Self {
         Self { base, coalesced }
     }
-    pub fn tuple(base: T, other: U) -> Self {
+    pub fn tuple(base: T, other: O) -> Self {
         Self::new(base, vec![other])
     }
     pub fn coalesce(&self) -> T {
@@ -343,7 +343,7 @@ pub enum Format {
     Toml,
 }
 impl Format {
-    pub fn from_path<P: AsRef<Path>>(path: P) -> WrappedResult<Self> {
+    pub fn from_path<A: AsRef<Path>>(path: A) -> WrappedResult<Self> {
         let basename = path.as_ref().extension().and_then(|ext| ext.to_str());
         match basename {
             #[cfg(feature = "json")]
@@ -357,7 +357,10 @@ impl Format {
         }
     }
 
-    pub fn deserialize_testcase<P: AsRef<Path>>(&self, path: P) -> WrappedResult<Config> {
+    pub fn deserialize_testcase<A: AsRef<Path>, Q: Configuration, P: Configuration>(
+        &self,
+        path: A,
+    ) -> WrappedResult<Config<Q, P>> {
         match self {
             #[cfg(feature = "json")]
             Format::Json => Ok(serde_json::from_reader(File::open(path)?)?),
@@ -373,7 +376,10 @@ impl Format {
         }
     }
 
-    pub fn deserialize_testcase_str(&self, content: &str) -> WrappedResult<Config> {
+    pub fn deserialize_testcase_str<Q: Configuration, P: Configuration>(
+        &self,
+        content: &str,
+    ) -> WrappedResult<Config<Q, P>> {
         match self {
             #[cfg(feature = "json")]
             Format::Json => Ok(serde_json::from_str(content)?),
@@ -711,42 +717,14 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "yaml", feature = "toml"))]
-    fn test_read_basic_config() {
-        let assault_yaml = Config::read("tests/config/basic/assault.yaml").unwrap();
-        let assault_toml = Config::read("tests/config/basic/assault.toml").unwrap();
-        assert_json_diff::assert_json_eq!(assault_yaml, assault_toml);
-        assert_eq!(assault_yaml, assault_toml);
-
-        let compare_yaml = Config::read("tests/config/basic/compare.yaml").unwrap();
-        let compare_toml = Config::read("tests/config/basic/compare.toml").unwrap();
-        assert_json_diff::assert_json_eq!(compare_yaml, compare_toml);
-        assert_eq!(compare_yaml, compare_toml);
-    }
-
-    #[test]
-    #[cfg(all(feature = "yaml", feature = "json", feature = "toml"))]
-    fn test_read_basic_config_for_json() {
-        let assault_yaml = Config::read("tests/config/basic/assault_json.yaml").unwrap();
-        let assault_toml = Config::read("tests/config/basic/assault_json.toml").unwrap();
-        assert_json_diff::assert_json_eq!(assault_yaml, assault_toml);
-        assert_eq!(assault_yaml, assault_toml);
-
-        let compare_yaml = Config::read("tests/config/basic/compare_json.yaml").unwrap();
-        let compare_toml = Config::read("tests/config/basic/compare_json.toml").unwrap();
-        assert_json_diff::assert_json_eq!(compare_yaml, compare_toml);
-        assert_eq!(compare_yaml, compare_toml);
-    }
-
-    #[test]
     #[cfg(all(feature = "yaml", feature = "json"))]
     fn test_config_roundtrip() {
         let example = Config {
             worker_config: WorkerConfig {
                 name: Some("example".to_string()),
                 setting: Setting {
-                    request: Default::default(),
-                    evaluate: HttpEvaluate { header: HeaderEvaluate::Ignore, ..Default::default() },
+                    request: HttpRequest::default(),
+                    response: HttpResponse { header: HeaderEvaluate::Ignore, ..Default::default() },
                     ..Default::default()
                 },
                 ..Default::default()
@@ -755,8 +733,8 @@ mod tests {
                 description: Some("test description".to_string()),
                 target: "/information".to_string(),
                 setting: Setting {
-                    request: Default::default(),
-                    evaluate: HttpEvaluate {
+                    request: HttpRequest::default(),
+                    response: HttpResponse {
                         body: BodyEvaluate::Json(JsonEvaluate {
                             ignore: vec!["/datetime".to_string()],
                             // patch: Some(PatchTo::All(
@@ -805,7 +783,7 @@ mod tests {
         - description: test description
           target: /information
           setting:
-            evaluate:
+            response:
               body:
                 json:
                   patch:
@@ -817,8 +795,8 @@ mod tests {
         assert_eq!(
             config.testcases[0].setting,
             Setting {
-                request: Default::default(),
-                evaluate: HttpEvaluate {
+                request: HttpRequest::default(),
+                response: HttpResponse {
                     body: BodyEvaluate::Json(JsonEvaluate {
                         ignore: vec![],
                         patch: Some(EvaluateTo::All(
@@ -844,7 +822,7 @@ mod tests {
         - description: test description
           target: /information
           setting:
-            evaluate:
+            response:
               body:
                 json:
                   patch:
@@ -860,8 +838,8 @@ mod tests {
         assert_eq!(
             config.testcases[0].setting,
             Setting {
-                request: Default::default(),
-                evaluate: HttpEvaluate {
+                request: HttpRequest::default(),
+                response: HttpResponse {
                     body: BodyEvaluate::Json(JsonEvaluate {
                         ignore: vec![],
                         patch: Some(EvaluateTo::Destinations(Destinations::from_iter([

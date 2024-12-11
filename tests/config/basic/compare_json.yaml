@@ -3,7 +3,7 @@ destinations:
   actual: http://localhost:3000
   expect: http://localhost:3000
 setting:
-  evaluate:
+  response:
     header: ignore
 
 testcases:
@@ -16,7 +16,7 @@ testcases:
   - target: /information
     description: ignore datetime and hostname and uri
     setting:
-      evaluate:
+      response:
         body:
           json:
             ignore:
@@ -31,7 +31,7 @@ testcases:
   - target: /information
     description: patch datetime and hostname and uri
     setting:
-      evaluate:
+      response:
         body:
           json:
             patch:
@@ -44,7 +44,7 @@ testcases:
   - target: /information
     description: remove actual datetime only (must be failed, so attr allowed)
     setting:
-      evaluate:
+      response:
         body:
           json:
             patch:
