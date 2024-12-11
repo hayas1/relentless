@@ -244,6 +244,25 @@ impl FromBodyStructure for BytesBody {
     }
 }
 
+pub trait IntoRequest<R>: Sized {
+    type Error;
+    fn into_request(self, destination: &http::Uri, target: &str, template: &Template) -> Result<R, Self::Error>;
+}
+impl<B> IntoRequest<http::Request<B>> for HttpRequest
+where
+    B: FromBodyStructure + Body,
+{
+    type Error = <http::Request<B> as FromRequestInfo>::Error;
+    fn into_request(
+        self,
+        destination: &http::Uri,
+        target: &str,
+        template: &Template,
+    ) -> Result<http::Request<B>, Self::Error> {
+        http::Request::<B>::from_request_info(template, destination, target, &self)
+    }
+}
+
 pub trait FromRequestInfo: Sized {
     type Error;
     fn from_request_info(
