@@ -125,7 +125,7 @@ where
         let responses = self.requests(destinations, testcase.coalesce()).await?;
 
         let (mut passed, mut v) = (0, Vec::new());
-        for res in responses.transpose() {
+        for res in responses {
             let pass = evaluator.evaluate(&testcase.coalesce().setting.evaluate, res, &mut v).await;
             passed += pass as usize;
         }
@@ -136,32 +136,34 @@ where
         self,
         destinations: &Destinations<http_serde_priv::Uri>,
         testcase: Testcase,
-    ) -> WrappedResult<Destinations<Vec<RequestResult<S::Response>>>> {
+    ) -> WrappedResult<Vec<Destinations<RequestResult<S::Response>>>> {
         let Testcase { target, setting, .. } = testcase;
 
-        let mut dest = Destinations::new();
+        let mut repeated = Vec::new();
         let mut timeout = ServiceBuilder::new()
             .option_layer(setting.timeout.map(TimeoutLayer::new))
             .map_err(Into::<tower::BoxError>::into) // https://github.com/tower-rs/tower/issues/665
             .service(self.client);
-        for (name, repeated) in Self::setup_requests(destinations, &target, &setting)? {
-            let mut responses = Vec::new();
-            for req in repeated {
+        for repeating in Self::setup_requests(destinations, &target, &setting)?.transpose() {
+            let mut responses = Destinations::new();
+            for (d, req) in repeating {
+                // TODO do not await here, use stream
                 let result = timeout.ready().await.map_err(Wrap::new)?.call(req).await;
                 match result {
-                    Ok(res) => responses.push(RequestResult::Response(res)),
+                    Ok(res) => responses.insert(d, RequestResult::Response(res)),
                     Err(err) => {
                         if err.is::<Elapsed>() {
-                            responses.push(RequestResult::Timeout(setting.timeout.unwrap_or_else(|| unreachable!())));
+                            responses
+                                .insert(d, RequestResult::Timeout(setting.timeout.unwrap_or_else(|| unreachable!())))
                         } else {
-                            Err(Wrap::new(err))?;
+                            Err(Wrap::new(err))?
                         }
                     }
-                }
+                };
             }
-            dest.insert(name, responses);
+            repeated.push(responses);
         }
-        Ok(dest)
+        Ok(repeated)
     }
 
     pub fn setup_requests(
