@@ -150,7 +150,7 @@ impl Relentless {
         Ok(report)
     }
     /// TODO document
-    pub async fn assault_with<S, Req, E>(
+    pub async fn assault_with<S, Req>(
         &self,
         configs: Vec<Config<HttpRequest, HttpResponse>>,
         service: &mut S,
