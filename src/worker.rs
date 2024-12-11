@@ -11,7 +11,7 @@ use crate::{
     error::{Wrap, WrappedResult},
     evaluate::{DefaultEvaluator, Evaluator, RequestResult},
     report::{CaseReport, Report, WorkerReport},
-    service::FromRequestInfo,
+    service::IntoRequest,
     template::Template,
 };
 use tower::{
@@ -43,14 +43,13 @@ impl
 }
 impl<'a, Q, P, S, Req, E> Control<'a, Q, P, S, Req, E>
 where
-    Req: FromRequestInfo,
-    Q: Configuration,
+    Q: Configuration + IntoRequest<Req>,
     P: Configuration,
     S: Service<Req> + Send + 'static,
     S::Error: std::error::Error + Send + Sync + 'static,
     S::Future: Send + 'static,
     E: Evaluator<P, S::Response>,
-    Wrap: From<Req::Error> + From<S::Error>,
+    Wrap: From<Q::Error> + From<S::Error>,
 {
     /// TODO document
     pub fn new(client: &'a mut S, evaluator: &'a E) -> Self {
@@ -81,14 +80,13 @@ pub struct Worker<'a, Q, P, S, Req, E> {
 }
 impl<'a, Q, P, S, Req, E> Worker<'a, Q, P, S, Req, E>
 where
-    Req: FromRequestInfo,
-    Q: Configuration,
+    Q: Configuration + IntoRequest<Req>,
     P: Configuration,
     S: Service<Req> + Send + 'static,
     S::Error: std::error::Error + Send + Sync + 'static,
     S::Future: Send + 'static,
     E: Evaluator<P, S::Response>,
-    Wrap: From<Req::Error> + From<S::Error>,
+    Wrap: From<Q::Error> + From<S::Error>,
 {
     pub fn new(client: &'a mut S, evaluator: &'a E) -> Self {
         Self { client, evaluator, phantom: PhantomData }
@@ -122,14 +120,13 @@ pub struct Case<'a, Q, P, S, Req, E> {
 }
 impl<'a, Q, P, S, Req, E> Case<'a, Q, P, S, Req, E>
 where
-    Req: FromRequestInfo,
-    Q: Configuration,
+    Q: Configuration + IntoRequest<Req>,
     P: Configuration,
     S: Service<Req> + Send + 'static,
     S::Error: std::error::Error + Send + Sync + 'static,
     S::Future: Send + 'static,
     E: Evaluator<P, S::Response>,
-    Wrap: From<Req::Error> + From<S::Error>,
+    Wrap: From<Q::Error> + From<S::Error>,
 {
     pub fn new(client: &'a mut S, evaluator: &'a E) -> Self {
         Self { client, evaluator, phantom: PhantomData }
@@ -203,7 +200,7 @@ where
                 let template = template.get(name).unwrap_or(&default_empty);
                 let requests = repeat
                     .range()
-                    .map(|_| Req::from_request_info(template, destination, target, request))
+                    .map(|_| request.into_request(destination, target, template))
                     .collect::<Result<Vec<_>, _>>()?;
                 Ok((name.to_string(), requests))
             })
