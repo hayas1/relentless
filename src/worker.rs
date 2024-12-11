@@ -6,7 +6,7 @@ use crate::{
     command::Relentless,
     config::{
         destinations::{Destinations, Transpose},
-        http_serde_priv, Coalesced, Config, HttpResponse, Setting, Testcase,
+        http_serde_priv, Coalesced, Config, Configuration, HttpRequest, HttpResponse, Setting, Testcase,
     },
     error::{Wrap, WrappedResult},
     evaluate::{DefaultEvaluator, Evaluator, RequestResult},
@@ -21,24 +21,35 @@ use tower::{
 
 /// TODO document
 #[derive(Debug)]
-pub struct Control<'a, S, Req, E> {
+pub struct Control<'a, Q, P, S, Req, E> {
     client: &'a mut S,
     evaluator: &'a E,
-    phantom: PhantomData<(S, Req, E)>,
+    phantom: PhantomData<(Q, P, S, Req, E)>,
 }
 #[cfg(feature = "default-http-client")]
-impl Control<'_, DefaultHttpClient<reqwest::Body, reqwest::Body>, reqwest::Body, DefaultEvaluator> {
+impl
+    Control<
+        '_,
+        HttpRequest,
+        HttpResponse,
+        DefaultHttpClient<reqwest::Body, reqwest::Body>,
+        reqwest::Body,
+        DefaultEvaluator,
+    >
+{
     pub async fn default_http_client() -> WrappedResult<DefaultHttpClient<reqwest::Body, reqwest::Body>> {
         DefaultHttpClient::new().await
     }
 }
-impl<'a, S, Req, E> Control<'a, S, Req, E>
+impl<'a, Q, P, S, Req, E> Control<'a, Q, P, S, Req, E>
 where
     Req: FromRequestInfo,
+    Q: Configuration,
+    P: Configuration,
     S: Service<Req> + Send + 'static,
     S::Error: std::error::Error + Send + Sync + 'static,
     S::Future: Send + 'static,
-    E: Evaluator<HttpResponse, S::Response>,
+    E: Evaluator<P, S::Response>,
     Wrap: From<Req::Error> + From<S::Error>,
 {
     /// TODO document
@@ -46,7 +57,11 @@ where
         Self { client, evaluator, phantom: PhantomData }
     }
     /// TODO document
-    pub async fn assault(self, cmd: &Relentless, configs: Vec<Config>) -> WrappedResult<Report<E::Message>> {
+    pub async fn assault(
+        self,
+        cmd: &Relentless,
+        configs: Vec<Config<Q, P>>,
+    ) -> WrappedResult<Report<E::Message, Q, P>> {
         let mut report = Vec::new();
         for config in configs {
             let worker = Worker::new(self.client, self.evaluator);
@@ -59,25 +74,31 @@ where
 
 /// TODO document
 #[derive(Debug)]
-pub struct Worker<'a, S, Req, E> {
+pub struct Worker<'a, Q, P, S, Req, E> {
     client: &'a mut S,
     evaluator: &'a E,
-    phantom: PhantomData<(Req, S, E)>,
+    phantom: PhantomData<(Q, P, Req, S, E)>,
 }
-impl<'a, S, Req, E> Worker<'a, S, Req, E>
+impl<'a, Q, P, S, Req, E> Worker<'a, Q, P, S, Req, E>
 where
     Req: FromRequestInfo,
+    Q: Configuration,
+    P: Configuration,
     S: Service<Req> + Send + 'static,
     S::Error: std::error::Error + Send + Sync + 'static,
     S::Future: Send + 'static,
-    E: Evaluator<HttpResponse, S::Response>,
+    E: Evaluator<P, S::Response>,
     Wrap: From<Req::Error> + From<S::Error>,
 {
     pub fn new(client: &'a mut S, evaluator: &'a E) -> Self {
         Self { client, evaluator, phantom: PhantomData }
     }
 
-    pub async fn assault(self, cmd: &Relentless, config: Config) -> WrappedResult<WorkerReport<E::Message>> {
+    pub async fn assault(
+        self,
+        cmd: &Relentless,
+        config: Config<Q, P>,
+    ) -> WrappedResult<WorkerReport<E::Message, Q, P>> {
         let worker_config = Coalesced::tuple(config.worker_config, cmd.destinations()?);
         let mut report = Vec::new();
         for testcase in config.testcases {
@@ -94,18 +115,20 @@ where
 
 /// TODO document
 #[derive(Debug)]
-pub struct Case<'a, S, Req, E> {
+pub struct Case<'a, Q, P, S, Req, E> {
     client: &'a mut S,
     evaluator: &'a E,
-    phantom: PhantomData<(S, Req, E)>,
+    phantom: PhantomData<(Q, P, S, Req, E)>,
 }
-impl<'a, S, Req, E> Case<'a, S, Req, E>
+impl<'a, Q, P, S, Req, E> Case<'a, Q, P, S, Req, E>
 where
     Req: FromRequestInfo,
+    Q: Configuration,
+    P: Configuration,
     S: Service<Req> + Send + 'static,
     S::Error: std::error::Error + Send + Sync + 'static,
     S::Future: Send + 'static,
-    E: Evaluator<HttpResponse, S::Response>,
+    E: Evaluator<P, S::Response>,
     Wrap: From<Req::Error> + From<S::Error>,
 {
     pub fn new(client: &'a mut S, evaluator: &'a E) -> Self {
@@ -116,8 +139,8 @@ where
         self,
         cmd: &Relentless,
         destinations: &Destinations<http_serde_priv::Uri>,
-        testcase: Coalesced<Testcase, Setting>,
-    ) -> WrappedResult<CaseReport<E::Message>> {
+        testcase: Coalesced<Testcase<Q, P>, Setting<Q, P>>,
+    ) -> WrappedResult<CaseReport<E::Message, Q, P>> {
         let _ = cmd;
         let evaluator = self.evaluator;
 
@@ -135,7 +158,7 @@ where
     pub async fn requests(
         self,
         destinations: &Destinations<http_serde_priv::Uri>,
-        testcase: Testcase,
+        testcase: Testcase<Q, P>,
     ) -> WrappedResult<Vec<Destinations<RequestResult<S::Response>>>> {
         let Testcase { target, setting, .. } = testcase;
 
@@ -169,7 +192,7 @@ where
     pub fn setup_requests(
         destinations: &Destinations<http_serde_priv::Uri>,
         target: &str,
-        setting: &Setting,
+        setting: &Setting<Q, P>,
     ) -> WrappedResult<Destinations<Vec<Req>>> {
         let Setting { request, template, repeat, .. } = setting;
 
