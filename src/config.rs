@@ -107,8 +107,7 @@ impl BodyStructure {
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct Repeat(pub Option<usize>);
 impl Coalesce for Repeat {
-    type Other = Self;
-    fn coalesce(self, other: &Self::Other) -> Self {
+    fn coalesce(self, other: &Self) -> Self {
         Self(self.0.or(other.0))
     }
 }
@@ -213,7 +212,7 @@ pub struct Attribute {
 
 // TODO this trait should be divided
 pub trait Configuration:
-    Debug + Clone + PartialEq + Eq + Serialize + DeserializeOwned + Default + Coalesce<Other = Self>
+    Debug + Clone + PartialEq + Eq + Serialize + DeserializeOwned + Default + Coalesce<Self>
 {
 }
 
@@ -234,16 +233,14 @@ impl<Q: Configuration, P: Configuration> Config<Q, P> {
         format.deserialize_testcase_str(s)
     }
 }
-impl<Q: Configuration, P: Configuration> Coalesce for WorkerConfig<Q, P> {
-    type Other = Destinations<http_serde_priv::Uri>;
-    fn coalesce(self, other: &Self::Other) -> Self {
+impl<Q: Configuration, P: Configuration> Coalesce<Destinations<http_serde_priv::Uri>> for WorkerConfig<Q, P> {
+    fn coalesce(self, other: &Destinations<http_serde_priv::Uri>) -> Self {
         let destinations = self.destinations.coalesce(&other.iter().map(|(k, v)| (k.to_string(), v.clone())).collect());
         Self { destinations, ..self }
     }
 }
-impl<T: Clone> Coalesce for Destinations<T> {
-    type Other = HashMap<String, T>;
-    fn coalesce(self, other: &Self::Other) -> Self {
+impl<T: Clone> Coalesce<HashMap<String, T>> for Destinations<T> {
+    fn coalesce(self, other: &HashMap<String, T>) -> Self {
         // TODO Coalesce trait should be renamed because override usage may be inverse of coalesce
         let mut destinations = self.clone();
         for (name, dest) in other {
@@ -253,15 +250,13 @@ impl<T: Clone> Coalesce for Destinations<T> {
     }
 }
 
-impl<Q: Configuration, P: Configuration> Coalesce for Testcase<Q, P> {
-    type Other = Setting<Q, P>;
-    fn coalesce(self, other: &Self::Other) -> Self {
+impl<Q: Configuration, P: Configuration> Coalesce<Setting<Q, P>> for Testcase<Q, P> {
+    fn coalesce(self, other: &Setting<Q, P>) -> Self {
         let setting = self.setting.coalesce(other);
         Self { setting, ..self }
     }
 }
 impl<Q: Configuration, P: Configuration> Coalesce for Setting<Q, P> {
-    type Other = Self;
     fn coalesce(self, other: &Self) -> Self {
         Self {
             request: self.request.coalesce(&other.request),
@@ -273,7 +268,6 @@ impl<Q: Configuration, P: Configuration> Coalesce for Setting<Q, P> {
     }
 }
 impl Coalesce for HttpRequest {
-    type Other = Self;
     fn coalesce(self, other: &Self) -> Self {
         Self {
             no_additional_headers: self.no_additional_headers || other.no_additional_headers,
@@ -284,7 +278,6 @@ impl Coalesce for HttpRequest {
     }
 }
 impl Coalesce for HttpResponse {
-    type Other = Self;
     fn coalesce(self, other: &Self) -> Self {
         Self {
             status: self.status.coalesce(&other.status),
@@ -294,7 +287,6 @@ impl Coalesce for HttpResponse {
     }
 }
 impl Coalesce for StatusEvaluate {
-    type Other = Self;
     fn coalesce(self, other: &Self) -> Self {
         if self.is_default() {
             other.clone()
@@ -304,7 +296,6 @@ impl Coalesce for StatusEvaluate {
     }
 }
 impl Coalesce for HeaderEvaluate {
-    type Other = Self;
     fn coalesce(self, other: &Self) -> Self {
         if self.is_default() {
             other.clone()
@@ -314,7 +305,6 @@ impl Coalesce for HeaderEvaluate {
     }
 }
 impl Coalesce for BodyEvaluate {
-    type Other = Self;
     fn coalesce(self, other: &Self) -> Self {
         if self.is_default() {
             other.clone()
@@ -324,20 +314,19 @@ impl Coalesce for BodyEvaluate {
     }
 }
 
-pub trait Coalesce {
-    type Other;
-    fn coalesce(self, other: &Self::Other) -> Self;
+pub trait Coalesce<O = Self> {
+    fn coalesce(self, other: &O) -> Self;
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-pub struct Coalesced<T, U> {
+pub struct Coalesced<T, O> {
     base: T,
-    coalesced: Vec<U>,
+    coalesced: Vec<O>,
 }
-impl<T: Clone + Coalesce<Other = U>, U> Coalesced<T, U> {
-    pub fn new(base: T, coalesced: Vec<U>) -> Self {
+impl<T: Clone + Coalesce<O>, O> Coalesced<T, O> {
+    pub fn new(base: T, coalesced: Vec<O>) -> Self {
         Self { base, coalesced }
     }
-    pub fn tuple(base: T, other: U) -> Self {
+    pub fn tuple(base: T, other: O) -> Self {
         Self::new(base, vec![other])
     }
     pub fn coalesce(&self) -> T {
