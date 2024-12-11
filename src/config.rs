@@ -71,7 +71,6 @@ pub struct HttpRequest {
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub body: Option<BodyStructure>,
 }
-impl Configuration for HttpRequest {}
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case", untagged)]
 pub enum BodyStructure {
@@ -133,7 +132,6 @@ pub struct HttpResponse {
     #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
     pub body: BodyEvaluate,
 }
-impl Configuration for HttpResponse {}
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub enum StatusEvaluate {
@@ -212,6 +210,7 @@ pub struct Attribute {
 
 // TODO this trait should be divided
 pub trait Configuration: Debug + Clone + PartialEq + Eq + Serialize + DeserializeOwned + Default {}
+impl<T> Configuration for T where T: Debug + Clone + PartialEq + Eq + Serialize + DeserializeOwned + Default {}
 
 pub trait IsDefault: Default + PartialEq<Self> {
     fn is_default(&self) -> bool {
