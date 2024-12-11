@@ -6,7 +6,7 @@ use crate::{
     command::Relentless,
     config::{
         destinations::{Destinations, Transpose},
-        http_serde_priv, Coalesced, Config, Protocol, Setting, Testcase, WorkerConfig,
+        http_serde_priv, Coalesced, Config, Setting, Testcase,
     },
     error::{Wrap, WrappedResult},
     evaluate::{DefaultEvaluator, Evaluator, RequestResult},
@@ -22,10 +22,9 @@ use tower::{
 /// TODO document
 #[derive(Debug)]
 pub struct Control<'a, S, Req, E> {
-    _cmd: &'a Relentless,
-    workers: Vec<Worker<'a, S, Req, E>>, // TODO all worker do not have same clients type ?
-    cases: Vec<Vec<Case<S, Req>>>,
     client: &'a mut S,
+    evaluator: &'a E,
+    phantom: PhantomData<(S, Req, E)>,
 }
 #[cfg(feature = "default-http-client")]
 impl Control<'_, DefaultHttpClient<reqwest::Body, reqwest::Body>, reqwest::Body, DefaultEvaluator> {
@@ -43,33 +42,15 @@ where
     Wrap: From<Req::Error> + From<S::Error>,
 {
     /// TODO document
-    pub fn with_service(cmd: &'a Relentless, configs: Vec<Config>, service: &'a mut S) -> WrappedResult<Self> {
-        let mut workers = Vec::new();
-        for config in &configs {
-            workers.push(Worker::new(cmd, config.worker_config.clone())?);
-        }
-        Ok(Self::new(cmd, configs, workers, service))
+    pub fn new(client: &'a mut S, evaluator: &'a E) -> Self {
+        Self { client, evaluator, phantom: PhantomData }
     }
     /// TODO document
-    pub fn new(
-        cmd: &'a Relentless,
-        configs: Vec<Config>,
-        workers: Vec<Worker<'a, S, Req, E>>,
-        client: &'a mut S,
-    ) -> Self {
-        let cases = configs
-            .iter()
-            .map(|c| c.testcases.clone().into_iter().map(|t| Case::new(&c.worker_config, t)).collect())
-            .collect();
-        Self { _cmd: cmd, workers, cases, client }
-    }
-    /// TODO document
-    pub async fn assault(self, evaluator: &E) -> WrappedResult<Report<E::Message>> {
-        let Self { workers, cases, .. } = self;
-
+    pub async fn assault(self, cmd: &Relentless, configs: Vec<Config>) -> WrappedResult<Report<E::Message>> {
         let mut report = Vec::new();
-        for (worker, cases) in workers.into_iter().zip(cases.into_iter()) {
-            report.push(worker.assault(cases, evaluator, self.client).await?);
+        for config in configs {
+            let worker = Worker::new(self.client, self.evaluator);
+            report.push(worker.assault(cmd, config).await?); // TODO do not await here, use stream
         }
 
         Ok(Report::new(report))
@@ -79,14 +60,9 @@ where
 /// TODO document
 #[derive(Debug)]
 pub struct Worker<'a, S, Req, E> {
-    _cmd: &'a Relentless,
-    config: Coalesced<WorkerConfig, Destinations<http_serde_priv::Uri>>,
+    client: &'a mut S,
+    evaluator: &'a E,
     phantom: PhantomData<(Req, S, E)>,
-}
-impl<S, Req, E> Worker<'_, S, Req, E> {
-    pub fn config(&self) -> WorkerConfig {
-        self.config.coalesce()
-    }
 }
 impl<'a, S, Req, E> Worker<'a, S, Req, E>
 where
@@ -97,109 +73,106 @@ where
     E: Evaluator<S::Response>,
     Wrap: From<Req::Error> + From<S::Error>,
 {
-    pub fn new(cmd: &'a Relentless, config: WorkerConfig) -> WrappedResult<Self> {
-        let config = Coalesced::tuple(config, cmd.destinations()?);
-        let phantom = PhantomData;
-        Ok(Self { _cmd: cmd, config, phantom })
+    pub fn new(client: &'a mut S, evaluator: &'a E) -> Self {
+        Self { client, evaluator, phantom: PhantomData }
     }
 
-    pub async fn assault(
-        self,
-        cases: Vec<Case<S, Req>>,
-        evaluator: &E,
-        client: &mut S,
-    ) -> WrappedResult<WorkerReport<E::Message>> {
-        let Self { config, .. } = self;
-
-        let mut processes = Vec::new();
-        for case in cases {
-            // TODO do not await here, use stream
-            let destinations = config.coalesce().destinations;
-            processes.push((case.testcases.clone(), case.process(&destinations, client).await));
-        }
-
+    pub async fn assault(self, cmd: &Relentless, config: Config) -> WrappedResult<WorkerReport<E::Message>> {
+        let worker_config = Coalesced::tuple(config.worker_config, cmd.destinations()?);
         let mut report = Vec::new();
-        for (testcase, process) in processes {
-            let Setting { protocol, .. } = &testcase.coalesce().setting;
-            let (mut passed, mut v) = (0, Vec::new());
-            for res in process?.transpose() {
-                let pass = evaluator.evaluate(E::evaluate_config(protocol.as_ref()), res, &mut v).await;
-                passed += pass as usize;
-            }
-            report.push(CaseReport::new(testcase, passed, v.into_iter().collect()));
+        for testcase in config.testcases {
+            let case = Case::new(self.client, self.evaluator);
+            let testcase = Coalesced::tuple(testcase, worker_config.coalesce().setting);
+
+            let destinations = worker_config.coalesce().destinations;
+            report.push(case.assault(cmd, &destinations, testcase).await?); // TODO do not await here, use stream
         }
-        Ok(WorkerReport::new(config, report))
+
+        Ok(WorkerReport::new(worker_config, report))
     }
 }
 
 /// TODO document
-#[derive(Debug, Clone)]
-pub struct Case<S, Req> {
-    testcases: Coalesced<Testcase, Setting>,
-    phantom: PhantomData<(S, Req)>,
+#[derive(Debug)]
+pub struct Case<'a, S, Req, E> {
+    client: &'a mut S,
+    evaluator: &'a E,
+    phantom: PhantomData<(S, Req, E)>,
 }
-impl<S, Req> Case<S, Req> {
-    pub fn testcase(&self) -> &Testcase {
-        self.testcases.base()
-    }
-}
-impl<S, Req> Case<S, Req>
+impl<'a, S, Req, E> Case<'a, S, Req, E>
 where
     Req: FromRequestInfo,
     S: Service<Req> + Send + 'static,
     S::Error: std::error::Error + Send + Sync + 'static,
     S::Future: Send + 'static,
+    E: Evaluator<S::Response>,
     Wrap: From<Req::Error> + From<S::Error>,
 {
-    pub fn new(worker_config: &WorkerConfig, testcases: Testcase) -> Self {
-        let testcase = Coalesced::tuple(testcases, worker_config.setting.clone());
-        let phantom = PhantomData;
-        Self { testcases: testcase, phantom }
+    pub fn new(client: &'a mut S, evaluator: &'a E) -> Self {
+        Self { client, evaluator, phantom: PhantomData }
     }
 
-    pub async fn process(
+    pub async fn assault(
+        self,
+        cmd: &Relentless,
+        destinations: &Destinations<http_serde_priv::Uri>,
+        testcase: Coalesced<Testcase, Setting>,
+    ) -> WrappedResult<CaseReport<E::Message>> {
+        let _ = cmd;
+        let evaluator = self.evaluator;
+
+        // TODO do not await here, use stream
+        let responses = self.requests(destinations, testcase.coalesce()).await?;
+
+        let (mut passed, mut v) = (0, Vec::new());
+        for res in responses {
+            let pass = evaluator.evaluate(&testcase.coalesce().setting.evaluate, res, &mut v).await;
+            passed += pass as usize;
+        }
+        Ok(CaseReport::new(testcase, passed, v.into_iter().collect()))
+    }
+
+    pub async fn requests(
         self,
         destinations: &Destinations<http_serde_priv::Uri>,
-        client: &mut S,
-    ) -> WrappedResult<Destinations<Vec<RequestResult<S::Response>>>> {
-        let Testcase { target, setting, .. } = self.testcases.coalesce();
+        testcase: Testcase,
+    ) -> WrappedResult<Vec<Destinations<RequestResult<S::Response>>>> {
+        let Testcase { target, setting, .. } = testcase;
 
-        let mut dest = Destinations::new();
+        let mut repeated = Vec::new();
         let mut timeout = ServiceBuilder::new()
             .option_layer(setting.timeout.map(TimeoutLayer::new))
             .map_err(Into::<tower::BoxError>::into) // https://github.com/tower-rs/tower/issues/665
-            .service(client);
-        for (name, repeated) in Self::requests(destinations, &target, &setting)? {
-            let mut responses = Vec::new();
-            for req in repeated {
+            .service(self.client);
+        for repeating in Self::setup_requests(destinations, &target, &setting)?.transpose() {
+            let mut responses = Destinations::new();
+            for (d, req) in repeating {
+                // TODO do not await here, use stream
                 let result = timeout.ready().await.map_err(Wrap::new)?.call(req).await;
                 match result {
-                    Ok(res) => responses.push(RequestResult::Response(res)),
+                    Ok(res) => responses.insert(d, RequestResult::Response(res)),
                     Err(err) => {
                         if err.is::<Elapsed>() {
-                            responses.push(RequestResult::Timeout(setting.timeout.unwrap_or_else(|| unreachable!())));
+                            responses
+                                .insert(d, RequestResult::Timeout(setting.timeout.unwrap_or_else(|| unreachable!())))
                         } else {
-                            Err(Wrap::new(err))?;
+                            Err(Wrap::new(err))?
                         }
                     }
-                }
+                };
             }
-            dest.insert(name, responses);
+            repeated.push(responses);
         }
-        Ok(dest)
+        Ok(repeated)
     }
 
-    pub fn requests(
+    pub fn setup_requests(
         destinations: &Destinations<http_serde_priv::Uri>,
         target: &str,
         setting: &Setting,
     ) -> WrappedResult<Destinations<Vec<Req>>> {
-        let Setting { protocol: service, template, repeat, .. } = setting;
+        let Setting { request, template, repeat, .. } = setting;
 
-        let request_info = match service {
-            Some(Protocol::Http { request, .. }) => request,
-            None => &Default::default(),
-        };
         destinations
             .iter()
             .map(|(name, destination)| {
@@ -207,7 +180,7 @@ where
                 let template = template.get(name).unwrap_or(&default_empty);
                 let requests = repeat
                     .range()
-                    .map(|_| Req::from_request_info(template, destination, target, request_info))
+                    .map(|_| Req::from_request_info(template, destination, target, request))
                     .collect::<Result<Vec<_>, _>>()?;
                 Ok((name.to_string(), requests))
             })

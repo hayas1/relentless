@@ -19,14 +19,13 @@ testcases:
         var:
           server1: server1
           server2: server2
-      http:
-        request:
-          method: POST
-          body: hello ${var}
-        evaluate:
-          body:
-            plaintext:
-              server1:
-                regex: hello server1
-              server2:
-                regex: hello server2
+      request:
+        method: POST
+        body: hello ${var}
+      evaluate:
+        body:
+          plaintext:
+            server1:
+              regex: hello server1
+            server2:
+              regex: hello server2
