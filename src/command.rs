@@ -163,8 +163,8 @@ impl Relentless {
         E: Evaluator<S::Response>,
         Wrap: From<Req::Error> + From<S::Error>,
     {
-        let control = Control::with_service(self, configs, service)?;
-        let report = control.assault(evaluator).await?;
+        let control = Control::new(service, evaluator);
+        let report = control.assault(self, configs).await?;
         Ok(report)
     }
 

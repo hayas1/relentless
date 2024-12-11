@@ -50,13 +50,13 @@ impl<T> Reportable for WorkerReport<T> {
 /// TODO document
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CaseReport<T> {
-    testcases: Coalesced<Testcase, Setting>,
+    testcase: Coalesced<Testcase, Setting>,
     passed: usize,
     messages: MultiWrap<T>,
 }
 impl<T> CaseReport<T> {
-    pub fn new(testcases: Coalesced<Testcase, Setting>, passed: usize, messages: MultiWrap<T>) -> Self {
-        Self { testcases, passed, messages }
+    pub fn new(testcase: Coalesced<Testcase, Setting>, passed: usize, messages: MultiWrap<T>) -> Self {
+        Self { testcase, passed, messages }
     }
 }
 impl<T> Reportable for CaseReport<T> {
@@ -64,10 +64,10 @@ impl<T> Reportable for CaseReport<T> {
         Vec::new()
     }
     fn pass(&self) -> bool {
-        self.passed == self.testcases.coalesce().setting.repeat.times()
+        self.passed == self.testcase.coalesce().setting.repeat.times()
     }
     fn allow(&self, strict: bool) -> bool {
-        let allowed = self.testcases.coalesce().attr.allow;
+        let allowed = self.testcase.coalesce().attr.allow;
         self.pass() || !strict && allowed
     }
 }
@@ -272,7 +272,7 @@ pub mod console_report {
             cmd: &Relentless,
             w: &mut ReportWriter<W>,
         ) -> Result<(), Self::Error> {
-            let Testcase { description, target, setting, .. } = self.testcases.coalesce();
+            let Testcase { description, target, setting, .. } = self.testcase.coalesce();
 
             let side = if self.pass() { CaseConsoleReport::PASS_EMOJI } else { CaseConsoleReport::FAIL_EMOJI };
             let target = console::style(&target);
@@ -420,7 +420,7 @@ pub mod github_markdown_report {
             cmd: &Relentless,
             w: &mut ReportWriter<W>,
         ) -> Result<(), Self::Error> {
-            let Testcase { description, target, setting, .. } = self.testcases.coalesce();
+            let Testcase { description, target, setting, .. } = self.testcase.coalesce();
 
             let side =
                 if self.pass() { CaseGithubMarkdownReport::PASS_EMOJI } else { CaseGithubMarkdownReport::FAIL_EMOJI };

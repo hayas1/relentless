@@ -26,6 +26,18 @@ async fn test_example_yaml_config() {
     assert!(relentless.allow(&report));
 }
 
+#[test]
+#[cfg(all(feature = "json", feature = "toml"))]
+fn test_same_basic_yaml_toml_config() {
+    let yaml = glob::glob("tests/config/basic/*.yaml").unwrap().collect::<Result<Vec<_>, _>>().unwrap();
+    let toml = glob::glob("tests/config/basic/*.toml").unwrap().collect::<Result<Vec<_>, _>>().unwrap();
+    assert_eq!(yaml.len(), toml.len());
+
+    let yam = Relentless { file: yaml, ..Default::default() };
+    let tom = Relentless { file: toml, ..Default::default() };
+    assert_eq!(yam.configs().unwrap(), tom.configs().unwrap());
+}
+
 #[tokio::test]
 #[cfg(all(feature = "json", feature = "yaml"))]
 async fn test_basic_yaml_config() {
