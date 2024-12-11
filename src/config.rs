@@ -17,7 +17,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
     error::{RunCommandError, WrappedResult},
-    service::FromBodyStructure,
+    service::BodyFactory,
     template::Template,
 };
 
@@ -81,14 +81,15 @@ pub enum BodyStructure {
     Json(HashMap<String, String>),
 }
 impl BodyStructure {
-    pub fn body_with_headers<ReqB: FromBodyStructure + Body>(
-        self,
-        template: &Template,
-    ) -> WrappedResult<(ReqB, HeaderMap)> {
+    pub fn body_with_headers<ReqB>(&self, template: &Template) -> WrappedResult<(ReqB, HeaderMap)>
+    where
+        ReqB: Body,
+        Self: BodyFactory<ReqB>,
+    {
         let mut headers = HeaderMap::new();
         self.content_type()
             .map(|t| headers.insert(CONTENT_TYPE, t.as_ref().parse().unwrap_or_else(|_| unreachable!())));
-        let body = ReqB::from_body_structure(self, template);
+        let body = self.produce(template);
         body.size_hint().exact().filter(|size| *size > 0).map(|size| headers.insert(CONTENT_LENGTH, size.into())); // TODO remove ?
         Ok((body, headers))
     }

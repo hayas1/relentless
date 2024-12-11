@@ -178,47 +178,23 @@ pub mod origin_router {
         }
     }
 }
-
 pub trait RequestFactory<R> {
     type Error;
     fn produce(&self, destination: &http::Uri, target: &str, template: &Template) -> Result<R, Self::Error>;
 }
 impl<B> RequestFactory<http::Request<B>> for HttpRequest
 where
-    B: FromBodyStructure + Body,
+    B: Body,
+    BodyStructure: BodyFactory<B>,
 {
-    type Error = <http::Request<B> as FromRequestInfo>::Error;
+    type Error = Wrap;
     fn produce(
         &self,
         destination: &http::Uri,
         target: &str,
         template: &Template,
     ) -> Result<http::Request<B>, Self::Error> {
-        http::Request::<B>::from_request_info(template, destination, target, self)
-    }
-}
-
-pub trait FromRequestInfo: Sized {
-    type Error;
-    fn from_request_info(
-        template: &Template,
-        destination: &http::Uri,
-        target: &str,
-        info: &HttpRequest,
-    ) -> Result<Self, Self::Error>;
-}
-impl<B> FromRequestInfo for http::Request<B>
-where
-    B: FromBodyStructure + Body,
-{
-    type Error = Wrap;
-    fn from_request_info(
-        template: &Template,
-        destination: &http::Uri,
-        target: &str,
-        info: &HttpRequest,
-    ) -> Result<Self, Self::Error> {
-        let HttpRequest { no_additional_headers, method, headers, body } = &info;
+        let HttpRequest { no_additional_headers, method, headers, body } = self;
         let uri = http::uri::Builder::from(destination.clone()).path_and_query(template.render(target)?).build()?;
         let unwrapped_method = method.as_ref().map(|m| (**m).clone()).unwrap_or_default();
         let unwrapped_headers: HeaderMap = headers.as_ref().map(|h| (**h).clone()).unwrap_or_default();
@@ -235,19 +211,19 @@ where
     }
 }
 
-pub trait FromBodyStructure {
-    fn from_body_structure(structure: BodyStructure, template: &Template) -> Self;
+pub trait BodyFactory<B: Body> {
+    fn produce(&self, template: &Template) -> B;
 }
-impl<T> FromBodyStructure for T
+impl<B> BodyFactory<B> for BodyStructure
 where
-    T: Body + From<Bytes> + Default,
+    B: Body + From<Bytes> + Default,
 {
-    fn from_body_structure(structure: BodyStructure, template: &Template) -> Self {
-        match structure {
+    fn produce(&self, template: &Template) -> B {
+        match self {
             BodyStructure::Empty => Default::default(),
-            BodyStructure::Plaintext(s) => Bytes::from(template.render(&s).unwrap_or(s)).into(),
+            BodyStructure::Plaintext(s) => Bytes::from(template.render(s).unwrap_or(s.to_string())).into(),
             #[cfg(feature = "json")]
-            BodyStructure::Json(_) => Bytes::from(serde_json::to_vec(&structure).unwrap()).into(),
+            BodyStructure::Json(_) => Bytes::from(serde_json::to_vec(&self).unwrap_or_else(|_| todo!())).into(),
         }
     }
 }
