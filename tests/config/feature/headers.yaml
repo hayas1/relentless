@@ -10,7 +10,7 @@ testcases:
           foo: hoge
           bar: fuga
           baz: piyo
-      evaluate:
+      response:
         body:
           json:
             patch:

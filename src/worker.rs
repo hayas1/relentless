@@ -126,7 +126,7 @@ where
 
         let (mut passed, mut v) = (0, Vec::new());
         for res in responses {
-            let pass = evaluator.evaluate(&testcase.coalesce().setting.evaluate, res, &mut v).await;
+            let pass = evaluator.evaluate(&testcase.coalesce().setting.response, res, &mut v).await;
             passed += pass as usize;
         }
         Ok(CaseReport::new(testcase, passed, v.into_iter().collect()))

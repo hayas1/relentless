@@ -35,6 +35,7 @@ fn test_same_basic_yaml_toml_config() {
 
     let yam = Relentless { file: yaml, ..Default::default() };
     let tom = Relentless { file: toml, ..Default::default() };
+    assert_json_diff::assert_json_eq!(yam.configs().unwrap(), tom.configs().unwrap());
     assert_eq!(yam.configs().unwrap(), tom.configs().unwrap());
 }
 

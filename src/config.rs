@@ -53,7 +53,7 @@ pub struct Setting {
     pub timeout: Option<Duration>, // TODO parse from string? https://crates.io/crates/humantime ?
 
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
-    pub evaluate: HttpEvaluate,
+    pub response: HttpResponse,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
@@ -118,7 +118,7 @@ impl Repeat {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
-pub struct HttpEvaluate {
+pub struct HttpResponse {
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
     pub status: StatusEvaluate,
@@ -255,7 +255,7 @@ impl Coalesce for Setting {
             template: if self.template.is_empty() { other.clone().template } else { self.template },
             repeat: self.repeat.coalesce(&other.repeat),
             timeout: self.timeout.or(other.timeout),
-            evaluate: self.evaluate.coalesce(&other.evaluate),
+            response: self.response.coalesce(&other.response),
         }
     }
 }
@@ -270,7 +270,7 @@ impl Coalesce for HttpRequest {
         }
     }
 }
-impl Coalesce for HttpEvaluate {
+impl Coalesce for HttpResponse {
     type Other = Self;
     fn coalesce(self, other: &Self) -> Self {
         Self {
@@ -713,34 +713,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "yaml", feature = "toml"))]
-    fn test_read_basic_config() {
-        let assault_yaml = Config::read("tests/config/basic/assault.yaml").unwrap();
-        let assault_toml = Config::read("tests/config/basic/assault.toml").unwrap();
-        assert_json_diff::assert_json_eq!(assault_yaml, assault_toml);
-        assert_eq!(assault_yaml, assault_toml);
-
-        let compare_yaml = Config::read("tests/config/basic/compare.yaml").unwrap();
-        let compare_toml = Config::read("tests/config/basic/compare.toml").unwrap();
-        assert_json_diff::assert_json_eq!(compare_yaml, compare_toml);
-        assert_eq!(compare_yaml, compare_toml);
-    }
-
-    #[test]
-    #[cfg(all(feature = "yaml", feature = "json", feature = "toml"))]
-    fn test_read_basic_config_for_json() {
-        let assault_yaml = Config::read("tests/config/basic/assault_json.yaml").unwrap();
-        let assault_toml = Config::read("tests/config/basic/assault_json.toml").unwrap();
-        assert_json_diff::assert_json_eq!(assault_yaml, assault_toml);
-        assert_eq!(assault_yaml, assault_toml);
-
-        let compare_yaml = Config::read("tests/config/basic/compare_json.yaml").unwrap();
-        let compare_toml = Config::read("tests/config/basic/compare_json.toml").unwrap();
-        assert_json_diff::assert_json_eq!(compare_yaml, compare_toml);
-        assert_eq!(compare_yaml, compare_toml);
-    }
-
-    #[test]
     #[cfg(all(feature = "yaml", feature = "json"))]
     fn test_config_roundtrip() {
         let example = Config {
@@ -748,7 +720,7 @@ mod tests {
                 name: Some("example".to_string()),
                 setting: Setting {
                     request: Default::default(),
-                    evaluate: HttpEvaluate { header: HeaderEvaluate::Ignore, ..Default::default() },
+                    response: HttpResponse { header: HeaderEvaluate::Ignore, ..Default::default() },
                     ..Default::default()
                 },
                 ..Default::default()
@@ -758,7 +730,7 @@ mod tests {
                 target: "/information".to_string(),
                 setting: Setting {
                     request: Default::default(),
-                    evaluate: HttpEvaluate {
+                    response: HttpResponse {
                         body: BodyEvaluate::Json(JsonEvaluate {
                             ignore: vec!["/datetime".to_string()],
                             // patch: Some(PatchTo::All(
@@ -807,7 +779,7 @@ mod tests {
         - description: test description
           target: /information
           setting:
-            evaluate:
+            response:
               body:
                 json:
                   patch:
@@ -820,7 +792,7 @@ mod tests {
             config.testcases[0].setting,
             Setting {
                 request: Default::default(),
-                evaluate: HttpEvaluate {
+                response: HttpResponse {
                     body: BodyEvaluate::Json(JsonEvaluate {
                         ignore: vec![],
                         patch: Some(EvaluateTo::All(
@@ -846,7 +818,7 @@ mod tests {
         - description: test description
           target: /information
           setting:
-            evaluate:
+            response:
               body:
                 json:
                   patch:
@@ -863,7 +835,7 @@ mod tests {
             config.testcases[0].setting,
             Setting {
                 request: Default::default(),
-                evaluate: HttpEvaluate {
+                response: HttpResponse {
                     body: BodyEvaluate::Json(JsonEvaluate {
                         ignore: vec![],
                         patch: Some(EvaluateTo::Destinations(Destinations::from_iter([

@@ -9,7 +9,7 @@ use serde_json::Value;
 
 #[cfg(feature = "json")]
 use crate::config::JsonEvaluate;
-use crate::config::{EvaluateTo, HttpEvaluate, Severity};
+use crate::config::{EvaluateTo, HttpResponse, Severity};
 use crate::error::EvaluateError;
 use crate::{
     config::{destinations::Destinations, BodyEvaluate, HeaderEvaluate, StatusEvaluate},
@@ -26,7 +26,7 @@ pub trait Evaluator<Res> {
     type Message;
     async fn evaluate(
         &self,
-        cfg: &HttpEvaluate,
+        cfg: &HttpResponse,
         res: Destinations<RequestResult<Res>>,
         msg: &mut Vec<Self::Message>,
     ) -> bool;
@@ -39,7 +39,7 @@ where
     type Message = EvaluateError;
     async fn evaluate(
         &self,
-        cfg: &HttpEvaluate,
+        cfg: &HttpResponse,
         res: Destinations<RequestResult<http::Response<B>>>,
         msg: &mut Vec<Self::Message>,
     ) -> bool {
@@ -49,7 +49,7 @@ where
 
 impl DefaultEvaluator {
     pub async fn acceptable_parts<B: Body>(
-        cfg: &HttpEvaluate,
+        cfg: &HttpResponse,
         res: Destinations<RequestResult<http::Response<B>>>,
         msg: &mut Vec<EvaluateError>,
     ) -> bool

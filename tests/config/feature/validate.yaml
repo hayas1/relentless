@@ -5,7 +5,7 @@ destinations:
 testcases:
   - target: /echo/json?foo=hoge&bar=fuga&baz=piyo
     setting:
-      evaluate:
+      response:
         body:
           json:
             patch:
