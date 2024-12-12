@@ -1,18 +1,22 @@
 use std::marker::PhantomData;
 
 #[cfg(feature = "default-http-client")]
-use crate::service::DefaultHttpClient;
+use crate::service::impl_http::client::DefaultHttpClient;
 use crate::{
     assault::reportable::{CaseReport, Report, WorkerReport},
     error::{Wrap, WrappedResult},
-    interface::command::Relentless,
-    interface::config::{
-        destinations::{Destinations, Transpose},
-        http_serde_priv, Coalesce, Coalesced, Config, Configuration, HttpRequest, HttpResponse, Setting, Testcase,
+    interface::{
+        command::Relentless,
+        config::{
+            destinations::{Destinations, Transpose},
+            http_serde_priv, Coalesce, Coalesced, Config, Configuration, HttpRequest, HttpResponse, Setting, Testcase,
+        },
+        template::Template,
     },
-    interface::template::Template,
-    service::evaluate::{Evaluator, RequestResult},
-    service::RequestFactory,
+    service::{
+        evaluate::{Evaluator, RequestResult},
+        factory::RequestFactory,
+    },
 };
 use tower::{
     timeout::{error::Elapsed, TimeoutLayer},

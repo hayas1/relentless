@@ -5,13 +5,15 @@ use clap::{Parser, ValueEnum};
 use serde::{Deserialize, Serialize};
 use tower::{Service, ServiceBuilder};
 
-use crate::assault::{
-    reportable::{Report, ReportWriter, Reportable},
-    worker::Control,
-};
 #[cfg(feature = "console-report")]
 use crate::interface::report::console::ConsoleReport;
-use crate::service::RequestFactory;
+use crate::{
+    assault::{
+        reportable::{Report, ReportWriter, Reportable},
+        worker::Control,
+    },
+    service::factory::RequestFactory,
+};
 use crate::{
     error::{IntoContext, MultiWrap, RunCommandError, Wrap, WrappedResult},
     service::{

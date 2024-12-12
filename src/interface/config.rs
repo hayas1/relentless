@@ -18,7 +18,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use crate::{
     error::{RunCommandError, Wrap, WrappedResult},
     interface::template::Template,
-    service::BodyFactory,
+    service::impl_http::factory::BodyFactory,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
