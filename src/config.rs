@@ -714,7 +714,7 @@ mod tests {
     #[test]
     #[cfg(not(any(feature = "json", feature = "yaml", feature = "toml")))]
     fn test_no_default_features() {
-        let err = Config::read("path/to/config.yaml").unwrap_err();
+        let err = Config::<HttpRequest, HttpResponse>::read("path/to/config.yaml").unwrap_err();
         assert_eq!(err.downcast_ref(), Some(&RunCommandError::UnknownFormatExtension("yaml".to_string())));
     }
 
