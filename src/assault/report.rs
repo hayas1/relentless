@@ -1,6 +1,6 @@
 use std::{
-    fmt::{Display, Formatter},
-    io::{BufWriter, Stdout},
+    fmt::{Display, Formatter, Write as FmtWrite},
+    io::{BufWriter, Stdout, Write as IoWrite},
     process::ExitCode,
 };
 
@@ -135,7 +135,7 @@ impl<W> ReportWriter<W> {
         Ok(ret)
     }
 }
-impl<W: std::io::Write> std::fmt::Write for ReportWriter<W> {
+impl<W: IoWrite> FmtWrite for ReportWriter<W> {
     fn write_str(&mut self, s: &str) -> std::fmt::Result {
         // TODO better indent implementation ?
         if s.contains('\n') {
