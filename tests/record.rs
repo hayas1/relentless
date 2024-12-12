@@ -1,6 +1,6 @@
 #![cfg(all(feature = "json", feature = "yaml"))]
 use axum::{body::Body, http::Request};
-use relentless::command::Relentless;
+use relentless::interface::command::Relentless;
 use relentless_dev_server::route;
 
 #[tokio::test]

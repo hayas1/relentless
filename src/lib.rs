@@ -61,8 +61,8 @@
 //! ## coverage
 //! <https://hayas1.github.io/relentless/tarpaulin-report.html>
 
-pub mod command;
-pub mod config;
+pub mod interface;
+
 pub mod error;
 pub mod evaluate;
 pub mod record;

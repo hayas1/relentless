@@ -1,7 +1,7 @@
 use axum::body::Body;
 use http::uri::Authority;
 use relentless::{
-    command::{Relentless, ReportFormat},
+    interface::command::{Relentless, ReportFormat},
     report::Reportable,
     service::origin_router::OriginRouter,
 };

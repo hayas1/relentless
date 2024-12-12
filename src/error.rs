@@ -6,7 +6,7 @@ use std::{
 
 use thiserror::Error;
 
-use crate::config::{Config, HttpRequest, HttpResponse};
+use crate::interface::config::{Config, HttpRequest, HttpResponse};
 
 pub type RelentlessResult<T, E = RelentlessError> = Result<T, E>;
 

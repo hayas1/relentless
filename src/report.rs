@@ -1,12 +1,13 @@
 use std::fmt::{Display, Formatter};
 use std::process::ExitCode;
 
-use crate::config::Coalesce;
 use crate::error::Wrap;
 use crate::{
-    command::{Relentless, ReportFormat},
-    config::{destinations::Destinations, http_serde_priv, Coalesced, Setting, Testcase, WorkerConfig},
     error::MultiWrap,
+    interface::command::{Relentless, ReportFormat},
+    interface::config::{
+        destinations::Destinations, http_serde_priv, Coalesce, Coalesced, Setting, Testcase, WorkerConfig,
+    },
 };
 
 /// TODO document
@@ -165,9 +166,9 @@ pub mod console_report {
     use std::fmt::{Display, Write as _};
 
     use crate::{
-        command::Relentless,
-        config::{Coalesce, Repeat, Testcase, WorkerConfig},
         error::Wrap,
+        interface::command::Relentless,
+        interface::config::{Coalesce, Repeat, Testcase, WorkerConfig},
     };
 
     use super::{CaseReport, Report, ReportWriter, Reportable, WorkerReport};
@@ -319,9 +320,9 @@ pub mod github_markdown_report {
     use std::fmt::{Display, Write as _};
 
     use crate::{
-        command::Relentless,
-        config::{Coalesce, Repeat, Testcase, WorkerConfig},
         error::Wrap,
+        interface::command::Relentless,
+        interface::config::{Coalesce, Repeat, Testcase, WorkerConfig},
     };
 
     use super::{CaseReport, Report, ReportWriter, Reportable, WorkerReport};

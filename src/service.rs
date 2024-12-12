@@ -11,8 +11,8 @@ use http_body::Body;
 use tower::Service;
 
 use crate::{
-    config::{HttpBody, HttpRequest},
     error::{Wrap, WrappedResult},
+    interface::config::{HttpBody, HttpRequest},
     template::Template,
 };
 

@@ -7,13 +7,13 @@ use regex::Regex;
 #[cfg(feature = "json")]
 use serde_json::Value;
 
-#[cfg(feature = "json")]
-use crate::config::JsonEvaluate;
-use crate::config::{EvaluateTo, HttpResponse, Severity};
 use crate::error::EvaluateError;
+#[cfg(feature = "json")]
+use crate::interface::config::JsonEvaluate;
+use crate::interface::config::{EvaluateTo, HttpResponse, Severity};
 use crate::{
-    config::{destinations::Destinations, BodyEvaluate, HeaderEvaluate, StatusEvaluate},
     error::WrappedResult,
+    interface::config::{destinations::Destinations, BodyEvaluate, HeaderEvaluate, StatusEvaluate},
 };
 
 pub enum RequestResult<Res> {
