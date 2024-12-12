@@ -6,15 +6,16 @@ use serde::{Deserialize, Serialize};
 use tower::{Service, ServiceBuilder};
 
 #[cfg(feature = "console-report")]
-use crate::report::console_report::ConsoleReport;
-use crate::report::{github_markdown_report::GithubMarkdownReport, ReportWriter};
+use crate::assault::report::console_report::ConsoleReport;
+use crate::assault::{
+    report::{github_markdown_report::GithubMarkdownReport, Report, ReportWriter, Reportable},
+    worker::Control,
+};
 use crate::service::RequestFactory;
 use crate::{
     error::{IntoContext, MultiWrap, RunCommandError, Wrap, WrappedResult},
     evaluate::Evaluator,
     record::{RecordLayer, RecordService},
-    report::{Report, Reportable},
-    worker::Control,
 };
 
 use super::config::destinations::Destinations;

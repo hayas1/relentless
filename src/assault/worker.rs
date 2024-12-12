@@ -3,6 +3,7 @@ use std::marker::PhantomData;
 #[cfg(feature = "default-http-client")]
 use crate::service::DefaultHttpClient;
 use crate::{
+    assault::report::{CaseReport, Report, WorkerReport},
     error::{Wrap, WrappedResult},
     evaluate::{Evaluator, RequestResult},
     interface::command::Relentless,
@@ -10,7 +11,6 @@ use crate::{
         destinations::{Destinations, Transpose},
         http_serde_priv, Coalesce, Coalesced, Config, Configuration, HttpRequest, HttpResponse, Setting, Testcase,
     },
-    report::{CaseReport, Report, WorkerReport},
     service::RequestFactory,
     template::Template,
 };

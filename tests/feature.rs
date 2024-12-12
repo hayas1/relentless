@@ -1,7 +1,7 @@
 #![cfg(all(feature = "json", feature = "yaml", feature = "console-report"))]
 use axum::{body::Body, http::Request};
 use http_body_util::BodyExt;
-use relentless::{interface::command::Relentless, report::console_report::CaseConsoleReport};
+use relentless::{assault::report::console_report::CaseConsoleReport, interface::command::Relentless};
 
 use relentless_dev_server::route::{self, counter::CounterResponse};
 use tower::Service;
