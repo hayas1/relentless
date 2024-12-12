@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use tower::{Service, ServiceBuilder};
 
 use crate::assault::{
-    report::{Report, ReportWriter, Reportable},
+    reportable::{Report, ReportWriter, Reportable},
     worker::Control,
 };
 #[cfg(feature = "console-report")]

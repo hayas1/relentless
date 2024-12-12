@@ -1,7 +1,7 @@
 use std::fmt::{Display, Write as _};
 
 use crate::{
-    assault::report::{CaseReport, Report, ReportWriter, Reportable, WorkerReport},
+    assault::reportable::{CaseReport, Report, ReportWriter, Reportable, WorkerReport},
     error::Wrap,
     interface::{
         command::Relentless,
