@@ -7,6 +7,8 @@ use tower::{Service, ServiceBuilder};
 
 #[cfg(feature = "console-report")]
 use crate::interface::report::console::ConsoleReport;
+#[cfg(feature = "default-http-client")]
+use crate::service::impl_http::client::DefaultHttpClient;
 use crate::{
     assault::{
         reportable::{Report, ReportWriter, Reportable},
@@ -154,7 +156,7 @@ impl Relentless {
     #[cfg(all(feature = "default-http-client", feature = "cli"))]
     pub async fn assault(&self) -> crate::Result<Report<crate::error::EvaluateError, HttpRequest, HttpResponse>> {
         let configs = self.configs_filtered(std::io::stderr())?;
-        let mut service = self.build_service(Control::default_http_client().await?);
+        let mut service = self.build_service(DefaultHttpClient::<reqwest::Body, reqwest::Body>::new().await?);
         let report = self.assault_with(configs, &mut service).await?;
         Ok(report)
     }
