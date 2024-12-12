@@ -61,12 +61,9 @@
 //! ## coverage
 //! <https://hayas1.github.io/relentless/tarpaulin-report.html>
 
-pub mod interface;
-
 pub mod assault;
 pub mod error;
-pub mod evaluate;
-pub mod record;
+pub mod interface;
 pub mod service;
 pub mod template;
 

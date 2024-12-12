@@ -14,8 +14,10 @@ use crate::assault::{
 use crate::service::RequestFactory;
 use crate::{
     error::{IntoContext, MultiWrap, RunCommandError, Wrap, WrappedResult},
-    evaluate::Evaluator,
-    record::{RecordLayer, RecordService},
+    service::{
+        evaluate::Evaluator,
+        record::{RecordLayer, RecordService},
+    },
 };
 
 use super::config::destinations::Destinations;

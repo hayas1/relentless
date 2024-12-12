@@ -5,12 +5,12 @@ use crate::service::DefaultHttpClient;
 use crate::{
     assault::report::{CaseReport, Report, WorkerReport},
     error::{Wrap, WrappedResult},
-    evaluate::{Evaluator, RequestResult},
     interface::command::Relentless,
     interface::config::{
         destinations::{Destinations, Transpose},
         http_serde_priv, Coalesce, Coalesced, Config, Configuration, HttpRequest, HttpResponse, Setting, Testcase,
     },
+    service::evaluate::{Evaluator, RequestResult},
     service::RequestFactory,
     template::Template,
 };
