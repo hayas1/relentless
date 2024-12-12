@@ -16,7 +16,7 @@ use tower::Service;
 use crate::{
     error::{Wrap, WrappedResult},
     interface::config::{HttpBody, HttpRequest},
-    template::Template,
+    interface::template::Template,
 };
 
 #[cfg(feature = "default-http-client")]

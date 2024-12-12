@@ -10,9 +10,9 @@ use crate::{
         destinations::{Destinations, Transpose},
         http_serde_priv, Coalesce, Coalesced, Config, Configuration, HttpRequest, HttpResponse, Setting, Testcase,
     },
+    interface::template::Template,
     service::evaluate::{Evaluator, RequestResult},
     service::RequestFactory,
-    template::Template,
 };
 use tower::{
     timeout::{error::Elapsed, TimeoutLayer},

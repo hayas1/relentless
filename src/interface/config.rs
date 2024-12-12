@@ -17,8 +17,8 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
     error::{RunCommandError, Wrap, WrappedResult},
+    interface::template::Template,
     service::BodyFactory,
-    template::Template,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -535,7 +535,7 @@ pub mod destinations {
 
         use serde::{Deserializer, Serializer};
 
-        use crate::template::Template;
+        use crate::interface::template::Template;
 
         use super::Destinations;
 
