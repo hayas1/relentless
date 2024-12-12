@@ -69,18 +69,18 @@ pub struct HttpRequest {
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub headers: Option<http_serde_priv::HeaderMap>,
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
-    pub body: Option<BodyStructure>,
+    pub body: Option<HttpBody>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case", untagged)]
-pub enum BodyStructure {
+pub enum HttpBody {
     #[default]
     Empty,
     Plaintext(String),
     #[cfg(feature = "json")]
     Json(HashMap<String, String>),
 }
-impl BodyStructure {
+impl HttpBody {
     pub fn body_with_headers<ReqB>(&self, template: &Template) -> WrappedResult<(ReqB, HeaderMap)>
     where
         ReqB: Body,
@@ -96,10 +96,10 @@ impl BodyStructure {
     }
     pub fn content_type(&self) -> Option<Mime> {
         match self {
-            BodyStructure::Empty => None,
-            BodyStructure::Plaintext(_) => Some(TEXT_PLAIN),
+            HttpBody::Empty => None,
+            HttpBody::Plaintext(_) => Some(TEXT_PLAIN),
             #[cfg(feature = "json")]
-            BodyStructure::Json(_) => Some(APPLICATION_JSON),
+            HttpBody::Json(_) => Some(APPLICATION_JSON),
         }
     }
 }

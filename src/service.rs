@@ -11,7 +11,7 @@ use http_body::Body;
 use tower::Service;
 
 use crate::{
-    config::{BodyStructure, HttpRequest},
+    config::{HttpBody, HttpRequest},
     error::{Wrap, WrappedResult},
     template::Template,
 };
@@ -185,8 +185,8 @@ pub trait RequestFactory<R> {
 impl<B> RequestFactory<http::Request<B>> for HttpRequest
 where
     B: Body,
-    BodyStructure: BodyFactory<B>,
-    Wrap: From<<BodyStructure as BodyFactory<B>>::Error>,
+    HttpBody: BodyFactory<B>,
+    Wrap: From<<HttpBody as BodyFactory<B>>::Error>,
 {
     type Error = Wrap;
     fn produce(
@@ -216,17 +216,17 @@ pub trait BodyFactory<B: Body> {
     type Error;
     fn produce(&self, template: &Template) -> Result<B, Self::Error>;
 }
-impl<B> BodyFactory<B> for BodyStructure
+impl<B> BodyFactory<B> for HttpBody
 where
     B: Body + From<Bytes> + Default,
 {
     type Error = Wrap;
     fn produce(&self, template: &Template) -> Result<B, Self::Error> {
         match self {
-            BodyStructure::Empty => Ok(Default::default()),
-            BodyStructure::Plaintext(s) => Ok(Bytes::from(template.render(s).unwrap_or(s.to_string())).into()),
+            HttpBody::Empty => Ok(Default::default()),
+            HttpBody::Plaintext(s) => Ok(Bytes::from(template.render(s).unwrap_or(s.to_string())).into()),
             #[cfg(feature = "json")]
-            BodyStructure::Json(_) => Ok(Bytes::from(serde_json::to_vec(&self)?).into()),
+            HttpBody::Json(_) => Ok(Bytes::from(serde_json::to_vec(&self)?).into()),
         }
     }
 }
