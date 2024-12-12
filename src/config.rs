@@ -16,7 +16,7 @@ use mime::{Mime, APPLICATION_JSON, TEXT_PLAIN};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
-    error::{RunCommandError, WrappedResult},
+    error::{RunCommandError, Wrap, WrappedResult},
     service::BodyFactory,
     template::Template,
 };
@@ -85,11 +85,12 @@ impl BodyStructure {
     where
         ReqB: Body,
         Self: BodyFactory<ReqB>,
+        Wrap: From<<Self as BodyFactory<ReqB>>::Error>,
     {
         let mut headers = HeaderMap::new();
         self.content_type()
             .map(|t| headers.insert(CONTENT_TYPE, t.as_ref().parse().unwrap_or_else(|_| unreachable!())));
-        let body = self.produce(template);
+        let body = self.produce(template)?;
         body.size_hint().exact().filter(|size| *size > 0).map(|size| headers.insert(CONTENT_LENGTH, size.into())); // TODO remove ?
         Ok((body, headers))
     }

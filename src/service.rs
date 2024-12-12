@@ -186,6 +186,7 @@ impl<B> RequestFactory<http::Request<B>> for HttpRequest
 where
     B: Body,
     BodyStructure: BodyFactory<B>,
+    Wrap: From<<BodyStructure as BodyFactory<B>>::Error>,
 {
     type Error = Wrap;
     fn produce(
@@ -212,18 +213,20 @@ where
 }
 
 pub trait BodyFactory<B: Body> {
-    fn produce(&self, template: &Template) -> B;
+    type Error;
+    fn produce(&self, template: &Template) -> Result<B, Self::Error>;
 }
 impl<B> BodyFactory<B> for BodyStructure
 where
     B: Body + From<Bytes> + Default,
 {
-    fn produce(&self, template: &Template) -> B {
+    type Error = Wrap;
+    fn produce(&self, template: &Template) -> Result<B, Self::Error> {
         match self {
-            BodyStructure::Empty => Default::default(),
-            BodyStructure::Plaintext(s) => Bytes::from(template.render(s).unwrap_or(s.to_string())).into(),
+            BodyStructure::Empty => Ok(Default::default()),
+            BodyStructure::Plaintext(s) => Ok(Bytes::from(template.render(s).unwrap_or(s.to_string())).into()),
             #[cfg(feature = "json")]
-            BodyStructure::Json(_) => Bytes::from(serde_json::to_vec(&self).unwrap_or_else(|_| todo!())).into(),
+            BodyStructure::Json(_) => Ok(Bytes::from(serde_json::to_vec(&self)?).into()),
         }
     }
 }
