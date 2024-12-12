@@ -14,22 +14,17 @@ use crate::{
         reportable::{Report, ReportWriter, Reportable},
         worker::Control,
     },
-    service::{
-        factory::RequestFactory,
-        impl_http::{evaluate::HttpResponse, factory::HttpRequest},
-    },
-};
-use crate::{
     error::{IntoContext, MultiWrap, RunCommandError, Wrap, WrappedResult},
     service::{
         evaluate::Evaluator,
+        factory::RequestFactory,
+        impl_http::{evaluate::HttpResponse, factory::HttpRequest},
         record::{RecordLayer, RecordService},
     },
 };
 
-use super::config::destinations::Destinations;
 use super::{
-    config::{http_serde_priv, Config},
+    config::{destinations::Destinations, http_serde_priv, Config},
     report::github_markdown::GithubMarkdownReport,
 };
 
