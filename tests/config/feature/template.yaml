@@ -22,7 +22,7 @@ testcases:
       request:
         method: POST
         body: hello ${var}
-      evaluate:
+      response:
         body:
           plaintext:
             server1:

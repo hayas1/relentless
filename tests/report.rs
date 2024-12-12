@@ -2,7 +2,6 @@
 use axum::{body::Body, http::Request};
 use relentless::{
     command::{Relentless, ReportFormat},
-    evaluate::DefaultEvaluator,
     report::github_markdown_report::CaseGithubMarkdownReport,
 };
 use relentless_dev_server::route;
@@ -16,8 +15,7 @@ async fn test_github_markdown_report_format() {
     };
     let configs = relentless.configs().unwrap();
     let mut service = route::app_with(Default::default());
-    let report =
-        relentless.assault_with::<_, Request<Body>, _>(configs, &mut service, &DefaultEvaluator).await.unwrap();
+    let report = relentless.assault_with::<_, Request<Body>>(configs, &mut service).await.unwrap();
 
     let mut buf = Vec::new();
     relentless.report_with(&report, &mut buf).unwrap();

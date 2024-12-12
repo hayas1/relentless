@@ -5,16 +5,17 @@ use clap::{Parser, ValueEnum};
 use serde::{Deserialize, Serialize};
 use tower::{Service, ServiceBuilder};
 
+use crate::config::{HttpRequest, HttpResponse};
 #[cfg(feature = "console-report")]
 use crate::report::console_report::ConsoleReport;
 use crate::report::{github_markdown_report::GithubMarkdownReport, ReportWriter};
+use crate::service::RequestFactory;
 use crate::{
     config::{destinations::Destinations, http_serde_priv, Config},
     error::{IntoContext, MultiWrap, RunCommandError, Wrap, WrappedResult},
     evaluate::Evaluator,
     record::{RecordLayer, RecordService},
     report::{Report, Reportable},
-    service::FromRequestInfo,
     worker::Control,
 };
 
@@ -101,7 +102,7 @@ impl Relentless {
     }
 
     /// TODO document
-    pub fn configs(&self) -> WrappedResult<Vec<Config>> {
+    pub fn configs(&self) -> WrappedResult<Vec<Config<HttpRequest, HttpResponse>>> {
         let Self { file, .. } = self;
         let (ok, err): (_, Vec<_>) = file.iter().map(Config::read).partition(Result::is_ok);
         let (configs, errors): (_, MultiWrap) =
@@ -114,7 +115,7 @@ impl Relentless {
     }
 
     /// TODO document
-    pub fn configs_filtered<W: Write>(&self, mut write: W) -> WrappedResult<Vec<Config>> {
+    pub fn configs_filtered<W: Write>(&self, mut write: W) -> WrappedResult<Vec<Config<HttpRequest, HttpResponse>>> {
         match self.configs() {
             Ok(configs) => Ok(configs),
             Err(e) => {
@@ -142,36 +143,39 @@ impl Relentless {
 
     /// TODO document
     #[cfg(all(feature = "default-http-client", feature = "cli"))]
-    pub async fn assault(&self) -> crate::Result<Report<crate::error::EvaluateError>> {
+    pub async fn assault(&self) -> crate::Result<Report<crate::error::EvaluateError, HttpRequest, HttpResponse>> {
         let configs = self.configs_filtered(std::io::stderr())?;
         let mut service = self.build_service(Control::default_http_client().await?);
-        let report = self.assault_with(configs, &mut service, &crate::evaluate::DefaultEvaluator).await?;
+        let report = self.assault_with(configs, &mut service).await?;
         Ok(report)
     }
     /// TODO document
-    pub async fn assault_with<S, Req, E>(
+    pub async fn assault_with<S, Req>(
         &self,
-        configs: Vec<Config>,
+        configs: Vec<Config<HttpRequest, HttpResponse>>,
         service: &mut S,
-        evaluator: &E,
-    ) -> crate::Result<Report<E::Message>>
+    ) -> crate::Result<Report<<HttpResponse as Evaluator<S::Response>>::Message, HttpRequest, HttpResponse>>
     where
-        Req: FromRequestInfo,
+        HttpRequest: RequestFactory<Req>,
+        HttpResponse: Evaluator<S::Response>,
         S: Service<Req> + Send + 'static,
         S::Error: std::error::Error + Send + Sync + 'static,
         S::Future: Send + 'static,
-        E: Evaluator<S::Response>,
-        Wrap: From<Req::Error> + From<S::Error>,
+        Wrap: From<<HttpRequest as RequestFactory<Req>>::Error> + From<<S as Service<Req>>::Error>,
     {
-        let control = Control::with_service(self, configs, service)?;
-        let report = control.assault(evaluator).await?;
+        let control = Control::new(service);
+        let report = control.assault(self, configs).await?;
         Ok(report)
     }
 
-    pub fn report<M: Display>(&self, report: &Report<M>) -> crate::Result<ExitCode> {
+    pub fn report<M: Display>(&self, report: &Report<M, HttpRequest, HttpResponse>) -> crate::Result<ExitCode> {
         self.report_with(report, std::io::stdout())
     }
-    pub fn report_with<M: Display, W: Write>(&self, report: &Report<M>, mut write: W) -> crate::Result<ExitCode> {
+    pub fn report_with<M: Display, W: Write>(
+        &self,
+        report: &Report<M, HttpRequest, HttpResponse>,
+        mut write: W,
+    ) -> crate::Result<ExitCode> {
         let Self { no_color, report_format, .. } = self;
         #[cfg(feature = "console-report")]
         console::set_colors_enabled(!no_color);
@@ -188,13 +192,13 @@ impl Relentless {
         Ok(report.exit_code(self))
     }
 
-    pub fn pass<T>(&self, report: &Report<T>) -> bool {
+    pub fn pass<T>(&self, report: &Report<T, HttpRequest, HttpResponse>) -> bool {
         report.pass()
     }
-    pub fn allow<T>(&self, report: &Report<T>) -> bool {
+    pub fn allow<T>(&self, report: &Report<T, HttpRequest, HttpResponse>) -> bool {
         report.allow(self.strict)
     }
-    pub fn exit_code<T>(self, report: &Report<T>) -> ExitCode {
+    pub fn exit_code<T>(self, report: &Report<T, HttpRequest, HttpResponse>) -> ExitCode {
         report.exit_code(&self)
     }
 }

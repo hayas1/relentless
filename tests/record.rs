@@ -1,6 +1,6 @@
 #![cfg(all(feature = "json", feature = "yaml"))]
 use axum::{body::Body, http::Request};
-use relentless::{command::Relentless, evaluate::DefaultEvaluator};
+use relentless::command::Relentless;
 use relentless_dev_server::route;
 
 #[tokio::test]
@@ -14,8 +14,7 @@ async fn test_record_config() {
     let configs = relentless.configs().unwrap();
     let service = route::app_with(Default::default());
     let mut record_service = relentless.build_service::<_, Request<Body>>(service);
-    let report =
-        relentless.assault_with::<_, Request<Body>, _>(configs, &mut record_service, &DefaultEvaluator).await.unwrap();
+    let report = relentless.assault_with::<_, Request<Body>>(configs, &mut record_service).await.unwrap();
     assert!(relentless.pass(&report));
     assert!(relentless.allow(&report));
 

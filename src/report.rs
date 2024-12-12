@@ -1,6 +1,7 @@
 use std::fmt::{Display, Formatter};
 use std::process::ExitCode;
 
+use crate::config::Coalesce;
 use crate::error::Wrap;
 use crate::{
     command::{Relentless, ReportFormat},
@@ -10,18 +11,18 @@ use crate::{
 
 /// TODO document
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Report<T> {
-    report: Vec<WorkerReport<T>>,
+pub struct Report<T, Q, P> {
+    report: Vec<WorkerReport<T, Q, P>>,
 }
-impl<T> Report<T> {
-    pub fn new(report: Vec<WorkerReport<T>>) -> Self {
+impl<T, Q: Clone + Coalesce, P: Clone + Coalesce> Report<T, Q, P> {
+    pub fn new(report: Vec<WorkerReport<T, Q, P>>) -> Self {
         Self { report }
     }
     pub fn exit_code(&self, cmd: &Relentless) -> ExitCode {
         (!self.allow(cmd.strict) as u8).into()
     }
 }
-impl<T> Reportable for Report<T> {
+impl<T, Q: Clone + Coalesce, P: Clone + Coalesce> Reportable for Report<T, Q, P> {
     fn sub_reportable(&self) -> Vec<&dyn Reportable> {
         self.report.iter().map(|r| r as _).collect()
     }
@@ -29,19 +30,19 @@ impl<T> Reportable for Report<T> {
 
 /// TODO document
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct WorkerReport<T> {
-    config: Coalesced<WorkerConfig, Destinations<http_serde_priv::Uri>>,
-    report: Vec<CaseReport<T>>,
+pub struct WorkerReport<T, Q, P> {
+    config: Coalesced<WorkerConfig<Q, P>, Destinations<http_serde_priv::Uri>>,
+    report: Vec<CaseReport<T, Q, P>>,
 }
-impl<T> WorkerReport<T> {
+impl<T, Q, P> WorkerReport<T, Q, P> {
     pub fn new(
-        config: Coalesced<WorkerConfig, Destinations<http_serde_priv::Uri>>,
-        report: Vec<CaseReport<T>>,
+        config: Coalesced<WorkerConfig<Q, P>, Destinations<http_serde_priv::Uri>>,
+        report: Vec<CaseReport<T, Q, P>>,
     ) -> Self {
         Self { config, report }
     }
 }
-impl<T> Reportable for WorkerReport<T> {
+impl<T, Q: Clone + Coalesce, P: Clone + Coalesce> Reportable for WorkerReport<T, Q, P> {
     fn sub_reportable(&self) -> Vec<&dyn Reportable> {
         self.report.iter().map(|r| r as _).collect()
     }
@@ -49,25 +50,25 @@ impl<T> Reportable for WorkerReport<T> {
 
 /// TODO document
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CaseReport<T> {
-    testcases: Coalesced<Testcase, Setting>,
+pub struct CaseReport<T, Q, P> {
+    testcase: Coalesced<Testcase<Q, P>, Setting<Q, P>>,
     passed: usize,
     messages: MultiWrap<T>,
 }
-impl<T> CaseReport<T> {
-    pub fn new(testcases: Coalesced<Testcase, Setting>, passed: usize, messages: MultiWrap<T>) -> Self {
-        Self { testcases, passed, messages }
+impl<T, Q, P> CaseReport<T, Q, P> {
+    pub fn new(testcase: Coalesced<Testcase<Q, P>, Setting<Q, P>>, passed: usize, messages: MultiWrap<T>) -> Self {
+        Self { testcase, passed, messages }
     }
 }
-impl<T> Reportable for CaseReport<T> {
+impl<T, Q: Clone + Coalesce, P: Clone + Coalesce> Reportable for CaseReport<T, Q, P> {
     fn sub_reportable(&self) -> Vec<&dyn Reportable> {
         Vec::new()
     }
     fn pass(&self) -> bool {
-        self.passed == self.testcases.coalesce().setting.repeat.times()
+        self.passed == self.testcase.coalesce().setting.repeat.times()
     }
     fn allow(&self, strict: bool) -> bool {
-        let allowed = self.testcases.coalesce().attr.allow;
+        let allowed = self.testcase.coalesce().attr.allow;
         self.pass() || !strict && allowed
     }
 }
@@ -165,7 +166,7 @@ pub mod console_report {
 
     use crate::{
         command::Relentless,
-        config::{Repeat, Testcase, WorkerConfig},
+        config::{Coalesce, Repeat, Testcase, WorkerConfig},
         error::Wrap,
     };
 
@@ -180,7 +181,7 @@ pub mod console_report {
         ) -> Result<(), Self::Error>;
     }
 
-    impl<T: Display> ConsoleReport for Report<T> {
+    impl<T: Display, Q: Clone + Coalesce, P: Clone + Coalesce> ConsoleReport for Report<T, Q, P> {
         type Error = crate::Error;
         fn console_report<W: std::io::Write>(
             &self,
@@ -205,7 +206,7 @@ pub mod console_report {
         pub const OVERWRITE_DESTINATION_EMOJI: console::Emoji<'_, '_> = console::Emoji("👉", "->");
     }
 
-    impl<T: Display> ConsoleReport for WorkerReport<T> {
+    impl<T: Display, Q: Clone + Coalesce, P: Clone + Coalesce> ConsoleReport for WorkerReport<T, Q, P> {
         type Error = Wrap; // TODO crate::Error ?
         fn console_report<W: std::io::Write>(
             &self,
@@ -265,14 +266,14 @@ pub mod console_report {
         pub const MESSAGE_EMOJI: console::Emoji<'_, '_> = console::Emoji("💬", "");
     }
 
-    impl<T: Display> ConsoleReport for CaseReport<T> {
+    impl<T: Display, Q: Clone + Coalesce, P: Clone + Coalesce> ConsoleReport for CaseReport<T, Q, P> {
         type Error = Wrap; // TODO crate::Error ?
         fn console_report<W: std::io::Write>(
             &self,
             cmd: &Relentless,
             w: &mut ReportWriter<W>,
         ) -> Result<(), Self::Error> {
-            let Testcase { description, target, setting, .. } = self.testcases.coalesce();
+            let Testcase { description, target, setting, .. } = self.testcase.coalesce();
 
             let side = if self.pass() { CaseConsoleReport::PASS_EMOJI } else { CaseConsoleReport::FAIL_EMOJI };
             let target = console::style(&target);
@@ -319,7 +320,7 @@ pub mod github_markdown_report {
 
     use crate::{
         command::Relentless,
-        config::{Repeat, Testcase, WorkerConfig},
+        config::{Coalesce, Repeat, Testcase, WorkerConfig},
         error::Wrap,
     };
 
@@ -334,7 +335,7 @@ pub mod github_markdown_report {
         ) -> Result<(), Self::Error>;
     }
 
-    impl<T: Display> GithubMarkdownReport for Report<T> {
+    impl<T: Display, Q: Clone + Coalesce, P: Clone + Coalesce> GithubMarkdownReport for Report<T, Q, P> {
         type Error = crate::Error;
         fn github_markdown_report<W: std::io::Write>(
             &self,
@@ -359,7 +360,7 @@ pub mod github_markdown_report {
         pub const OVERWRITE_DESTINATION_EMOJI: &str = ":point_right:";
     }
 
-    impl<T: Display> GithubMarkdownReport for WorkerReport<T> {
+    impl<T: Display, Q: Clone + Coalesce, P: Clone + Coalesce> GithubMarkdownReport for WorkerReport<T, Q, P> {
         type Error = Wrap; // TODO crate::Error ?
         fn github_markdown_report<W: std::io::Write>(
             &self,
@@ -413,14 +414,14 @@ pub mod github_markdown_report {
         pub const MESSAGE_EMOJI: &str = ":speech_balloon:";
     }
 
-    impl<T: Display> GithubMarkdownReport for CaseReport<T> {
+    impl<T: Display, Q: Clone + Coalesce, P: Clone + Coalesce> GithubMarkdownReport for CaseReport<T, Q, P> {
         type Error = Wrap; // TODO crate::Error ?
         fn github_markdown_report<W: std::io::Write>(
             &self,
             cmd: &Relentless,
             w: &mut ReportWriter<W>,
         ) -> Result<(), Self::Error> {
-            let Testcase { description, target, setting, .. } = self.testcases.coalesce();
+            let Testcase { description, target, setting, .. } = self.testcase.coalesce();
 
             let side =
                 if self.pass() { CaseGithubMarkdownReport::PASS_EMOJI } else { CaseGithubMarkdownReport::FAIL_EMOJI };

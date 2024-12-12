@@ -8,11 +8,10 @@ use std::{
 use bytes::Bytes;
 use http::HeaderMap;
 use http_body::Body;
-use http_body_util::{combinators::BoxBody, BodyExt};
 use tower::Service;
 
 use crate::{
-    config::{BodyStructure, RequestInfo},
+    config::{HttpBody, HttpRequest},
     error::{Wrap, WrappedResult},
     template::Template,
 };
@@ -179,68 +178,24 @@ pub mod origin_router {
         }
     }
 }
-
-// TODO delete BytesBody ?
-#[derive(Debug)]
-pub struct BytesBody(BoxBody<Bytes, crate::Error>);
-impl Body for BytesBody {
-    type Data = Bytes;
-    type Error = crate::Error;
-
-    fn poll_frame(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-    ) -> Poll<Option<Result<http_body::Frame<Self::Data>, Self::Error>>> {
-        Pin::new(&mut self.0).poll_frame(cx)
-    }
-    fn is_end_stream(&self) -> bool {
-        self.0.is_end_stream()
-    }
-    fn size_hint(&self) -> http_body::SizeHint {
-        self.0.size_hint()
-    }
-}
-impl From<Bytes> for BytesBody {
-    fn from(val: Bytes) -> Self {
-        if val.is_empty() {
-            BytesBody(http_body_util::Empty::new().map_err(Wrap::error).boxed())
-        } else {
-            BytesBody(http_body_util::Full::new(val).map_err(Wrap::error).boxed())
-        }
-    }
-}
-impl FromBodyStructure for BytesBody {
-    fn from_body_structure(val: BodyStructure, template: &Template) -> Self {
-        match val {
-            BodyStructure::Empty => Bytes::new().into(),
-            BodyStructure::Plaintext(s) => Bytes::from(template.render(&s).unwrap_or(s)).into(),
-            #[cfg(feature = "json")]
-            BodyStructure::Json(body) => Bytes::from(serde_json::to_vec(&body).unwrap()).into(),
-        }
-    }
-}
-
-pub trait FromRequestInfo: Sized {
+pub trait RequestFactory<R> {
     type Error;
-    fn from_request_info(
-        template: &Template,
-        destination: &http::Uri,
-        target: &str,
-        info: &RequestInfo,
-    ) -> Result<Self, Self::Error>;
+    fn produce(&self, destination: &http::Uri, target: &str, template: &Template) -> Result<R, Self::Error>;
 }
-impl<B> FromRequestInfo for http::Request<B>
+impl<B> RequestFactory<http::Request<B>> for HttpRequest
 where
-    B: FromBodyStructure + Body,
+    B: Body,
+    HttpBody: BodyFactory<B>,
+    Wrap: From<<HttpBody as BodyFactory<B>>::Error>,
 {
     type Error = Wrap;
-    fn from_request_info(
-        template: &Template,
+    fn produce(
+        &self,
         destination: &http::Uri,
         target: &str,
-        info: &RequestInfo,
-    ) -> Result<Self, Self::Error> {
-        let RequestInfo { no_additional_headers, method, headers, body } = &info;
+        template: &Template,
+    ) -> Result<http::Request<B>, Self::Error> {
+        let HttpRequest { no_additional_headers, method, headers, body } = self;
         let uri = http::uri::Builder::from(destination.clone()).path_and_query(template.render(target)?).build()?;
         let unwrapped_method = method.as_ref().map(|m| (**m).clone()).unwrap_or_default();
         let unwrapped_headers: HeaderMap = headers.as_ref().map(|h| (**h).clone()).unwrap_or_default();
@@ -257,19 +212,21 @@ where
     }
 }
 
-pub trait FromBodyStructure {
-    fn from_body_structure(structure: BodyStructure, template: &Template) -> Self;
+pub trait BodyFactory<B: Body> {
+    type Error;
+    fn produce(&self, template: &Template) -> Result<B, Self::Error>;
 }
-impl<T> FromBodyStructure for T
+impl<B> BodyFactory<B> for HttpBody
 where
-    T: Body + From<Bytes> + Default,
+    B: Body + From<Bytes> + Default,
 {
-    fn from_body_structure(structure: BodyStructure, template: &Template) -> Self {
-        match structure {
-            BodyStructure::Empty => Default::default(),
-            BodyStructure::Plaintext(s) => Bytes::from(template.render(&s).unwrap_or(s)).into(),
+    type Error = Wrap;
+    fn produce(&self, template: &Template) -> Result<B, Self::Error> {
+        match self {
+            HttpBody::Empty => Ok(Default::default()),
+            HttpBody::Plaintext(s) => Ok(Bytes::from(template.render(s).unwrap_or(s.to_string())).into()),
             #[cfg(feature = "json")]
-            BodyStructure::Json(_) => Bytes::from(serde_json::to_vec(&structure).unwrap()).into(),
+            HttpBody::Json(_) => Ok(Bytes::from(serde_json::to_vec(&self)?).into()),
         }
     }
 }

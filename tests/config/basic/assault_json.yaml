@@ -3,7 +3,7 @@ destinations:
   test-api: http://localhost:3000
 setting:
   repeat: 10
-  evaluate:
+  response:
     header: ignore
 
 
@@ -12,7 +12,7 @@ testcases:
     description: request to json response endpoint
     setting:
       repeat: 100
-      evaluate:
+      response:
         body:
           json:
             patch:
@@ -25,7 +25,7 @@ testcases:
     description: 'test failed ({"status": "200 OK"} but test for {"status": "200 NG"})'
     setting:
       repeat: 100
-      evaluate:
+      response:
         body:
           json:
             patch:

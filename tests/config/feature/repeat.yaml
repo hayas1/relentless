@@ -11,7 +11,7 @@ testcases:
   - target: /counter/decrement/10
     setting:
       repeat: 1
-      evaluate:
+      response:
         body:
           json:
             patch:

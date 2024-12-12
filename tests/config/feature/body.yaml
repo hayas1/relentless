@@ -8,7 +8,7 @@ testcases:
       request:
         method: POST
         body: hello world
-      evaluate:
+      response:
         body:
           plaintext:
             regex: hello world
@@ -20,7 +20,7 @@ testcases:
           foo: hoge
           bar: fuga
           baz: piyo
-      evaluate:
+      response:
         body:
           json:
             patch:
@@ -40,6 +40,6 @@ testcases:
           foo: hoge
           bar: fuga
           baz: piyo
-      evaluate:
+      response:
         status:
           expect: 415
