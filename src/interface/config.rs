@@ -7,18 +7,11 @@ use std::{
 };
 
 use destinations::Destinations;
-use http::{
-    header::{CONTENT_LENGTH, CONTENT_TYPE},
-    HeaderMap,
-};
-use http_body::Body;
-use mime::{Mime, APPLICATION_JSON, TEXT_PLAIN};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
-    error::{RunCommandError, Wrap, WrappedResult},
+    error::{RunCommandError, WrappedResult},
     interface::template::Template,
-    service::impl_http::factory::BodyFactory,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -59,50 +52,6 @@ pub struct Setting<Q, P> {
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub response: P,
 }
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(deny_unknown_fields, rename_all = "kebab-case")]
-pub struct HttpRequest {
-    #[serde(default, skip_serializing_if = "IsDefault::is_default")]
-    pub no_additional_headers: bool,
-    #[serde(default, skip_serializing_if = "IsDefault::is_default")]
-    pub method: Option<http_serde_priv::Method>,
-    #[serde(default, skip_serializing_if = "IsDefault::is_default")]
-    pub headers: Option<http_serde_priv::HeaderMap>,
-    #[serde(default, skip_serializing_if = "IsDefault::is_default")]
-    pub body: Option<HttpBody>,
-}
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(deny_unknown_fields, rename_all = "kebab-case", untagged)]
-pub enum HttpBody {
-    #[default]
-    Empty,
-    Plaintext(String),
-    #[cfg(feature = "json")]
-    Json(HashMap<String, String>),
-}
-impl HttpBody {
-    pub fn body_with_headers<ReqB>(&self, template: &Template) -> WrappedResult<(ReqB, HeaderMap)>
-    where
-        ReqB: Body,
-        Self: BodyFactory<ReqB>,
-        Wrap: From<<Self as BodyFactory<ReqB>>::Error>,
-    {
-        let mut headers = HeaderMap::new();
-        self.content_type()
-            .map(|t| headers.insert(CONTENT_TYPE, t.as_ref().parse().unwrap_or_else(|_| unreachable!())));
-        let body = self.produce(template)?;
-        body.size_hint().exact().filter(|size| *size > 0).map(|size| headers.insert(CONTENT_LENGTH, size.into())); // TODO remove ?
-        Ok((body, headers))
-    }
-    pub fn content_type(&self) -> Option<Mime> {
-        match self {
-            HttpBody::Empty => None,
-            HttpBody::Plaintext(_) => Some(TEXT_PLAIN),
-            #[cfg(feature = "json")]
-            HttpBody::Json(_) => Some(APPLICATION_JSON),
-        }
-    }
-}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
@@ -121,60 +70,6 @@ impl Repeat {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(deny_unknown_fields, rename_all = "kebab-case")]
-pub struct HttpResponse {
-    #[serde(default, skip_serializing_if = "IsDefault::is_default")]
-    #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
-    pub status: StatusEvaluate,
-    #[serde(default, skip_serializing_if = "IsDefault::is_default")]
-    #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
-    pub header: HeaderEvaluate,
-    #[serde(default, skip_serializing_if = "IsDefault::is_default")]
-    #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
-    pub body: BodyEvaluate,
-}
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(deny_unknown_fields, rename_all = "kebab-case")]
-pub enum StatusEvaluate {
-    #[default]
-    OkOrEqual,
-    Expect(EvaluateTo<http_serde_priv::StatusCode>),
-    Ignore,
-}
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(deny_unknown_fields, rename_all = "kebab-case")]
-pub enum HeaderEvaluate {
-    #[default]
-    AnyOrEqual,
-    Expect(EvaluateTo<http_serde_priv::HeaderMap>),
-    Ignore,
-}
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(deny_unknown_fields, rename_all = "kebab-case")]
-pub enum BodyEvaluate {
-    #[default]
-    AnyOrEqual,
-    Plaintext(EvaluateTo<PlaintextEvaluate>),
-    #[cfg(feature = "json")]
-    Json(JsonEvaluate),
-}
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(deny_unknown_fields, rename_all = "kebab-case")]
-pub struct PlaintextEvaluate {
-    pub regex: Option<String>,
-}
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(deny_unknown_fields, rename_all = "kebab-case")]
-#[cfg(feature = "json")]
-pub struct JsonEvaluate {
-    #[serde(default, skip_serializing_if = "IsDefault::is_default")]
-    pub ignore: Vec<String>,
-    #[serde(default, skip_serializing_if = "IsDefault::is_default")]
-    pub patch: Option<EvaluateTo<json_patch::Patch>>,
-    #[serde(default, skip_serializing_if = "IsDefault::is_default")]
-    pub patch_fail: Option<Severity>,
-}
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case", untagged)]
 pub enum EvaluateTo<T> {
@@ -262,52 +157,6 @@ impl<Q: Coalesce, P: Coalesce> Coalesce for Setting<Q, P> {
             repeat: self.repeat.coalesce(&other.repeat),
             timeout: self.timeout.or(other.timeout),
             response: self.response.coalesce(&other.response),
-        }
-    }
-}
-impl Coalesce for HttpRequest {
-    fn coalesce(self, other: &Self) -> Self {
-        Self {
-            no_additional_headers: self.no_additional_headers || other.no_additional_headers,
-            method: self.method.or(other.method.clone()),
-            headers: self.headers.or(other.headers.clone()),
-            body: self.body.or(other.body.clone()),
-        }
-    }
-}
-impl Coalesce for HttpResponse {
-    fn coalesce(self, other: &Self) -> Self {
-        Self {
-            status: self.status.coalesce(&other.status),
-            header: self.header.coalesce(&other.header),
-            body: self.body.coalesce(&other.body),
-        }
-    }
-}
-impl Coalesce for StatusEvaluate {
-    fn coalesce(self, other: &Self) -> Self {
-        if self.is_default() {
-            other.clone()
-        } else {
-            self
-        }
-    }
-}
-impl Coalesce for HeaderEvaluate {
-    fn coalesce(self, other: &Self) -> Self {
-        if self.is_default() {
-            other.clone()
-        } else {
-            self
-        }
-    }
-}
-impl Coalesce for BodyEvaluate {
-    fn coalesce(self, other: &Self) -> Self {
-        if self.is_default() {
-            other.clone()
-        } else {
-            self
         }
     }
 }
@@ -709,6 +558,11 @@ pub(crate) mod http_serde_priv {
 
 #[cfg(test)]
 mod tests {
+    use crate::service::impl_http::{
+        evaluate::{BodyEvaluate, HeaderEvaluate, HttpResponse, JsonEvaluate},
+        factory::HttpRequest,
+    };
+
     use super::*;
 
     #[test]

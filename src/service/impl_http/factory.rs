@@ -1,15 +1,78 @@
+use std::collections::HashMap;
+
 use bytes::Bytes;
-use http::HeaderMap;
+use http::{
+    header::{CONTENT_LENGTH, CONTENT_TYPE},
+    HeaderMap,
+};
 use http_body::Body;
+use mime::{Mime, APPLICATION_JSON, TEXT_PLAIN};
+use serde::{Deserialize, Serialize};
 
 use crate::{
-    error::Wrap,
+    error::{Wrap, WrappedResult},
     interface::{
-        config::{HttpBody, HttpRequest},
+        config::{http_serde_priv, Coalesce, IsDefault},
         template::Template,
     },
     service::factory::RequestFactory,
 };
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
+pub struct HttpRequest {
+    #[serde(default, skip_serializing_if = "IsDefault::is_default")]
+    pub no_additional_headers: bool,
+    #[serde(default, skip_serializing_if = "IsDefault::is_default")]
+    pub method: Option<http_serde_priv::Method>,
+    #[serde(default, skip_serializing_if = "IsDefault::is_default")]
+    pub headers: Option<http_serde_priv::HeaderMap>,
+    #[serde(default, skip_serializing_if = "IsDefault::is_default")]
+    pub body: Option<HttpBody>,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields, rename_all = "kebab-case", untagged)]
+pub enum HttpBody {
+    #[default]
+    Empty,
+    Plaintext(String),
+    #[cfg(feature = "json")]
+    Json(HashMap<String, String>),
+}
+impl HttpBody {
+    pub fn body_with_headers<ReqB>(&self, template: &Template) -> WrappedResult<(ReqB, HeaderMap)>
+    where
+        ReqB: Body,
+        Self: BodyFactory<ReqB>,
+        Wrap: From<<Self as BodyFactory<ReqB>>::Error>,
+    {
+        let mut headers = HeaderMap::new();
+        self.content_type()
+            .map(|t| headers.insert(CONTENT_TYPE, t.as_ref().parse().unwrap_or_else(|_| unreachable!())));
+        let body = self.produce(template)?;
+        body.size_hint().exact().filter(|size| *size > 0).map(|size| headers.insert(CONTENT_LENGTH, size.into())); // TODO remove ?
+        Ok((body, headers))
+    }
+    pub fn content_type(&self) -> Option<Mime> {
+        match self {
+            HttpBody::Empty => None,
+            HttpBody::Plaintext(_) => Some(TEXT_PLAIN),
+            #[cfg(feature = "json")]
+            HttpBody::Json(_) => Some(APPLICATION_JSON),
+        }
+    }
+}
+
+impl Coalesce for HttpRequest {
+    fn coalesce(self, other: &Self) -> Self {
+        Self {
+            no_additional_headers: self.no_additional_headers || other.no_additional_headers,
+            method: self.method.or(other.method.clone()),
+            headers: self.headers.or(other.headers.clone()),
+            body: self.body.or(other.body.clone()),
+        }
+    }
+}
 
 impl<B> RequestFactory<http::Request<B>> for HttpRequest
 where
