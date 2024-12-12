@@ -1,8 +1,8 @@
 #![cfg(all(feature = "json", feature = "yaml"))]
 use axum::{body::Body, http::Request};
-use relentless::{
-    assault::report::github_markdown_report::CaseGithubMarkdownReport,
-    interface::command::{Relentless, ReportFormat},
+use relentless::interface::{
+    command::{Relentless, ReportFormat},
+    report::github_markdown::CaseGithubMarkdownReport,
 };
 use relentless_dev_server::route;
 

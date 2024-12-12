@@ -5,12 +5,12 @@ use clap::{Parser, ValueEnum};
 use serde::{Deserialize, Serialize};
 use tower::{Service, ServiceBuilder};
 
-#[cfg(feature = "console-report")]
-use crate::assault::report::console_report::ConsoleReport;
 use crate::assault::{
-    report::{github_markdown_report::GithubMarkdownReport, Report, ReportWriter, Reportable},
+    report::{Report, ReportWriter, Reportable},
     worker::Control,
 };
+#[cfg(feature = "console-report")]
+use crate::interface::report::console::ConsoleReport;
 use crate::service::RequestFactory;
 use crate::{
     error::{IntoContext, MultiWrap, RunCommandError, Wrap, WrappedResult},
@@ -21,7 +21,10 @@ use crate::{
 };
 
 use super::config::destinations::Destinations;
-use super::config::{http_serde_priv, Config, HttpRequest, HttpResponse};
+use super::{
+    config::{http_serde_priv, Config, HttpRequest, HttpResponse},
+    report::github_markdown::GithubMarkdownReport,
+};
 
 #[cfg(feature = "cli")]
 pub async fn execute() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sync>> {
