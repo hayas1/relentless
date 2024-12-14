@@ -108,6 +108,55 @@ where
     }
 }
 
+impl StatusEvaluate {
+    pub fn acceptable_status(&self, status: &Destinations<http::StatusCode>, msg: &mut Vec<EvaluateError>) -> bool {
+        let acceptable = match &self {
+            StatusEvaluate::OkOrEqual => HttpResponse::assault_or_compare(status, |(_, s)| s.is_success()),
+            StatusEvaluate::Expect(EvaluateTo::All(code)) => HttpResponse::validate_all(status, |(_, s)| s == &**code),
+            StatusEvaluate::Expect(EvaluateTo::Destinations(code)) => {
+                // TODO subset ?
+                status == &code.iter().map(|(d, c)| (d.to_string(), **c)).collect()
+            }
+            StatusEvaluate::Ignore => true,
+        };
+        if !acceptable {
+            msg.push(EvaluateError::UnacceptableStatus);
+        }
+        acceptable
+    }
+}
+
+impl HeaderEvaluate {
+    pub fn acceptable_header(&self, headers: &Destinations<http::HeaderMap>, msg: &mut Vec<EvaluateError>) -> bool {
+        let acceptable = match &self {
+            HeaderEvaluate::AnyOrEqual => HttpResponse::assault_or_compare(headers, |_| true),
+            HeaderEvaluate::Expect(EvaluateTo::All(header)) => {
+                HttpResponse::validate_all(headers, |(_, h)| h == &**header)
+            }
+            HeaderEvaluate::Expect(EvaluateTo::Destinations(header)) => {
+                // TODO subset ?
+                headers == &header.iter().map(|(d, h)| (d.to_string(), (**h).clone())).collect()
+            }
+            HeaderEvaluate::Ignore => true,
+        };
+        if !acceptable {
+            msg.push(EvaluateError::UnacceptableHeaderMap);
+        }
+        acceptable
+    }
+}
+
+impl BodyEvaluate {
+    pub fn acceptable_body(&self, body: &Destinations<Bytes>, msg: &mut Vec<EvaluateError>) -> bool {
+        match &self {
+            BodyEvaluate::AnyOrEqual => HttpResponse::assault_or_compare(body, |_| true),
+            BodyEvaluate::Plaintext(p) => p.plaintext_acceptable(body, msg),
+            #[cfg(feature = "json")]
+            BodyEvaluate::Json(e) => e.json_acceptable(body, msg),
+        }
+    }
+}
+
 impl HttpResponse {
     pub async fn acceptable_parts<B: Body>(
         &self,
@@ -138,48 +187,9 @@ impl HttpResponse {
             h.insert(name.clone(), headers);
             b.insert(name.clone(), bytes);
         }
-        self.acceptable_status(&s, msg) && self.acceptable_header(&h, msg) && self.acceptable_body(&b, msg)
-    }
-
-    pub fn acceptable_status(&self, status: &Destinations<http::StatusCode>, msg: &mut Vec<EvaluateError>) -> bool {
-        let acceptable = match &self.status {
-            StatusEvaluate::OkOrEqual => Self::assault_or_compare(status, |(_, s)| s.is_success()),
-            StatusEvaluate::Expect(EvaluateTo::All(code)) => Self::validate_all(status, |(_, s)| s == &**code),
-            StatusEvaluate::Expect(EvaluateTo::Destinations(code)) => {
-                // TODO subset ?
-                status == &code.iter().map(|(d, c)| (d.to_string(), **c)).collect()
-            }
-            StatusEvaluate::Ignore => true,
-        };
-        if !acceptable {
-            msg.push(EvaluateError::UnacceptableStatus);
-        }
-        acceptable
-    }
-
-    pub fn acceptable_header(&self, headers: &Destinations<http::HeaderMap>, msg: &mut Vec<EvaluateError>) -> bool {
-        let acceptable = match &self.header {
-            HeaderEvaluate::AnyOrEqual => Self::assault_or_compare(headers, |_| true),
-            HeaderEvaluate::Expect(EvaluateTo::All(header)) => Self::validate_all(headers, |(_, h)| h == &**header),
-            HeaderEvaluate::Expect(EvaluateTo::Destinations(header)) => {
-                // TODO subset ?
-                headers == &header.iter().map(|(d, h)| (d.to_string(), (**h).clone())).collect()
-            }
-            HeaderEvaluate::Ignore => true,
-        };
-        if !acceptable {
-            msg.push(EvaluateError::UnacceptableHeaderMap);
-        }
-        acceptable
-    }
-
-    pub fn acceptable_body(&self, body: &Destinations<Bytes>, msg: &mut Vec<EvaluateError>) -> bool {
-        match &self.body {
-            BodyEvaluate::AnyOrEqual => Self::assault_or_compare(body, |_| true),
-            BodyEvaluate::Plaintext(p) => p.plaintext_acceptable(body, msg),
-            #[cfg(feature = "json")]
-            BodyEvaluate::Json(e) => e.json_acceptable(body, msg),
-        }
+        self.status.acceptable_status(&s, msg)
+            && self.header.acceptable_header(&h, msg)
+            && self.body.acceptable_body(&b, msg)
     }
 
     pub fn assault_or_compare<T: PartialEq, F: Fn((&String, &T)) -> bool>(d: &Destinations<T>, f: F) -> bool {
