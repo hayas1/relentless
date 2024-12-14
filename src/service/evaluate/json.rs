@@ -8,7 +8,7 @@ use crate::{
         config::{EvaluateTo, Severity},
         helper::is_default::IsDefault,
     },
-    service::destinations::Destinations,
+    service::{destinations::Destinations, evaluator::Acceptable},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -23,8 +23,14 @@ pub struct JsonEvaluate {
 }
 
 #[cfg(feature = "json")]
+impl Acceptable<Bytes> for JsonEvaluate {
+    type Message = EvaluateError;
+    fn accept(&self, bytes: &Destinations<Bytes>, msg: &mut Vec<EvaluateError>) -> bool {
+        self.accept_json(bytes, msg)
+    }
+}
 impl JsonEvaluate {
-    pub fn json_acceptable(&self, bytes: &Destinations<Bytes>, msg: &mut Vec<EvaluateError>) -> bool {
+    pub fn accept_json(&self, bytes: &Destinations<Bytes>, msg: &mut Vec<EvaluateError>) -> bool {
         let values: Vec<_> = match self.patched(bytes) {
             Ok(values) => values,
             Err(e) => {
