@@ -218,7 +218,7 @@ mod tests {
         evaluate::{BodyEvaluate, HeaderEvaluate, HttpResponse},
         factory::HttpRequest,
     };
-    use crate::service::destinations::EvaluateTo;
+    use crate::service::destinations::AllOr;
     #[cfg(feature = "json")]
     use crate::service::evaluate::json::JsonEvaluate;
 
@@ -258,7 +258,7 @@ mod tests {
                             //     )
                             //     .unwrap(),
                             // )),
-                            patch: Some(EvaluateTo::Destinations(Destinations::from_iter([
+                            patch: Some(AllOr::Destinations(Destinations::from_iter([
                                 (
                                     "actual".to_string(),
                                     serde_json::from_value(serde_json::json!([{"op": "remove", "path": "/datetime"}]))
@@ -314,7 +314,7 @@ mod tests {
                 response: HttpResponse {
                     body: BodyEvaluate::Json(JsonEvaluate {
                         ignore: vec![],
-                        patch: Some(EvaluateTo::All(
+                        patch: Some(AllOr::All(
                             serde_json::from_value(
                                 serde_json::json!([{"op": "replace", "path": "/datetime", "value": "2021-01-01"}])
                             )
@@ -357,7 +357,7 @@ mod tests {
                 response: HttpResponse {
                     body: BodyEvaluate::Json(JsonEvaluate {
                         ignore: vec![],
-                        patch: Some(EvaluateTo::Destinations(Destinations::from_iter([
+                        patch: Some(AllOr::Destinations(Destinations::from_iter([
                             (
                                 "actual".to_string(),
                                 serde_json::from_value(serde_json::json!([{"op": "remove", "path": "/datetime"}]))

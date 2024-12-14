@@ -9,7 +9,7 @@ use crate::{
     error::EvaluateError,
     interface::helper::{coalesce::Coalesce, http_serde_priv, is_default::IsDefault},
     service::{
-        destinations::{Destinations, EvaluateTo},
+        destinations::{AllOr, Destinations},
         evaluate::plaintext::PlaintextEvaluate,
         evaluator::{Acceptable, Evaluator, RequestResult},
     },
@@ -33,7 +33,7 @@ pub struct HttpResponse {
 pub enum StatusEvaluate {
     #[default]
     OkOrEqual,
-    Expect(EvaluateTo<http_serde_priv::StatusCode>),
+    Expect(AllOr<http_serde_priv::StatusCode>),
     Ignore,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -41,7 +41,7 @@ pub enum StatusEvaluate {
 pub enum HeaderEvaluate {
     #[default]
     AnyOrEqual,
-    Expect(EvaluateTo<http_serde_priv::HeaderMap>),
+    Expect(AllOr<http_serde_priv::HeaderMap>),
     Ignore,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -132,8 +132,8 @@ impl Acceptable<http::StatusCode> for StatusEvaluate {
     fn accept(&self, status: &Destinations<http::StatusCode>, msg: &mut Vec<Self::Message>) -> bool {
         let acceptable = match &self {
             StatusEvaluate::OkOrEqual => Self::assault_or_compare(status, |(_, s)| s.is_success()),
-            StatusEvaluate::Expect(EvaluateTo::All(code)) => Self::validate_all(status, |(_, s)| s == &**code),
-            StatusEvaluate::Expect(EvaluateTo::Destinations(code)) => {
+            StatusEvaluate::Expect(AllOr::All(code)) => Self::validate_all(status, |(_, s)| s == &**code),
+            StatusEvaluate::Expect(AllOr::Destinations(code)) => {
                 // TODO subset ?
                 status == &code.iter().map(|(d, c)| (d.to_string(), **c)).collect()
             }
@@ -151,8 +151,8 @@ impl Acceptable<http::HeaderMap> for HeaderEvaluate {
     fn accept(&self, headers: &Destinations<http::HeaderMap>, msg: &mut Vec<Self::Message>) -> bool {
         let acceptable = match &self {
             HeaderEvaluate::AnyOrEqual => Self::assault_or_compare(headers, |_| true),
-            HeaderEvaluate::Expect(EvaluateTo::All(header)) => Self::validate_all(headers, |(_, h)| h == &**header),
-            HeaderEvaluate::Expect(EvaluateTo::Destinations(header)) => {
+            HeaderEvaluate::Expect(AllOr::All(header)) => Self::validate_all(headers, |(_, h)| h == &**header),
+            HeaderEvaluate::Expect(AllOr::Destinations(header)) => {
                 // TODO subset ?
                 headers == &header.iter().map(|(d, h)| (d.to_string(), (**h).clone())).collect()
             }

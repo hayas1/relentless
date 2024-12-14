@@ -13,7 +13,7 @@ use crate::interface::helper::transpose::Transpose;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case", untagged)]
-pub enum EvaluateTo<T> {
+pub enum AllOr<T> {
     All(T),
     Destinations(Destinations<T>),
 }

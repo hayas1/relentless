@@ -6,7 +6,7 @@ use crate::{
     error::{EvaluateError, WrappedResult},
     interface::{config::Severity, helper::is_default::IsDefault},
     service::{
-        destinations::{Destinations, EvaluateTo},
+        destinations::{AllOr, Destinations},
         evaluator::Acceptable,
     },
 };
@@ -17,7 +17,7 @@ pub struct JsonEvaluate {
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub ignore: Vec<String>,
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
-    pub patch: Option<EvaluateTo<json_patch::Patch>>,
+    pub patch: Option<AllOr<json_patch::Patch>>,
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub patch_fail: Option<Severity>,
 }
@@ -61,8 +61,8 @@ impl JsonEvaluate {
     pub fn patch(&self, name: &str, value: &mut Value) -> Result<(), json_patch::PatchError> {
         let default_patch = json_patch::Patch::default();
         let patch = match &self.patch {
-            Some(EvaluateTo::All(p)) => p,
-            Some(EvaluateTo::Destinations(patch)) => patch.get(name).unwrap_or(&default_patch),
+            Some(AllOr::All(p)) => p,
+            Some(AllOr::Destinations(patch)) => patch.get(name).unwrap_or(&default_patch),
             None => &default_patch,
         };
         json_patch::patch_unsafe(value, patch)
