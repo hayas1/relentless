@@ -63,6 +63,7 @@
 
 pub mod assault;
 pub mod error;
+pub mod implement;
 pub mod interface;
 pub mod service;
 

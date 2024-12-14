@@ -5,21 +5,21 @@ use clap::{Parser, ValueEnum};
 use serde::{Deserialize, Serialize};
 use tower::{Service, ServiceBuilder};
 
+#[cfg(feature = "default-http-client")]
+use crate::implement::service_http::client::DefaultHttpClient;
 #[cfg(feature = "console-report")]
 use crate::interface::report::console::ConsoleReport;
-#[cfg(feature = "default-http-client")]
-use crate::service::impl_http::client::DefaultHttpClient;
 use crate::{
     assault::{
         reportable::{Report, ReportWriter, Reportable},
         worker::Control,
     },
     error::{IntoContext, MultiWrap, RunCommandError, Wrap, WrappedResult},
+    implement::service_http::{evaluate::HttpResponse, factory::HttpRequest},
     service::{
         destinations::Destinations,
         evaluate::Evaluator,
         factory::RequestFactory,
-        impl_http::{evaluate::HttpResponse, factory::HttpRequest},
         record::{RecordLayer, RecordService},
     },
 };
