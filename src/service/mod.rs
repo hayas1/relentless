@@ -1,4 +1,4 @@
-pub mod evaluate;
+pub mod evaluator;
 pub mod factory;
 
 pub mod destinations;

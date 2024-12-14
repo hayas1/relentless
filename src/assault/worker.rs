@@ -15,7 +15,7 @@ use crate::{
     },
     service::{
         destinations::Destinations,
-        evaluate::{Evaluator, RequestResult},
+        evaluator::{Evaluator, RequestResult},
         factory::RequestFactory,
     },
 };
