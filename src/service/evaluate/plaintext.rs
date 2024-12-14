@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     error::EvaluateError,
     service::{
-        destinations::{Destinations, AllOr},
+        destinations::{AllOr, Destinations},
         evaluator::Acceptable,
     },
 };
