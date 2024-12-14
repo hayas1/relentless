@@ -13,15 +13,16 @@ use crate::{
         },
         template::Template,
     },
-    service::{
-        destinations::Destinations,
-        evaluator::{Evaluator, RequestResult},
-        factory::RequestFactory,
-    },
 };
 use tower::{
     timeout::{error::Elapsed, TimeoutLayer},
     Service, ServiceBuilder, ServiceExt,
+};
+
+use super::{
+    destinations::Destinations,
+    evaluator::{Evaluator, RequestResult},
+    factory::RequestFactory,
 };
 
 /// TODO document

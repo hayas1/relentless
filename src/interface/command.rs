@@ -10,18 +10,14 @@ use crate::implement::service_http::client::DefaultHttpClient;
 #[cfg(feature = "console-report")]
 use crate::interface::report::console::ConsoleReport;
 use crate::{
+    assault::{destinations::Destinations, evaluator::Evaluator, factory::RequestFactory},
     assault::{
         reportable::{Report, ReportWriter, Reportable},
         worker::Control,
     },
     error::{IntoContext, MultiWrap, RunCommandError, Wrap, WrappedResult},
     implement::service_http::{evaluate::HttpResponse, factory::HttpRequest},
-    service::{
-        destinations::Destinations,
-        evaluator::Evaluator,
-        factory::RequestFactory,
-        record::{RecordLayer, RecordService},
-    },
+    service::record::{RecordLayer, RecordService},
 };
 
 use super::{config::Config, helper::http_serde_priv, report::github_markdown::GithubMarkdownReport};

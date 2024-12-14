@@ -8,7 +8,7 @@ pub mod transpose_template_serde {
 
     use serde::{Deserializer, Serializer};
 
-    use crate::{interface::template::Template, service::destinations::Destinations};
+    use crate::{assault::destinations::Destinations, interface::template::Template};
 
     pub fn serialize<S>(template: &Destinations<Template>, serializer: S) -> Result<S::Ok, S::Error>
     where

@@ -9,9 +9,9 @@ use std::{
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
+    assault::destinations::Destinations,
     error::{RunCommandError, WrappedResult},
     interface::template::Template,
-    service::destinations::Destinations,
 };
 
 use super::helper::{coalesce::Coalesce, http_serde_priv, is_default::IsDefault, transpose};
@@ -214,13 +214,13 @@ impl Format {
 
 #[cfg(test)]
 mod tests {
+    use crate::assault::destinations::AllOr;
+    #[cfg(feature = "json")]
+    use crate::assault::evaluate::json::JsonEvaluate;
     use crate::implement::service_http::{
         evaluate::{BodyEvaluate, HeaderEvaluate, HttpResponse},
         factory::HttpRequest,
     };
-    use crate::service::destinations::AllOr;
-    #[cfg(feature = "json")]
-    use crate::service::evaluate::json::JsonEvaluate;
 
     use super::*;
 

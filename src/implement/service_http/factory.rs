@@ -10,12 +10,12 @@ use mime::{Mime, APPLICATION_JSON, TEXT_PLAIN};
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    assault::factory::RequestFactory,
     error::{Wrap, WrappedResult},
     interface::{
         helper::{coalesce::Coalesce, http_serde_priv, is_default::IsDefault},
         template::Template,
     },
-    service::factory::RequestFactory,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]

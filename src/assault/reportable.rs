@@ -14,8 +14,9 @@ use crate::{
             http_serde_priv,
         },
     },
-    service::destinations::Destinations,
 };
+
+use super::destinations::Destinations;
 
 /// TODO document
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -3,12 +3,12 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::{
-    error::{EvaluateError, WrappedResult},
-    interface::{config::Severity, helper::is_default::IsDefault},
-    service::{
+    assault::{
         destinations::{AllOr, Destinations},
         evaluator::Acceptable,
     },
+    error::{EvaluateError, WrappedResult},
+    interface::{config::Severity, helper::is_default::IsDefault},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
