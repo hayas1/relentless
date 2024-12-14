@@ -9,11 +9,12 @@ use crate::{
         helper::{
             coalesce::{Coalesce, Coalesced},
             http_serde_priv,
+            transpose::Transpose,
         },
         template::Template,
     },
     service::{
-        destinations::{Destinations, Transpose},
+        destinations::Destinations,
         evaluate::{Evaluator, RequestResult},
         factory::RequestFactory,
     },

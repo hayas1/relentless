@@ -11,10 +11,10 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use crate::{
     error::{RunCommandError, WrappedResult},
     interface::template::Template,
-    service::destinations::{self, Destinations},
+    service::destinations::Destinations,
 };
 
-use super::helper::{coalesce::Coalesce, http_serde_priv, is_default::IsDefault};
+use super::helper::{coalesce::Coalesce, http_serde_priv, is_default::IsDefault, transpose};
 
 // TODO this trait should be divided
 pub trait Configuration: Debug + Clone + PartialEq + Eq + Serialize + DeserializeOwned + Default {}
@@ -48,7 +48,7 @@ pub struct Setting<Q, P> {
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub request: Q,
 
-    #[serde(default, skip_serializing_if = "IsDefault::is_default", with = "destinations::transpose_template_serde")]
+    #[serde(default, skip_serializing_if = "IsDefault::is_default", with = "transpose::transpose_template_serde")]
     pub template: Destinations<Template>,
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub repeat: Repeat,
