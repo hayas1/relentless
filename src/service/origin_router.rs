@@ -5,7 +5,6 @@ use tower::Service;
 
 use crate::error::{AssaultError, Wrap};
 
-// TODO deref ?
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OriginRouter<S, B> {
     map: HashMap<Authority, S>,
