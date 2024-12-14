@@ -16,6 +16,10 @@ use crate::{
 
 use super::helper::{coalesce::Coalesce, http_serde_priv, is_default::IsDefault};
 
+// TODO this trait should be divided
+pub trait Configuration: Debug + Clone + PartialEq + Eq + Serialize + DeserializeOwned + Default {}
+impl<T> Configuration for T where T: Debug + Clone + PartialEq + Eq + Serialize + DeserializeOwned + Default {}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[serde(bound = "Q: Configuration, P: Configuration")]
@@ -106,10 +110,6 @@ pub struct Attribute {
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub allow: bool,
 }
-
-// TODO this trait should be divided
-pub trait Configuration: Debug + Clone + PartialEq + Eq + Serialize + DeserializeOwned + Default {}
-impl<T> Configuration for T where T: Debug + Clone + PartialEq + Eq + Serialize + DeserializeOwned + Default {}
 
 impl<Q: Configuration, P: Configuration> Config<Q, P> {
     pub fn read<A: AsRef<Path>>(path: A) -> WrappedResult<Self> {
