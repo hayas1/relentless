@@ -3,6 +3,7 @@ use http_body::Body;
 use http_body_util::{BodyExt, Collected};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "json")]
 use serde_json::Value;
 
 use crate::{
