@@ -14,7 +14,7 @@ use crate::{
     interface::template::Template,
 };
 
-use super::helper::{coalesce::Coalesce, http_serde_priv};
+use super::helper::{coalesce::Coalesce, http_serde_priv, is_default::IsDefault};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
@@ -110,13 +110,6 @@ pub struct Attribute {
 // TODO this trait should be divided
 pub trait Configuration: Debug + Clone + PartialEq + Eq + Serialize + DeserializeOwned + Default {}
 impl<T> Configuration for T where T: Debug + Clone + PartialEq + Eq + Serialize + DeserializeOwned + Default {}
-
-pub trait IsDefault: Default + PartialEq<Self> {
-    fn is_default(&self) -> bool {
-        self == &Self::default()
-    }
-}
-impl<T> IsDefault for T where T: Default + PartialEq<T> {}
 
 impl<Q: Configuration, P: Configuration> Config<Q, P> {
     pub fn read<A: AsRef<Path>>(path: A) -> WrappedResult<Self> {
