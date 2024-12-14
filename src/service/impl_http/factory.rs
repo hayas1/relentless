@@ -12,8 +12,8 @@ use serde::{Deserialize, Serialize};
 use crate::{
     error::{Wrap, WrappedResult},
     interface::{
-        config::{Coalesce, IsDefault},
-        helper::http_serde_priv,
+        config::IsDefault,
+        helper::{coalesce::Coalesce, http_serde_priv},
         template::Template,
     },
     service::factory::RequestFactory,

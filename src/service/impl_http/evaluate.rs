@@ -8,8 +8,8 @@ use serde_json::Value;
 use crate::{
     error::{EvaluateError, WrappedResult},
     interface::{
-        config::{destinations::Destinations, Coalesce, EvaluateTo, IsDefault, Severity},
-        helper::http_serde_priv,
+        config::{destinations::Destinations, EvaluateTo, IsDefault, Severity},
+        helper::{coalesce::Coalesce, http_serde_priv},
     },
     service::evaluate::{Evaluator, RequestResult},
 };

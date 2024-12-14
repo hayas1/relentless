@@ -8,8 +8,11 @@ use crate::{
     error::{MultiWrap, Wrap},
     interface::{
         command::{Relentless, ReportFormat},
-        config::{destinations::Destinations, Coalesce, Coalesced, Setting, Testcase, WorkerConfig},
-        helper::http_serde_priv,
+        config::{destinations::Destinations, Setting, Testcase, WorkerConfig},
+        helper::{
+            coalesce::{Coalesce, Coalesced},
+            http_serde_priv,
+        },
     },
 };
 

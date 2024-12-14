@@ -5,7 +5,8 @@ use crate::{
     error::Wrap,
     interface::{
         command::Relentless,
-        config::{Coalesce, Repeat, Testcase, WorkerConfig},
+        config::{Repeat, Testcase, WorkerConfig},
+        helper::coalesce::Coalesce,
     },
 };
 

@@ -7,9 +7,12 @@ use crate::{
         command::Relentless,
         config::{
             destinations::{Destinations, Transpose},
-            Coalesce, Coalesced, Config, Configuration, Setting, Testcase,
+            Config, Configuration, Setting, Testcase,
         },
-        helper::http_serde_priv,
+        helper::{
+            coalesce::{Coalesce, Coalesced},
+            http_serde_priv,
+        },
         template::Template,
     },
     service::{
