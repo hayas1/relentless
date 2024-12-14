@@ -38,12 +38,13 @@ impl JsonEvaluate {
         values.windows(2).all(|w| self.json_compare((&w[0], &w[1]), msg))
     }
 
-    pub fn patched(&self, body: &Destinations<Bytes>) -> WrappedResult<Destinations<Value>> {
-        body.iter()
-            .map(|(name, body)| {
-                let mut value = serde_json::from_slice(body)?;
+    pub fn patched(&self, bytes: &Destinations<Bytes>) -> WrappedResult<Destinations<Value>> {
+        bytes
+            .iter()
+            .map(|(name, b)| {
+                let mut value = serde_json::from_slice(b)?;
                 if let Err(e) = self.patch(name, &mut value) {
-                    if self.patch_fail.is_none() && body.len() == 1 || self.patch_fail > Some(Severity::Warn) {
+                    if self.patch_fail.is_none() && bytes.len() == 1 || self.patch_fail > Some(Severity::Warn) {
                         Err(e)?;
                     }
                 }
