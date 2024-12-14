@@ -28,7 +28,7 @@ pub struct HttpRequest {
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub headers: Option<http_serde_priv::HeaderMap>,
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
-    pub body: Option<HttpBody>,
+    pub body: HttpBody,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case", untagged)]
@@ -69,7 +69,15 @@ impl Coalesce for HttpRequest {
             no_additional_headers: self.no_additional_headers || other.no_additional_headers,
             method: self.method.or(other.method.clone()),
             headers: self.headers.or(other.headers.clone()),
-            body: self.body.or(other.body.clone()),
+            body: self.body.coalesce(&other.body),
+        }
+    }
+}
+impl Coalesce for HttpBody {
+    fn coalesce(self, other: &Self) -> Self {
+        match self {
+            HttpBody::Empty => other.clone(),
+            _ => self,
         }
     }
 }
@@ -92,7 +100,7 @@ where
         let unwrapped_method = method.as_ref().map(|m| (**m).clone()).unwrap_or_default();
         let unwrapped_headers: HeaderMap = headers.as_ref().map(|h| (**h).clone()).unwrap_or_default();
         // .into_iter().map(|(k, v)| (k, template.render_as_string(v))).collect(); // TODO template with header
-        let (actual_body, additional_headers) = body.clone().unwrap_or_default().body_with_headers(template)?;
+        let (actual_body, additional_headers) = body.clone().body_with_headers(template)?;
 
         let mut request = http::Request::builder().uri(uri).method(unwrapped_method).body(actual_body)?;
         let header_map = request.headers_mut();
