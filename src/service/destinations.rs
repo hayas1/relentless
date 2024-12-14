@@ -31,9 +31,9 @@ impl<T> DerefMut for Destinations<T> {
         &mut self.0
     }
 }
-impl<T> FromIterator<(String, T)> for Destinations<T> {
-    fn from_iter<I: IntoIterator<Item = (String, T)>>(iter: I) -> Self {
-        Self(iter.into_iter().collect())
+impl<S: ToString, T> FromIterator<(S, T)> for Destinations<T> {
+    fn from_iter<I: IntoIterator<Item = (S, T)>>(iter: I) -> Self {
+        Self(iter.into_iter().map(|(k, val)| (k.to_string(), val)).collect())
     }
 }
 impl<T> IntoIterator for Destinations<T> {
@@ -126,4 +126,45 @@ where
         }
         t
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_transpose_destination_vec_roundtrip() {
+        let d: Destinations<_> = [("a", vec![1, 2]), ("b", vec![3, 4]), ("c", vec![5, 6])].into_iter().collect();
+        let transposed = vec![
+            [("a", 1), ("b", 3), ("c", 5)].into_iter().collect(),
+            [("a", 2), ("b", 4), ("c", 6)].into_iter().collect(),
+        ];
+
+        let t = d.clone().transpose();
+        assert_eq!(t, transposed);
+        assert_eq!(t.transpose(), d);
+    }
+
+    #[test]
+    fn test_transpose_destination_hashmap_roundtrip() {
+        let d: Destinations<HashMap<_, _>> = [
+            ("a", vec![(1, "1"), (2, "2")].into_iter().collect()),
+            ("b", vec![(1, "one"), (2, "two")].into_iter().collect()),
+            ("c", vec![(1, "一"), (2, "二")].into_iter().collect()),
+        ]
+        .into_iter()
+        .collect();
+        let transposed = vec![
+            (1, [("a", "1"), ("b", "one"), ("c", "一")].into_iter().collect()),
+            (2, [("a", "2"), ("b", "two"), ("c", "二")].into_iter().collect()),
+        ]
+        .into_iter()
+        .collect();
+
+        let t = d.clone().transpose();
+        assert_eq!(t, transposed);
+        assert_eq!(t.transpose(), d);
+    }
+
+    // TODO if length is not equal
 }
