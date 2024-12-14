@@ -221,12 +221,12 @@ impl Format {
 
 #[cfg(test)]
 mod tests {
-    #[cfg(feature = "json")]
-    use crate::implement::service_http::evaluate::JsonEvaluate;
     use crate::implement::service_http::{
         evaluate::{BodyEvaluate, HeaderEvaluate, HttpResponse},
         factory::HttpRequest,
     };
+    #[cfg(feature = "json")]
+    use crate::service::evaluate::json::JsonEvaluate;
 
     use super::*;
 
