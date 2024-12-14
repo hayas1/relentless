@@ -52,14 +52,30 @@ pub enum HeaderEvaluate {
 pub enum BodyEvaluate {
     #[default]
     AnyOrEqual,
-    Plaintext(EvaluateTo<PlaintextEvaluate>),
+    Plaintext(PlaintextEvaluate),
     #[cfg(feature = "json")]
     Json(JsonEvaluate),
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct PlaintextEvaluate {
-    pub regex: Option<String>,
+    pub regex: Option<EvaluateTo<String>>,
+}
+impl PlaintextEvaluate {
+    pub fn plaintext_acceptable(&self, body: &Destinations<Bytes>, msg: &mut Vec<EvaluateError>) -> bool {
+        let _ = msg; // TODO body[d] can be failed
+        match &self.regex {
+            Some(EvaluateTo::All(regex)) => body.iter().all(|(_, b)| {
+                Regex::new(regex).map(|re| re.is_match(String::from_utf8_lossy(b).as_ref())).unwrap_or(false)
+            }),
+            Some(EvaluateTo::Destinations(dest)) => dest.iter().all(|(d, regex)| {
+                Regex::new(regex)
+                    .map(|re| re.is_match(String::from_utf8_lossy(body[d].as_ref()).as_ref()))
+                    .unwrap_or(false)
+            }),
+            None => true,
+        }
+    }
 }
 
 impl Coalesce for HttpResponse {
@@ -181,20 +197,7 @@ impl HttpResponse {
     pub fn acceptable_body(&self, body: &Destinations<Bytes>, msg: &mut Vec<EvaluateError>) -> bool {
         match &self.body {
             BodyEvaluate::AnyOrEqual => Self::assault_or_compare(body, |_| true),
-            BodyEvaluate::Plaintext(EvaluateTo::All(p)) => Self::validate_all(body, |(_, b)| match &p.regex {
-                Some(regex) => {
-                    Regex::new(regex).map(|re| re.is_match(String::from_utf8_lossy(b).as_ref())).unwrap_or(false)
-                }
-                None => true,
-            }),
-            BodyEvaluate::Plaintext(EvaluateTo::Destinations(dest)) => {
-                Self::validate_all(dest, |(d, p)| match &p.regex {
-                    Some(regex) => Regex::new(regex)
-                        .map(|re| re.is_match(String::from_utf8_lossy(body[d].as_ref()).as_ref()))
-                        .unwrap_or(false),
-                    None => true,
-                })
-            }
+            BodyEvaluate::Plaintext(p) => p.plaintext_acceptable(body, msg),
             #[cfg(feature = "json")]
             BodyEvaluate::Json(e) => e.json_acceptable(body, msg),
         }
