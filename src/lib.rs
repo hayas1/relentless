@@ -65,6 +65,5 @@ pub mod assault;
 pub mod error;
 pub mod implement;
 pub mod interface;
-pub mod service;
 
 pub use {error::RelentlessError as Error, error::RelentlessResult as Result};
