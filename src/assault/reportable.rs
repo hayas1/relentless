@@ -8,12 +8,13 @@ use crate::{
     error::{MultiWrap, Wrap},
     interface::{
         command::{Relentless, ReportFormat},
-        config::{destinations::Destinations, Setting, Testcase, WorkerConfig},
+        config::{Setting, Testcase, WorkerConfig},
         helper::{
             coalesce::{Coalesce, Coalesced},
             http_serde_priv,
         },
     },
+    service::destinations::Destinations,
 };
 
 /// TODO document

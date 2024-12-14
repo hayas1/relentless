@@ -5,10 +5,7 @@ use crate::{
     error::{Wrap, WrappedResult},
     interface::{
         command::Relentless,
-        config::{
-            destinations::{Destinations, Transpose},
-            Config, Configuration, Setting, Testcase,
-        },
+        config::{Config, Configuration, Setting, Testcase},
         helper::{
             coalesce::{Coalesce, Coalesced},
             http_serde_priv,
@@ -16,6 +13,7 @@ use crate::{
         template::Template,
     },
     service::{
+        destinations::{Destinations, Transpose},
         evaluate::{Evaluator, RequestResult},
         factory::RequestFactory,
     },

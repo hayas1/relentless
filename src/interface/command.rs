@@ -16,6 +16,7 @@ use crate::{
     },
     error::{IntoContext, MultiWrap, RunCommandError, Wrap, WrappedResult},
     service::{
+        destinations::Destinations,
         evaluate::Evaluator,
         factory::RequestFactory,
         impl_http::{evaluate::HttpResponse, factory::HttpRequest},
@@ -23,11 +24,7 @@ use crate::{
     },
 };
 
-use super::{
-    config::{destinations::Destinations, Config},
-    helper::http_serde_priv,
-    report::github_markdown::GithubMarkdownReport,
-};
+use super::{config::Config, helper::http_serde_priv, report::github_markdown::GithubMarkdownReport};
 
 #[cfg(feature = "cli")]
 pub async fn execute() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sync>> {

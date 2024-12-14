@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use crate::interface::config::destinations::Destinations;
+use super::destinations::Destinations;
 
 pub enum RequestResult<Res> {
     Response(Res),
