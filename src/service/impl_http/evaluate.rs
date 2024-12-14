@@ -7,7 +7,10 @@ use serde_json::Value;
 
 use crate::{
     error::{EvaluateError, WrappedResult},
-    interface::config::{destinations::Destinations, http_serde_priv, Coalesce, EvaluateTo, IsDefault, Severity},
+    interface::{
+        config::{destinations::Destinations, Coalesce, EvaluateTo, IsDefault, Severity},
+        helper::http_serde_priv,
+    },
     service::evaluate::{Evaluator, RequestResult},
 };
 

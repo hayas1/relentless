@@ -24,7 +24,8 @@ use crate::{
 };
 
 use super::{
-    config::{destinations::Destinations, http_serde_priv, Config},
+    config::{destinations::Destinations, Config},
+    helper::http_serde_priv,
     report::github_markdown::GithubMarkdownReport,
 };
 

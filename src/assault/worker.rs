@@ -7,8 +7,9 @@ use crate::{
         command::Relentless,
         config::{
             destinations::{Destinations, Transpose},
-            http_serde_priv, Coalesce, Coalesced, Config, Configuration, Setting, Testcase,
+            Coalesce, Coalesced, Config, Configuration, Setting, Testcase,
         },
+        helper::http_serde_priv,
         template::Template,
     },
     service::{
