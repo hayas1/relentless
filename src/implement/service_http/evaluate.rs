@@ -7,12 +7,9 @@ use serde::{Deserialize, Serialize};
 use crate::service::evaluate::json::JsonEvaluate;
 use crate::{
     error::EvaluateError,
-    interface::{
-        config::EvaluateTo,
-        helper::{coalesce::Coalesce, http_serde_priv, is_default::IsDefault},
-    },
+    interface::helper::{coalesce::Coalesce, http_serde_priv, is_default::IsDefault},
     service::{
-        destinations::Destinations,
+        destinations::{Destinations, EvaluateTo},
         evaluate::plaintext::PlaintextEvaluate,
         evaluator::{Acceptable, Evaluator, RequestResult},
     },

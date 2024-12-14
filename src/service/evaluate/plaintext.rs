@@ -4,8 +4,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     error::EvaluateError,
-    interface::config::EvaluateTo,
-    service::{destinations::Destinations, evaluator::Acceptable},
+    service::{
+        destinations::{Destinations, EvaluateTo},
+        evaluator::Acceptable,
+    },
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]

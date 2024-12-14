@@ -76,13 +76,6 @@ impl Repeat {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "kebab-case", untagged)]
-pub enum EvaluateTo<T> {
-    All(T),
-    Destinations(Destinations<T>),
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub enum Severity {
@@ -225,6 +218,7 @@ mod tests {
         evaluate::{BodyEvaluate, HeaderEvaluate, HttpResponse},
         factory::HttpRequest,
     };
+    use crate::service::destinations::EvaluateTo;
     #[cfg(feature = "json")]
     use crate::service::evaluate::json::JsonEvaluate;
 

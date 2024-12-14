@@ -4,11 +4,11 @@ use serde_json::Value;
 
 use crate::{
     error::{EvaluateError, WrappedResult},
-    interface::{
-        config::{EvaluateTo, Severity},
-        helper::is_default::IsDefault,
+    interface::{config::Severity, helper::is_default::IsDefault},
+    service::{
+        destinations::{Destinations, EvaluateTo},
+        evaluator::Acceptable,
     },
-    service::{destinations::Destinations, evaluator::Acceptable},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]

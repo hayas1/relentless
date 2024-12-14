@@ -12,6 +12,13 @@ use serde::{Deserialize, Serialize};
 use crate::interface::helper::transpose::Transpose;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "kebab-case", untagged)]
+pub enum EvaluateTo<T> {
+    All(T),
+    Destinations(Destinations<T>),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Destinations<T>(HashMap<String, T>);
 impl<T> Default for Destinations<T> {
     fn default() -> Self {
