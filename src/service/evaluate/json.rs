@@ -24,8 +24,8 @@ pub struct JsonEvaluate {
 
 #[cfg(feature = "json")]
 impl JsonEvaluate {
-    pub fn json_acceptable(&self, parts: &Destinations<Bytes>, msg: &mut Vec<EvaluateError>) -> bool {
-        let values: Vec<_> = match self.patched(parts) {
+    pub fn json_acceptable(&self, bytes: &Destinations<Bytes>, msg: &mut Vec<EvaluateError>) -> bool {
+        let values: Vec<_> = match self.patched(bytes) {
             Ok(values) => values,
             Err(e) => {
                 msg.push(EvaluateError::FailToPatchJson(e));
@@ -38,13 +38,12 @@ impl JsonEvaluate {
         values.windows(2).all(|w| self.json_compare((&w[0], &w[1]), msg))
     }
 
-    pub fn patched(&self, parts: &Destinations<Bytes>) -> WrappedResult<Destinations<Value>> {
-        parts
-            .iter()
+    pub fn patched(&self, body: &Destinations<Bytes>) -> WrappedResult<Destinations<Value>> {
+        body.iter()
             .map(|(name, body)| {
                 let mut value = serde_json::from_slice(body)?;
                 if let Err(e) = self.patch(name, &mut value) {
-                    if self.patch_fail.is_none() && parts.len() == 1 || self.patch_fail > Some(Severity::Warn) {
+                    if self.patch_fail.is_none() && body.len() == 1 || self.patch_fail > Some(Severity::Warn) {
                         Err(e)?;
                     }
                 }
