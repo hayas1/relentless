@@ -34,7 +34,7 @@ pub fn route_counter() -> Router<AppState> {
         .route("/resets", get(reset::<BInt>))
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash, Serialize, Deserialize)]
 pub struct CounterState {
     #[serde(with = "bigint_string")]
     pub count: BigInt,
@@ -56,11 +56,11 @@ mod bigint_string {
 }
 
 // TODO better implementation for increment/increments ?
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash, Serialize, Deserialize)]
 pub struct CounterResponse<T> {
     pub count: T,
 }
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash, Serialize, Deserialize)]
 pub struct BInt(#[serde(with = "bigint_string")] pub BigInt);
 impl From<BigInt> for BInt {
     fn from(value: BigInt) -> Self {

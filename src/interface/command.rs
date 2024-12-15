@@ -41,7 +41,7 @@ pub async fn execute() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sy
     Ok(cmd.exit_code(&rep))
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "cli", derive(Parser))]
 #[cfg_attr(feature = "cli", clap(version, about, arg_required_else_help = true))]
 pub struct Relentless {
@@ -82,7 +82,7 @@ pub struct Relentless {
     pub rps: Option<usize>,
 }
 #[cfg_attr(feature = "cli", derive(ValueEnum))]
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Hash, Serialize, Deserialize)]
 pub enum ReportFormat {
     /// without report
     #[cfg_attr(not(feature = "console-report"), default)]

@@ -15,7 +15,7 @@ pub type AppError<K, T = ()> = AppErrorDetail<K, T>;
 
 pub const APP_DEFAULT_ERROR_CODE: StatusCode = StatusCode::BAD_REQUEST;
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone, PartialEq, Eq, Default, Hash)]
 #[error("{0}")]
 pub struct Logged<T>(pub T);
 #[derive(Error, Debug)]
@@ -88,7 +88,7 @@ pub mod kind {
         fn msg() -> &'static str;
     }
 
-    #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+    #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
     pub enum NotFound {}
     impl Kind for NotFound {
         fn msg() -> &'static str {
@@ -96,7 +96,7 @@ pub mod kind {
         }
     }
 
-    #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+    #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
     pub enum BadRequest {}
     impl Kind for BadRequest {
         fn msg() -> &'static str {
@@ -104,7 +104,7 @@ pub mod kind {
         }
     }
 
-    #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+    #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
     pub enum Retriable {}
     impl Kind for Retriable {
         fn msg() -> &'static str {
@@ -112,7 +112,7 @@ pub mod kind {
         }
     }
 
-    #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+    #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
     pub enum Unreachable {}
     impl Kind for Unreachable {
         fn msg() -> &'static str {
@@ -120,7 +120,7 @@ pub mod kind {
         }
     }
 }
-#[derive(Error, Debug, Clone, PartialEq, Eq)]
+#[derive(Error, Debug, Clone, PartialEq, Eq, Default, Hash)]
 pub struct AppErrorInner<K, T> {
     pub msg: PhantomData<K>,
     pub detail: T,
@@ -130,7 +130,7 @@ impl<K: kind::Kind, T: Serialize> IntoResponse for AppErrorInner<K, T> {
         Json(ErrorResponseInner::from(self)).into_response()
     }
 }
-#[derive(Error, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Error, Debug, Clone, PartialEq, Eq, Default, Hash, Serialize, Deserialize)]
 pub struct ErrorResponseInner<T> {
     pub msg: String,
     pub detail: T,
@@ -144,7 +144,7 @@ impl<K: kind::Kind, T> From<AppErrorInner<K, T>> for ErrorResponseInner<T> {
 pub mod counter {
     use super::*;
 
-    #[derive(Error, Debug, Clone, PartialEq, Eq)]
+    #[derive(Error, Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
     pub enum CounterError<E> {
         #[error("overflow counter")]
         Overflow(E),

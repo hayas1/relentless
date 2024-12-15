@@ -20,7 +20,7 @@ use super::helper::{coalesce::Coalesce, http_serde_priv, is_default::IsDefault, 
 pub trait Configuration: Debug + Clone + PartialEq + Eq + Serialize + DeserializeOwned + Default {}
 impl<T> Configuration for T where T: Debug + Clone + PartialEq + Eq + Serialize + DeserializeOwned + Default {}
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[serde(bound = "Q: Configuration, P: Configuration")]
 pub struct Config<Q, P> {
@@ -30,7 +30,7 @@ pub struct Config<Q, P> {
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub testcases: Vec<Testcase<Q, P>>,
 }
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[serde(bound = "Q: Configuration, P: Configuration")]
 pub struct WorkerConfig<Q, P> {
@@ -41,7 +41,7 @@ pub struct WorkerConfig<Q, P> {
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub setting: Setting<Q, P>,
 }
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[serde(bound = "Q: Configuration, P: Configuration")]
 pub struct Setting<Q, P> {
@@ -59,7 +59,7 @@ pub struct Setting<Q, P> {
     pub response: P,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct Repeat(pub Option<usize>);
 impl Coalesce for Repeat {
@@ -76,7 +76,7 @@ impl Repeat {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub enum Severity {
     Allow,
@@ -84,7 +84,7 @@ pub enum Severity {
     Error,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[serde(bound = "Q: Configuration, P: Configuration")]
 pub struct Testcase<Q, P> {
@@ -97,7 +97,7 @@ pub struct Testcase<Q, P> {
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub attr: Attribute,
 }
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Hash, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct Attribute {
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
@@ -149,7 +149,7 @@ impl<Q: Coalesce, P: Coalesce> Coalesce for Setting<Q, P> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Format {
     #[cfg(feature = "json")]
     Json,

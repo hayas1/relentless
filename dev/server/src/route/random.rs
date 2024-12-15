@@ -52,7 +52,7 @@ where
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct RandomString {
     #[serde(default)]
     pub len: Option<usize>,
@@ -103,7 +103,7 @@ impl RandomResponse {
         }
     }
 }
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct DistRangeParam<T> {
     #[serde(default)]
     pub low: Option<T>,

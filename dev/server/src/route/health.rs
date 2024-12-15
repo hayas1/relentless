@@ -19,7 +19,7 @@ pub fn route_health() -> Router<AppState> {
         .route("/disabled", get(disabled))
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash, Serialize, Deserialize)]
 pub struct Health {
     #[serde(flatten, with = "health_response")]
     pub status: StatusCode,
@@ -31,7 +31,7 @@ impl IntoResponse for Health {
 }
 mod health_response {
     use super::*;
-    #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+    #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
     struct HealthResponse {
         status: String,
         code: u16,
