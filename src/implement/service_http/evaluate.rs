@@ -101,16 +101,17 @@ where
         res: Destinations<RequestResult<http::Response<B>>>,
         msg: &mut Vec<Self::Message>,
     ) -> bool {
+        let responses: Vec<_> = match res.into_iter().map(|(d, r)| Ok((d, r.response()?))).collect() {
+            Ok(r) => r,
+            Err(e) => {
+                msg.push(e);
+                return false;
+            }
+        };
+
         // TODO `Unzip` trait ?
         let (mut s, mut h, mut b) = (Destinations::new(), Destinations::new(), Destinations::new());
-        for (name, r) in res {
-            let response = match r {
-                RequestResult::Response(r) => r,
-                RequestResult::Timeout(d) => {
-                    msg.push(EvaluateError::RequestTimeout(d));
-                    return false;
-                }
-            };
+        for (name, response) in responses {
             let (http::response::Parts { status, headers, .. }, body) = response.into_parts();
             let bytes = match BodyExt::collect(body).await.map(Collected::to_bytes) {
                 Ok(b) => b,
