@@ -91,8 +91,9 @@ impl Coalesce for BodyEvaluate {
     }
 }
 
-impl<B: Body> Evaluator<http::Response<B>> for HttpResponse
+impl<B> Evaluator<http::Response<B>> for HttpResponse
 where
+    B: Body,
     B::Error: std::error::Error + Sync + Send + 'static,
 {
     type Message = EvaluateError;
@@ -101,30 +102,58 @@ where
         res: Destinations<RequestResult<http::Response<B>>>,
         msg: &mut Vec<Self::Message>,
     ) -> bool {
-        let responses: Vec<_> = match res.into_iter().map(|(d, r)| Ok((d, r.response()?))).collect() {
+        let responses: Destinations<_> = match res.into_iter().map(|(d, r)| Ok((d, r.response()?))).collect() {
             Ok(r) => r,
             Err(e) => {
                 msg.push(e);
                 return false;
             }
         };
+        let parts = match HttpResponse::unzip_parts(responses).await {
+            Ok(p) => p,
+            Err(e) => {
+                msg.push(e);
+                return false;
+            }
+        };
 
-        // TODO `Unzip` trait ?
-        let (mut s, mut h, mut b) = (Destinations::new(), Destinations::new(), Destinations::new());
+        self.accept(&parts, msg)
+    }
+}
+impl Acceptable<(http::StatusCode, http::HeaderMap, Bytes)> for HttpResponse {
+    type Message = EvaluateError;
+    fn accept(
+        &self,
+        parts: &Destinations<(http::StatusCode, http::HeaderMap, Bytes)>,
+        msg: &mut Vec<Self::Message>,
+    ) -> bool {
+        let (mut status, mut headers, mut body) = (Destinations::new(), Destinations::new(), Destinations::new());
+        for (name, (s, h, b)) in parts {
+            status.insert(name.clone(), *s);
+            headers.insert(name.clone(), h.clone());
+            body.insert(name.clone(), b.clone());
+        }
+        self.status.accept(&status, msg) && self.header.accept(&headers, msg) && self.body.accept(&body, msg)
+    }
+}
+impl HttpResponse {
+    pub async fn unzip_parts<B>(
+        responses: Destinations<http::Response<B>>,
+    ) -> Result<Destinations<(http::StatusCode, http::HeaderMap, Bytes)>, EvaluateError>
+    where
+        B: Body,
+        B::Error: std::error::Error + Sync + Send + 'static,
+    {
+        let mut p = Destinations::new();
         for (name, response) in responses {
             let (http::response::Parts { status, headers, .. }, body) = response.into_parts();
-            let bytes = match BodyExt::collect(body).await.map(Collected::to_bytes) {
-                Ok(b) => b,
-                Err(e) => {
-                    msg.push(EvaluateError::FailToCollectBody(e.into()));
-                    return false;
-                }
-            };
-            s.insert(name.clone(), status);
-            h.insert(name.clone(), headers);
-            b.insert(name.clone(), bytes);
+            let bytes = BodyExt::collect(body)
+                .await
+                .map(Collected::to_bytes)
+                .map_err(|e| EvaluateError::FailToCollectBody(e.into()))?;
+            p.insert(name, (status, headers, bytes));
         }
-        self.status.accept(&s, msg) && self.header.accept(&h, msg) && self.body.accept(&b, msg)
+        Ok(p)
     }
 }
 

@@ -1,6 +1,6 @@
 use std::{
     collections::{
-        hash_map::{IntoIter as HashMapIter, IntoKeys, IntoValues},
+        hash_map::{IntoIter as HashMapIntoIter, IntoKeys, IntoValues, Iter as HashMapIter},
         HashMap,
     },
     hash::Hash,
@@ -45,9 +45,16 @@ impl<S: ToString, T> FromIterator<(S, T)> for Destinations<T> {
 }
 impl<T> IntoIterator for Destinations<T> {
     type Item = (String, T);
-    type IntoIter = HashMapIter<String, T>;
+    type IntoIter = HashMapIntoIter<String, T>;
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
+    }
+}
+impl<'a, T> IntoIterator for &'a Destinations<T> {
+    type Item = (&'a String, &'a T);
+    type IntoIter = HashMapIter<'a, String, T>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
     }
 }
 impl<T> From<HashMap<String, T>> for Destinations<T> {
