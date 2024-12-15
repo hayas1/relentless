@@ -91,8 +91,9 @@ impl Coalesce for BodyEvaluate {
     }
 }
 
-impl<B: Body> Evaluator<http::Response<B>> for HttpResponse
+impl<B> Evaluator<http::Response<B>> for HttpResponse
 where
+    B: Body,
     B::Error: std::error::Error + Sync + Send + 'static,
 {
     type Message = EvaluateError;
@@ -101,41 +102,70 @@ where
         res: Destinations<RequestResult<http::Response<B>>>,
         msg: &mut Vec<Self::Message>,
     ) -> bool {
-        // TODO `Unzip` trait ?
-        let (mut s, mut h, mut b) = (Destinations::new(), Destinations::new(), Destinations::new());
-        for (name, r) in res {
-            let response = match r {
-                RequestResult::Response(r) => r,
-                RequestResult::Timeout(d) => {
-                    msg.push(EvaluateError::RequestTimeout(d));
-                    return false;
-                }
-            };
-            let (http::response::Parts { status, headers, .. }, body) = response.into_parts();
-            let bytes = match BodyExt::collect(body).await.map(Collected::to_bytes) {
-                Ok(b) => b,
-                Err(e) => {
-                    msg.push(EvaluateError::FailToCollectBody(e.into()));
-                    return false;
-                }
-            };
-            s.insert(name.clone(), status);
-            h.insert(name.clone(), headers);
-            b.insert(name.clone(), bytes);
+        let responses: Destinations<_> = match res.into_iter().map(|(d, r)| Ok((d, r.response()?))).collect() {
+            Ok(r) => r,
+            Err(e) => {
+                msg.push(e);
+                return false;
+            }
+        };
+        let parts = match HttpResponse::unzip_parts(responses).await {
+            Ok(p) => p,
+            Err(e) => {
+                msg.push(e);
+                return false;
+            }
+        };
+
+        self.accept(&parts, msg)
+    }
+}
+impl Acceptable<(http::StatusCode, http::HeaderMap, Bytes)> for HttpResponse {
+    type Message = EvaluateError;
+    fn accept(
+        &self,
+        parts: &Destinations<(http::StatusCode, http::HeaderMap, Bytes)>,
+        msg: &mut Vec<Self::Message>,
+    ) -> bool {
+        let (mut status, mut headers, mut body) = (Destinations::new(), Destinations::new(), Destinations::new());
+        for (name, (s, h, b)) in parts {
+            status.insert(name.clone(), s);
+            headers.insert(name.clone(), h);
+            body.insert(name.clone(), b);
         }
-        self.status.accept(&s, msg) && self.header.accept(&h, msg) && self.body.accept(&b, msg)
+        self.status.accept(&status, msg) && self.header.accept(&headers, msg) && self.body.accept(&body, msg)
+    }
+}
+impl HttpResponse {
+    pub async fn unzip_parts<B>(
+        responses: Destinations<http::Response<B>>,
+    ) -> Result<Destinations<(http::StatusCode, http::HeaderMap, Bytes)>, EvaluateError>
+    where
+        B: Body,
+        B::Error: std::error::Error + Sync + Send + 'static,
+    {
+        let mut parts = Destinations::new();
+        for (name, response) in responses {
+            let (http::response::Parts { status, headers, .. }, body) = response.into_parts();
+            let bytes = BodyExt::collect(body)
+                .await
+                .map(Collected::to_bytes)
+                .map_err(|e| EvaluateError::FailToCollectBody(e.into()))?;
+            parts.insert(name, (status, headers, bytes));
+        }
+        Ok(parts)
     }
 }
 
-impl Acceptable<http::StatusCode> for StatusEvaluate {
+impl Acceptable<&http::StatusCode> for StatusEvaluate {
     type Message = EvaluateError;
-    fn accept(&self, status: &Destinations<http::StatusCode>, msg: &mut Vec<Self::Message>) -> bool {
+    fn accept(&self, status: &Destinations<&http::StatusCode>, msg: &mut Vec<Self::Message>) -> bool {
         let acceptable = match &self {
             StatusEvaluate::OkOrEqual => Self::assault_or_compare(status, |(_, s)| s.is_success()),
-            StatusEvaluate::Expect(AllOr::All(code)) => Self::validate_all(status, |(_, s)| s == &**code),
+            StatusEvaluate::Expect(AllOr::All(code)) => Self::validate_all(status, |(_, s)| s == &&**code),
             StatusEvaluate::Expect(AllOr::Destinations(code)) => {
                 // TODO subset ?
-                status == &code.iter().map(|(d, c)| (d.to_string(), **c)).collect()
+                status == &code.iter().map(|(d, c)| (d.to_string(), &**c)).collect()
             }
             StatusEvaluate::Ignore => true,
         };
@@ -146,15 +176,15 @@ impl Acceptable<http::StatusCode> for StatusEvaluate {
     }
 }
 
-impl Acceptable<http::HeaderMap> for HeaderEvaluate {
+impl Acceptable<&http::HeaderMap> for HeaderEvaluate {
     type Message = EvaluateError;
-    fn accept(&self, headers: &Destinations<http::HeaderMap>, msg: &mut Vec<Self::Message>) -> bool {
+    fn accept(&self, headers: &Destinations<&http::HeaderMap>, msg: &mut Vec<Self::Message>) -> bool {
         let acceptable = match &self {
             HeaderEvaluate::AnyOrEqual => Self::assault_or_compare(headers, |_| true),
-            HeaderEvaluate::Expect(AllOr::All(header)) => Self::validate_all(headers, |(_, h)| h == &**header),
+            HeaderEvaluate::Expect(AllOr::All(header)) => Self::validate_all(headers, |(_, h)| h == &&**header),
             HeaderEvaluate::Expect(AllOr::Destinations(header)) => {
                 // TODO subset ?
-                headers == &header.iter().map(|(d, h)| (d.to_string(), (**h).clone())).collect()
+                headers == &header.iter().map(|(d, h)| (d.to_string(), &**h)).collect()
             }
             HeaderEvaluate::Ignore => true,
         };
@@ -165,9 +195,9 @@ impl Acceptable<http::HeaderMap> for HeaderEvaluate {
     }
 }
 
-impl Acceptable<Bytes> for BodyEvaluate {
+impl Acceptable<&Bytes> for BodyEvaluate {
     type Message = EvaluateError;
-    fn accept(&self, body: &Destinations<Bytes>, msg: &mut Vec<Self::Message>) -> bool {
+    fn accept(&self, body: &Destinations<&Bytes>, msg: &mut Vec<Self::Message>) -> bool {
         match &self {
             BodyEvaluate::AnyOrEqual => Self::assault_or_compare(body, |_| true),
             BodyEvaluate::Plaintext(p) => p.accept(body, msg),

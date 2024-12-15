@@ -23,14 +23,14 @@ pub struct JsonEvaluate {
 }
 
 #[cfg(feature = "json")]
-impl Acceptable<Bytes> for JsonEvaluate {
+impl Acceptable<&Bytes> for JsonEvaluate {
     type Message = EvaluateError;
-    fn accept(&self, bytes: &Destinations<Bytes>, msg: &mut Vec<EvaluateError>) -> bool {
+    fn accept(&self, bytes: &Destinations<&Bytes>, msg: &mut Vec<EvaluateError>) -> bool {
         self.accept_json(bytes, msg)
     }
 }
 impl JsonEvaluate {
-    pub fn accept_json(&self, bytes: &Destinations<Bytes>, msg: &mut Vec<EvaluateError>) -> bool {
+    pub fn accept_json(&self, bytes: &Destinations<&Bytes>, msg: &mut Vec<EvaluateError>) -> bool {
         let values: Vec<_> = match self.patched(bytes) {
             Ok(values) => values,
             Err(e) => {
@@ -44,7 +44,7 @@ impl JsonEvaluate {
         values.windows(2).all(|w| self.json_compare((&w[0], &w[1]), msg))
     }
 
-    pub fn patched(&self, bytes: &Destinations<Bytes>) -> WrappedResult<Destinations<Value>> {
+    pub fn patched(&self, bytes: &Destinations<&Bytes>) -> WrappedResult<Destinations<Value>> {
         bytes
             .iter()
             .map(|(name, b)| {

@@ -64,13 +64,12 @@ where
 #[cfg(test)]
 mod tests {
     use bytes::Bytes;
+    use tower::ServiceExt;
 
     use super::*;
 
     #[tokio::test]
     async fn test_default_http_client() {
-        use tower::ServiceExt;
-
         let server = httptest::Server::run();
         server.expect(
             httptest::Expectation::matching(httptest::matchers::request::method_path("GET", "/"))
