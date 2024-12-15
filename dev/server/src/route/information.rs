@@ -27,7 +27,7 @@ pub fn route_information() -> Router<AppState> {
         .route("/*path", any(information))
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct InformationResponse {
     #[serde(default)]
     pub datetime: Option<DateTime<Utc>>,

@@ -75,7 +75,7 @@ pub async fn json_body(body: Json<Value>) -> Json<Value> {
     body
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Hash, Serialize, Deserialize)]
 pub struct Jsonizer(pub Vec<(String, String)>);
 impl Jsonizer {
     pub fn entry<'a, I: Iterator<Item = &'a str>>(
