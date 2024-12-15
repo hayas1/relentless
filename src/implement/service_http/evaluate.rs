@@ -129,9 +129,9 @@ impl Acceptable<(http::StatusCode, http::HeaderMap, Bytes)> for HttpResponse {
     ) -> bool {
         let (mut status, mut headers, mut body) = (Destinations::new(), Destinations::new(), Destinations::new());
         for (name, (s, h, b)) in parts {
-            status.insert(name.clone(), *s);
-            headers.insert(name.clone(), h.clone());
-            body.insert(name.clone(), b.clone());
+            status.insert(name.clone(), s);
+            headers.insert(name.clone(), h);
+            body.insert(name.clone(), b);
         }
         self.status.accept(&status, msg) && self.header.accept(&headers, msg) && self.body.accept(&body, msg)
     }
@@ -157,15 +157,15 @@ impl HttpResponse {
     }
 }
 
-impl Acceptable<http::StatusCode> for StatusEvaluate {
+impl Acceptable<&http::StatusCode> for StatusEvaluate {
     type Message = EvaluateError;
-    fn accept(&self, status: &Destinations<http::StatusCode>, msg: &mut Vec<Self::Message>) -> bool {
+    fn accept(&self, status: &Destinations<&http::StatusCode>, msg: &mut Vec<Self::Message>) -> bool {
         let acceptable = match &self {
             StatusEvaluate::OkOrEqual => Self::assault_or_compare(status, |(_, s)| s.is_success()),
-            StatusEvaluate::Expect(AllOr::All(code)) => Self::validate_all(status, |(_, s)| s == &**code),
+            StatusEvaluate::Expect(AllOr::All(code)) => Self::validate_all(status, |(_, s)| s == &&**code),
             StatusEvaluate::Expect(AllOr::Destinations(code)) => {
                 // TODO subset ?
-                status == &code.iter().map(|(d, c)| (d.to_string(), **c)).collect()
+                status == &code.iter().map(|(d, c)| (d.to_string(), &**c)).collect()
             }
             StatusEvaluate::Ignore => true,
         };
@@ -176,15 +176,15 @@ impl Acceptable<http::StatusCode> for StatusEvaluate {
     }
 }
 
-impl Acceptable<http::HeaderMap> for HeaderEvaluate {
+impl Acceptable<&http::HeaderMap> for HeaderEvaluate {
     type Message = EvaluateError;
-    fn accept(&self, headers: &Destinations<http::HeaderMap>, msg: &mut Vec<Self::Message>) -> bool {
+    fn accept(&self, headers: &Destinations<&http::HeaderMap>, msg: &mut Vec<Self::Message>) -> bool {
         let acceptable = match &self {
             HeaderEvaluate::AnyOrEqual => Self::assault_or_compare(headers, |_| true),
-            HeaderEvaluate::Expect(AllOr::All(header)) => Self::validate_all(headers, |(_, h)| h == &**header),
+            HeaderEvaluate::Expect(AllOr::All(header)) => Self::validate_all(headers, |(_, h)| h == &&**header),
             HeaderEvaluate::Expect(AllOr::Destinations(header)) => {
                 // TODO subset ?
-                headers == &header.iter().map(|(d, h)| (d.to_string(), (**h).clone())).collect()
+                headers == &header.iter().map(|(d, h)| (d.to_string(), &**h)).collect()
             }
             HeaderEvaluate::Ignore => true,
         };
@@ -195,9 +195,9 @@ impl Acceptable<http::HeaderMap> for HeaderEvaluate {
     }
 }
 
-impl Acceptable<Bytes> for BodyEvaluate {
+impl Acceptable<&Bytes> for BodyEvaluate {
     type Message = EvaluateError;
-    fn accept(&self, body: &Destinations<Bytes>, msg: &mut Vec<Self::Message>) -> bool {
+    fn accept(&self, body: &Destinations<&Bytes>, msg: &mut Vec<Self::Message>) -> bool {
         match &self {
             BodyEvaluate::AnyOrEqual => Self::assault_or_compare(body, |_| true),
             BodyEvaluate::Plaintext(p) => p.accept(body, msg),
