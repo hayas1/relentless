@@ -21,7 +21,7 @@ default-http-client = ["reqwest"]
 
 [dependencies]
 tokio = { version = "1.42.0", features = ["full"] }
-tower = { version = "0.5.0", features = ["timeout", "util"] }
+tower = { version = "0.5.0", features = ["timeout", "util", "make"] }
 reqwest = { version = "0.12.9", optional = true }
 http = "1.2.0"
 http-serde = "2.1.1"

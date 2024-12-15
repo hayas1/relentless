@@ -3,7 +3,7 @@ use std::{fmt::Display, io::Write, path::PathBuf, process::ExitCode};
 #[cfg(feature = "cli")]
 use clap::{Parser, ValueEnum};
 use serde::{Deserialize, Serialize};
-use tower::{Service, ServiceBuilder};
+use tower::{MakeService, Service, ServiceBuilder};
 
 #[cfg(feature = "default-http-client")]
 use crate::implement::service_http::client::DefaultHttpClient;
@@ -36,7 +36,7 @@ pub async fn execute() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sy
         unimplemented!("`--rps` is not implemented yet");
     }
 
-    let rep = cmd.assault().await?;
+    let rep = cmd.assault_make().await?;
     cmd.report(&rep)?;
     Ok(cmd.exit_code(&rep))
 }
@@ -169,6 +169,39 @@ impl Relentless {
         Wrap: From<<HttpRequest as RequestFactory<Req>>::Error> + From<<S as Service<Req>>::Error>,
     {
         let control = Control::new(service);
+        let report = control.assault(self, configs).await?;
+        Ok(report)
+    }
+    #[cfg(all(feature = "default-http-client", feature = "cli"))]
+    pub async fn assault_make(&self) -> crate::Result<Report<crate::error::EvaluateError, HttpRequest, HttpResponse>> {
+        use crate::implement::service_http::client::MakeDefaultHttpClient;
+
+        let configs = self.configs_filtered(std::io::stderr())?;
+        let report =
+            self.assault_with_make(configs, MakeDefaultHttpClient::<reqwest::Body, reqwest::Body>::new()).await?;
+        Ok(report)
+    }
+    pub async fn assault_with_make<M, Req>(
+        &self,
+        configs: Vec<Config<HttpRequest, HttpResponse>>,
+        mut make_service: M,
+    ) -> crate::Result<
+        Report<<HttpResponse as Evaluator<<M::Service as Service<Req>>::Response>>::Message, HttpRequest, HttpResponse>,
+    >
+    where
+        HttpRequest: RequestFactory<Req>,
+        HttpResponse: Evaluator<<M::Service as Service<Req>>::Response>,
+        M: MakeService<(), Req> + Send + 'static,
+        M::Error: std::error::Error + Send + Sync + 'static,
+        M::Future: Send + 'static,
+        M::Service: Service<Req> + Send + 'static,
+        <M::Service as Service<Req>>::Error: std::error::Error + Send + Sync + 'static,
+        <M::Service as Service<Req>>::Future: Send + 'static,
+        Wrap: From<<HttpRequest as RequestFactory<Req>>::Error> + From<<M::Service as Service<Req>>::Error>,
+        crate::Error: From<<M as tower::MakeService<(), Req>>::MakeError>,
+    {
+        let mut service = make_service.make_service(()).await?;
+        let control = Control::new(&mut service);
         let report = control.assault(self, configs).await?;
         Ok(report)
     }

@@ -7,7 +7,7 @@ use std::{
 
 use tower::Service;
 
-use crate::error::WrappedResult;
+use crate::error::{Wrap, WrappedResult};
 
 pub const APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),);
 
@@ -58,6 +58,41 @@ where
             }
             Err(e) => Box::pin(async { Err(e) }),
         }
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct MakeDefaultHttpClient<ReqB, ResB> {
+    phantom: PhantomData<(ReqB, ResB)>,
+}
+impl<ReqB, ResB> Clone for MakeDefaultHttpClient<ReqB, ResB> {
+    fn clone(&self) -> Self {
+        // derive(Clone) do not implement Clone when ReqB or ResB are not implement Clone
+        // https://github.com/rust-lang/rust/issues/26925
+        Self { phantom: PhantomData }
+    }
+}
+impl<ReqB, ResB> MakeDefaultHttpClient<ReqB, ResB> {
+    pub fn new() -> Self {
+        Self { phantom: PhantomData }
+    }
+}
+
+impl<ReqB, ResB> Service<()> for MakeDefaultHttpClient<ReqB, ResB>
+where
+    ReqB: Send + 'static,
+    ResB: Send + 'static,
+{
+    type Response = DefaultHttpClient<ReqB, ResB>;
+    type Error = Wrap;
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
+
+    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn call(&mut self, _: ()) -> Self::Future {
+        Box::pin(async { DefaultHttpClient::new().await })
     }
 }
 
