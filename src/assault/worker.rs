@@ -27,11 +27,11 @@ use super::{
 
 /// TODO document
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct Control<'a, Q, P, S, Req> {
-    client: &'a mut S,
+pub struct Control<Q, P, S, Req> {
+    client: S,
     phantom: PhantomData<(Q, P, S, Req)>,
 }
-impl<'a, Q, P, S, Req> Control<'a, Q, P, S, Req>
+impl<Q, P, S, Req> Control<Q, P, S, Req>
 where
     Q: Configuration + Coalesce + RequestFactory<Req>,
     P: Configuration + Coalesce + Evaluator<S::Response>,
@@ -41,7 +41,7 @@ where
     Wrap: From<Q::Error> + From<S::Error>,
 {
     /// TODO document
-    pub fn new(client: &'a mut S) -> Self {
+    pub fn new(client: S) -> Self {
         Self { client, phantom: PhantomData }
     }
     /// TODO document
@@ -62,11 +62,11 @@ where
 
 /// TODO document
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct Worker<'a, Q, P, S, Req> {
-    client: &'a mut S,
+pub struct Worker<Q, P, S, Req> {
+    client: S,
     phantom: PhantomData<(Q, P, Req, S)>,
 }
-impl<'a, Q, P, S, Req> Worker<'a, Q, P, S, Req>
+impl<Q, P, S, Req> Worker<Q, P, S, Req>
 where
     Q: Configuration + Coalesce + RequestFactory<Req>,
     P: Configuration + Coalesce + Evaluator<S::Response>,
@@ -75,7 +75,7 @@ where
     S::Future: Send + 'static,
     Wrap: From<Q::Error> + From<S::Error>,
 {
-    pub fn new(client: &'a mut S) -> Self {
+    pub fn new(client: S) -> Self {
         Self { client, phantom: PhantomData }
     }
 
@@ -100,11 +100,11 @@ where
 
 /// TODO document
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct Case<'a, Q, P, S, Req> {
-    client: &'a mut S,
+pub struct Case<Q, P, S, Req> {
+    client: S,
     phantom: PhantomData<(Q, P, S, Req)>,
 }
-impl<'a, Q, P, S, Req> Case<'a, Q, P, S, Req>
+impl<Q, P, S, Req> Case<Q, P, S, Req>
 where
     Q: Configuration + Coalesce + RequestFactory<Req>,
     P: Configuration + Coalesce + Evaluator<S::Response>,
@@ -113,7 +113,7 @@ where
     S::Future: Send + 'static,
     Wrap: From<Q::Error> + From<S::Error>,
 {
-    pub fn new(client: &'a mut S) -> Self {
+    pub fn new(client: S) -> Self {
         Self { client, phantom: PhantomData }
     }
 
