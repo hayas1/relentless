@@ -26,7 +26,7 @@ use super::{
 };
 
 /// TODO document
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct Control<'a, Q, P, S, Req> {
     client: &'a mut S,
     phantom: PhantomData<(Q, P, S, Req)>,
@@ -61,7 +61,7 @@ where
 }
 
 /// TODO document
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct Worker<'a, Q, P, S, Req> {
     client: &'a mut S,
     phantom: PhantomData<(Q, P, Req, S)>,
@@ -99,7 +99,7 @@ where
 }
 
 /// TODO document
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct Case<'a, Q, P, S, Req> {
     client: &'a mut S,
     phantom: PhantomData<(Q, P, S, Req)>,

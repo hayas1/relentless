@@ -11,7 +11,7 @@ use crate::{
     interface::{config::Severity, helper::is_default::IsDefault},
 };
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct JsonEvaluate {
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]

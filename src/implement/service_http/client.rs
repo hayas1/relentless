@@ -11,7 +11,7 @@ use crate::error::WrappedResult;
 
 pub const APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),);
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct DefaultHttpClient<ReqB, ResB> {
     client: reqwest::Client,
     phantom: PhantomData<(ReqB, ResB)>,

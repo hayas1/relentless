@@ -15,7 +15,7 @@ use crate::{
     interface::helper::{coalesce::Coalesce, http_serde_priv, is_default::IsDefault},
 };
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct HttpResponse {
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
@@ -28,7 +28,7 @@ pub struct HttpResponse {
     #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
     pub body: BodyEvaluate,
 }
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub enum StatusEvaluate {
     #[default]
@@ -36,7 +36,7 @@ pub enum StatusEvaluate {
     Expect(AllOr<http_serde_priv::StatusCode>),
     Ignore,
 }
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub enum HeaderEvaluate {
     #[default]
@@ -44,7 +44,7 @@ pub enum HeaderEvaluate {
     Expect(AllOr<http_serde_priv::HeaderMap>),
     Ignore,
 }
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub enum BodyEvaluate {
     #[default]

@@ -100,7 +100,7 @@ where
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Hash)]
 pub struct RecordLayer {
     path: Option<PathBuf>,
 }
@@ -117,7 +117,7 @@ impl<S> Layer<S> for RecordLayer {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Hash)]
 pub struct RecordService<S> {
     path: Option<PathBuf>,
     inner: S,

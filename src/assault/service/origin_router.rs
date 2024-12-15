@@ -5,7 +5,7 @@ use tower::Service;
 
 use crate::error::{AssaultError, Wrap};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct OriginRouter<S, B> {
     map: HashMap<Authority, S>,
     phantom: PhantomData<B>,

@@ -5,7 +5,7 @@ pub trait Coalesce<O = Self> {
     fn coalesce(self, other: &O) -> Self;
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Hash, Serialize, Deserialize)]
 pub struct Coalesced<T, O> {
     base: T,
     coalesced: Vec<O>,
