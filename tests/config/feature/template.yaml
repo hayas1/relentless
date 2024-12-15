@@ -26,5 +26,5 @@ testcases:
         body:
           plaintext:
             regex:
-              server1: hello server1
-              server2: hello server2
+              server1: ^hello server1$
+              server2: ^hello server2$
