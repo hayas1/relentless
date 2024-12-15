@@ -16,8 +16,8 @@ async fn test_example_yaml_config() {
         ..Default::default()
     };
     let configs = relentless.configs().unwrap();
-    let mut service = route::app_with(Default::default());
-    let report = relentless.assault_with::<_, http::Request<Body>>(configs, &mut service).await.unwrap();
+    let service = route::app_with(Default::default());
+    let report = relentless.assault_with::<_, http::Request<Body>>(configs, service).await.unwrap();
 
     assert_eq!(relentless.file.len(), report.sub_reportable().len());
     assert!(relentless.allow(&report));
@@ -47,12 +47,12 @@ async fn test_basic_yaml_config() {
     };
     let configs = relentless.configs().unwrap();
     let (actual, expect) = (route::app_with(Default::default()), route::app_with(Default::default()));
-    let mut service = OriginRouter::new(
+    let service = OriginRouter::new(
         [(Authority::from_static("localhost:3001"), actual), (Authority::from_static("localhost:3000"), expect)]
             .into_iter()
             .collect(),
     );
-    let report = relentless.assault_with::<_, http::Request<Body>>(configs, &mut service).await.unwrap();
+    let report = relentless.assault_with::<_, http::Request<Body>>(configs, service).await.unwrap();
 
     assert_eq!(relentless.file.len(), report.sub_reportable().len());
     assert!(relentless.allow(&report));
@@ -69,12 +69,12 @@ async fn test_basic_toml_config() {
     };
     let configs = relentless.configs().unwrap();
     let (actual, expect) = (route::app_with(Default::default()), route::app_with(Default::default()));
-    let mut service = OriginRouter::new(
+    let service = OriginRouter::new(
         [(Authority::from_static("localhost:3001"), actual), (Authority::from_static("localhost:3000"), expect)]
             .into_iter()
             .collect(),
     );
-    let report = relentless.assault_with::<_, http::Request<Body>>(configs, &mut service).await.unwrap();
+    let report = relentless.assault_with::<_, http::Request<Body>>(configs, service).await.unwrap();
 
     relentless.report(&report).unwrap();
     assert_eq!(relentless.file.len(), report.sub_reportable().len());
