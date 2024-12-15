@@ -61,14 +61,9 @@
 //! ## coverage
 //! <https://hayas1.github.io/relentless/tarpaulin-report.html>
 
-pub mod command;
-pub mod config;
+pub mod assault;
 pub mod error;
-pub mod evaluate;
-pub mod record;
-pub mod report;
-pub mod service;
-pub mod template;
-pub mod worker;
+pub mod implement;
+pub mod interface;
 
 pub use {error::RelentlessError as Error, error::RelentlessResult as Result};

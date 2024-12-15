@@ -5,19 +5,24 @@ use clap::{Parser, ValueEnum};
 use serde::{Deserialize, Serialize};
 use tower::{Service, ServiceBuilder};
 
-use crate::config::{HttpRequest, HttpResponse};
+#[cfg(feature = "default-http-client")]
+use crate::implement::service_http::client::DefaultHttpClient;
 #[cfg(feature = "console-report")]
-use crate::report::console_report::ConsoleReport;
-use crate::report::{github_markdown_report::GithubMarkdownReport, ReportWriter};
-use crate::service::RequestFactory;
+use crate::interface::report::console::ConsoleReport;
 use crate::{
-    config::{destinations::Destinations, http_serde_priv, Config},
+    assault::{
+        destinations::Destinations,
+        evaluator::Evaluator,
+        factory::RequestFactory,
+        reportable::{Report, ReportWriter, Reportable},
+        service::record::{RecordLayer, RecordService},
+        worker::Control,
+    },
     error::{IntoContext, MultiWrap, RunCommandError, Wrap, WrappedResult},
-    evaluate::Evaluator,
-    record::{RecordLayer, RecordService},
-    report::{Report, Reportable},
-    worker::Control,
+    implement::service_http::{evaluate::HttpResponse, factory::HttpRequest},
 };
+
+use super::{config::Config, helper::http_serde_priv, report::github_markdown::GithubMarkdownReport};
 
 #[cfg(feature = "cli")]
 pub async fn execute() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sync>> {
@@ -145,7 +150,7 @@ impl Relentless {
     #[cfg(all(feature = "default-http-client", feature = "cli"))]
     pub async fn assault(&self) -> crate::Result<Report<crate::error::EvaluateError, HttpRequest, HttpResponse>> {
         let configs = self.configs_filtered(std::io::stderr())?;
-        let mut service = self.build_service(Control::default_http_client().await?);
+        let mut service = self.build_service(DefaultHttpClient::<reqwest::Body, reqwest::Body>::new().await?);
         let report = self.assault_with(configs, &mut service).await?;
         Ok(report)
     }

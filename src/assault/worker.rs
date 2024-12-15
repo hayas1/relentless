@@ -1,22 +1,28 @@
 use std::marker::PhantomData;
 
-#[cfg(feature = "default-http-client")]
-use crate::service::DefaultHttpClient;
 use crate::{
-    command::Relentless,
-    config::{
-        destinations::{Destinations, Transpose},
-        http_serde_priv, Coalesce, Coalesced, Config, Configuration, HttpRequest, HttpResponse, Setting, Testcase,
-    },
+    assault::reportable::{CaseReport, Report, WorkerReport},
     error::{Wrap, WrappedResult},
-    evaluate::{Evaluator, RequestResult},
-    report::{CaseReport, Report, WorkerReport},
-    service::RequestFactory,
-    template::Template,
+    interface::{
+        command::Relentless,
+        config::{Config, Configuration, Setting, Testcase},
+        helper::{
+            coalesce::{Coalesce, Coalesced},
+            http_serde_priv,
+            transpose::Transpose,
+        },
+        template::Template,
+    },
 };
 use tower::{
     timeout::{error::Elapsed, TimeoutLayer},
     Service, ServiceBuilder, ServiceExt,
+};
+
+use super::{
+    destinations::Destinations,
+    evaluator::{Evaluator, RequestResult},
+    factory::RequestFactory,
 };
 
 /// TODO document
@@ -24,12 +30,6 @@ use tower::{
 pub struct Control<'a, Q, P, S, Req> {
     client: &'a mut S,
     phantom: PhantomData<(Q, P, S, Req)>,
-}
-#[cfg(feature = "default-http-client")]
-impl Control<'_, HttpRequest, HttpResponse, DefaultHttpClient<reqwest::Body, reqwest::Body>, reqwest::Body> {
-    pub async fn default_http_client() -> WrappedResult<DefaultHttpClient<reqwest::Body, reqwest::Body>> {
-        DefaultHttpClient::new().await
-    }
 }
 impl<'a, Q, P, S, Req> Control<'a, Q, P, S, Req>
 where

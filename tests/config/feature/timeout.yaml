@@ -3,15 +3,15 @@ destinations:
   test-api: http://localhost:3000
 
 testcases:
+  - target: /wait/1/s
+    setting:
+      timeout:
+        secs: 0
+        nanos: 500000000
+    attr:
+      allow: true
   - target: /wait/500/ms
     setting:
       timeout:
         secs: 1
         nanos: 0
-  - target: /wait/3/s
-    setting:
-      timeout:
-        secs: 1
-        nanos: 500000000
-    attr:
-      allow: true

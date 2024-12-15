@@ -1,7 +1,7 @@
 #![cfg(all(feature = "json", feature = "yaml", feature = "console-report"))]
 use axum::{body::Body, http::Request};
 use http_body_util::BodyExt;
-use relentless::{command::Relentless, report::console_report::CaseConsoleReport};
+use relentless::interface::{command::Relentless, report::console::CaseConsoleReport};
 
 use relentless_dev_server::route::{self, counter::CounterResponse};
 use tower::Service;
@@ -185,11 +185,11 @@ async fn test_timeout_config() {
     let out = String::from_utf8_lossy(&buf);
 
     for line in [
-        format!("{} /wait/500/ms", CaseConsoleReport::PASS_EMOJI),
-        format!("{} /wait/3/s", CaseConsoleReport::FAIL_EMOJI),
+        format!("{} /wait/1/s", CaseConsoleReport::FAIL_EMOJI),
         format!("  {} this testcase is allowed", CaseConsoleReport::ALLOW_EMOJI),
         format!("  {} message was found", CaseConsoleReport::MESSAGE_EMOJI),
-        format!("    request timeout: {}", "1.5s"),
+        format!("    request timeout: {}", "0.5s"),
+        format!("{} /wait/500/ms", CaseConsoleReport::PASS_EMOJI),
     ] {
         assert!(out.contains(&line));
     }
