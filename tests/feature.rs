@@ -4,14 +4,14 @@ use http_body_util::BodyExt;
 use relentless::interface::{command::Relentless, report::console::CaseConsoleReport};
 
 use relentless_dev_server::route::{self, counter::CounterResponse};
-use tower::Service;
+use tower::ServiceExt;
 
 #[tokio::test]
 async fn test_repeat_config() {
     let relentless =
         Relentless { file: vec!["tests/config/feature/repeat.yaml".into()], no_color: true, ..Default::default() };
     let configs = relentless.configs().unwrap();
-    let mut service = route::app_with(Default::default());
+    let service = route::app_with(Default::default());
     let report = relentless.assault_with::<_, Request<Body>>(configs, service.clone()).await.unwrap();
 
     let mut buf = Vec::new();
@@ -29,7 +29,7 @@ async fn test_repeat_config() {
     assert!(relentless.pass(&report));
     assert!(relentless.allow(&report));
 
-    let response = service.call(Request::builder().uri("/counter").body(Body::empty()).unwrap()).await.unwrap();
+    let response = service.oneshot(Request::builder().uri("/counter").body(Body::empty()).unwrap()).await.unwrap();
     let count: CounterResponse<u64> = serde_json::from_slice(&response.collect().await.unwrap().to_bytes()).unwrap();
     assert_eq!(count.count, 90);
 }
