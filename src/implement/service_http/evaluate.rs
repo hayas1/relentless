@@ -144,16 +144,16 @@ impl HttpResponse {
         B: Body,
         B::Error: std::error::Error + Sync + Send + 'static,
     {
-        let mut p = Destinations::new();
+        let mut parts = Destinations::new();
         for (name, response) in responses {
             let (http::response::Parts { status, headers, .. }, body) = response.into_parts();
             let bytes = BodyExt::collect(body)
                 .await
                 .map(Collected::to_bytes)
                 .map_err(|e| EvaluateError::FailToCollectBody(e.into()))?;
-            p.insert(name, (status, headers, bytes));
+            parts.insert(name, (status, headers, bytes));
         }
-        Ok(p)
+        Ok(parts)
     }
 }
 
