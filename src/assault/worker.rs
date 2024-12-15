@@ -26,7 +26,7 @@ use super::{
 };
 
 /// TODO document
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Control<Q, P, S, Req> {
     client: S,
     phantom: PhantomData<(Q, P, S, Req)>,
@@ -35,7 +35,7 @@ impl<Q, P, S, Req> Control<Q, P, S, Req>
 where
     Q: Configuration + Coalesce + RequestFactory<Req>,
     P: Configuration + Coalesce + Evaluator<S::Response>,
-    S: Service<Req> + Send + 'static,
+    S: Service<Req> + Clone + Send + 'static,
     S::Error: std::error::Error + Send + Sync + 'static,
     S::Future: Send + 'static,
     Wrap: From<Q::Error> + From<S::Error>,
@@ -52,7 +52,7 @@ where
     ) -> WrappedResult<Report<P::Message, Q, P>> {
         let mut report = Vec::new();
         for config in configs {
-            let worker = Worker::new(self.client);
+            let worker = Worker::new(self.client.clone());
             report.push(worker.assault(cmd, config).await?); // TODO do not await here, use stream
         }
 
@@ -61,7 +61,7 @@ where
 }
 
 /// TODO document
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Worker<Q, P, S, Req> {
     client: S,
     phantom: PhantomData<(Q, P, Req, S)>,
@@ -70,7 +70,7 @@ impl<Q, P, S, Req> Worker<Q, P, S, Req>
 where
     Q: Configuration + Coalesce + RequestFactory<Req>,
     P: Configuration + Coalesce + Evaluator<S::Response>,
-    S: Service<Req> + Send + 'static,
+    S: Service<Req> + Clone + Send + 'static,
     S::Error: std::error::Error + Send + Sync + 'static,
     S::Future: Send + 'static,
     Wrap: From<Q::Error> + From<S::Error>,
@@ -87,7 +87,7 @@ where
         let worker_config = Coalesced::tuple(config.worker_config, cmd.destinations()?);
         let mut report = Vec::new();
         for testcase in config.testcases {
-            let case = Case::new(self.client);
+            let case = Case::new(self.client.clone());
             let testcase = Coalesced::tuple(testcase, worker_config.coalesce().setting);
 
             let destinations = worker_config.coalesce().destinations;
@@ -99,7 +99,7 @@ where
 }
 
 /// TODO document
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Case<Q, P, S, Req> {
     client: S,
     phantom: PhantomData<(Q, P, S, Req)>,
@@ -108,7 +108,7 @@ impl<Q, P, S, Req> Case<Q, P, S, Req>
 where
     Q: Configuration + Coalesce + RequestFactory<Req>,
     P: Configuration + Coalesce + Evaluator<S::Response>,
-    S: Service<Req> + Send + 'static,
+    S: Service<Req> + Clone + Send + 'static,
     S::Error: std::error::Error + Send + Sync + 'static,
     S::Future: Send + 'static,
     Wrap: From<Q::Error> + From<S::Error>,

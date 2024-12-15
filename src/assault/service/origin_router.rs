@@ -5,10 +5,18 @@ use tower::Service;
 
 use crate::error::{AssaultError, Wrap};
 
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, PartialEq, Eq, Default)]
 pub struct OriginRouter<S, B> {
     map: HashMap<Authority, S>,
     phantom: PhantomData<B>,
+}
+impl<S, B> Clone for OriginRouter<S, B>
+where
+    S: Clone,
+{
+    fn clone(&self) -> Self {
+        Self::new(self.map.clone())
+    }
 }
 impl<S, B> OriginRouter<S, B> {
     pub fn new(map: HashMap<Authority, S>) -> Self {
