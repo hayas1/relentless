@@ -38,6 +38,11 @@ impl<T> DerefMut for Destinations<T> {
         &mut self.0
     }
 }
+impl<S: ToString, T> Extend<(S, T)> for Destinations<T> {
+    fn extend<I: IntoIterator<Item = (S, T)>>(&mut self, iter: I) {
+        self.0.extend(iter.into_iter().map(|(k, val)| (k.to_string(), val)));
+    }
+}
 impl<S: ToString, T> FromIterator<(S, T)> for Destinations<T> {
     fn from_iter<I: IntoIterator<Item = (S, T)>>(iter: I) -> Self {
         Self(iter.into_iter().map(|(k, val)| (k.to_string(), val)).collect())
