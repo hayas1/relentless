@@ -1,5 +1,10 @@
 use std::marker::PhantomData;
 
+use tower::{
+    timeout::{error::Elapsed, TimeoutLayer},
+    Service, ServiceBuilder, ServiceExt,
+};
+
 use crate::{
     assault::reportable::{CaseReport, Report, WorkerReport},
     error::{Wrap, WrappedResult},
@@ -13,10 +18,6 @@ use crate::{
         },
         template::Template,
     },
-};
-use tower::{
-    timeout::{error::Elapsed, TimeoutLayer},
-    Service, ServiceBuilder, ServiceExt,
 };
 
 use super::{
