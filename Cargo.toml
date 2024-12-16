@@ -21,6 +21,8 @@ default-http-client = ["reqwest"]
 
 [dependencies]
 tokio = { version = "1.42.0", features = ["full"] }
+# tokio-stream = "0.1.17" # TODO tokio-stream do not implement flatten
+futures = "0.3.31"
 tower = { version = "0.5.0", features = ["timeout", "util"] }
 reqwest = { version = "0.12.9", optional = true }
 http = "1.2.0"
