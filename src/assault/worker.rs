@@ -1,5 +1,6 @@
 use std::marker::PhantomData;
 
+use futures::{stream, Stream, StreamExt};
 use tower::{
     timeout::{error::Elapsed, TimeoutLayer},
     Service, ServiceBuilder, ServiceExt,
@@ -127,7 +128,7 @@ where
         let _ = cmd;
 
         // TODO do not await here, use stream
-        let responses = self.requests(destinations, testcase.coalesce()).await?;
+        let responses: Vec<Destinations<_>> = self.requests(destinations, testcase.coalesce()).await.collect().await;
 
         let (mut passed, mut v) = (0, Vec::new());
         for res in responses {
@@ -141,34 +142,70 @@ where
         self,
         destinations: &Destinations<http_serde_priv::Uri>,
         testcase: Testcase<Q, P>,
-    ) -> WrappedResult<Vec<Destinations<RequestResult<S::Response>>>> {
+    ) -> impl Stream<Item = Destinations<RequestResult<S::Response>>> {
         let Testcase { target, setting, .. } = testcase;
+        let setting_timeout = setting.timeout;
 
-        let mut repeated = Vec::new();
-        let mut timeout = ServiceBuilder::new()
-            .option_layer(setting.timeout.map(TimeoutLayer::new))
+        // let mut repeated = Vec::new();
+        let timeout = ServiceBuilder::new()
+            .option_layer(setting_timeout.map(TimeoutLayer::new))
             .map_err(Into::<tower::BoxError>::into) // https://github.com/tower-rs/tower/issues/665
             .service(self.client);
-        for repeating in Self::setup_requests(destinations, &target, &setting)?.transpose() {
-            let mut responses = Destinations::new();
-            for (d, req) in repeating {
-                // TODO do not await here, use stream
-                let result = timeout.ready().await.map_err(Wrap::new)?.call(req).await;
-                match result {
-                    Ok(res) => responses.insert(d, RequestResult::Response(res)),
-                    Err(err) => {
-                        if err.is::<Elapsed>() {
-                            responses
-                                .insert(d, RequestResult::Timeout(setting.timeout.unwrap_or_else(|| unreachable!())))
-                        } else {
-                            Err(Wrap::new(err))?
-                        }
-                    }
-                };
-            }
-            repeated.push(responses);
-        }
-        Ok(repeated)
+        stream::iter(Self::setup_requests(destinations, &target, &setting).unwrap_or_else(|_| todo!()).transpose())
+            .then(move |repeating| {
+                // let (timeout, setting_timeout) = (timeout.clone(), setting_timeout.clone());
+                let timeout = timeout.clone();
+                async move {
+                    stream::iter(repeating)
+                        .then(|(d, req)| {
+                            // let (timeout, setting_timeout) = (timeout.clone(), setting_timeout.clone());
+                            let timeout = timeout.clone();
+                            async move {
+                                let result = timeout.clone().ready().await.unwrap_or_else(|_| todo!()).call(req).await;
+                                match result {
+                                    Ok(res) => Ok((d, RequestResult::Response(res))),
+                                    Err(err) => {
+                                        if err.is::<Elapsed>() {
+                                            Ok((
+                                                d,
+                                                RequestResult::Timeout(
+                                                    setting_timeout.unwrap_or_else(|| unreachable!()),
+                                                ),
+                                            ))
+                                        } else {
+                                            todo!()
+                                        }
+                                    }
+                                }
+                            }
+                        })
+                        .collect::<Vec<WrappedResult<(String, RequestResult<S::Response>)>>>()
+                        .await
+                        .into_iter()
+                        .collect::<WrappedResult<Destinations<RequestResult<S::Response>>>>()
+                        .unwrap()
+                }
+            })
+        // for repeating in Self::setup_requests(destinations, &target, &setting)?.transpose() {
+        //     let mut responses = Destinations::new();
+        //     for (d, req) in repeating {
+        //         // TODO do not await here, use stream
+        //         let result = timeout.ready().await.map_err(Wrap::new)?.call(req).await;
+        //         match result {
+        //             Ok(res) => responses.insert(d, RequestResult::Response(res)),
+        //             Err(err) => {
+        //                 if err.is::<Elapsed>() {
+        //                     responses
+        //                         .insert(d, RequestResult::Timeout(setting.timeout.unwrap_or_else(|| unreachable!())))
+        //                 } else {
+        //                     Err(Wrap::new(err))?
+        //                 }
+        //             }
+        //         };
+        //     }
+        //     repeated.push(responses);
+        // }
+        // Ok(repeated)
     }
 
     pub fn setup_requests(
