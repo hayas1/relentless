@@ -187,10 +187,8 @@ where
                             }
                         })
                         .buffer_unordered(destinations)
-                        .collect::<Vec<(String, RequestResult<S::Response>)>>()
+                        .collect::<Destinations<_>>()
                         .await
-                        .into_iter()
-                        .collect::<Destinations<RequestResult<S::Response>>>()
                 }
             })
             .buffered(repeat_buffer))
