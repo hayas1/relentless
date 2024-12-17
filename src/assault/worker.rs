@@ -156,8 +156,9 @@ where
                 // let (timeout, setting_timeout) = (timeout.clone(), setting_timeout.clone());
                 let timeout = timeout.clone();
                 async move {
+                    let destinations = repeating.len();
                     stream::iter(repeating)
-                        .then(|(d, req)| {
+                        .map(|(d, req)| {
                             // let (timeout, setting_timeout) = (timeout.clone(), setting_timeout.clone());
                             let timeout = timeout.clone();
                             async move {
@@ -179,6 +180,7 @@ where
                                 }
                             }
                         })
+                        .buffer_unordered(destinations)
                         .collect::<Vec<WrappedResult<(String, RequestResult<S::Response>)>>>()
                         .await
                         .into_iter()
