@@ -126,17 +126,14 @@ where
         testcase: Coalesced<Testcase<Q, P>, Setting<Q, P>>,
     ) -> WrappedResult<CaseReport<P::Message, Q, P>> {
         let _ = cmd;
-        let case = testcase.coalesce();
+        let case = &testcase.coalesce();
 
         let (passed, messages) = self
-            .requests(destinations, case.clone())
+            .requests(destinations, case)
             .await?
-            .fold((0, Vec::new()), move |(p, mut msg), res| {
-                let case = case.clone();
-                async move {
-                    let pass = case.setting.response.evaluate(res, &mut msg).await;
-                    (p + pass as usize, msg)
-                }
+            .fold((0, Vec::new()), |(p, mut msg), res| async move {
+                let pass = case.setting.response.evaluate(res, &mut msg).await;
+                (p + pass as usize, msg)
             })
             .await;
 
@@ -146,7 +143,7 @@ where
     pub async fn requests(
         self,
         destinations: &Destinations<http_serde_priv::Uri>,
-        testcase: Testcase<Q, P>,
+        testcase: &Testcase<Q, P>,
     ) -> WrappedResult<impl Stream<Item = Destinations<RequestResult<S::Response>>>> {
         let Testcase { target, setting, .. } = testcase;
         let setting_timeout = setting.timeout;
@@ -156,7 +153,7 @@ where
             .option_layer(setting_timeout.map(TimeoutLayer::new))
             .map_err(Into::<tower::BoxError>::into) // https://github.com/tower-rs/tower/issues/665
             .service(self.client);
-        let requests = Self::setup_requests(destinations, &target, &setting)?.transpose();
+        let requests = Self::setup_requests(destinations, target, setting)?.transpose();
         let repeat_buffer = if false { 1 } else { requests.len() };
         Ok(stream::iter(requests)
             .map(move |repeating| {
