@@ -148,7 +148,6 @@ where
         let Testcase { target, setting, .. } = testcase;
         let setting_timeout = setting.timeout;
 
-        // let mut repeated = Vec::new();
         let timeout = ServiceBuilder::new()
             .option_layer(setting_timeout.map(TimeoutLayer::new))
             .map_err(Into::<tower::BoxError>::into) // https://github.com/tower-rs/tower/issues/665
@@ -157,13 +156,11 @@ where
         let repeat_buffer = if false { 1 } else { requests.len() };
         Ok(stream::iter(requests)
             .map(move |repeating| {
-                // let (timeout, setting_timeout) = (timeout.clone(), setting_timeout.clone());
                 let timeout = timeout.clone();
                 async move {
                     let destinations = repeating.len();
                     stream::iter(repeating)
                         .map(|(d, req)| {
-                            // let (timeout, setting_timeout) = (timeout.clone(), setting_timeout.clone());
                             let timeout = timeout.clone();
                             async move {
                                 match timeout.clone().ready().await {
@@ -192,26 +189,6 @@ where
                 }
             })
             .buffered(repeat_buffer))
-        // for repeating in Self::setup_requests(destinations, &target, &setting)?.transpose() {
-        //     let mut responses = Destinations::new();
-        //     for (d, req) in repeating {
-        //         // TODO do not await here, use stream
-        //         let result = timeout.ready().await.map_err(Wrap::new)?.call(req).await;
-        //         match result {
-        //             Ok(res) => responses.insert(d, RequestResult::Response(res)),
-        //             Err(err) => {
-        //                 if err.is::<Elapsed>() {
-        //                     responses
-        //                         .insert(d, RequestResult::Timeout(setting.timeout.unwrap_or_else(|| unreachable!())))
-        //                 } else {
-        //                     Err(Wrap::new(err))?
-        //                 }
-        //             }
-        //         };
-        //     }
-        //     repeated.push(responses);
-        // }
-        // Ok(repeated)
     }
 
     pub fn setup_requests(
