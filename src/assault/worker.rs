@@ -128,12 +128,11 @@ where
         let _ = cmd;
 
         // TODO do not await here, use stream
-        let responses: Vec<WrappedResult<Destinations<_>>> =
-            self.requests(destinations, testcase.coalesce()).await?.collect().await;
+        let responses: Vec<Destinations<_>> = self.requests(destinations, testcase.coalesce()).await?.collect().await;
 
         let (mut passed, mut v) = (0, Vec::new());
         for res in responses {
-            let pass = testcase.coalesce().setting.response.evaluate(res?, &mut v).await;
+            let pass = testcase.coalesce().setting.response.evaluate(res, &mut v).await;
             passed += pass as usize;
         }
         Ok(CaseReport::new(testcase, passed, v.into_iter().collect()))
@@ -143,7 +142,7 @@ where
         self,
         destinations: &Destinations<http_serde_priv::Uri>,
         testcase: Testcase<Q, P>,
-    ) -> WrappedResult<impl Stream<Item = WrappedResult<Destinations<RequestResult<S::Response>>>>> {
+    ) -> WrappedResult<impl Stream<Item = Destinations<RequestResult<S::Response>>>> {
         let Testcase { target, setting, .. } = testcase;
         let setting_timeout = setting.timeout;
 
@@ -164,29 +163,31 @@ where
                             // let (timeout, setting_timeout) = (timeout.clone(), setting_timeout.clone());
                             let timeout = timeout.clone();
                             async move {
-                                let result = timeout.clone().ready().await.map_err(Wrap::new)?.call(req).await;
-                                match result {
-                                    Ok(res) => Ok((d, RequestResult::Response(res))),
-                                    Err(err) => {
-                                        if err.is::<Elapsed>() {
-                                            Ok((
-                                                d,
-                                                RequestResult::Timeout(
-                                                    setting_timeout.unwrap_or_else(|| unreachable!()),
-                                                ),
-                                            ))
-                                        } else {
-                                            Err(Wrap::new(err))?
+                                match timeout.clone().ready().await {
+                                    Ok(service) => match service.call(req).await {
+                                        Ok(res) => (d, RequestResult::Response(res)),
+                                        Err(err) => {
+                                            if err.is::<Elapsed>() {
+                                                (
+                                                    d,
+                                                    RequestResult::Timeout(
+                                                        setting_timeout.unwrap_or_else(|| unreachable!()),
+                                                    ),
+                                                )
+                                            } else {
+                                                (d, RequestResult::RequestError(err))
+                                            }
                                         }
-                                    }
+                                    },
+                                    Err(err) => (d, RequestResult::NoReady(err)),
                                 }
                             }
                         })
                         .buffer_unordered(destinations)
-                        .collect::<Vec<WrappedResult<(String, RequestResult<S::Response>)>>>()
+                        .collect::<Vec<(String, RequestResult<S::Response>)>>()
                         .await
                         .into_iter()
-                        .collect::<WrappedResult<Destinations<RequestResult<S::Response>>>>()
+                        .collect::<Destinations<RequestResult<S::Response>>>()
                 }
             })
             .buffered(32))
