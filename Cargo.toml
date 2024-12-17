@@ -1,6 +1,6 @@
 [package]
 name = "relentless"
-version = "0.1.4"
+version = "0.1.5"
 description = "Relentless HTTP load testing / comparison testing tool"
 authors = ["hayas1 <h4ystack@gmail.com>"]
 edition = "2021"
@@ -23,7 +23,7 @@ default-http-client = ["reqwest"]
 tokio = { version = "1.42.0", features = ["full"] }
 # tokio-stream = "0.1.17" # TODO tokio-stream do not implement flatten
 futures = "0.3.31"
-tower = { version = "0.5.0", features = ["timeout", "util"] }
+tower = { version = "0.5.2", features = ["timeout", "util"] }
 reqwest = { version = "0.12.9", optional = true }
 http = "1.2.0"
 http-serde = "2.1.1"
@@ -31,9 +31,9 @@ http-body = "1.0.1"
 http-body-util = "0.1.2"
 bytes = "1.9.0"
 
-thiserror = "2.0.6"
+thiserror = "2.0.7"
 regex = "1.11.1"
-serde = { version = "1.0.215", features = ["derive"] }
+serde = { version = "1.0.216", features = ["derive"] }
 serde_json = { version = "1.0.133", optional = true }
 serde_yaml = { version = "0.9.34", optional = true }
 toml = { version = "0.8.19", optional = true }
@@ -42,7 +42,7 @@ jsonptr = { version = "0.6.3", optional = true }
 mime = "0.3.17"
 
 clap = { version = "4.5.23", features = ["derive"], optional = true }
-console = { version = "0.15.8", optional = true }
+console = { version = "0.15.10", optional = true }
 nom = "7.1.3"
 
 
