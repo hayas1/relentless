@@ -1,6 +1,6 @@
 [package]
 name = "relentless"
-version = "0.1.4"
+version = "0.1.5"
 description = "Relentless HTTP load testing / comparison testing tool"
 authors = ["hayas1 <h4ystack@gmail.com>"]
 edition = "2021"
