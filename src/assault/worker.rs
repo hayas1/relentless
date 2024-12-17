@@ -152,7 +152,7 @@ where
             .map_err(Into::<tower::BoxError>::into) // https://github.com/tower-rs/tower/issues/665
             .service(self.client);
         stream::iter(Self::setup_requests(destinations, &target, &setting).unwrap_or_else(|_| todo!()).transpose())
-            .then(move |repeating| {
+            .map(move |repeating| {
                 // let (timeout, setting_timeout) = (timeout.clone(), setting_timeout.clone());
                 let timeout = timeout.clone();
                 async move {
@@ -173,7 +173,7 @@ where
                                                 ),
                                             ))
                                         } else {
-                                            todo!()
+                                            Err(Wrap::new(err))?
                                         }
                                     }
                                 }
@@ -186,6 +186,7 @@ where
                         .unwrap()
                 }
             })
+            .buffered(32)
         // for repeating in Self::setup_requests(destinations, &target, &setting)?.transpose() {
         //     let mut responses = Destinations::new();
         //     for (d, req) in repeating {
