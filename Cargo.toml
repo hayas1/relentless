@@ -21,7 +21,7 @@ default-http-client = ["reqwest"]
 
 [dependencies]
 tokio = { version = "1.42.0", features = ["full"] }
-# tokio-stream = "0.1.17" # TODO tokio-stream do not implement flatten
+# tokio-stream = "0.1.17" # TODO map of tokio-stream may not collect as Vec<T>Item (it reduce Vec<Future>), so use futures
 futures = "0.3.31"
 tower = { version = "0.5.2", features = ["timeout", "util"] }
 reqwest = { version = "0.12.9", optional = true }
