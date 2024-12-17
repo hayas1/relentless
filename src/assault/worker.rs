@@ -126,16 +126,21 @@ where
         testcase: Coalesced<Testcase<Q, P>, Setting<Q, P>>,
     ) -> WrappedResult<CaseReport<P::Message, Q, P>> {
         let _ = cmd;
+        let case = testcase.coalesce();
 
-        // TODO do not await here, use stream
-        let responses: Vec<Destinations<_>> = self.requests(destinations, testcase.coalesce()).await?.collect().await;
+        let (passed, messages) = self
+            .requests(destinations, case.clone())
+            .await?
+            .fold((0, Vec::new()), move |(p, mut msg), res| {
+                let case = case.clone();
+                async move {
+                    let pass = case.setting.response.evaluate(res, &mut msg).await;
+                    (p + pass as usize, msg)
+                }
+            })
+            .await;
 
-        let (mut passed, mut v) = (0, Vec::new());
-        for res in responses {
-            let pass = testcase.coalesce().setting.response.evaluate(res, &mut v).await;
-            passed += pass as usize;
-        }
-        Ok(CaseReport::new(testcase, passed, v.into_iter().collect()))
+        Ok(CaseReport::new(testcase, passed, messages.into_iter().collect()))
     }
 
     pub async fn requests(
