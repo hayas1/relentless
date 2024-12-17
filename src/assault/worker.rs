@@ -161,7 +161,7 @@ where
                             // let (timeout, setting_timeout) = (timeout.clone(), setting_timeout.clone());
                             let timeout = timeout.clone();
                             async move {
-                                let result = timeout.clone().ready().await.unwrap_or_else(|_| todo!()).call(req).await;
+                                let result = timeout.clone().ready().await.map_err(Wrap::new)?.call(req).await;
                                 match result {
                                     Ok(res) => Ok((d, RequestResult::Response(res))),
                                     Err(err) => {
