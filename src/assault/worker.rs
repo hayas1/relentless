@@ -152,6 +152,7 @@ where
             .map_err(Into::<tower::BoxError>::into) // https://github.com/tower-rs/tower/issues/665
             .service(self.client);
         let requests = Self::setup_requests(destinations, &target, &setting)?.transpose();
+        let repeat_buffer = if false { 1 } else { requests.len() };
         Ok(stream::iter(requests)
             .map(move |repeating| {
                 // let (timeout, setting_timeout) = (timeout.clone(), setting_timeout.clone());
@@ -190,7 +191,7 @@ where
                         .collect::<Destinations<RequestResult<S::Response>>>()
                 }
             })
-            .buffered(32))
+            .buffered(repeat_buffer))
         // for repeating in Self::setup_requests(destinations, &target, &setting)?.transpose() {
         //     let mut responses = Destinations::new();
         //     for (d, req) in repeating {
