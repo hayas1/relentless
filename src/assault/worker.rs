@@ -128,11 +128,12 @@ where
         let _ = cmd;
 
         // TODO do not await here, use stream
-        let responses: Vec<Destinations<_>> = self.requests(destinations, testcase.coalesce()).await.collect().await;
+        let responses: Vec<WrappedResult<Destinations<_>>> =
+            self.requests(destinations, testcase.coalesce()).await?.collect().await;
 
         let (mut passed, mut v) = (0, Vec::new());
         for res in responses {
-            let pass = testcase.coalesce().setting.response.evaluate(res, &mut v).await;
+            let pass = testcase.coalesce().setting.response.evaluate(res?, &mut v).await;
             passed += pass as usize;
         }
         Ok(CaseReport::new(testcase, passed, v.into_iter().collect()))
@@ -142,7 +143,7 @@ where
         self,
         destinations: &Destinations<http_serde_priv::Uri>,
         testcase: Testcase<Q, P>,
-    ) -> impl Stream<Item = Destinations<RequestResult<S::Response>>> {
+    ) -> WrappedResult<impl Stream<Item = WrappedResult<Destinations<RequestResult<S::Response>>>>> {
         let Testcase { target, setting, .. } = testcase;
         let setting_timeout = setting.timeout;
 
@@ -151,7 +152,8 @@ where
             .option_layer(setting_timeout.map(TimeoutLayer::new))
             .map_err(Into::<tower::BoxError>::into) // https://github.com/tower-rs/tower/issues/665
             .service(self.client);
-        stream::iter(Self::setup_requests(destinations, &target, &setting).unwrap_or_else(|_| todo!()).transpose())
+        let requests = Self::setup_requests(destinations, &target, &setting)?.transpose();
+        Ok(stream::iter(requests)
             .map(move |repeating| {
                 // let (timeout, setting_timeout) = (timeout.clone(), setting_timeout.clone());
                 let timeout = timeout.clone();
@@ -185,10 +187,9 @@ where
                         .await
                         .into_iter()
                         .collect::<WrappedResult<Destinations<RequestResult<S::Response>>>>()
-                        .unwrap()
                 }
             })
-            .buffered(32)
+            .buffered(32))
         // for repeating in Self::setup_requests(destinations, &target, &setting)?.transpose() {
         //     let mut responses = Destinations::new();
         //     for (d, req) in repeating {
