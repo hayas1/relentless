@@ -2,13 +2,42 @@ use std::{
     future::Future,
     pin::Pin,
     task::{Context, Poll},
-    time::{Duration, Instant},
+    time::{Duration, SystemTime, SystemTimeError},
 };
 
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tower::{timeout::error::Elapsed, Layer, Service};
 
-pub type RequestResult<Res> = Result<Res, RequestError>;
+pub type RequestResult<Res> = Result<MetaResponse<Res>, RequestError>;
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct MetaResponse<Res> {
+    response: Res,
+    timestamp: SystemTime,
+    latency: Duration,
+}
+impl<Res> MetaResponse<Res> {
+    pub fn new(response: Res, timestamp: SystemTime, latency: Duration) -> Self {
+        Self { response, timestamp, latency }
+    }
+
+    pub fn response(&self) -> &Res {
+        &self.response
+    }
+    pub fn into_response(self) -> Res {
+        self.response
+    }
+
+    pub fn timestamp(&self) -> SystemTime {
+        self.timestamp
+    }
+    pub fn end_timestamp(&self) -> SystemTime {
+        self.timestamp + self.latency
+    }
+    pub fn latency(&self) -> Duration {
+        self.latency
+    }
+}
 
 #[derive(Error, Debug)]
 pub enum RequestError {
@@ -23,6 +52,8 @@ pub enum RequestError {
     #[error(transparent)]
     InnerServiceError(Box<dyn std::error::Error + Send + Sync>),
 
+    #[error(transparent)]
+    FailToMeasureLatency(SystemTimeError),
     #[error(transparent)]
     Unknown(Box<dyn std::error::Error + Send + Sync>),
 }
@@ -49,9 +80,9 @@ where
     S::Future: Send + 'static,
     S::Error: std::error::Error + Send + Sync + 'static,
 {
-    type Response = S::Response; // TODO contain timestamp, latency, byte size, ...
+    type Response = MetaResponse<S::Response>; // TODO contain byte size, (http status?), ...
     type Error = RequestError;
-    type Future = Pin<Box<dyn Future<Output = RequestResult<Self::Response>> + Send>>;
+    type Future = Pin<Box<dyn Future<Output = RequestResult<S::Response>> + Send>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.inner.poll_ready(cx).map_err(|e| RequestError::NoReady(e.into()))
@@ -60,11 +91,11 @@ where
     fn call(&mut self, req: Req) -> Self::Future {
         let fut = self.inner.call(req);
         Box::pin(async {
-            let now = Instant::now();
+            let timestamp = SystemTime::now();
             let result = fut.await;
-            let latency = now.elapsed();
+            let latency = timestamp.elapsed().map_err(RequestError::FailToMeasureLatency)?; // TODO this error should be allowed?
 
-            result.map_err(|error| {
+            let response = result.map_err(|error| {
                 let boxed: Box<dyn std::error::Error + Send + Sync> = error.into();
                 if let Some(err) = boxed.downcast_ref() {
                     match err {
@@ -80,7 +111,8 @@ where
                 } else {
                     RequestError::Unknown(boxed)
                 }
-            })
+            })?;
+            Ok(MetaResponse::new(response, timestamp, latency))
         })
     }
 }

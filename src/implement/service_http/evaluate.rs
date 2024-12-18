@@ -10,7 +10,7 @@ use crate::{
         destinations::{AllOr, Destinations},
         evaluate::plaintext::PlaintextEvaluate,
         evaluator::{Acceptable, Evaluator},
-        service::request::RequestResult,
+        service::request::{MetaResponse, RequestResult},
     },
     error::EvaluateError,
     interface::helper::{coalesce::Coalesce, http_serde_priv, is_default::IsDefault},
@@ -140,7 +140,7 @@ impl Acceptable<(http::StatusCode, http::HeaderMap, Bytes)> for HttpResponse {
 }
 impl HttpResponse {
     pub async fn unzip_parts<B>(
-        responses: Destinations<http::Response<B>>,
+        responses: Destinations<MetaResponse<http::Response<B>>>,
     ) -> Result<Destinations<(http::StatusCode, http::HeaderMap, Bytes)>, EvaluateError>
     where
         B: Body,
@@ -148,7 +148,7 @@ impl HttpResponse {
     {
         let mut parts = Destinations::new();
         for (name, response) in responses {
-            let (http::response::Parts { status, headers, .. }, body) = response.into_parts();
+            let (http::response::Parts { status, headers, .. }, body) = response.into_response().into_parts();
             let bytes = BodyExt::collect(body)
                 .await
                 .map(Collected::to_bytes)
@@ -211,6 +211,8 @@ impl Acceptable<&Bytes> for BodyEvaluate {
 
 #[cfg(test)]
 mod tests {
+    use std::time::SystemTime;
+
     use super::*;
 
     #[tokio::test]
@@ -219,7 +221,10 @@ mod tests {
 
         let ok =
             http::Response::builder().status(http::StatusCode::OK).body(http_body_util::Empty::<Bytes>::new()).unwrap();
-        let responses = Destinations::from_iter(vec![("test".to_string(), Ok(ok))]);
+        let responses = Destinations::from_iter(vec![(
+            "test".to_string(),
+            Ok(MetaResponse::new(ok, SystemTime::now(), Default::default())),
+        )]);
         let mut msg = Vec::new();
         let result = evaluator.evaluate(responses, &mut msg).await;
         assert!(result);
@@ -229,7 +234,10 @@ mod tests {
             .status(http::StatusCode::SERVICE_UNAVAILABLE)
             .body(http_body_util::Empty::<Bytes>::new())
             .unwrap();
-        let responses = Destinations::from_iter(vec![("test".to_string(), Ok(unavailable))]);
+        let responses = Destinations::from_iter(vec![(
+            "test".to_string(),
+            Ok(MetaResponse::new(unavailable, SystemTime::now(), Default::default())),
+        )]);
         let mut msg = Vec::new();
         let result = evaluator.evaluate(responses, &mut msg).await;
         assert!(!result);
