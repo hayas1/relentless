@@ -16,6 +16,9 @@ pub enum RequestError {
     Timeout(Duration),
 
     #[error(transparent)]
+    FailToMakeRequest(Box<dyn std::error::Error + Send + Sync>),
+
+    #[error(transparent)]
     NoReady(Box<dyn std::error::Error + Send + Sync>),
     #[error(transparent)]
     RequestError(Box<dyn std::error::Error + Send + Sync>),

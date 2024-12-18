@@ -33,6 +33,7 @@ pub struct Control<Q, P, S, Req> {
 impl<Q, P, S, Req> Control<Q, P, S, Req>
 where
     Q: Configuration + Coalesce + RequestFactory<Req>,
+    Q::Error: std::error::Error + Send + Sync + 'static,
     P: Configuration + Coalesce + Evaluator<S::Response>,
     S: Service<Req> + Clone + Send + 'static,
     S::Error: std::error::Error + Send + Sync + 'static,
@@ -73,6 +74,7 @@ pub struct Worker<Q, P, S, Req> {
 impl<Q, P, S, Req> Worker<Q, P, S, Req>
 where
     Q: Configuration + Coalesce + RequestFactory<Req>,
+    Q::Error: std::error::Error + Send + Sync + 'static,
     P: Configuration + Coalesce + Evaluator<S::Response>,
     S: Service<Req> + Clone + Send + 'static,
     S::Error: std::error::Error + Send + Sync + 'static,
@@ -115,6 +117,7 @@ pub struct Case<Q, P, S, Req> {
 impl<Q, P, S, Req> Case<Q, P, S, Req>
 where
     Q: Configuration + Coalesce + RequestFactory<Req>,
+    Q::Error: std::error::Error + Send + Sync + 'static,
     P: Configuration + Coalesce + Evaluator<S::Response>,
     S: Service<Req> + Clone + Send + 'static,
     S::Error: std::error::Error + Send + Sync + 'static,
@@ -163,7 +166,7 @@ where
                     stream::iter(repeating)
                         .map(|(d, req)| {
                             let client = client.clone();
-                            async move { (d, Self::call(client, req.unwrap_or_else(|_| todo!()), setting).await) }
+                            async move { (d, Self::call(client, req, setting).await) }
                         })
                         .buffer_unordered(destinations)
                         .collect()
@@ -173,7 +176,7 @@ where
             .buffered(repeat_buffer))
     }
 
-    pub async fn call(client: S, req: Req, setting: &Setting<Q, P>) -> RequestResult<S::Response> {
+    pub async fn call(client: S, req: Result<Req, Q::Error>, setting: &Setting<Q, P>) -> RequestResult<S::Response> {
         let mut service = ServiceBuilder::new()
             .layer(RequestLayer)
             .map_err(RequestError::InnerError) // TODO how to handle this error?
@@ -181,7 +184,12 @@ where
             .map_err(Into::<tower::BoxError>::into) // https://github.com/tower-rs/tower/issues/665
             .service(client.clone());
 
-        service.ready().await.map_err(|e| RequestError::NoReady(e.into()))?.call(req).await
+        service
+            .ready()
+            .await
+            .map_err(|e| RequestError::NoReady(e.into()))?
+            .call(req.map_err(|e| RequestError::FailToMakeRequest(e.into()))?)
+            .await
     }
 
     pub fn request_stream<'a>(
