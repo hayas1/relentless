@@ -8,7 +8,7 @@ use std::{
 use thiserror::Error;
 use tower::{timeout::error::Elapsed, Layer, Service};
 
-pub type RequestResult<T> = Result<T, RequestError>;
+pub type RequestResult<Res> = Result<Res, RequestError>;
 
 #[derive(Error, Debug)]
 pub enum RequestError {
