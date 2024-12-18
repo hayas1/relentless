@@ -86,16 +86,19 @@ where
         config: Config<Q, P>,
     ) -> WrappedResult<WorkerReport<P::Message, Q, P>> {
         let worker_config = Coalesced::tuple(config.worker_config, cmd.destinations()?);
-        let mut report = Vec::new();
-        for testcase in config.testcases {
-            let case = Case::new(self.client.clone());
-            let testcase = Coalesced::tuple(testcase, worker_config.coalesce().setting);
+        let testcase_buffer = if false { 1 } else { config.testcases.len() };
+        let report: Vec<WrappedResult<CaseReport<P::Message, Q, P>>> = stream::iter(config.testcases)
+            .map(|testcase| {
+                let case = Case::new(self.client.clone());
+                let testcase = Coalesced::tuple(testcase, worker_config.coalesce().setting);
+                let destinations = worker_config.coalesce().destinations;
+                async move { case.assault(cmd, &destinations, testcase).await }
+            })
+            .buffered(testcase_buffer)
+            .collect()
+            .await;
 
-            let destinations = worker_config.coalesce().destinations;
-            report.push(case.assault(cmd, &destinations, testcase).await?); // TODO do not await here, use stream
-        }
-
-        Ok(WorkerReport::new(worker_config, report))
+        Ok(WorkerReport::new(worker_config, report.into_iter().collect::<Result<_, Wrap>>()?))
     }
 }
 
