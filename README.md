@@ -45,6 +45,7 @@ expect🌐 http://localhost:3000
 ✅ /healthz
 ```
 In this case the actual and expected are the same server, so the request gets the same response and the test passes.
+- Each request is done **concurrently** by default.
 
 ## Library Usage
 ### Install
