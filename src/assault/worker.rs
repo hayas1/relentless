@@ -184,10 +184,11 @@ where
             .map_err(Into::<tower::BoxError>::into) // https://github.com/tower-rs/tower/issues/665
             .service(client.clone());
 
-        ServiceExt::<Result<Req, RequestError>>::ready(&mut service)
+        service
+            .ready()
             .await
             .map_err(|e| RequestError::NoReady(e.into()))?
-            .call(req)
+            .call(req.map_err(|e| RequestError::FailToMakeRequest(e.into()))?)
             .await
     }
 
