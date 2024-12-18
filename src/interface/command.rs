@@ -74,6 +74,10 @@ pub struct Relentless {
     #[cfg_attr(feature = "cli", arg(long))]
     pub no_async_configs: bool,
 
+    /// without async for each testcases
+    #[cfg_attr(feature = "cli", arg(long))]
+    pub no_async_testcases: bool,
+
     /// requests per second
     #[cfg_attr(feature = "cli", arg(long))]
     pub rps: Option<usize>,
