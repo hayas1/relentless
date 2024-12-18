@@ -1,18 +1,23 @@
 use std::time::Duration;
 
-use crate::error::EvaluateError;
+use crate::error::{EvaluateError, Wrap};
 
 use super::destinations::Destinations;
 
 pub enum RequestResult<Res> {
     Response(Res),
     Timeout(Duration),
+
+    FailToMakeRequest(Wrap), // TODO error type
+    NoReady(Box<dyn std::error::Error + Send + Sync>),
+    RequestError(Box<dyn std::error::Error + Send + Sync>),
 }
 impl<Res> RequestResult<Res> {
     pub fn response(self) -> Result<Res, EvaluateError> {
         match self {
             Self::Response(res) => Ok(res),
             Self::Timeout(d) => Err(EvaluateError::RequestTimeout(d)),
+            _ => todo!(), // TODO error handling
         }
     }
     pub fn is_timeout(&self) -> bool {

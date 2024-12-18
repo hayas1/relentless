@@ -28,10 +28,7 @@ use super::{config::Config, helper::http_serde_priv, report::github_markdown::Gi
 pub async fn execute() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sync>> {
     let cmd = Relentless::parse();
 
-    let Relentless { number_of_threads, rps, .. } = &cmd;
-    if number_of_threads.is_some() {
-        unimplemented!("`--number-of-threads` is not implemented yet");
-    }
+    let Relentless { rps, .. } = &cmd;
     if rps.is_some() {
         unimplemented!("`--rps` is not implemented yet");
     }
@@ -73,9 +70,17 @@ pub struct Relentless {
     #[cfg_attr(feature = "cli", arg(short, long))]
     pub output_record: Option<PathBuf>,
 
-    /// number of threads
-    #[cfg_attr(feature = "cli", arg(short, long))]
-    pub number_of_threads: Option<usize>,
+    /// without async for each configs
+    #[cfg_attr(feature = "cli", arg(long))]
+    pub no_async_configs: bool,
+
+    /// without async for each testcases
+    #[cfg_attr(feature = "cli", arg(long))]
+    pub no_async_testcases: bool,
+
+    /// without async for each repeats of requests
+    #[cfg_attr(feature = "cli", arg(long))]
+    pub no_async_repeat: bool,
 
     /// requests per second
     #[cfg_attr(feature = "cli", arg(long))]
@@ -150,20 +155,20 @@ impl Relentless {
     #[cfg(all(feature = "default-http-client", feature = "cli"))]
     pub async fn assault(&self) -> crate::Result<Report<crate::error::EvaluateError, HttpRequest, HttpResponse>> {
         let configs = self.configs_filtered(std::io::stderr())?;
-        let mut service = self.build_service(DefaultHttpClient::<reqwest::Body, reqwest::Body>::new().await?);
-        let report = self.assault_with(configs, &mut service).await?;
+        let service = self.build_service(DefaultHttpClient::<reqwest::Body, reqwest::Body>::new().await?);
+        let report = self.assault_with(configs, service).await?;
         Ok(report)
     }
     /// TODO document
     pub async fn assault_with<S, Req>(
         &self,
         configs: Vec<Config<HttpRequest, HttpResponse>>,
-        service: &mut S,
+        service: S,
     ) -> crate::Result<Report<<HttpResponse as Evaluator<S::Response>>::Message, HttpRequest, HttpResponse>>
     where
         HttpRequest: RequestFactory<Req>,
         HttpResponse: Evaluator<S::Response>,
-        S: Service<Req> + Send + 'static,
+        S: Service<Req> + Clone + Send + 'static,
         S::Error: std::error::Error + Send + Sync + 'static,
         S::Future: Send + 'static,
         Wrap: From<<HttpRequest as RequestFactory<Req>>::Error> + From<<S as Service<Req>>::Error>,

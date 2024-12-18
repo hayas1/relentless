@@ -14,8 +14,8 @@ async fn test_github_markdown_report_format() {
         ..Default::default()
     };
     let configs = relentless.configs().unwrap();
-    let mut service = route::app_with(Default::default());
-    let report = relentless.assault_with::<_, Request<Body>>(configs, &mut service).await.unwrap();
+    let service = route::app_with(Default::default());
+    let report = relentless.assault_with::<_, Request<Body>>(configs, service).await.unwrap();
 
     let mut buf = Vec::new();
     relentless.report_with(&report, &mut buf).unwrap();

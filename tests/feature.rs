@@ -4,15 +4,15 @@ use http_body_util::BodyExt;
 use relentless::interface::{command::Relentless, report::console::CaseConsoleReport};
 
 use relentless_dev_server::route::{self, counter::CounterResponse};
-use tower::Service;
+use tower::ServiceExt;
 
 #[tokio::test]
 async fn test_repeat_config() {
     let relentless =
         Relentless { file: vec!["tests/config/feature/repeat.yaml".into()], no_color: true, ..Default::default() };
     let configs = relentless.configs().unwrap();
-    let mut service = route::app_with(Default::default());
-    let report = relentless.assault_with::<_, Request<Body>>(configs, &mut service).await.unwrap();
+    let service = route::app_with(Default::default());
+    let report = relentless.assault_with::<_, Request<Body>>(configs, service.clone()).await.unwrap();
 
     let mut buf = Vec::new();
     relentless.report_with(&report, &mut buf).unwrap();
@@ -29,7 +29,7 @@ async fn test_repeat_config() {
     assert!(relentless.pass(&report));
     assert!(relentless.allow(&report));
 
-    let response = service.call(Request::builder().uri("/counter").body(Body::empty()).unwrap()).await.unwrap();
+    let response = service.oneshot(Request::builder().uri("/counter").body(Body::empty()).unwrap()).await.unwrap();
     let count: CounterResponse<u64> = serde_json::from_slice(&response.collect().await.unwrap().to_bytes()).unwrap();
     assert_eq!(count.count, 90);
 }
@@ -39,8 +39,8 @@ async fn test_validate_config() {
     let relentless =
         Relentless { file: vec!["tests/config/feature/validate.yaml".into()], no_color: true, ..Default::default() };
     let configs = relentless.configs().unwrap();
-    let mut service = route::app_with(Default::default());
-    let report = relentless.assault_with::<_, Request<Body>>(configs, &mut service).await.unwrap();
+    let service = route::app_with(Default::default());
+    let report = relentless.assault_with::<_, Request<Body>>(configs, service).await.unwrap();
 
     let mut buf = Vec::new();
     relentless.report_with(&report, &mut buf).unwrap();
@@ -59,8 +59,8 @@ async fn test_fail_validate_config() {
         ..Default::default()
     };
     let configs = relentless.configs().unwrap();
-    let mut service = route::app_with(Default::default());
-    let report = relentless.assault_with::<_, Request<Body>>(configs, &mut service).await.unwrap();
+    let service = route::app_with(Default::default());
+    let report = relentless.assault_with::<_, Request<Body>>(configs, service).await.unwrap();
 
     let mut buf = Vec::new();
     relentless.report_with(&report, &mut buf).unwrap();
@@ -82,8 +82,8 @@ async fn test_allow_config() {
     let relentless =
         Relentless { file: vec!["tests/config/feature/allow.yaml".into()], no_color: true, ..Default::default() };
     let configs = relentless.configs().unwrap();
-    let mut service = route::app_with(Default::default());
-    let report = relentless.assault_with::<_, Request<Body>>(configs, &mut service).await.unwrap();
+    let service = route::app_with(Default::default());
+    let report = relentless.assault_with::<_, Request<Body>>(configs, service).await.unwrap();
 
     let mut buf = Vec::new();
     relentless.report_with(&report, &mut buf).unwrap();
@@ -106,8 +106,8 @@ async fn test_headers_config() {
     let relentless =
         Relentless { file: vec!["tests/config/feature/headers.yaml".into()], no_color: true, ..Default::default() };
     let configs = relentless.configs().unwrap();
-    let mut service = route::app_with(Default::default());
-    let report = relentless.assault_with::<_, Request<Body>>(configs, &mut service).await.unwrap();
+    let service = route::app_with(Default::default());
+    let report = relentless.assault_with::<_, Request<Body>>(configs, service).await.unwrap();
 
     let mut buf = Vec::new();
     relentless.report_with(&report, &mut buf).unwrap();
@@ -126,8 +126,8 @@ async fn test_fail_headers_config() {
         ..Default::default()
     };
     let configs = relentless.configs().unwrap();
-    let mut service = route::app_with(Default::default());
-    let report = relentless.assault_with::<_, Request<Body>>(configs, &mut service).await.unwrap();
+    let service = route::app_with(Default::default());
+    let report = relentless.assault_with::<_, Request<Body>>(configs, service).await.unwrap();
 
     let mut buf = Vec::new();
     relentless.report_with(&report, &mut buf).unwrap();
@@ -149,8 +149,8 @@ async fn test_body_config() {
     let relentless =
         Relentless { file: vec!["tests/config/feature/body.yaml".into()], no_color: true, ..Default::default() };
     let configs = relentless.configs().unwrap();
-    let mut service = route::app_with(Default::default());
-    let report = relentless.assault_with::<_, Request<Body>>(configs, &mut service).await.unwrap();
+    let service = route::app_with(Default::default());
+    let report = relentless.assault_with::<_, Request<Body>>(configs, service).await.unwrap();
 
     let mut buf = Vec::new();
     relentless.report_with(&report, &mut buf).unwrap();
@@ -177,8 +177,8 @@ async fn test_timeout_config() {
     let relentless =
         Relentless { file: vec!["tests/config/feature/timeout.yaml".into()], no_color: true, ..Default::default() };
     let configs = relentless.configs().unwrap();
-    let mut service = route::app_with(Default::default());
-    let report = relentless.assault_with::<_, Request<Body>>(configs, &mut service).await.unwrap();
+    let service = route::app_with(Default::default());
+    let report = relentless.assault_with::<_, Request<Body>>(configs, service).await.unwrap();
 
     let mut buf = Vec::new();
     relentless.report_with(&report, &mut buf).unwrap();
@@ -202,8 +202,8 @@ async fn test_template_config() {
     let relentless =
         Relentless { file: vec!["tests/config/feature/template.yaml".into()], no_color: true, ..Default::default() };
     let configs = relentless.configs().unwrap();
-    let mut service = route::app_with(Default::default());
-    let report = relentless.assault_with::<_, Request<Body>>(configs, &mut service).await.unwrap();
+    let service = route::app_with(Default::default());
+    let report = relentless.assault_with::<_, Request<Body>>(configs, service).await.unwrap();
 
     let mut buf = Vec::new();
     relentless.report_with(&report, &mut buf).unwrap();
@@ -217,5 +217,46 @@ async fn test_template_config() {
         assert!(out.contains(&line));
     }
     assert!(!relentless.pass(&report));
+    assert!(relentless.allow(&report));
+}
+
+#[tokio::test]
+async fn test_async_config() {
+    let relentless =
+        Relentless { file: vec!["tests/config/feature/async.yaml".into(); 5], no_color: true, ..Default::default() };
+    let configs = relentless.configs().unwrap();
+    let service = route::app_with(Default::default());
+    let report = relentless.assault_with::<_, Request<Body>>(configs, service).await.unwrap();
+
+    let mut buf = Vec::new();
+    relentless.report_with(&report, &mut buf).unwrap();
+    let out = String::from_utf8_lossy(&buf);
+
+    // TODO test for 5 times
+    for line in [
+        format!("{} /wait/500/ns {}1000/1000 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
+        format!("{} /wait/500/us {}100/100 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
+        format!("{} /wait/500/ms {}10/10 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
+        format!("{} /wait/1/s {}5/5 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
+        format!("{} /wait/500/ns {}1000/1000 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
+        format!("{} /wait/500/us {}100/100 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
+        format!("{} /wait/500/ms {}10/10 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
+        format!("{} /wait/1/s {}5/5 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
+        format!("{} /wait/500/ns {}1000/1000 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
+        format!("{} /wait/500/us {}100/100 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
+        format!("{} /wait/500/ms {}10/10 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
+        format!("{} /wait/1/s {}5/5 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
+        format!("{} /wait/500/ns {}1000/1000 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
+        format!("{} /wait/500/us {}100/100 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
+        format!("{} /wait/500/ms {}10/10 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
+        format!("{} /wait/1/s {}5/5 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
+        format!("{} /wait/500/ns {}1000/1000 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
+        format!("{} /wait/500/us {}100/100 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
+        format!("{} /wait/500/ms {}10/10 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
+        format!("{} /wait/1/s {}5/5 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
+    ] {
+        assert!(out.contains(&line));
+    }
+    assert!(relentless.pass(&report));
     assert!(relentless.allow(&report));
 }

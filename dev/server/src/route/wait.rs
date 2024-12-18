@@ -13,6 +13,7 @@ pub fn route_wait() -> Router<AppState> {
         .route("/:duration", get(DurationUnit::default().handler()))
         .route("/:duration/s", get(DurationUnit::Seconds.handler()))
         .route("/:duration/ms", get(DurationUnit::Milliseconds.handler()))
+        .route("/:duration/us", get(DurationUnit::Microseconds.handler()))
         .route("/:duration/ns", get(DurationUnit::Nanoseconds.handler()))
     // .fallback() // TODO
 }
@@ -26,6 +27,7 @@ pub struct WaitResponse {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash, Serialize, Deserialize)]
 pub enum DurationUnit {
     Nanoseconds,
+    Microseconds,
     Milliseconds,
     #[default]
     Seconds,
@@ -36,6 +38,7 @@ impl DurationUnit {
         move |Path(duration)| {
             let d = match self {
                 DurationUnit::Nanoseconds => Duration::from_nanos(duration),
+                DurationUnit::Microseconds => Duration::from_micros(duration),
                 DurationUnit::Milliseconds => Duration::from_millis(duration),
                 DurationUnit::Seconds => Duration::from_secs(duration),
             };

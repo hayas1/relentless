@@ -5,10 +5,20 @@ use tower::Service;
 
 use crate::error::{AssaultError, Wrap};
 
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, PartialEq, Eq, Default)]
 pub struct OriginRouter<S, B> {
     map: HashMap<Authority, S>,
     phantom: PhantomData<B>,
+}
+impl<S, B> Clone for OriginRouter<S, B>
+where
+    S: Clone,
+{
+    fn clone(&self) -> Self {
+        // derive(Clone) do not implement Clone when ReqB or ResB are not implement Clone
+        // https://github.com/rust-lang/rust/issues/26925
+        Self::new(self.map.clone())
+    }
 }
 impl<S, B> OriginRouter<S, B> {
     pub fn new(map: HashMap<Authority, S>) -> Self {
