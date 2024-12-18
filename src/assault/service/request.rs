@@ -43,11 +43,12 @@ pub struct RequestService<S> {
     inner: S,
 }
 
-impl<S, Req> Service<Req> for RequestService<S>
+impl<S, Req, E> Service<Result<Req, E>> for RequestService<S>
 where
     S: Service<Req> + Clone + Send + 'static,
     S::Future: Send + 'static,
     S::Error: std::error::Error + Send + Sync + 'static,
+    E: std::error::Error + Send + Sync + 'static,
 {
     type Response = S::Response; // TODO contain timestamp, latency, byte size, ...
     type Error = RequestError;
@@ -57,30 +58,38 @@ where
         self.inner.poll_ready(cx).map_err(|e| RequestError::NoReady(e.into()))
     }
 
-    fn call(&mut self, req: Req) -> Self::Future {
-        let fut = self.inner.call(req);
-        Box::pin(async {
-            let now = Instant::now();
-            let result = fut.await;
-            let latency = now.elapsed();
+    fn call(&mut self, req: Result<Req, E>) -> Self::Future {
+        match req {
+            Ok(req) => {
+                let fut = self.inner.call(req);
+                Box::pin(async {
+                    let now = Instant::now();
+                    let result = fut.await;
+                    let latency = now.elapsed();
 
-            result.map_err(|error| {
-                let boxed: Box<dyn std::error::Error + Send + Sync> = error.into();
-                if let Some(err) = boxed.downcast_ref() {
-                    match err {
-                        RequestError::InnerServiceError(e) => {
-                            if e.is::<Elapsed>() {
-                                RequestError::Timeout(latency)
-                            } else {
-                                RequestError::InnerServiceError(boxed)
+                    result.map_err(|error| {
+                        let boxed: Box<dyn std::error::Error + Send + Sync> = error.into();
+                        if let Some(err) = boxed.downcast_ref() {
+                            match err {
+                                RequestError::InnerServiceError(e) => {
+                                    if e.is::<Elapsed>() {
+                                        RequestError::Timeout(latency)
+                                    } else {
+                                        RequestError::InnerServiceError(boxed)
+                                    }
+                                }
+                                _ => RequestError::Unknown(boxed),
                             }
+                        } else {
+                            RequestError::Unknown(boxed)
                         }
-                        _ => RequestError::Unknown(boxed),
-                    }
-                } else {
-                    RequestError::Unknown(boxed)
-                }
-            })
-        })
+                    })
+                })
+            }
+            Err(e) => {
+                let boxed: Box<dyn std::error::Error + Send + Sync> = e.into();
+                Box::pin(async move { Err(RequestError::FailToMakeRequest(boxed)) })
+            }
+        }
     }
 }
