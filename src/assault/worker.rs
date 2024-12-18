@@ -139,11 +139,11 @@ where
         Ok(CaseReport::new(testcase, passed, messages.into_iter().collect()))
     }
 
-    pub async fn requests(
+    pub async fn requests<'a>(
         self,
-        destinations: &Destinations<http_serde_priv::Uri>,
-        testcase: &Testcase<Q, P>,
-    ) -> WrappedResult<impl Stream<Item = Destinations<RequestResult<S::Response>>>> {
+        destinations: &'a Destinations<http_serde_priv::Uri>,
+        testcase: &'a Testcase<Q, P>,
+    ) -> WrappedResult<impl Stream<Item = Destinations<RequestResult<S::Response>>> + 'a> {
         let Testcase { target, setting, .. } = testcase;
         let setting_timeout = setting.timeout;
 
@@ -193,30 +193,24 @@ where
             .buffered(repeat_buffer))
     }
 
-    pub fn request_stream(
-        destinations: &Destinations<http_serde_priv::Uri>,
-        target: &str,
-        setting: &Setting<Q, P>,
-    ) -> impl Stream<Item = Destinations<Result<Req, Q::Error>>> {
-        // TODO remove this clone, use lifetime (impl Stream + 'a)
-        let (destinations, target, setting) = (destinations.clone(), target.to_string(), setting.clone());
+    pub fn request_stream<'a>(
+        destinations: &'a Destinations<http_serde_priv::Uri>,
+        target: &'a str,
+        setting: &'a Setting<Q, P>,
+    ) -> impl Stream<Item = Destinations<Result<Req, Q::Error>>> + 'a {
         let Setting { request, template, repeat, .. } = setting;
 
         stream::iter(repeat.range())
-            .map(move |_| {
-                let (destinations, target, request, template) =
-                    (destinations.clone(), target.to_string(), request.clone(), template.clone());
-                async move {
-                    destinations
-                        .iter()
-                        .map(|(name, destination)| {
-                            let default_empty = Template::new();
-                            let template = template.get(name).unwrap_or(&default_empty);
-                            (name.to_string(), request.produce(destination, &target, template))
-                        })
-                        .collect()
-                }
+            .map(move |_| async move {
+                destinations
+                    .iter()
+                    .map(|(name, destination)| {
+                        let default_empty = Template::new();
+                        let template = template.get(name).unwrap_or(&default_empty);
+                        (name.to_string(), request.produce(destination, target, template))
+                    })
+                    .collect()
             })
-            .buffered(repeat.times())
+            .buffer_unordered(repeat.times())
     }
 }
