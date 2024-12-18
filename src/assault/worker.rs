@@ -179,7 +179,7 @@ where
     pub async fn call(client: S, req: Result<Req, Q::Error>, setting: &Setting<Q, P>) -> RequestResult<S::Response> {
         let mut service = ServiceBuilder::new()
             .layer(RequestLayer)
-            .map_err(RequestError::InnerError) // TODO how to handle this error?
+            .map_err(RequestError::InnerServiceError) // TODO how to handle this error?
             .option_layer(setting.timeout.map(TimeoutLayer::new))
             .map_err(Into::<tower::BoxError>::into) // https://github.com/tower-rs/tower/issues/665
             .service(client.clone());

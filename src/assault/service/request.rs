@@ -21,10 +21,8 @@ pub enum RequestError {
     #[error(transparent)]
     NoReady(Box<dyn std::error::Error + Send + Sync>),
     #[error(transparent)]
-    RequestError(Box<dyn std::error::Error + Send + Sync>),
+    InnerServiceError(Box<dyn std::error::Error + Send + Sync>),
 
-    #[error(transparent)]
-    InnerError(Box<dyn std::error::Error + Send + Sync>),
     #[error(transparent)]
     Unknown(Box<dyn std::error::Error + Send + Sync>),
 }
@@ -70,11 +68,11 @@ where
                 let boxed: Box<dyn std::error::Error + Send + Sync> = error.into();
                 if let Some(err) = boxed.downcast_ref() {
                     match err {
-                        RequestError::InnerError(e) => {
+                        RequestError::InnerServiceError(e) => {
                             if e.is::<Elapsed>() {
                                 RequestError::Timeout(latency)
                             } else {
-                                RequestError::InnerError(boxed)
+                                RequestError::InnerServiceError(boxed)
                             }
                         }
                         _ => RequestError::Unknown(boxed),
