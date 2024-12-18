@@ -219,3 +219,44 @@ async fn test_template_config() {
     assert!(!relentless.pass(&report));
     assert!(relentless.allow(&report));
 }
+
+#[tokio::test]
+async fn test_async_config() {
+    let relentless =
+        Relentless { file: vec!["tests/config/feature/async.yaml".into(); 5], no_color: true, ..Default::default() };
+    let configs = relentless.configs().unwrap();
+    let service = route::app_with(Default::default());
+    let report = relentless.assault_with::<_, Request<Body>>(configs, service).await.unwrap();
+
+    let mut buf = Vec::new();
+    relentless.report_with(&report, &mut buf).unwrap();
+    let out = String::from_utf8_lossy(&buf);
+
+    // TODO test for 5 times
+    for line in [
+        format!("{} /wait/500/ns {}1000/1000 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
+        format!("{} /wait/500/us {}100/100 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
+        format!("{} /wait/500/ms {}10/10 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
+        format!("{} /wait/1/s {}5/5 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
+        format!("{} /wait/500/ns {}1000/1000 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
+        format!("{} /wait/500/us {}100/100 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
+        format!("{} /wait/500/ms {}10/10 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
+        format!("{} /wait/1/s {}5/5 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
+        format!("{} /wait/500/ns {}1000/1000 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
+        format!("{} /wait/500/us {}100/100 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
+        format!("{} /wait/500/ms {}10/10 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
+        format!("{} /wait/1/s {}5/5 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
+        format!("{} /wait/500/ns {}1000/1000 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
+        format!("{} /wait/500/us {}100/100 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
+        format!("{} /wait/500/ms {}10/10 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
+        format!("{} /wait/1/s {}5/5 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
+        format!("{} /wait/500/ns {}1000/1000 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
+        format!("{} /wait/500/us {}100/100 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
+        format!("{} /wait/500/ms {}10/10 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
+        format!("{} /wait/1/s {}5/5 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
+    ] {
+        assert!(out.contains(&line));
+    }
+    assert!(relentless.pass(&report));
+    assert!(relentless.allow(&report));
+}
