@@ -87,6 +87,7 @@ where
     ) -> WrappedResult<WorkerReport<P::Message, Q, P>> {
         let worker_config = Coalesced::tuple(config.worker_config, cmd.destinations()?);
         let testcase_buffer = if false { 1 } else { config.testcases.len() };
+
         let report = stream::iter(config.testcases)
             .map(|testcase| {
                 let case = Case::new(self.client.clone());
