@@ -162,7 +162,7 @@ where
                             let timeout = timeout.clone();
                             async move {
                                 match req {
-                                    // TODO Service<Req, Response=RequestResult<S::Response>>
+                                    // TODO Service<Req, Response=RequestResult<S::Response>> (as Layer)
                                     Ok(req) => match timeout.clone().ready().await {
                                         Ok(service) => match service.call(req).await {
                                             Ok(res) => (d, RequestResult::Response(res)),
