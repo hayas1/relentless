@@ -15,6 +15,8 @@ where
     S: Clone,
 {
     fn clone(&self) -> Self {
+        // derive(Clone) do not implement Clone when ReqB or ResB are not implement Clone
+        // https://github.com/rust-lang/rust/issues/26925
         Self::new(self.map.clone())
     }
 }
