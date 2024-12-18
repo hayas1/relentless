@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use futures::{stream, Stream, StreamExt};
+use futures::{stream, Stream, StreamExt, TryStreamExt};
 use tower::{
     timeout::{error::Elapsed, TimeoutLayer},
     Service, ServiceBuilder, ServiceExt,
@@ -87,7 +87,7 @@ where
     ) -> WrappedResult<WorkerReport<P::Message, Q, P>> {
         let worker_config = Coalesced::tuple(config.worker_config, cmd.destinations()?);
         let testcase_buffer = if false { 1 } else { config.testcases.len() };
-        let report: Vec<WrappedResult<CaseReport<P::Message, Q, P>>> = stream::iter(config.testcases)
+        let report = stream::iter(config.testcases)
             .map(|testcase| {
                 let case = Case::new(self.client.clone());
                 let testcase = Coalesced::tuple(testcase, worker_config.coalesce().setting);
@@ -95,10 +95,10 @@ where
                 async move { case.assault(cmd, &destinations, testcase).await }
             })
             .buffered(testcase_buffer)
-            .collect()
+            .try_collect()
             .await;
 
-        Ok(WorkerReport::new(worker_config, report.into_iter().collect::<Result<_, Wrap>>()?))
+        Ok(WorkerReport::new(worker_config, report?))
     }
 }
 
