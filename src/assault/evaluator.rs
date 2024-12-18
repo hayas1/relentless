@@ -1,12 +1,14 @@
 use std::time::Duration;
 
-use crate::error::EvaluateError;
+use crate::error::{EvaluateError, Wrap};
 
 use super::destinations::Destinations;
 
 pub enum RequestResult<Res> {
     Response(Res),
     Timeout(Duration),
+
+    FailToMakeRequest(Wrap), // TODO error type
     NoReady(Box<dyn std::error::Error + Send + Sync>),
     RequestError(Box<dyn std::error::Error + Send + Sync>),
 }

@@ -156,29 +156,32 @@ where
             .map(move |repeating| {
                 let timeout = timeout.clone();
                 async move {
-                    let repeating = repeating.unwrap_or_else(|_| todo!());
                     let destinations = repeating.len();
                     stream::iter(repeating)
                         .map(|(d, req)| {
                             let timeout = timeout.clone();
                             async move {
-                                match timeout.clone().ready().await {
-                                    Ok(service) => match service.call(req).await {
-                                        Ok(res) => (d, RequestResult::Response(res)),
-                                        Err(err) => {
-                                            if err.is::<Elapsed>() {
-                                                (
-                                                    d,
-                                                    RequestResult::Timeout(
-                                                        setting_timeout.unwrap_or_else(|| unreachable!()),
-                                                    ),
-                                                )
-                                            } else {
-                                                (d, RequestResult::RequestError(err))
+                                match req {
+                                    // TODO Service<Req, Response=RequestResult<S::Response>>
+                                    Ok(req) => match timeout.clone().ready().await {
+                                        Ok(service) => match service.call(req).await {
+                                            Ok(res) => (d, RequestResult::Response(res)),
+                                            Err(err) => {
+                                                if err.is::<Elapsed>() {
+                                                    (
+                                                        d,
+                                                        RequestResult::Timeout(
+                                                            setting_timeout.unwrap_or_else(|| unreachable!()),
+                                                        ),
+                                                    )
+                                                } else {
+                                                    (d, RequestResult::RequestError(err))
+                                                }
                                             }
-                                        }
+                                        },
+                                        Err(err) => (d, RequestResult::NoReady(err)),
                                     },
-                                    Err(err) => (d, RequestResult::NoReady(err)),
+                                    Err(err) => (d, RequestResult::FailToMakeRequest(Wrap::from(err))),
                                 }
                             }
                         })
@@ -194,7 +197,7 @@ where
         destinations: &Destinations<http_serde_priv::Uri>,
         target: &str,
         setting: &Setting<Q, P>,
-    ) -> impl Stream<Item = WrappedResult<Destinations<Req>>> {
+    ) -> impl Stream<Item = Destinations<Result<Req, Q::Error>>> {
         // TODO remove this clone, use lifetime (impl Stream + 'a)
         let (destinations, target, setting) = (destinations.clone(), target.to_string(), setting.clone());
         let Setting { request, template, repeat, .. } = setting;
@@ -209,9 +212,9 @@ where
                         .map(|(name, destination)| {
                             let default_empty = Template::new();
                             let template = template.get(name).unwrap_or(&default_empty);
-                            Ok::<_, Wrap>((name.to_string(), request.produce(destination, &target[..], template)?))
+                            (name.to_string(), request.produce(destination, &target, template))
                         })
-                        .collect::<WrappedResult<Destinations<Req>>>()
+                        .collect()
                 }
             })
             .buffered(repeat.times())
