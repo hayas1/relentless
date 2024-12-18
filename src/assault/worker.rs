@@ -195,7 +195,7 @@ where
                             }
                         })
                         .buffer_unordered(destinations)
-                        .collect::<Destinations<_>>()
+                        .collect()
                         .await
                 }
             })
