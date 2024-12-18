@@ -9,7 +9,8 @@ use crate::{
     assault::{
         destinations::{AllOr, Destinations},
         evaluate::plaintext::PlaintextEvaluate,
-        evaluator::{Acceptable, Evaluator, RequestResult},
+        evaluator::{Acceptable, Evaluator},
+        service::request::RequestResult,
     },
     error::EvaluateError,
     interface::helper::{coalesce::Coalesce, http_serde_priv, is_default::IsDefault},
@@ -102,13 +103,14 @@ where
         res: Destinations<RequestResult<http::Response<B>>>,
         msg: &mut Vec<Self::Message>,
     ) -> bool {
-        let responses: Destinations<_> = match res.into_iter().map(|(d, r)| Ok((d, r.response()?))).collect() {
-            Ok(r) => r,
-            Err(e) => {
-                msg.push(e);
-                return false;
-            }
-        };
+        let responses: Destinations<_> =
+            match res.into_iter().map(|(d, r)| Ok((d, r.map_err(EvaluateError::RequestError)?))).collect() {
+                Ok(r) => r,
+                Err(e) => {
+                    msg.push(e);
+                    return false;
+                }
+            };
         let parts = match HttpResponse::unzip_parts(responses).await {
             Ok(p) => p,
             Err(e) => {
@@ -217,7 +219,7 @@ mod tests {
 
         let ok =
             http::Response::builder().status(http::StatusCode::OK).body(http_body_util::Empty::<Bytes>::new()).unwrap();
-        let responses = Destinations::from_iter(vec![("test".to_string(), RequestResult::Response(ok))]);
+        let responses = Destinations::from_iter(vec![("test".to_string(), Ok(ok))]);
         let mut msg = Vec::new();
         let result = evaluator.evaluate(responses, &mut msg).await;
         assert!(result);
@@ -227,7 +229,7 @@ mod tests {
             .status(http::StatusCode::SERVICE_UNAVAILABLE)
             .body(http_body_util::Empty::<Bytes>::new())
             .unwrap();
-        let responses = Destinations::from_iter(vec![("test".to_string(), RequestResult::Response(unavailable))]);
+        let responses = Destinations::from_iter(vec![("test".to_string(), Ok(unavailable))]);
         let mut msg = Vec::new();
         let result = evaluator.evaluate(responses, &mut msg).await;
         assert!(!result);

@@ -7,6 +7,7 @@ use std::{
 use thiserror::Error;
 
 use crate::{
+    assault::service::request::RequestError,
     implement::service_http::{evaluate::HttpResponse, factory::HttpRequest},
     interface::config::Config,
 };
@@ -333,6 +334,9 @@ pub enum EvaluateError {
     #[cfg(feature = "json")]
     #[error("diff in `{0}`")]
     Diff(String),
+
+    #[error(transparent)]
+    RequestError(RequestError),
 }
 
 #[derive(Error, Debug, Clone, PartialEq, Eq)]

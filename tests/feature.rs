@@ -188,7 +188,7 @@ async fn test_timeout_config() {
         format!("{} /wait/1/s", CaseConsoleReport::FAIL_EMOJI),
         format!("  {} this testcase is allowed", CaseConsoleReport::ALLOW_EMOJI),
         format!("  {} message was found", CaseConsoleReport::MESSAGE_EMOJI),
-        format!("    request timeout: {}", "0.5s"),
+        format!("    request timeout: {}", ""),
         format!("{} /wait/500/ms", CaseConsoleReport::PASS_EMOJI),
     ] {
         assert!(out.contains(&line));

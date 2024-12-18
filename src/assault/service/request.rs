@@ -1,41 +1,52 @@
 use std::{
     future::Future,
-    marker::PhantomData,
     pin::Pin,
     task::{Context, Poll},
     time::{Duration, Instant},
 };
 
 use thiserror::Error;
-use tower::{timeout::error::Elapsed, Service};
-
-use crate::error::Wrap;
+use tower::{timeout::error::Elapsed, Layer, Service};
 
 pub type RequestResult<T> = Result<T, RequestError>;
 
 #[derive(Error, Debug)]
 pub enum RequestError {
-    #[error("timeout in {0:?}")]
+    #[error("request timeout: {0:?}")]
     Timeout(Duration),
 
-    // TODO use S::Error ?
     #[error(transparent)]
-    NoReady(Wrap),
+    NoReady(Box<dyn std::error::Error + Send + Sync>),
     #[error(transparent)]
-    RequestError(Wrap),
+    RequestError(Box<dyn std::error::Error + Send + Sync>),
+
+    #[error(transparent)]
+    InnerError(Box<dyn std::error::Error + Send + Sync>),
+    #[error(transparent)]
+    Unknown(Box<dyn std::error::Error + Send + Sync>),
 }
 
-pub struct RequestService<S, Req> {
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash)]
+pub struct RequestLayer;
+
+impl<S> Layer<S> for RequestLayer {
+    type Service = RequestService<S>;
+
+    fn layer(&self, inner: S) -> Self::Service {
+        RequestService { inner }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash)]
+pub struct RequestService<S> {
     inner: S,
-    phantom: PhantomData<Req>,
 }
 
-impl<S, Req> Service<Req> for RequestService<S, Req>
+impl<S, Req> Service<Req> for RequestService<S>
 where
     S: Service<Req> + Clone + Send + 'static,
     S::Future: Send + 'static,
-    // S::Error: std::error::Error + Send + Sync + 'static,
-    Wrap: From<S::Error>,
+    S::Error: std::error::Error + Send + Sync + 'static,
 {
     type Response = S::Response; // TODO contain timestamp, latency, byte size, ...
     type Error = RequestError;
@@ -52,12 +63,21 @@ where
             let result = fut.await;
             let latency = now.elapsed();
 
-            result.map_err(|e| {
-                let wrapped = Wrap::from(e);
-                if wrapped.is::<Elapsed>() {
-                    RequestError::Timeout(latency)
+            result.map_err(|error| {
+                let boxed: Box<dyn std::error::Error + Send + Sync> = error.into();
+                if let Some(err) = boxed.downcast_ref() {
+                    match err {
+                        RequestError::InnerError(e) => {
+                            if e.is::<Elapsed>() {
+                                RequestError::Timeout(latency)
+                            } else {
+                                RequestError::InnerError(boxed)
+                            }
+                        }
+                        _ => RequestError::Unknown(boxed),
+                    }
                 } else {
-                    RequestError::RequestError(wrapped)
+                    RequestError::Unknown(boxed)
                 }
             })
         })

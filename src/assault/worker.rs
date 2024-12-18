@@ -1,10 +1,7 @@
 use std::marker::PhantomData;
 
 use futures::{stream, Stream, StreamExt, TryStreamExt};
-use tower::{
-    timeout::{error::Elapsed, TimeoutLayer},
-    Service, ServiceBuilder, ServiceExt,
-};
+use tower::{timeout::TimeoutLayer, Service, ServiceBuilder, ServiceExt};
 
 use crate::{
     assault::reportable::{CaseReport, Report, WorkerReport},
@@ -22,8 +19,9 @@ use crate::{
 
 use super::{
     destinations::Destinations,
-    evaluator::{Evaluator, RequestResult},
+    evaluator::Evaluator,
     factory::RequestFactory,
+    service::request::{RequestError, RequestLayer, RequestResult},
 };
 
 /// TODO document
@@ -154,45 +152,18 @@ where
         testcase: &'a Testcase<Q, P>,
     ) -> WrappedResult<impl Stream<Item = Destinations<RequestResult<S::Response>>> + 'a> {
         let Testcase { target, setting, .. } = testcase;
-        let setting_timeout = setting.timeout;
+        let client = self.client.clone();
 
-        let timeout = ServiceBuilder::new()
-            .option_layer(setting_timeout.map(TimeoutLayer::new))
-            .map_err(Into::<tower::BoxError>::into) // https://github.com/tower-rs/tower/issues/665
-            .service(self.client);
         let repeat_buffer = if cmd.no_async_repeat { 1 } else { setting.repeat.times() };
         Ok(Self::request_stream(destinations, target, setting)
             .map(move |repeating| {
-                let timeout = timeout.clone();
+                let client = client.clone();
                 async move {
                     let destinations = repeating.len();
                     stream::iter(repeating)
                         .map(|(d, req)| {
-                            let timeout = timeout.clone();
-                            async move {
-                                match req {
-                                    // TODO Service<Req, Response=RequestResult<S::Response>> (as Layer)
-                                    Ok(req) => match timeout.clone().ready().await {
-                                        Ok(service) => match service.call(req).await {
-                                            Ok(res) => (d, RequestResult::Response(res)),
-                                            Err(err) => {
-                                                if err.is::<Elapsed>() {
-                                                    (
-                                                        d,
-                                                        RequestResult::Timeout(
-                                                            setting_timeout.unwrap_or_else(|| unreachable!()),
-                                                        ),
-                                                    )
-                                                } else {
-                                                    (d, RequestResult::RequestError(err))
-                                                }
-                                            }
-                                        },
-                                        Err(err) => (d, RequestResult::NoReady(err)),
-                                    },
-                                    Err(err) => (d, RequestResult::FailToMakeRequest(Wrap::from(err))),
-                                }
-                            }
+                            let client = client.clone();
+                            async move { (d, Self::call(client, req.unwrap_or_else(|_| todo!()), setting).await) }
                         })
                         .buffer_unordered(destinations)
                         .collect()
@@ -200,6 +171,17 @@ where
                 }
             })
             .buffered(repeat_buffer))
+    }
+
+    pub async fn call(client: S, req: Req, setting: &Setting<Q, P>) -> RequestResult<S::Response> {
+        let mut service = ServiceBuilder::new()
+            .layer(RequestLayer)
+            .map_err(RequestError::InnerError) // TODO how to handle this error?
+            .option_layer(setting.timeout.map(TimeoutLayer::new))
+            .map_err(Into::<tower::BoxError>::into) // https://github.com/tower-rs/tower/issues/665
+            .service(client.clone());
+
+        service.ready().await.map_err(|e| RequestError::NoReady(e.into()))?.call(req).await
     }
 
     pub fn request_stream<'a>(
