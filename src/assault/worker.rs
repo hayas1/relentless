@@ -184,12 +184,8 @@ where
             .map_err(Into::<tower::BoxError>::into) // https://github.com/tower-rs/tower/issues/665
             .service(client.clone());
 
-        service
-            .ready()
-            .await
-            .map_err(|e| RequestError::NoReady(e.into()))?
-            .call(req.map_err(|e| RequestError::FailToMakeRequest(e.into()))?)
-            .await
+        let request = req.map_err(|e| RequestError::FailToMakeRequest(e.into()))?;
+        service.ready().await.map_err(|e| RequestError::NoReady(e.into()))?.call(request).await
     }
 
     pub fn request_stream<'a>(
