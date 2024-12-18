@@ -15,7 +15,6 @@ use crate::{
         helper::{
             coalesce::{Coalesce, Coalesced},
             http_serde_priv,
-            transpose::Transpose,
         },
         template::Template,
     },
@@ -152,12 +151,12 @@ where
             .option_layer(setting_timeout.map(TimeoutLayer::new))
             .map_err(Into::<tower::BoxError>::into) // https://github.com/tower-rs/tower/issues/665
             .service(self.client);
-        let requests = Self::setup_requests(destinations, target, setting)?.transpose();
-        let repeat_buffer = if false { 1 } else { requests.len() };
-        Ok(stream::iter(requests)
+        let repeat_buffer = if false { 1 } else { setting.repeat.times() };
+        Ok(Self::request_stream(destinations, target, setting)
             .map(move |repeating| {
                 let timeout = timeout.clone();
                 async move {
+                    let repeating = repeating.unwrap_or_else(|_| todo!());
                     let destinations = repeating.len();
                     stream::iter(repeating)
                         .map(|(d, req)| {
@@ -191,24 +190,30 @@ where
             .buffered(repeat_buffer))
     }
 
-    pub fn setup_requests(
+    pub fn request_stream(
         destinations: &Destinations<http_serde_priv::Uri>,
         target: &str,
         setting: &Setting<Q, P>,
-    ) -> WrappedResult<Destinations<Vec<Req>>> {
+    ) -> impl Stream<Item = WrappedResult<Destinations<Req>>> {
+        // TODO remove this clone, use lifetime (impl Stream + 'a)
+        let (destinations, target, setting) = (destinations.clone(), target.to_string(), setting.clone());
         let Setting { request, template, repeat, .. } = setting;
 
-        destinations
-            .iter()
-            .map(|(name, destination)| {
-                let default_empty = Template::new();
-                let template = template.get(name).unwrap_or(&default_empty);
-                let requests = repeat
-                    .range()
-                    .map(|_| request.produce(destination, target, template))
-                    .collect::<Result<Vec<_>, _>>()?;
-                Ok((name.to_string(), requests))
+        stream::iter(repeat.range())
+            .map(move |_| {
+                let (destinations, target, request, template) =
+                    (destinations.clone(), target.to_string(), request.clone(), template.clone());
+                async move {
+                    destinations
+                        .iter()
+                        .map(|(name, destination)| {
+                            let default_empty = Template::new();
+                            let template = template.get(name).unwrap_or(&default_empty);
+                            Ok::<_, Wrap>((name.to_string(), request.produce(destination, &target[..], template)?))
+                        })
+                        .collect::<WrappedResult<Destinations<Req>>>()
+                }
             })
-            .collect()
+            .buffered(repeat.times())
     }
 }
