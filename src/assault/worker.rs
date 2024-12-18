@@ -51,13 +51,18 @@ where
         cmd: &Relentless,
         configs: Vec<Config<Q, P>>,
     ) -> WrappedResult<Report<P::Message, Q, P>> {
-        let mut report = Vec::new();
-        for config in configs {
-            let worker = Worker::new(self.client.clone());
-            report.push(worker.assault(cmd, config).await?); // TODO do not await here, use stream
-        }
+        let configs_buffer = configs.len();
 
-        Ok(Report::new(report))
+        let report = stream::iter(configs)
+            .map(|config| {
+                let worker = Worker::new(self.client.clone());
+                async move { worker.assault(cmd, config).await }
+            })
+            .buffer_unordered(configs_buffer)
+            .try_collect()
+            .await;
+
+        Ok(Report::new(report?))
     }
 }
 
