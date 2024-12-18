@@ -51,7 +51,7 @@ where
         cmd: &Relentless,
         configs: Vec<Config<Q, P>>,
     ) -> WrappedResult<Report<P::Message, Q, P>> {
-        let configs_buffer = configs.len();
+        let configs_buffer = if cmd.no_async_configs { 1 } else { configs.len() };
 
         let report = stream::iter(configs)
             .map(|config| {

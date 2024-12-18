@@ -28,10 +28,7 @@ use super::{config::Config, helper::http_serde_priv, report::github_markdown::Gi
 pub async fn execute() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sync>> {
     let cmd = Relentless::parse();
 
-    let Relentless { number_of_threads, rps, .. } = &cmd;
-    if number_of_threads.is_some() {
-        unimplemented!("`--number-of-threads` is not implemented yet");
-    }
+    let Relentless { rps, .. } = &cmd;
     if rps.is_some() {
         unimplemented!("`--rps` is not implemented yet");
     }
@@ -73,9 +70,9 @@ pub struct Relentless {
     #[cfg_attr(feature = "cli", arg(short, long))]
     pub output_record: Option<PathBuf>,
 
-    /// number of threads
-    #[cfg_attr(feature = "cli", arg(short, long))]
-    pub number_of_threads: Option<usize>,
+    /// without async for each configs
+    #[cfg_attr(feature = "cli", arg(long))]
+    pub no_async_configs: bool,
 
     /// requests per second
     #[cfg_attr(feature = "cli", arg(long))]
