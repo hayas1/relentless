@@ -133,11 +133,10 @@ where
         destinations: &Destinations<http_serde_priv::Uri>,
         testcase: Coalesced<Testcase<Q, P>, Setting<Q, P>>,
     ) -> WrappedResult<CaseReport<P::Message, Q, P>> {
-        let _ = cmd;
         let case = &testcase.coalesce();
 
         let (passed, messages) = self
-            .requests(destinations, case)
+            .requests(cmd, destinations, case)
             .await?
             .fold((0, Vec::new()), |(p, mut msg), res| async move {
                 let pass = case.setting.response.evaluate(res, &mut msg).await;
@@ -150,6 +149,7 @@ where
 
     pub async fn requests<'a>(
         self,
+        cmd: &Relentless,
         destinations: &'a Destinations<http_serde_priv::Uri>,
         testcase: &'a Testcase<Q, P>,
     ) -> WrappedResult<impl Stream<Item = Destinations<RequestResult<S::Response>>> + 'a> {
@@ -160,7 +160,7 @@ where
             .option_layer(setting_timeout.map(TimeoutLayer::new))
             .map_err(Into::<tower::BoxError>::into) // https://github.com/tower-rs/tower/issues/665
             .service(self.client);
-        let repeat_buffer = if false { 1 } else { setting.repeat.times() };
+        let repeat_buffer = if cmd.no_async_repeat { 1 } else { setting.repeat.times() };
         Ok(Self::request_stream(destinations, target, setting)
             .map(move |repeating| {
                 let timeout = timeout.clone();
