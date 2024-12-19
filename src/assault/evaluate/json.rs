@@ -32,15 +32,10 @@ impl Acceptable<&Bytes> for JsonEvaluate {
 }
 impl JsonEvaluate {
     pub fn accept_json(&self, bytes: &Destinations<&Bytes>, msg: &mut Messages<EvaluateError>) -> bool {
-        let values: Vec<_> = match self.patched(bytes) {
-            Ok(values) => values,
-            Err(e) => {
-                msg.push_err(EvaluateError::FailToPatchJson(e));
-                return false;
-            }
-        }
-        .into_values()
-        .collect();
+        let Some(patched) = msg.push_unwrap_err(self.patched(bytes).map_err(EvaluateError::FailToPatchJson)) else {
+            return false;
+        };
+        let values: Vec<_> = patched.into_values().collect();
 
         values.windows(2).all(|w| self.json_compare((&w[0], &w[1]), msg))
     }
@@ -72,10 +67,10 @@ impl JsonEvaluate {
     pub fn json_compare(&self, (va, vb): (&Value, &Value), msg: &mut Messages<EvaluateError>) -> bool {
         let diff = json_patch::diff(va, vb);
         let pointers = Self::pointers(&diff);
-        diff.iter().zip(pointers).filter(|(_op, path)| !self.ignore.contains(path)).fold(true, |_acc, (_op, path)| {
-            msg.push_err(EvaluateError::Diff(path));
-            false
-        })
+        diff.iter()
+            .zip(pointers)
+            .filter(|(_op, path)| !self.ignore.contains(path))
+            .fold(true, |_acc, (_op, path)| msg.push_unacceptable(EvaluateError::Diff(path)))
     }
 
     pub fn pointers(p: &json_patch::Patch) -> Vec<String> {

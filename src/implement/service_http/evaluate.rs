@@ -104,20 +104,15 @@ where
         res: Destinations<RequestResult<http::Response<B>>>,
         msg: &mut Messages<Self::Message>,
     ) -> bool {
-        let responses: Destinations<_> =
-            match res.into_iter().map(|(d, r)| Ok((d, r.map_err(EvaluateError::RequestError)?))).collect() {
-                Ok(r) => r,
-                Err(e) => {
-                    msg.push_err(e);
-                    return false;
-                }
-            };
-        let parts = match HttpResponse::unzip_parts(responses).await {
-            Ok(p) => p,
-            Err(e) => {
-                msg.push_err(e);
-                return false;
-            }
+        let Some(responses) = res
+            .into_iter()
+            .map(|(d, r)| Some((d, msg.push_unwrap_err(r.map_err(EvaluateError::RequestError))?)))
+            .collect()
+        else {
+            return false;
+        };
+        let Some(parts) = msg.push_unwrap_err(HttpResponse::unzip_parts(responses).await) else {
+            return false;
         };
 
         self.accept(&parts, msg)
@@ -192,7 +187,7 @@ impl Acceptable<&http::HeaderMap> for HeaderEvaluate {
             HeaderEvaluate::Ignore => true,
         };
         if !acceptable {
-            msg.push_err(EvaluateError::UnacceptableHeaderMap)
+            msg.push_err(EvaluateError::UnacceptableHeaderMap);
         }
         acceptable
     }

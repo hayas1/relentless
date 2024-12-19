@@ -71,7 +71,7 @@ impl<M> Messages<M> {
         self.0.is_empty()
     }
 
-    pub fn push_unwrap<T>(&mut self, message: Result<T, M>) -> Option<T> {
+    pub fn push_unwrap_err<T>(&mut self, message: Result<T, M>) -> Option<T> {
         // message.map_or_else(|m| {self.0.push(m);None},|t| Some(t))
         match message {
             Ok(t) => Some(t),
@@ -82,7 +82,10 @@ impl<M> Messages<M> {
         }
     }
     pub fn push_err(&mut self, message: M) {
-        self.push_unwrap::<()>(Err(message));
+        self.push_unwrap_err::<()>(Err(message));
+    }
+    pub fn push_unacceptable(&mut self, message: M) -> bool {
+        !matches!(self.push_err(message), ()) // always return false
     }
 }
 
