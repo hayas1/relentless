@@ -8,7 +8,7 @@ use super::{
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub struct Messages<M>(Vec<M>);
+pub struct Messages<M>(Vec<M>); // TODO size limit ?
 impl<M> Default for Messages<M> {
     fn default() -> Self {
         // derive(Default) do not implement Default when T are not implement Default
