@@ -10,7 +10,7 @@ use crate::{
         destinations::{AllOr, Destinations},
         evaluate::plaintext::PlaintextEvaluate,
         evaluator::{Acceptable, Evaluator},
-        metrics::{MetaResponse, RequestResult},
+        metrics::{MeasuredResponse, RequestResult},
     },
     error::EvaluateError,
     interface::helper::{coalesce::Coalesce, http_serde_priv, is_default::IsDefault},
@@ -140,7 +140,7 @@ impl Acceptable<(http::StatusCode, http::HeaderMap, Bytes)> for HttpResponse {
 }
 impl HttpResponse {
     pub async fn unzip_parts<B>(
-        responses: Destinations<MetaResponse<http::Response<B>>>,
+        responses: Destinations<MeasuredResponse<http::Response<B>>>,
     ) -> Result<Destinations<(http::StatusCode, http::HeaderMap, Bytes)>, EvaluateError>
     where
         B: Body,
@@ -223,7 +223,7 @@ mod tests {
             http::Response::builder().status(http::StatusCode::OK).body(http_body_util::Empty::<Bytes>::new()).unwrap();
         let responses = Destinations::from_iter(vec![(
             "test".to_string(),
-            Ok(MetaResponse::new(ok, SystemTime::now(), Default::default())),
+            Ok(MeasuredResponse::new(ok, SystemTime::now(), Default::default())),
         )]);
         let mut msg = Vec::new();
         let result = evaluator.evaluate(responses, &mut msg).await;
@@ -236,7 +236,7 @@ mod tests {
             .unwrap();
         let responses = Destinations::from_iter(vec![(
             "test".to_string(),
-            Ok(MetaResponse::new(unavailable, SystemTime::now(), Default::default())),
+            Ok(MeasuredResponse::new(unavailable, SystemTime::now(), Default::default())),
         )]);
         let mut msg = Vec::new();
         let result = evaluator.evaluate(responses, &mut msg).await;

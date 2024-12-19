@@ -3,14 +3,14 @@ use std::time::{Duration, SystemTime, SystemTimeError};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-pub type RequestResult<Res> = Result<MetaResponse<Res>, RequestError>;
+pub type RequestResult<Res> = Result<MeasuredResponse<Res>, RequestError>;
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct MetaResponse<Res> {
+pub struct MeasuredResponse<Res> {
     response: Res,
     timestamp: SystemTime,
     latency: Duration,
 }
-impl<Res> MetaResponse<Res> {
+impl<Res> MeasuredResponse<Res> {
     pub fn new(response: Res, timestamp: SystemTime, latency: Duration) -> Self {
         Self { response, timestamp, latency }
     }

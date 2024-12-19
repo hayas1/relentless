@@ -7,31 +7,31 @@ use std::{
 
 use tower::{timeout::error::Elapsed, Layer, Service};
 
-use crate::assault::metrics::{MetaResponse, RequestError, RequestResult};
+use crate::assault::metrics::{MeasuredResponse, RequestError, RequestResult};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash)]
-pub struct RequestLayer;
+pub struct MeasureLayer;
 
-impl<S> Layer<S> for RequestLayer {
-    type Service = RequestService<S>;
+impl<S> Layer<S> for MeasureLayer {
+    type Service = MeasureService<S>;
 
     fn layer(&self, inner: S) -> Self::Service {
-        RequestService { inner }
+        MeasureService { inner }
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash)]
-pub struct RequestService<S> {
+pub struct MeasureService<S> {
     inner: S,
 }
 
-impl<S, Req> Service<Req> for RequestService<S>
+impl<S, Req> Service<Req> for MeasureService<S>
 where
     S: Service<Req> + Clone + Send + 'static,
     S::Future: Send + 'static,
     S::Error: std::error::Error + Send + Sync + 'static,
 {
-    type Response = MetaResponse<S::Response>; // TODO contain byte size, (http status?), ...
+    type Response = MeasuredResponse<S::Response>; // TODO contain byte size, (http status?), ...
     type Error = RequestError;
     type Future = Pin<Box<dyn Future<Output = RequestResult<S::Response>> + Send>>;
 
@@ -63,7 +63,7 @@ where
                     RequestError::Unknown(boxed)
                 }
             })?;
-            Ok(MetaResponse::new(response, timestamp, latency))
+            Ok(MeasuredResponse::new(response, timestamp, latency))
         })
     }
 }

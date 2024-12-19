@@ -22,7 +22,7 @@ use super::{
     evaluator::Evaluator,
     factory::RequestFactory,
     metrics::{RequestError, RequestResult},
-    service::request::RequestLayer,
+    service::measure::MeasureLayer,
 };
 
 /// TODO document
@@ -180,7 +180,7 @@ where
 
     pub async fn call(client: S, req: Result<Req, Q::Error>, setting: &Setting<Q, P>) -> RequestResult<S::Response> {
         let mut service = ServiceBuilder::new()
-            .layer(RequestLayer)
+            .layer(MeasureLayer)
             .map_err(RequestError::InnerServiceError) // TODO how to handle this error?
             .option_layer(setting.timeout.map(TimeoutLayer::new))
             .map_err(Into::<tower::BoxError>::into) // https://github.com/tower-rs/tower/issues/665
