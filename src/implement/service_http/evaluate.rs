@@ -11,7 +11,7 @@ use crate::{
         evaluate::plaintext::PlaintextEvaluate,
         evaluator::{Acceptable, Evaluator},
         messages::Messages,
-        metrics::{MeasuredResponse, RequestResult},
+        metrics::RequestResult,
     },
     error::EvaluateError,
     interface::helper::{coalesce::Coalesce, http_serde_priv, is_default::IsDefault},
@@ -104,9 +104,7 @@ where
         res: Destinations<RequestResult<http::Response<B>>>,
         msg: &mut Messages<Self::Message>,
     ) -> bool {
-        let Some(responses) =
-            res.into_iter().map(|(d, r)| Some((d, msg.push_if_err(r.map_err(EvaluateError::RequestError))?))).collect()
-        else {
+        let Some(responses) = msg.response_destinations_with(res, EvaluateError::RequestError) else {
             return false;
         };
         let Some(parts) = msg.push_if_err(HttpResponse::unzip_parts(responses).await) else {
@@ -134,7 +132,7 @@ impl Acceptable<(http::StatusCode, http::HeaderMap, Bytes)> for HttpResponse {
 }
 impl HttpResponse {
     pub async fn unzip_parts<B>(
-        responses: Destinations<MeasuredResponse<http::Response<B>>>,
+        responses: Destinations<http::Response<B>>,
     ) -> Result<Destinations<(http::StatusCode, http::HeaderMap, Bytes)>, EvaluateError>
     where
         B: Body,
@@ -142,7 +140,7 @@ impl HttpResponse {
     {
         let mut parts = Destinations::new();
         for (name, response) in responses {
-            let (http::response::Parts { status, headers, .. }, body) = response.into_response().into_parts();
+            let (http::response::Parts { status, headers, .. }, body) = response.into_parts();
             let bytes = BodyExt::collect(body)
                 .await
                 .map(Collected::to_bytes)
@@ -206,6 +204,8 @@ impl Acceptable<&Bytes> for BodyEvaluate {
 #[cfg(test)]
 mod tests {
     use std::time::SystemTime;
+
+    use crate::assault::metrics::MeasuredResponse;
 
     use super::*;
 

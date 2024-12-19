@@ -2,6 +2,11 @@ use std::{fmt::Display, vec::IntoIter as VecIntoIter};
 
 use serde::{Deserialize, Serialize};
 
+use super::{
+    destinations::Destinations,
+    metrics::{RequestError, RequestResult},
+};
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct Messages<M>(Vec<M>);
 impl<M> Default for Messages<M> {
@@ -86,6 +91,16 @@ impl<M> Messages<M> {
     }
     pub fn push_unacceptable(&mut self, message: M) -> bool {
         !matches!(self.push_err(message), ()) // always return false
+    }
+    pub fn response_with<Res, F: Fn(RequestError) -> M>(&mut self, res: RequestResult<Res>, f: F) -> Option<Res> {
+        self.push_if_err(res.map(|r| r.into_response()).map_err(f))
+    }
+    pub fn response_destinations_with<Res, F: Fn(RequestError) -> M + Clone>(
+        &mut self,
+        res: Destinations<RequestResult<Res>>,
+        f: F,
+    ) -> Option<Destinations<Res>> {
+        res.into_iter().map(|(d, r)| Some((d, self.response_with(r, f.clone())?))).collect()
     }
 }
 
