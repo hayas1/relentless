@@ -32,7 +32,7 @@ impl Acceptable<&Bytes> for JsonEvaluate {
 }
 impl JsonEvaluate {
     pub fn accept_json(&self, bytes: &Destinations<&Bytes>, msg: &mut Messages<EvaluateError>) -> bool {
-        let Some(patched) = msg.push_unwrap_err(self.patched(bytes).map_err(EvaluateError::FailToPatchJson)) else {
+        let Some(patched) = msg.push_if_err(self.patched(bytes).map_err(EvaluateError::FailToPatchJson)) else {
             return false;
         };
         let values: Vec<_> = patched.into_values().collect();

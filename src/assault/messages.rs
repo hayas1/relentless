@@ -71,7 +71,7 @@ impl<M> Messages<M> {
         self.0.is_empty()
     }
 
-    pub fn push_unwrap_err<T>(&mut self, message: Result<T, M>) -> Option<T> {
+    pub fn push_if_err<T>(&mut self, message: Result<T, M>) -> Option<T> {
         // message.map_or_else(|m| {self.0.push(m);None},|t| Some(t))
         match message {
             Ok(t) => Some(t),
@@ -82,7 +82,7 @@ impl<M> Messages<M> {
         }
     }
     pub fn push_err(&mut self, message: M) {
-        self.push_unwrap_err::<()>(Err(message));
+        self.push_if_err::<()>(Err(message));
     }
     pub fn push_unacceptable(&mut self, message: M) -> bool {
         !matches!(self.push_err(message), ()) // always return false
@@ -117,14 +117,14 @@ mod tests {
     }
 
     #[test]
-    fn test_push_unwrap_err() {
+    fn test_push_if_err() {
         let mut messages = Messages::new();
-        let Some(t) = messages.push_unwrap_err(Ok("Hello World!")) else {
+        let Some(t) = messages.push_if_err(Ok("Hello World!")) else {
             panic!("Ok(x) does not cause error, so Some(x) was returned")
         };
         assert_eq!(t, "Hello World!");
 
-        let Some(()) = messages.push_unwrap_err(Err("Hello World!!")) else {
+        let Some(()) = messages.push_if_err(Err("Hello World!!")) else {
             assert_eq!(messages.to_vec(), vec!["Hello World!!"]);
             return;
         };

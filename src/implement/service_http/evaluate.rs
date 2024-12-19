@@ -104,14 +104,12 @@ where
         res: Destinations<RequestResult<http::Response<B>>>,
         msg: &mut Messages<Self::Message>,
     ) -> bool {
-        let Some(responses) = res
-            .into_iter()
-            .map(|(d, r)| Some((d, msg.push_unwrap_err(r.map_err(EvaluateError::RequestError))?)))
-            .collect()
+        let Some(responses) =
+            res.into_iter().map(|(d, r)| Some((d, msg.push_if_err(r.map_err(EvaluateError::RequestError))?))).collect()
         else {
             return false;
         };
-        let Some(parts) = msg.push_unwrap_err(HttpResponse::unzip_parts(responses).await) else {
+        let Some(parts) = msg.push_if_err(HttpResponse::unzip_parts(responses).await) else {
             return false;
         };
 
