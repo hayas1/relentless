@@ -115,4 +115,19 @@ mod tests {
             ["Hello World!", "Hello World!", "Hello World!", "... and 97 more"].join("\n")
         );
     }
+
+    #[test]
+    fn test_push_unwrap_err() {
+        let mut messages = Messages::new();
+        let Some(t) = messages.push_unwrap_err(Ok("Hello World!")) else {
+            panic!("Ok(x) does not cause error, so Some(x) was returned")
+        };
+        assert_eq!(t, "Hello World!");
+
+        let Some(()) = messages.push_unwrap_err(Err("Hello World!!")) else {
+            assert_eq!(messages.to_vec(), vec!["Hello World!!"]);
+            return;
+        };
+        panic!("Err(x) cause error, so message was pushed and None was returned");
+    }
 }
