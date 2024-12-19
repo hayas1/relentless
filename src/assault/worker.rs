@@ -21,6 +21,7 @@ use super::{
     destinations::Destinations,
     evaluator::Evaluator,
     factory::RequestFactory,
+    messages::Messages,
     metrics::{RequestError, RequestResult},
     service::measure::MeasureLayer,
 };
@@ -140,14 +141,14 @@ where
         let (passed, messages) = self
             .requests(cmd, destinations, case)
             .await?
-            .fold((0, Vec::new()), |(p, mut msg), res| async move {
+            .fold((0, Messages::new()), |(p, mut msg), res| async move {
                 // TODO aggregate latency, byte size, etc...
                 let pass = case.setting.response.evaluate(res, &mut msg).await;
                 (p + pass as usize, msg)
             })
             .await;
 
-        Ok(CaseReport::new(testcase, passed, messages.into_iter().collect()))
+        Ok(CaseReport::new(testcase, passed, messages))
     }
 
     pub async fn requests<'a>(

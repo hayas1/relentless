@@ -57,14 +57,18 @@ impl<M> Messages<M> {
         Default::default()
     }
 
-    pub fn to_slice(&self) -> &[M] {
+    pub fn as_slice(&self) -> &[M] {
         &self.0
     }
-    pub fn to_slice_mut(&mut self) -> &mut [M] {
+    pub fn as_slice_mut(&mut self) -> &mut [M] {
         &mut self.0
     }
     pub fn to_vec(self) -> Vec<M> {
         self.0
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
     }
 
     pub fn push_unwrap<T>(&mut self, message: Result<T, M>) -> Option<T> {
@@ -76,6 +80,9 @@ impl<M> Messages<M> {
                 None
             }
         }
+    }
+    pub fn push_err(&mut self, message: M) {
+        self.push_unwrap::<()>(Err(message));
     }
 }
 

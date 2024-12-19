@@ -1,14 +1,14 @@
-use super::{destinations::Destinations, metrics::RequestResult};
+use super::{destinations::Destinations, messages::Messages, metrics::RequestResult};
 
 #[allow(async_fn_in_trait)] // TODO #[warn(async_fn_in_trait)] by default
 pub trait Evaluator<Res> {
     type Message;
-    async fn evaluate(&self, res: Destinations<RequestResult<Res>>, msg: &mut Vec<Self::Message>) -> bool;
+    async fn evaluate(&self, res: Destinations<RequestResult<Res>>, msg: &mut Messages<Self::Message>) -> bool;
 }
 
 pub trait Acceptable<T> {
     type Message;
-    fn accept(&self, dest: &Destinations<T>, msg: &mut Vec<Self::Message>) -> bool;
+    fn accept(&self, dest: &Destinations<T>, msg: &mut Messages<Self::Message>) -> bool;
 
     fn assault_or_compare<F>(d: &Destinations<T>, f: F) -> bool
     where

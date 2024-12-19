@@ -6,6 +6,7 @@ use crate::{
     assault::{
         destinations::{AllOr, Destinations},
         evaluator::Acceptable,
+        messages::Messages,
     },
     error::{EvaluateError, WrappedResult},
     interface::{config::Severity, helper::is_default::IsDefault},
@@ -25,16 +26,16 @@ pub struct JsonEvaluate {
 #[cfg(feature = "json")]
 impl Acceptable<&Bytes> for JsonEvaluate {
     type Message = EvaluateError;
-    fn accept(&self, bytes: &Destinations<&Bytes>, msg: &mut Vec<EvaluateError>) -> bool {
+    fn accept(&self, bytes: &Destinations<&Bytes>, msg: &mut Messages<EvaluateError>) -> bool {
         self.accept_json(bytes, msg)
     }
 }
 impl JsonEvaluate {
-    pub fn accept_json(&self, bytes: &Destinations<&Bytes>, msg: &mut Vec<EvaluateError>) -> bool {
+    pub fn accept_json(&self, bytes: &Destinations<&Bytes>, msg: &mut Messages<EvaluateError>) -> bool {
         let values: Vec<_> = match self.patched(bytes) {
             Ok(values) => values,
             Err(e) => {
-                msg.push(EvaluateError::FailToPatchJson(e));
+                msg.push_err(EvaluateError::FailToPatchJson(e));
                 return false;
             }
         }
@@ -68,11 +69,11 @@ impl JsonEvaluate {
         json_patch::patch_unsafe(value, patch)
     }
 
-    pub fn json_compare(&self, (va, vb): (&Value, &Value), msg: &mut Vec<EvaluateError>) -> bool {
+    pub fn json_compare(&self, (va, vb): (&Value, &Value), msg: &mut Messages<EvaluateError>) -> bool {
         let diff = json_patch::diff(va, vb);
         let pointers = Self::pointers(&diff);
         diff.iter().zip(pointers).filter(|(_op, path)| !self.ignore.contains(path)).fold(true, |_acc, (_op, path)| {
-            msg.push(EvaluateError::Diff(path));
+            msg.push_err(EvaluateError::Diff(path));
             false
         })
     }
