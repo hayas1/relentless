@@ -1,0 +1,18 @@
+name: test config for json diff
+destinations:
+  server1: http://localhost:3000
+  server2: http://localhost:3001
+
+
+testcases:
+  - target: /information
+    description: diff in some paths
+    setting:
+      response:
+        body:
+          json:
+            patch:
+              - op: remove
+                path: /datetime
+    attr:
+      allow: true

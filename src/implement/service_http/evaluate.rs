@@ -9,7 +9,9 @@ use crate::{
     assault::{
         destinations::{AllOr, Destinations},
         evaluate::plaintext::PlaintextEvaluate,
-        evaluator::{Acceptable, Evaluator, RequestResult},
+        evaluator::{Acceptable, Evaluator},
+        messages::Messages,
+        metrics::RequestResult,
     },
     error::EvaluateError,
     interface::helper::{coalesce::Coalesce, http_serde_priv, is_default::IsDefault},
@@ -100,21 +102,13 @@ where
     async fn evaluate(
         &self,
         res: Destinations<RequestResult<http::Response<B>>>,
-        msg: &mut Vec<Self::Message>,
+        msg: &mut Messages<Self::Message>,
     ) -> bool {
-        let responses: Destinations<_> = match res.into_iter().map(|(d, r)| Ok((d, r.response()?))).collect() {
-            Ok(r) => r,
-            Err(e) => {
-                msg.push(e);
-                return false;
-            }
+        let Some(responses) = msg.response_destinations_with(res, EvaluateError::RequestError) else {
+            return false;
         };
-        let parts = match HttpResponse::unzip_parts(responses).await {
-            Ok(p) => p,
-            Err(e) => {
-                msg.push(e);
-                return false;
-            }
+        let Some(parts) = msg.push_if_err(HttpResponse::unzip_parts(responses).await) else {
+            return false;
         };
 
         self.accept(&parts, msg)
@@ -125,7 +119,7 @@ impl Acceptable<(http::StatusCode, http::HeaderMap, Bytes)> for HttpResponse {
     fn accept(
         &self,
         parts: &Destinations<(http::StatusCode, http::HeaderMap, Bytes)>,
-        msg: &mut Vec<Self::Message>,
+        msg: &mut Messages<Self::Message>,
     ) -> bool {
         let (mut status, mut headers, mut body) = (Destinations::new(), Destinations::new(), Destinations::new());
         for (name, (s, h, b)) in parts {
@@ -159,7 +153,7 @@ impl HttpResponse {
 
 impl Acceptable<&http::StatusCode> for StatusEvaluate {
     type Message = EvaluateError;
-    fn accept(&self, status: &Destinations<&http::StatusCode>, msg: &mut Vec<Self::Message>) -> bool {
+    fn accept(&self, status: &Destinations<&http::StatusCode>, msg: &mut Messages<Self::Message>) -> bool {
         let acceptable = match &self {
             StatusEvaluate::OkOrEqual => Self::assault_or_compare(status, |(_, s)| s.is_success()),
             StatusEvaluate::Expect(AllOr::All(code)) => Self::validate_all(status, |(_, s)| s == &&**code),
@@ -170,7 +164,7 @@ impl Acceptable<&http::StatusCode> for StatusEvaluate {
             StatusEvaluate::Ignore => true,
         };
         if !acceptable {
-            msg.push(EvaluateError::UnacceptableStatus);
+            msg.push_err(EvaluateError::UnacceptableStatus);
         }
         acceptable
     }
@@ -178,7 +172,7 @@ impl Acceptable<&http::StatusCode> for StatusEvaluate {
 
 impl Acceptable<&http::HeaderMap> for HeaderEvaluate {
     type Message = EvaluateError;
-    fn accept(&self, headers: &Destinations<&http::HeaderMap>, msg: &mut Vec<Self::Message>) -> bool {
+    fn accept(&self, headers: &Destinations<&http::HeaderMap>, msg: &mut Messages<Self::Message>) -> bool {
         let acceptable = match &self {
             HeaderEvaluate::AnyOrEqual => Self::assault_or_compare(headers, |_| true),
             HeaderEvaluate::Expect(AllOr::All(header)) => Self::validate_all(headers, |(_, h)| h == &&**header),
@@ -189,7 +183,7 @@ impl Acceptable<&http::HeaderMap> for HeaderEvaluate {
             HeaderEvaluate::Ignore => true,
         };
         if !acceptable {
-            msg.push(EvaluateError::UnacceptableHeaderMap);
+            msg.push_err(EvaluateError::UnacceptableHeaderMap);
         }
         acceptable
     }
@@ -197,7 +191,7 @@ impl Acceptable<&http::HeaderMap> for HeaderEvaluate {
 
 impl Acceptable<&Bytes> for BodyEvaluate {
     type Message = EvaluateError;
-    fn accept(&self, body: &Destinations<&Bytes>, msg: &mut Vec<Self::Message>) -> bool {
+    fn accept(&self, body: &Destinations<&Bytes>, msg: &mut Messages<Self::Message>) -> bool {
         match &self {
             BodyEvaluate::AnyOrEqual => Self::assault_or_compare(body, |_| true),
             BodyEvaluate::Plaintext(p) => p.accept(body, msg),
@@ -209,6 +203,10 @@ impl Acceptable<&Bytes> for BodyEvaluate {
 
 #[cfg(test)]
 mod tests {
+    use std::time::SystemTime;
+
+    use crate::assault::metrics::MeasuredResponse;
+
     use super::*;
 
     #[tokio::test]
@@ -217,8 +215,11 @@ mod tests {
 
         let ok =
             http::Response::builder().status(http::StatusCode::OK).body(http_body_util::Empty::<Bytes>::new()).unwrap();
-        let responses = Destinations::from_iter(vec![("test".to_string(), RequestResult::Response(ok))]);
-        let mut msg = Vec::new();
+        let responses = Destinations::from_iter(vec![(
+            "test".to_string(),
+            Ok(MeasuredResponse::new(ok, SystemTime::now(), Default::default())),
+        )]);
+        let mut msg = Messages::new();
         let result = evaluator.evaluate(responses, &mut msg).await;
         assert!(result);
         assert!(msg.is_empty());
@@ -227,11 +228,14 @@ mod tests {
             .status(http::StatusCode::SERVICE_UNAVAILABLE)
             .body(http_body_util::Empty::<Bytes>::new())
             .unwrap();
-        let responses = Destinations::from_iter(vec![("test".to_string(), RequestResult::Response(unavailable))]);
-        let mut msg = Vec::new();
+        let responses = Destinations::from_iter(vec![(
+            "test".to_string(),
+            Ok(MeasuredResponse::new(unavailable, SystemTime::now(), Default::default())),
+        )]);
+        let mut msg = Messages::new();
         let result = evaluator.evaluate(responses, &mut msg).await;
         assert!(!result);
-        assert!(matches!(msg[0], EvaluateError::UnacceptableStatus));
+        assert!(matches!(msg.as_slice(), [EvaluateError::UnacceptableStatus]));
     }
 
     // TODO more tests

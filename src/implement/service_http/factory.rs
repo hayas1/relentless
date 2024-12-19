@@ -88,7 +88,7 @@ where
     HttpBody: BodyFactory<B>,
     Wrap: From<<HttpBody as BodyFactory<B>>::Error>,
 {
-    type Error = Wrap;
+    type Error = crate::Error;
     fn produce(
         &self,
         destination: &http::Uri,
@@ -96,13 +96,17 @@ where
         template: &Template,
     ) -> Result<http::Request<B>, Self::Error> {
         let HttpRequest { no_additional_headers, method, headers, body } = self;
-        let uri = http::uri::Builder::from(destination.clone()).path_and_query(template.render(target)?).build()?;
+        let uri = http::uri::Builder::from(destination.clone())
+            .path_and_query(template.render(target)?)
+            .build()
+            .map_err(Wrap::error)?;
         let unwrapped_method = method.as_ref().map(|m| (**m).clone()).unwrap_or_default();
         let unwrapped_headers: HeaderMap = headers.as_ref().map(|h| (**h).clone()).unwrap_or_default();
         // .into_iter().map(|(k, v)| (k, template.render_as_string(v))).collect(); // TODO template with header
         let (actual_body, additional_headers) = body.clone().body_with_headers(template)?;
 
-        let mut request = http::Request::builder().uri(uri).method(unwrapped_method).body(actual_body)?;
+        let mut request =
+            http::Request::builder().uri(uri).method(unwrapped_method).body(actual_body).map_err(Wrap::error)?;
         let header_map = request.headers_mut();
         header_map.extend(unwrapped_headers);
         if !no_additional_headers {
@@ -120,13 +124,13 @@ impl<B> BodyFactory<B> for HttpBody
 where
     B: Body + From<Bytes> + Default,
 {
-    type Error = Wrap;
+    type Error = crate::Error;
     fn produce(&self, template: &Template) -> Result<B, Self::Error> {
         match self {
             HttpBody::Empty => Ok(Default::default()),
             HttpBody::Plaintext(s) => Ok(Bytes::from(template.render(s).unwrap_or(s.to_string())).into()),
             #[cfg(feature = "json")]
-            HttpBody::Json(_) => Ok(Bytes::from(serde_json::to_vec(&self)?).into()),
+            HttpBody::Json(_) => Ok(Bytes::from(serde_json::to_vec(&self).map_err(Wrap::error)?).into()),
         }
     }
 }

@@ -5,7 +5,7 @@ use std::{
 };
 
 use crate::{
-    error::{MultiWrap, Wrap},
+    error::Wrap,
     interface::{
         command::{Relentless, ReportFormat},
         config::{Setting, Testcase, WorkerConfig},
@@ -16,7 +16,7 @@ use crate::{
     },
 };
 
-use super::destinations::Destinations;
+use super::{destinations::Destinations, messages::Messages};
 
 /// TODO document
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -62,10 +62,10 @@ impl<T, Q: Clone + Coalesce, P: Clone + Coalesce> Reportable for WorkerReport<T,
 pub struct CaseReport<T, Q, P> {
     pub testcase: Coalesced<Testcase<Q, P>, Setting<Q, P>>,
     pub passed: usize,
-    pub messages: MultiWrap<T>,
+    pub messages: Messages<T>,
 }
 impl<T, Q, P> CaseReport<T, Q, P> {
-    pub fn new(testcase: Coalesced<Testcase<Q, P>, Setting<Q, P>>, passed: usize, messages: MultiWrap<T>) -> Self {
+    pub fn new(testcase: Coalesced<Testcase<Q, P>, Setting<Q, P>>, passed: usize, messages: Messages<T>) -> Self {
         Self { testcase, passed, messages }
     }
 }

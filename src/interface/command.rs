@@ -167,6 +167,7 @@ impl Relentless {
     ) -> crate::Result<Report<<HttpResponse as Evaluator<S::Response>>::Message, HttpRequest, HttpResponse>>
     where
         HttpRequest: RequestFactory<Req>,
+        <HttpRequest as RequestFactory<Req>>::Error: std::error::Error + Send + Sync + 'static,
         HttpResponse: Evaluator<S::Response>,
         S: Service<Req> + Clone + Send + 'static,
         S::Error: std::error::Error + Send + Sync + 'static,
