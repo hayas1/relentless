@@ -140,6 +140,7 @@ where
             .requests(cmd, destinations, case)
             .await?
             .fold((0, Vec::new()), |(p, mut msg), res| async move {
+                // TODO aggregate latency, byte size, etc...
                 let pass = case.setting.response.evaluate(res, &mut msg).await;
                 (p + pass as usize, msg)
             })
