@@ -1,4 +1,4 @@
-use super::{destinations::Destinations, service::request::RequestResult};
+use super::{destinations::Destinations, metrics::RequestResult};
 
 #[allow(async_fn_in_trait)] // TODO #[warn(async_fn_in_trait)] by default
 pub trait Evaluator<Res> {

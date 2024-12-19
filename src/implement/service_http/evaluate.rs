@@ -10,7 +10,7 @@ use crate::{
         destinations::{AllOr, Destinations},
         evaluate::plaintext::PlaintextEvaluate,
         evaluator::{Acceptable, Evaluator},
-        service::request::{MetaResponse, RequestResult},
+        metrics::{MetaResponse, RequestResult},
     },
     error::EvaluateError,
     interface::helper::{coalesce::Coalesce, http_serde_priv, is_default::IsDefault},

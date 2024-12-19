@@ -21,7 +21,8 @@ use super::{
     destinations::Destinations,
     evaluator::Evaluator,
     factory::RequestFactory,
-    service::request::{RequestError, RequestLayer, RequestResult},
+    metrics::{RequestError, RequestResult},
+    service::request::RequestLayer,
 };
 
 /// TODO document

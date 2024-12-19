@@ -2,61 +2,12 @@ use std::{
     future::Future,
     pin::Pin,
     task::{Context, Poll},
-    time::{Duration, SystemTime, SystemTimeError},
+    time::SystemTime,
 };
 
-use serde::{Deserialize, Serialize};
-use thiserror::Error;
 use tower::{timeout::error::Elapsed, Layer, Service};
 
-pub type RequestResult<Res> = Result<MetaResponse<Res>, RequestError>;
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct MetaResponse<Res> {
-    response: Res,
-    timestamp: SystemTime,
-    latency: Duration,
-}
-impl<Res> MetaResponse<Res> {
-    pub fn new(response: Res, timestamp: SystemTime, latency: Duration) -> Self {
-        Self { response, timestamp, latency }
-    }
-
-    pub fn response(&self) -> &Res {
-        &self.response
-    }
-    pub fn into_response(self) -> Res {
-        self.response
-    }
-
-    pub fn timestamp(&self) -> SystemTime {
-        self.timestamp
-    }
-    pub fn end_timestamp(&self) -> SystemTime {
-        self.timestamp + self.latency
-    }
-    pub fn latency(&self) -> Duration {
-        self.latency
-    }
-}
-
-#[derive(Error, Debug)]
-pub enum RequestError {
-    #[error("request timeout: {0:?}")]
-    Timeout(Duration),
-
-    #[error(transparent)]
-    FailToMakeRequest(Box<dyn std::error::Error + Send + Sync>),
-
-    #[error(transparent)]
-    NoReady(Box<dyn std::error::Error + Send + Sync>),
-    #[error(transparent)]
-    InnerServiceError(Box<dyn std::error::Error + Send + Sync>),
-
-    #[error(transparent)]
-    FailToMeasureLatency(SystemTimeError),
-    #[error(transparent)]
-    Unknown(Box<dyn std::error::Error + Send + Sync>),
-}
+use crate::assault::metrics::{MetaResponse, RequestError, RequestResult};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash)]
 pub struct RequestLayer;
