@@ -7,7 +7,7 @@ use std::{
 use thiserror::Error;
 
 use crate::{
-    assault::metrics::RequestError,
+    assault::error::RequestError,
     implement::service_http::{evaluate::HttpResponse, factory::HttpRequest},
     interface::config::Config,
 };

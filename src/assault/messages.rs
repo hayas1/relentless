@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{
     destinations::Destinations,
-    metrics::{RequestError, RequestResult},
+    error::{RequestError, RequestResult},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]

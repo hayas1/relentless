@@ -9,7 +9,7 @@ use tower::{timeout::error::Elapsed, Layer, Service};
 
 use crate::assault::{
     measure::metrics::MeasuredResponse,
-    metrics::{RequestError, RequestResult},
+    error::{RequestError, RequestResult},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash)]

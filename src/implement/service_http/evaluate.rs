@@ -11,7 +11,7 @@ use crate::{
         evaluate::plaintext::PlaintextEvaluate,
         evaluator::{Acceptable, Evaluator},
         messages::Messages,
-        metrics::RequestResult,
+        error::RequestResult,
     },
     error::EvaluateError,
     interface::helper::{coalesce::Coalesce, http_serde_priv, is_default::IsDefault},
