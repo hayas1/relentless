@@ -38,6 +38,11 @@ impl CountAggregate {
 }
 
 #[derive(Debug, Clone)]
+pub struct BytesAggregate {
+    // TODO implement
+}
+
+#[derive(Debug, Clone)]
 pub struct LatencyAggregate {
     min: Min,
     mean: Mean,
