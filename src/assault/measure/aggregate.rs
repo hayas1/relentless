@@ -1,12 +1,41 @@
-use std::time::{Duration, SystemTime};
+use std::{
+    marker::PhantomData,
+    time::{Duration, SystemTime},
+};
 
 use average::{Estimate, Max, Mean, Min, Quantile};
+
+use super::metrics::MeasuredResponse;
 
 pub trait Aggregator {
     type Add;
     type Aggregate;
     fn add(&mut self, add: Self::Add);
     fn aggregate(&self) -> Self::Aggregate;
+}
+
+#[derive(Debug, Clone)]
+pub struct ResponseAggregate<Res> {
+    count: CountAggregate,
+    bytes: BytesAggregate,
+    latency: LatencyAggregate,
+    phantom: PhantomData<Res>,
+}
+impl<Res> Aggregator for ResponseAggregate<Res> {
+    type Add = (bool, MeasuredResponse<Res>);
+    type Aggregate = (
+        <CountAggregate as Aggregator>::Aggregate,
+        <BytesAggregate as Aggregator>::Aggregate,
+        <LatencyAggregate as Aggregator>::Aggregate,
+    );
+    fn add(&mut self, (pass, res): Self::Add) {
+        self.count.add((pass, res.timestamp()));
+        self.bytes.add(());
+        self.latency.add(res.latency());
+    }
+    fn aggregate(&self) -> Self::Aggregate {
+        (self.count.aggregate(), self.bytes.aggregate(), self.latency.aggregate())
+    }
 }
 
 #[derive(Debug, Clone)]
