@@ -2,6 +2,13 @@ use std::time::{Duration, SystemTime};
 
 use average::{Estimate, Max, Mean, Min, Quantile};
 
+pub trait Aggregator {
+    type Add;
+    type Aggregate;
+    fn add(&mut self, add: Self::Add);
+    fn aggregate(&self) -> Self::Aggregate;
+}
+
 #[derive(Debug, Clone)]
 pub struct CountAggregate {
     count: u64,
@@ -9,17 +16,22 @@ pub struct CountAggregate {
     first: SystemTime,
     last: SystemTime,
 }
-
-impl CountAggregate {
-    pub fn new(now: SystemTime) -> Self {
-        Self { count: 0, passed: 0, first: now, last: now }
-    }
-
-    pub fn add(&mut self, passed: bool, timestamp: SystemTime) {
+impl Aggregator for CountAggregate {
+    type Add = (bool, SystemTime);
+    type Aggregate = (u64, u64, f64, f64);
+    fn add(&mut self, (passed, timestamp): Self::Add) {
         self.count += 1;
         self.passed += passed as u64;
         self.first = self.first.min(timestamp);
         self.last = self.last.max(timestamp);
+    }
+    fn aggregate(&self) -> Self::Aggregate {
+        (self.count, self.passed, self.success_rate(), self.rps())
+    }
+}
+impl CountAggregate {
+    pub fn new(now: SystemTime) -> Self {
+        Self { count: 0, passed: 0, first: now, last: now }
     }
 
     pub fn count(&self) -> u64 {
@@ -41,6 +53,12 @@ impl CountAggregate {
 pub struct BytesAggregate {
     // TODO implement
 }
+impl Aggregator for BytesAggregate {
+    type Add = ();
+    type Aggregate = ();
+    fn add(&mut self, _: Self::Add) {}
+    fn aggregate(&self) -> Self::Aggregate {}
+}
 
 #[derive(Debug, Clone)]
 pub struct LatencyAggregate {
@@ -48,6 +66,20 @@ pub struct LatencyAggregate {
     mean: Mean,
     quantile: Vec<Quantile>,
     max: Max,
+}
+impl Aggregator for LatencyAggregate {
+    type Add = Duration;
+    type Aggregate = (Duration, Duration, Vec<Duration>, Duration);
+    fn add(&mut self, latency: Self::Add) {
+        let nanos = latency.as_secs_f64();
+        self.min.add(nanos);
+        self.mean.add(nanos);
+        self.quantile.iter_mut().for_each(|q| q.add(nanos));
+        self.max.add(nanos);
+    }
+    fn aggregate(&self) -> Self::Aggregate {
+        (self.min(), self.mean(), self.quantile(), self.max())
+    }
 }
 impl LatencyAggregate {
     pub fn new<I: IntoIterator<Item = f64>>(quantile: I) -> Self {
@@ -57,14 +89,6 @@ impl LatencyAggregate {
             quantile: quantile.into_iter().map(Quantile::new).collect(),
             max: Max::new(),
         }
-    }
-
-    pub fn add(&mut self, latency: Duration) {
-        let nanos = latency.as_secs_f64();
-        self.min.add(nanos);
-        self.mean.add(nanos);
-        self.quantile.iter_mut().for_each(|q| q.add(nanos));
-        self.max.add(nanos);
     }
 
     pub fn min(&self) -> Duration {
@@ -79,9 +103,6 @@ impl LatencyAggregate {
     pub fn max(&self) -> Duration {
         Duration::from_secs_f64(self.max.max())
     }
-    pub fn aggregate(&self) -> (Duration, Duration, Vec<Duration>, Duration) {
-        (self.min(), self.mean(), self.quantile(), self.max())
-    }
 }
 
 #[cfg(test)]
@@ -92,7 +113,7 @@ mod tests {
     fn count_aggregate() {
         let mut agg = CountAggregate::new(SystemTime::UNIX_EPOCH);
         for i in 0..1000 {
-            agg.add(i % 2 == 0, SystemTime::UNIX_EPOCH + Duration::from_millis(i));
+            agg.add((i % 2 == 0, SystemTime::UNIX_EPOCH + Duration::from_millis(i)));
         }
         assert_eq!(agg.count(), 1000);
         assert_eq!(agg.passed(), 500);
