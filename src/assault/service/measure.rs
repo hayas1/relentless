@@ -7,7 +7,10 @@ use std::{
 
 use tower::{timeout::error::Elapsed, Layer, Service};
 
-use crate::assault::metrics::{MeasuredResponse, RequestError, RequestResult};
+use crate::assault::{
+    measure::metrics::MeasuredResponse,
+    metrics::{RequestError, RequestResult},
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash)]
 pub struct MeasureLayer;

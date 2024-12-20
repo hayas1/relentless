@@ -205,7 +205,7 @@ impl Acceptable<&Bytes> for BodyEvaluate {
 mod tests {
     use std::time::SystemTime;
 
-    use crate::assault::metrics::MeasuredResponse;
+    use crate::assault::measure::metrics::MeasuredResponse;
 
     use super::*;
 
