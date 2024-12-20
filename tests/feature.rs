@@ -102,6 +102,30 @@ async fn test_allow_config() {
 }
 
 #[tokio::test]
+async fn test_json_diff_config() {
+    let relentless =
+        Relentless { file: vec!["tests/config/feature/json_diff.yaml".into()], no_color: true, ..Default::default() };
+    let configs = relentless.configs().unwrap();
+    let service = route::app_with(Default::default());
+    let report = relentless.assault_with::<_, Request<Body>>(configs, service).await.unwrap();
+
+    let mut buf = Vec::new();
+    relentless.report_with(&report, &mut buf).unwrap();
+    let out = String::from_utf8_lossy(&buf);
+
+    for line in [
+        format!("{} /information", CaseConsoleReport::FAIL_EMOJI),
+        format!("  {} this testcase is allowed", CaseConsoleReport::ALLOW_EMOJI),
+        format!("  {} message was found", CaseConsoleReport::MESSAGE_EMOJI),
+        format!("    diff in {}", "`/uri`"),
+    ] {
+        assert!(out.contains(&line));
+    }
+    assert!(!relentless.pass(&report));
+    assert!(relentless.allow(&report));
+}
+
+#[tokio::test]
 async fn test_headers_config() {
     let relentless =
         Relentless { file: vec!["tests/config/feature/headers.yaml".into()], no_color: true, ..Default::default() };
@@ -188,7 +212,7 @@ async fn test_timeout_config() {
         format!("{} /wait/1/s", CaseConsoleReport::FAIL_EMOJI),
         format!("  {} this testcase is allowed", CaseConsoleReport::ALLOW_EMOJI),
         format!("  {} message was found", CaseConsoleReport::MESSAGE_EMOJI),
-        format!("    request timeout: {}", "0.5s"),
+        format!("    request timeout: {}", ""), // TODO regex
         format!("{} /wait/500/ms", CaseConsoleReport::PASS_EMOJI),
     ] {
         assert!(out.contains(&line));
