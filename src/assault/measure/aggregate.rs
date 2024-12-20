@@ -1,11 +1,6 @@
-use std::{
-    marker::PhantomData,
-    time::{Duration, SystemTime},
-};
+use std::time::{Duration, SystemTime, SystemTimeError};
 
 use average::{Estimate, Max, Mean, Min, Quantile};
-
-use super::metrics::MeasuredResponse;
 
 pub trait Aggregator {
     type Add;
@@ -15,66 +10,77 @@ pub trait Aggregator {
 }
 
 #[derive(Debug, Clone)]
-pub struct ResponseAggregate<Res> {
-    count: CountAggregate,
-    bytes: BytesAggregate,
-    latency: LatencyAggregate,
-    phantom: PhantomData<Res>,
-}
-impl<Res> Aggregator for ResponseAggregate<Res> {
-    type Add = (bool, MeasuredResponse<Res>);
-    type Aggregate = (
-        <CountAggregate as Aggregator>::Aggregate,
-        <BytesAggregate as Aggregator>::Aggregate,
-        <LatencyAggregate as Aggregator>::Aggregate,
-    );
-    fn add(&mut self, (pass, res): Self::Add) {
-        self.count.add((pass, res.timestamp()));
-        self.bytes.add(());
-        self.latency.add(res.latency());
-    }
-    fn aggregate(&self) -> Self::Aggregate {
-        (self.count.aggregate(), self.bytes.aggregate(), self.latency.aggregate())
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct CountAggregate {
-    count: u64,
-    passed: u64,
+pub struct DurationAggregate {
     first: SystemTime,
     last: SystemTime,
 }
-impl Aggregator for CountAggregate {
-    type Add = (bool, SystemTime);
-    type Aggregate = (u64, u64, f64, f64);
-    fn add(&mut self, (passed, timestamp): Self::Add) {
-        self.count += 1;
-        self.passed += passed as u64;
+impl Aggregator for DurationAggregate {
+    type Add = SystemTime;
+    type Aggregate = Result<Duration, SystemTimeError>;
+    fn add(&mut self, timestamp: Self::Add) {
         self.first = self.first.min(timestamp);
         self.last = self.last.max(timestamp);
     }
     fn aggregate(&self) -> Self::Aggregate {
-        (self.count, self.passed, self.success_rate(), self.rps())
+        self.last.duration_since(self.first)
+    }
+}
+impl DurationAggregate {
+    pub fn new(now: SystemTime) -> Self {
+        Self { first: now, last: now }
+    }
+}
+#[derive(Debug, Clone, Default)]
+pub struct CountAggregate {
+    count: u64,
+}
+impl Aggregator for CountAggregate {
+    type Add = ();
+    type Aggregate = u64;
+    fn add(&mut self, (): Self::Add) {
+        self.count += 1;
+    }
+    fn aggregate(&self) -> Self::Aggregate {
+        self.count
     }
 }
 impl CountAggregate {
-    pub fn new(now: SystemTime) -> Self {
-        Self { count: 0, passed: 0, first: now, last: now }
+    pub fn new() -> Self {
+        Default::default()
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct PassedAggregate {
+    count: CountAggregate,
+    passed: CountAggregate,
+}
+impl Aggregator for PassedAggregate {
+    type Add = bool;
+    type Aggregate = (u64, u64, f64);
+    fn add(&mut self, pass: Self::Add) {
+        self.count.add(());
+        if pass {
+            self.passed.add(());
+        }
+    }
+    fn aggregate(&self) -> Self::Aggregate {
+        (self.count(), self.passed(), self.ratio())
+    }
+}
+impl PassedAggregate {
+    pub fn new() -> Self {
+        Default::default()
     }
 
     pub fn count(&self) -> u64 {
-        self.count
+        self.count.aggregate()
     }
     pub fn passed(&self) -> u64 {
-        self.passed
+        self.passed.aggregate()
     }
-    pub fn success_rate(&self) -> f64 {
-        self.passed as f64 / self.count as f64
-    }
-    pub fn rps(&self) -> f64 {
-        let elapsed = self.last.duration_since(self.first).unwrap_or_default();
-        self.count as f64 / elapsed.as_secs_f64()
+    pub fn ratio(&self) -> f64 {
+        self.passed() as f64 / self.count() as f64
     }
 }
 
@@ -140,14 +146,29 @@ mod tests {
 
     #[test]
     fn count_aggregate() {
-        let mut agg = CountAggregate::new(SystemTime::UNIX_EPOCH);
-        for i in 0..1000 {
-            agg.add((i % 2 == 0, SystemTime::UNIX_EPOCH + Duration::from_millis(i)));
+        let mut agg = CountAggregate::new();
+        for _ in 0..1000 {
+            agg.add(());
         }
-        assert_eq!(agg.count(), 1000);
-        assert_eq!(agg.passed(), 500);
-        assert_eq!(agg.success_rate(), 0.5);
-        assert_eq!(agg.rps(), 1001.001001001001);
+        assert_eq!(agg.aggregate(), 1000);
+    }
+
+    #[test]
+    fn passed_aggregate() {
+        let mut agg = PassedAggregate::new();
+        for i in 0..1000 {
+            agg.add(i % 2 == 0);
+        }
+        assert_eq!(agg.aggregate(), (1000, 500, 0.5));
+    }
+
+    #[test]
+    fn duration_aggregate() {
+        let mut agg = DurationAggregate::new(SystemTime::UNIX_EPOCH);
+        for i in 0..1000 {
+            agg.add(SystemTime::UNIX_EPOCH + Duration::from_millis(i));
+        }
+        assert_eq!(agg.aggregate().unwrap(), Duration::from_millis(999));
     }
 
     #[test]
