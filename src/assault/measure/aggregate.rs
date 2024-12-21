@@ -1,13 +1,10 @@
-use std::{
-    marker::PhantomData,
-    time::{Duration, SystemTime, SystemTimeError},
-};
+use std::time::{Duration, SystemTime, SystemTimeError};
 
 use average::{Estimate, Max, Mean, Min, Quantile};
 
 use crate::assault::destinations::Destinations;
 
-use super::metrics::MeasuredResponse;
+use super::metrics::Metrics;
 
 pub trait Aggregator {
     type Add;
@@ -16,15 +13,14 @@ pub trait Aggregator {
     fn aggregate(&self) -> Self::Aggregate;
 }
 
-pub struct EvaluateAggregate<Res> {
+pub struct EvaluateAggregate {
     passed: PassAggregate,
-    destinations: Destinations<ResponseAggregate<Res>>,
-    phantom: PhantomData<Res>,
+    destinations: Destinations<ResponseAggregate>,
 }
-impl<Res> Aggregator for EvaluateAggregate<Res> {
-    type Add = (bool, Destinations<MeasuredResponse<Res>>);
+impl Aggregator for EvaluateAggregate {
+    type Add = (bool, Destinations<<ResponseAggregate as Aggregator>::Add>);
     type Aggregate =
-        (<PassAggregate as Aggregator>::Aggregate, Destinations<<ResponseAggregate<Res> as Aggregator>::Aggregate>);
+        (<PassAggregate as Aggregator>::Aggregate, Destinations<<ResponseAggregate as Aggregator>::Aggregate>);
 
     fn add(&mut self, (pass, dst): &Self::Add) {
         self.passed.add(pass);
@@ -34,25 +30,24 @@ impl<Res> Aggregator for EvaluateAggregate<Res> {
         (self.passed.aggregate(), self.destinations.iter().map(|(d, r)| (d, r.aggregate())).collect())
     }
 }
-impl<Res> EvaluateAggregate<Res> {
+impl EvaluateAggregate {
     pub fn new<T, I: IntoIterator<Item = f64>>(dst: &Destinations<T>, now: SystemTime, quantile: I) -> Self {
         let percentile: Vec<_> = quantile.into_iter().collect();
         let destinations = dst.keys().map(|d| (d, ResponseAggregate::new(now, percentile.iter().copied()))).collect();
-        Self { passed: PassAggregate::new(), destinations, phantom: PhantomData }
+        Self { passed: PassAggregate::new(), destinations }
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct ResponseAggregate<Res> {
+pub struct ResponseAggregate {
     count: CountAggregate,
     duration: DurationAggregate,
     bytes: BytesAggregate,
     latency: LatencyAggregate,
-    phantom: PhantomData<Res>,
 }
 pub type Rps = f64;
-impl<Res> Aggregator for ResponseAggregate<Res> {
-    type Add = MeasuredResponse<Res>;
+impl Aggregator for ResponseAggregate {
+    type Add = Metrics;
     type Aggregate = (
         <CountAggregate as Aggregator>::Aggregate,
         <DurationAggregate as Aggregator>::Aggregate,
@@ -62,9 +57,9 @@ impl<Res> Aggregator for ResponseAggregate<Res> {
     );
     fn add(&mut self, res: &Self::Add) {
         self.count.add(&());
-        self.duration.add(&res.metrics().timestamp());
+        self.duration.add(&res.timestamp());
         self.bytes.add(&());
-        self.latency.add(&res.metrics().latency());
+        self.latency.add(&res.latency());
     }
     fn aggregate(&self) -> Self::Aggregate {
         (
@@ -76,14 +71,13 @@ impl<Res> Aggregator for ResponseAggregate<Res> {
         )
     }
 }
-impl<Res> ResponseAggregate<Res> {
+impl ResponseAggregate {
     pub fn new<I: IntoIterator<Item = f64>>(now: SystemTime, quantile: I) -> Self {
         Self {
             count: CountAggregate::new(),
             duration: DurationAggregate::new(now),
             bytes: BytesAggregate {},
             latency: LatencyAggregate::new(quantile),
-            phantom: PhantomData,
         }
     }
 
