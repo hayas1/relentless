@@ -1,12 +1,66 @@
-use std::time::{Duration, SystemTime, SystemTimeError};
+use std::{
+    marker::PhantomData,
+    time::{Duration, SystemTime, SystemTimeError},
+};
 
 use average::{Estimate, Max, Mean, Min, Quantile};
+
+use super::metrics::MeasuredResponse;
 
 pub trait Aggregator {
     type Add;
     type Aggregate;
     fn add(&mut self, add: Self::Add);
     fn aggregate(&self) -> Self::Aggregate;
+}
+
+#[derive(Debug, Clone)]
+pub struct ResponseAggregate<Res> {
+    count: CountAggregate,
+    duration: DurationAggregate,
+    bytes: BytesAggregate,
+    latency: LatencyAggregate,
+    phantom: PhantomData<Res>,
+}
+impl<Res> Aggregator for ResponseAggregate<Res> {
+    type Add = MeasuredResponse<Res>;
+    type Aggregate = (
+        <CountAggregate as Aggregator>::Aggregate,
+        <DurationAggregate as Aggregator>::Aggregate,
+        Result<f64, SystemTimeError>,
+        <BytesAggregate as Aggregator>::Aggregate,
+        <LatencyAggregate as Aggregator>::Aggregate,
+    );
+    fn add(&mut self, res: Self::Add) {
+        self.count.add(());
+        self.duration.add(res.timestamp());
+        self.bytes.add(());
+        self.latency.add(res.latency());
+    }
+    fn aggregate(&self) -> Self::Aggregate {
+        (
+            self.count.aggregate(),
+            self.duration.aggregate(),
+            self.rps(),
+            self.bytes.aggregate(),
+            self.latency.aggregate(),
+        )
+    }
+}
+impl<Res> ResponseAggregate<Res> {
+    pub fn new<I: Iterator<Item = f64>>(now: SystemTime, quantile: I) -> Self {
+        Self {
+            count: CountAggregate::new(),
+            duration: DurationAggregate::new(now),
+            bytes: BytesAggregate {},
+            latency: LatencyAggregate::new(quantile),
+            phantom: PhantomData,
+        }
+    }
+
+    pub fn rps(&self) -> Result<f64, SystemTimeError> {
+        Ok(self.count.aggregate() as f64 / self.duration.aggregate()?.as_secs_f64())
+    }
 }
 
 #[derive(Debug, Clone, Default)]
