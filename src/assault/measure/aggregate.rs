@@ -62,9 +62,9 @@ impl<Res> Aggregator for ResponseAggregate<Res> {
     );
     fn add(&mut self, res: &Self::Add) {
         self.count.add(&());
-        self.duration.add(&res.timestamp());
+        self.duration.add(&res.metrics().timestamp());
         self.bytes.add(&());
-        self.latency.add(&res.latency());
+        self.latency.add(&res.metrics().latency());
     }
     fn aggregate(&self) -> Self::Aggregate {
         (
