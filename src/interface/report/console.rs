@@ -95,7 +95,7 @@ impl CaseConsoleReport {
 impl<T: Display, Q: Clone + Coalesce, P: Clone + Coalesce> ConsoleReport for CaseReport<T, Q, P> {
     type Error = Wrap; // TODO crate::Error ?
     fn console_report<W: std::io::Write>(&self, cmd: &Relentless, w: &mut ReportWriter<W>) -> Result<(), Self::Error> {
-        let Testcase { description, target, setting, .. } = self.testcase.coalesce();
+        let Testcase { description, target, setting, .. } = self.testcase().coalesce();
 
         let side = if self.pass() { CaseConsoleReport::PASS_EMOJI } else { CaseConsoleReport::FAIL_EMOJI };
         let target = console::style(&target);
@@ -113,11 +113,11 @@ impl<T: Display, Q: Clone + Coalesce, P: Clone + Coalesce> ConsoleReport for Cas
                 writeln!(w, "{} {}", CaseConsoleReport::ALLOW_EMOJI, console::style("this testcase is allowed").green())
             })?;
         }
-        if !self.messages.is_empty() {
+        if !self.messages().is_empty() {
             w.scope(|w| {
                 writeln!(w, "{} {}", CaseConsoleReport::MESSAGE_EMOJI, console::style("message was found").yellow())?;
                 w.scope(|w| {
-                    let message = &self.messages;
+                    let message = &self.messages();
                     writeln!(w, "{}", console::style(message).dim())
                 })
             })?;

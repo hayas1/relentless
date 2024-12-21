@@ -64,9 +64,9 @@ impl<T, Q: Clone + Coalesce, P: Clone + Coalesce> Reportable for WorkerReport<T,
 /// TODO document
 #[derive(Debug, Clone)]
 pub struct CaseReport<T, Q, P> {
-    pub testcase: Coalesced<Testcase<Q, P>, Setting<Q, P>>,
-    pub passed: usize,
-    pub messages: Messages<T>,
+    testcase: Coalesced<Testcase<Q, P>, Setting<Q, P>>,
+    pub(crate) passed: usize,
+    messages: Messages<T>,
     aggregate: EvaluateAggregate,
 }
 impl<T, Q, P> CaseReport<T, Q, P> {
@@ -77,6 +77,13 @@ impl<T, Q, P> CaseReport<T, Q, P> {
         aggregate: EvaluateAggregate,
     ) -> Self {
         Self { testcase, passed, messages, aggregate }
+    }
+
+    pub fn testcase(&self) -> &Coalesced<Testcase<Q, P>, Setting<Q, P>> {
+        &self.testcase
+    }
+    pub fn messages(&self) -> &Messages<T> {
+        &self.messages
     }
 }
 impl<T, Q: Clone + Coalesce, P: Clone + Coalesce> Reportable for CaseReport<T, Q, P> {
@@ -129,9 +136,9 @@ pub trait Reportable {
 }
 
 pub struct ReportWriter<W> {
-    pub indent: usize,
-    pub buf: W,
-    pub at_start_line: bool,
+    indent: usize,
+    buf: W,
+    at_start_line: bool,
 }
 impl ReportWriter<BufWriter<Stdout>> {
     pub fn with_stdout(indent: usize) -> Self {

@@ -105,7 +105,7 @@ impl<T: Display, Q: Clone + Coalesce, P: Clone + Coalesce> GithubMarkdownReport 
         cmd: &Relentless,
         w: &mut ReportWriter<W>,
     ) -> Result<(), Self::Error> {
-        let Testcase { description, target, setting, .. } = self.testcase.coalesce();
+        let Testcase { description, target, setting, .. } = self.testcase().coalesce();
 
         let side =
             if self.pass() { CaseGithubMarkdownReport::PASS_EMOJI } else { CaseGithubMarkdownReport::FAIL_EMOJI };
@@ -121,14 +121,14 @@ impl<T: Display, Q: Clone + Coalesce, P: Clone + Coalesce> GithubMarkdownReport 
         if !self.pass() && self.allow(cmd.strict) {
             w.scope(|w| writeln!(w, "{} this testcase is allowed", CaseGithubMarkdownReport::ALLOW_EMOJI))?;
         }
-        if !self.messages.is_empty() {
+        if !self.messages().is_empty() {
             w.scope(|w| {
                 writeln!(w, "<details>")?;
                 w.scope(|w| {
                     writeln!(w, "<summary> {} message was found </summary>", CaseGithubMarkdownReport::MESSAGE_EMOJI)?;
                     writeln!(w)?;
                     writeln!(w, "```")?;
-                    writeln!(w, "{}", &self.messages)?;
+                    writeln!(w, "{}", &self.messages())?;
                     writeln!(w, "```")
                 })?;
                 writeln!(w, "</details>")
