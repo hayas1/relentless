@@ -6,6 +6,7 @@ use crate::assault::destinations::Destinations;
 
 use super::metrics::Metrics;
 
+// TODO remove Reportable trait ?
 pub trait Aggregator: Default {
     type Add;
     type Aggregate;
