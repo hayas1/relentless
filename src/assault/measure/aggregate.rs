@@ -6,7 +6,7 @@ use crate::assault::destinations::Destinations;
 
 use super::metrics::Metrics;
 
-pub trait Aggregator {
+pub trait Aggregator: Default {
     type Add;
     type Aggregate;
     fn add(&mut self, add: &Self::Add);
@@ -14,7 +14,7 @@ pub trait Aggregator {
     fn aggregate(&self) -> Self::Aggregate;
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct EvaluateAggregate {
     passed: PassAggregate,
     destinations: Destinations<ResponseAggregate>,
@@ -42,14 +42,14 @@ impl Aggregator for EvaluateAggregate {
     }
 }
 impl EvaluateAggregate {
-    pub fn new<T, I: IntoIterator<Item = f64>>(dst: &Destinations<T>, now: SystemTime, quantile: I) -> Self {
+    pub fn new<T, I: IntoIterator<Item = f64>>(dst: &Destinations<T>, now: Option<SystemTime>, quantile: I) -> Self {
         let percentile: Vec<_> = quantile.into_iter().collect();
         let destinations = dst.keys().map(|d| (d, ResponseAggregate::new(now, percentile.iter().copied()))).collect();
         Self { passed: PassAggregate::new(), destinations }
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct ResponseAggregate {
     count: CountAggregate,
     duration: DurationAggregate,
@@ -89,7 +89,7 @@ impl Aggregator for ResponseAggregate {
     }
 }
 impl ResponseAggregate {
-    pub fn new<I: IntoIterator<Item = f64>>(now: SystemTime, quantile: I) -> Self {
+    pub fn new<I: IntoIterator<Item = f64>>(now: Option<SystemTime>, quantile: I) -> Self {
         Self {
             count: CountAggregate::new(),
             duration: DurationAggregate::new(now),
@@ -167,33 +167,42 @@ impl PassAggregate {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct DurationAggregate {
-    first: SystemTime,
-    last: SystemTime,
+    start_end: Option<(SystemTime, SystemTime)>,
 }
 impl Aggregator for DurationAggregate {
     type Add = SystemTime;
     type Aggregate = Result<Duration, SystemTimeError>;
     fn add(&mut self, timestamp: &Self::Add) {
-        self.first = self.first.min(*timestamp);
-        self.last = self.last.max(*timestamp);
+        match self.start_end {
+            None => self.start_end = Some((*timestamp, *timestamp)),
+            Some((start, end)) => self.start_end = Some((start.min(*timestamp), end.max(*timestamp))),
+        }
     }
     fn merge(&mut self, other: &Self) {
-        self.first = self.first.min(other.first);
-        self.last = self.last.max(other.last);
+        match (&self.start_end, &other.start_end) {
+            (None, _) => self.start_end = other.start_end,
+            (_, None) => (),
+            (Some((start1, end1)), Some((start2, end2))) => {
+                self.start_end = Some((*start1.min(start2), *end1.max(end2)))
+            }
+        }
     }
     fn aggregate(&self) -> Self::Aggregate {
-        self.last.duration_since(self.first)
+        match &self.start_end {
+            None => Ok(Duration::from_secs(0)),
+            Some((start, end)) => Ok(end.duration_since(*start)?),
+        }
     }
 }
 impl DurationAggregate {
-    pub fn new(now: SystemTime) -> Self {
-        Self { first: now, last: now }
+    pub fn new(now: Option<SystemTime>) -> Self {
+        Self { start_end: now.map(|t| (t, t)) }
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct BytesAggregate {
     // TODO implement
 }
@@ -221,10 +230,16 @@ impl Aggregator for LatencyAggregate {
         self.hist += latency.as_nanos() as u64; // TODO overflow ?
     }
     fn merge(&mut self, other: &Self) {
+        self.quantile = other.quantile.clone(); // Default quantile will be empty, so give priority to other
         self.hist += &other.hist;
     }
     fn aggregate(&self) -> Self::Aggregate {
         (self.min(), self.mean(), self.quantile(), self.max())
+    }
+}
+impl Default for LatencyAggregate {
+    fn default() -> Self {
+        Self::new([])
     }
 }
 impl LatencyAggregate {
@@ -275,7 +290,7 @@ mod tests {
 
     #[test]
     fn duration_aggregate() {
-        let mut agg = DurationAggregate::new(SystemTime::UNIX_EPOCH);
+        let mut agg = DurationAggregate::new(Some(SystemTime::UNIX_EPOCH));
         for i in 0..1000 {
             agg.add(&(SystemTime::UNIX_EPOCH + Duration::from_millis(i)));
         }

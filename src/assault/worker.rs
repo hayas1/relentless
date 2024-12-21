@@ -1,4 +1,4 @@
-use std::{marker::PhantomData, time::SystemTime};
+use std::marker::PhantomData;
 
 use futures::{stream, Stream, StreamExt, TryStreamExt};
 use tower::{timeout::TimeoutLayer, Service, ServiceBuilder, ServiceExt};
@@ -138,7 +138,8 @@ where
         testcase: Coalesced<Testcase<Q, P>, Setting<Q, P>>,
     ) -> WrappedResult<CaseReport<P::Message, Q, P>> {
         let case = &testcase.coalesce();
-        let evaluate_aggregate = EvaluateAggregate::new(destinations, SystemTime::now(), vec![0.50, 0.90, 0.99]);
+        let evaluate_aggregate = EvaluateAggregate::new(destinations, None, vec![0.50, 0.90, 0.99]);
+
         let (passed, messages, aggregate) = self
             .requests(cmd, destinations, case)
             .await?
