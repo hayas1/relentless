@@ -1,4 +1,4 @@
-use std::marker::PhantomData;
+use std::{marker::PhantomData, time::SystemTime};
 
 use futures::{stream, Stream, StreamExt, TryStreamExt};
 use tower::{timeout::TimeoutLayer, Service, ServiceBuilder, ServiceExt};
@@ -22,6 +22,7 @@ use super::{
     error::{RequestError, RequestResult},
     evaluator::Evaluator,
     factory::RequestFactory,
+    measure::aggregate::{Aggregator, EvaluateAggregate, ResponseAggregate},
     messages::Messages,
     service::measure::MeasureLayer,
 };
@@ -137,14 +138,17 @@ where
         testcase: Coalesced<Testcase<Q, P>, Setting<Q, P>>,
     ) -> WrappedResult<CaseReport<P::Message, Q, P>> {
         let case = &testcase.coalesce();
-
-        let (passed, messages) = self
+        let evaluate_aggregate = EvaluateAggregate::new(destinations, SystemTime::now(), vec![0.50, 0.90, 0.99]);
+        let (passed, messages, aggregate) = self
             .requests(cmd, destinations, case)
             .await?
-            .fold((0, Messages::new()), |(p, mut msg), res| async move {
-                // TODO aggregate latency, byte size, etc...
+            .fold((0, Messages::new(), evaluate_aggregate), |(p, mut msg, mut agg), res| async move {
+                let metrics = res.iter().map(|(d, r)| Some((d, r.as_ref().ok()?.metrics().clone()))).collect();
                 let pass = case.setting.response.evaluate(res, &mut msg).await;
-                (p + pass as usize, msg)
+                if let Some(m) = metrics {
+                    agg.add(&(pass, m)); // TODO error handling: if RequestResult = Timeout
+                }
+                (p + pass as usize, msg, agg)
             })
             .await;
 
