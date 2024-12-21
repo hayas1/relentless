@@ -5,6 +5,8 @@ use std::{
 
 use average::{Estimate, Max, Mean, Min, Quantile};
 
+use crate::assault::destinations::Destinations;
+
 use super::metrics::MeasuredResponse;
 
 pub trait Aggregator {
@@ -12,6 +14,32 @@ pub trait Aggregator {
     type Aggregate;
     fn add(&mut self, add: &Self::Add);
     fn aggregate(&self) -> Self::Aggregate;
+}
+
+pub struct EvaluateAggregate<Res> {
+    passed: PassAggregate,
+    destinations: Destinations<ResponseAggregate<Res>>,
+    phantom: PhantomData<Res>,
+}
+impl<Res> Aggregator for EvaluateAggregate<Res> {
+    type Add = (bool, Destinations<MeasuredResponse<Res>>);
+    type Aggregate =
+        (<PassAggregate as Aggregator>::Aggregate, Destinations<<ResponseAggregate<Res> as Aggregator>::Aggregate>);
+
+    fn add(&mut self, (pass, dst): &Self::Add) {
+        self.passed.add(pass);
+        self.destinations.iter_mut().for_each(|(d, r)| r.add(&dst[d]));
+    }
+    fn aggregate(&self) -> Self::Aggregate {
+        (self.passed.aggregate(), self.destinations.iter().map(|(d, r)| (d, r.aggregate())).collect())
+    }
+}
+impl<Res> EvaluateAggregate<Res> {
+    pub fn new<T, I: Iterator<Item = f64>>(dst: &Destinations<T>, now: SystemTime, quantile: I) -> Self {
+        let percentile: Vec<_> = quantile.collect();
+        let destinations = dst.keys().map(|d| (d, ResponseAggregate::new(now, percentile.iter().copied()))).collect();
+        Self { passed: PassAggregate::new(), destinations, phantom: PhantomData }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -85,20 +113,20 @@ impl CountAggregate {
 
 #[derive(Debug, Clone, Default)]
 pub struct PassAggregate {
-    count: CountAggregate,
     pass: CountAggregate,
+    count: CountAggregate,
 }
 impl Aggregator for PassAggregate {
     type Add = bool;
     type Aggregate = (u64, u64, f64);
     fn add(&mut self, pass: &Self::Add) {
-        self.count.add(&());
         if *pass {
             self.pass.add(&());
         }
+        self.count.add(&());
     }
     fn aggregate(&self) -> Self::Aggregate {
-        (self.count(), self.passed(), self.ratio())
+        (self.passed(), self.count(), self.ratio())
     }
 }
 impl PassAggregate {
