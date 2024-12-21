@@ -10,6 +10,7 @@ pub trait Aggregator {
     type Add;
     type Aggregate;
     fn add(&mut self, add: &Self::Add);
+    fn merge(&mut self, other: &Self);
     fn aggregate(&self) -> Self::Aggregate;
 }
 
@@ -25,6 +26,11 @@ impl Aggregator for EvaluateAggregate {
     fn add(&mut self, (pass, dst): &Self::Add) {
         self.passed.add(pass);
         self.destinations.iter_mut().for_each(|(d, r)| r.add(&dst[d])); // TODO error handling
+    }
+    fn merge(&mut self, other: &Self) {
+        self.passed.merge(&other.passed);
+        // TODO error handling
+        self.destinations.iter_mut().for_each(|(d, r)| r.merge(&other.destinations[d]));
     }
     fn aggregate(&self) -> Self::Aggregate {
         (self.passed.aggregate(), self.destinations.iter().map(|(d, r)| (d, r.aggregate())).collect())
@@ -60,6 +66,12 @@ impl Aggregator for ResponseAggregate {
         self.duration.add(&res.timestamp());
         self.bytes.add(&());
         self.latency.add(&res.latency());
+    }
+    fn merge(&mut self, other: &Self) {
+        self.count.merge(&other.count);
+        self.duration.merge(&other.duration);
+        self.bytes.merge(&other.bytes);
+        self.latency.merge(&other.latency);
     }
     fn aggregate(&self) -> Self::Aggregate {
         (
@@ -97,6 +109,9 @@ impl Aggregator for CountAggregate {
     fn add(&mut self, (): &Self::Add) {
         self.count += 1;
     }
+    fn merge(&mut self, other: &Self) {
+        self.count += other.count;
+    }
     fn aggregate(&self) -> Self::Aggregate {
         self.count
     }
@@ -122,6 +137,10 @@ impl Aggregator for PassAggregate {
             self.pass.add(&());
         }
         self.count.add(&());
+    }
+    fn merge(&mut self, other: &Self) {
+        self.pass.merge(&other.pass);
+        self.count.merge(&other.count);
     }
     fn aggregate(&self) -> Self::Aggregate {
         (self.passed(), self.count(), self.ratio())
@@ -155,6 +174,10 @@ impl Aggregator for DurationAggregate {
         self.first = self.first.min(*timestamp);
         self.last = self.last.max(*timestamp);
     }
+    fn merge(&mut self, other: &Self) {
+        self.first = self.first.min(other.first);
+        self.last = self.last.max(other.last);
+    }
     fn aggregate(&self) -> Self::Aggregate {
         self.last.duration_since(self.first)
     }
@@ -173,6 +196,7 @@ impl Aggregator for BytesAggregate {
     type Add = ();
     type Aggregate = ();
     fn add(&mut self, _: &Self::Add) {}
+    fn merge(&mut self, _: &Self) {}
     fn aggregate(&self) -> Self::Aggregate {}
 }
 
@@ -190,6 +214,9 @@ impl Aggregator for LatencyAggregate {
     type Aggregate = (MinLatency, MeanLatency, QuantileLatencies, MaxLatency);
     fn add(&mut self, latency: &Self::Add) {
         self.hist += latency.as_nanos() as u64; // TODO overflow ?
+    }
+    fn merge(&mut self, other: &Self) {
+        self.hist += &other.hist;
     }
     fn aggregate(&self) -> Self::Aggregate {
         (self.min(), self.mean(), self.quantile(), self.max())
@@ -257,9 +284,60 @@ mod tests {
             agg.add(&Duration::from_millis(i));
         }
 
-        let (min, mean, quantile, max) = agg.aggregate();
         let tolerance = Duration::from_millis(1);
+        let (min, mean, quantile, max) = agg.aggregate();
 
+        assert!(min.abs_diff(Duration::from_millis(1)) < tolerance);
+        assert!(mean.abs_diff(Duration::from_millis(500)) < tolerance);
+        for (q, p) in quantile.iter().zip(vec![
+            Duration::from_millis(500),
+            Duration::from_millis(900),
+            Duration::from_millis(990),
+        ]) {
+            assert!(q.abs_diff(p) < tolerance);
+        }
+        assert!(max.abs_diff(Duration::from_millis(1000)) < tolerance);
+    }
+
+    #[test]
+    fn merge_latency_aggregate() {
+        let mut agg1 = LatencyAggregate::new([0.5, 0.9, 0.99]);
+        for i in 1..500 {
+            agg1.add(&Duration::from_millis(i));
+        }
+        let mut agg2 = LatencyAggregate::new([0.5, 0.9, 0.99]);
+        for i in 500..1000 {
+            agg2.add(&Duration::from_millis(i));
+        }
+
+        let tolerance = Duration::from_millis(1);
+        let (min1, mean1, quantile1, max1) = agg1.aggregate();
+        let (min2, mean2, quantile2, max2) = agg2.aggregate();
+
+        assert!(min1.abs_diff(Duration::from_millis(1)) < tolerance);
+        assert!(mean1.abs_diff(Duration::from_millis(250)) < tolerance);
+        for (q, p) in quantile1.iter().zip(vec![
+            Duration::from_millis(250),
+            Duration::from_millis(450),
+            Duration::from_millis(495),
+        ]) {
+            assert!(q.abs_diff(p) < tolerance);
+        }
+        assert!(max1.abs_diff(Duration::from_millis(500)) < tolerance);
+
+        assert!(min2.abs_diff(Duration::from_millis(500)) < tolerance);
+        assert!(mean2.abs_diff(Duration::from_millis(750)) < tolerance);
+        for (q, p) in quantile2.iter().zip(vec![
+            Duration::from_millis(750),
+            Duration::from_millis(950),
+            Duration::from_millis(995),
+        ]) {
+            assert!(q.abs_diff(p) < tolerance);
+        }
+        assert!(max2.abs_diff(Duration::from_millis(1000)) < tolerance);
+
+        agg1.merge(&agg2);
+        let (min, mean, quantile, max) = agg1.aggregate();
         assert!(min.abs_diff(Duration::from_millis(1)) < tolerance);
         assert!(mean.abs_diff(Duration::from_millis(500)) < tolerance);
         for (q, p) in quantile.iter().zip(vec![
