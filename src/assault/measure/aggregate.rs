@@ -21,8 +21,7 @@ pub struct EvaluateAggregate {
 }
 impl Aggregator for EvaluateAggregate {
     type Add = (bool, Destinations<Option<<ResponseAggregate as Aggregator>::Add>>);
-    type Aggregate =
-        (<PassAggregate as Aggregator>::Aggregate, Destinations<<ResponseAggregate as Aggregator>::Aggregate>);
+    type Aggregate = (<PassAggregate as Aggregator>::Aggregate, <ResponseAggregate as Aggregator>::Aggregate);
 
     fn add(&mut self, (pass, dst): &Self::Add) {
         self.passed.add(pass);
@@ -38,7 +37,16 @@ impl Aggregator for EvaluateAggregate {
         self.destinations.iter_mut().for_each(|(d, r)| r.merge(&other.destinations[d]));
     }
     fn aggregate(&self) -> Self::Aggregate {
-        (self.passed.aggregate(), self.destinations.iter().map(|(d, r)| (d, r.aggregate())).collect())
+        (
+            self.passed.aggregate(),
+            self.destinations
+                .values()
+                .fold(ResponseAggregate::default(), |mut agg, r| {
+                    agg.merge(r);
+                    agg
+                })
+                .aggregate(),
+        )
     }
 }
 impl EvaluateAggregate {

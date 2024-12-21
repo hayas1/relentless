@@ -1,7 +1,10 @@
 use std::fmt::{Display, Write as _};
 
 use crate::{
-    assault::reportable::{CaseReport, Report, ReportWriter, Reportable, WorkerReport},
+    assault::{
+        measure::aggregate::Aggregator,
+        reportable::{CaseReport, Report, ReportWriter, Reportable, WorkerReport},
+    },
     error::Wrap,
     interface::{
         command::Relentless,
@@ -24,6 +27,19 @@ impl<T: Display, Q: Clone + Coalesce, P: Clone + Coalesce> ConsoleReport for Rep
                 writeln!(w).map_err(Wrap::wrapping)?;
             }
         }
+        let ((passed, count, pass_rate), requests) = self.aggregate().aggregate();
+        let (req, duration, rps, _bytes, latency) = requests;
+        let (min, mean, quantile, max) = latency;
+        write!(w, "passed: {}/{} ({:.2}%)\t", passed, count, pass_rate).map_err(Wrap::wrapping)?;
+        writeln!(w, "rps: {}/{:?} ({:.2})", req, duration.unwrap_or_else(|_| todo!()), rps.unwrap_or_else(|_| todo!()))
+            .map_err(Wrap::wrapping)?;
+        writeln!(w, "min\tmean\tp50\tp90\tp99\tmax").map_err(Wrap::wrapping)?;
+        writeln!(
+            w,
+            "{:.3?}\t{:.3?}\t{:.3?}\t{:.3?}\t{:.3?}\t{:.3?}",
+            min, mean, quantile[0], quantile[1], quantile[2], max
+        )
+        .map_err(Wrap::wrapping)?;
         Ok(())
     }
 }
