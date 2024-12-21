@@ -35,8 +35,8 @@ impl<Res> Aggregator for EvaluateAggregate<Res> {
     }
 }
 impl<Res> EvaluateAggregate<Res> {
-    pub fn new<T, I: Iterator<Item = f64>>(dst: &Destinations<T>, now: SystemTime, quantile: I) -> Self {
-        let percentile: Vec<_> = quantile.collect();
+    pub fn new<T, I: IntoIterator<Item = f64>>(dst: &Destinations<T>, now: SystemTime, quantile: I) -> Self {
+        let percentile: Vec<_> = quantile.into_iter().collect();
         let destinations = dst.keys().map(|d| (d, ResponseAggregate::new(now, percentile.iter().copied()))).collect();
         Self { passed: PassAggregate::new(), destinations, phantom: PhantomData }
     }
@@ -77,7 +77,7 @@ impl<Res> Aggregator for ResponseAggregate<Res> {
     }
 }
 impl<Res> ResponseAggregate<Res> {
-    pub fn new<I: Iterator<Item = f64>>(now: SystemTime, quantile: I) -> Self {
+    pub fn new<I: IntoIterator<Item = f64>>(now: SystemTime, quantile: I) -> Self {
         Self {
             count: CountAggregate::new(),
             duration: DurationAggregate::new(now),
