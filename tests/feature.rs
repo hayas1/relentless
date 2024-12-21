@@ -8,8 +8,12 @@ use tower::ServiceExt;
 
 #[tokio::test]
 async fn test_repeat_config() {
-    let relentless =
-        Relentless { file: vec!["tests/config/feature/repeat.yaml".into()], no_color: true, ..Default::default() };
+    let relentless = Relentless {
+        file: vec!["tests/config/feature/repeat.yaml".into()],
+        no_color: true,
+        no_async_testcases: true,
+        ..Default::default()
+    };
     let configs = relentless.configs().unwrap();
     let service = route::app_with(Default::default());
     let report = relentless.assault_with::<_, Request<Body>>(configs, service.clone()).await.unwrap();
