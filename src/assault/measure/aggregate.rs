@@ -28,7 +28,7 @@ impl<Res> Aggregator for EvaluateAggregate<Res> {
 
     fn add(&mut self, (pass, dst): &Self::Add) {
         self.passed.add(pass);
-        self.destinations.iter_mut().for_each(|(d, r)| r.add(&dst[d]));
+        self.destinations.iter_mut().for_each(|(d, r)| r.add(&dst[d])); // TODO error handling
     }
     fn aggregate(&self) -> Self::Aggregate {
         (self.passed.aggregate(), self.destinations.iter().map(|(d, r)| (d, r.aggregate())).collect())
