@@ -1,4 +1,4 @@
-name: test config for repeat
+name: test config for repeat (must enable --no-async-testcases option)
 destinations:
   test-api: http://localhost:3000
 setting:
