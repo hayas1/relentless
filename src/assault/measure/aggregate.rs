@@ -84,24 +84,24 @@ impl CountAggregate {
 }
 
 #[derive(Debug, Clone, Default)]
-pub struct PassedAggregate {
+pub struct PassAggregate {
     count: CountAggregate,
-    passed: CountAggregate,
+    pass: CountAggregate,
 }
-impl Aggregator for PassedAggregate {
+impl Aggregator for PassAggregate {
     type Add = bool;
     type Aggregate = (u64, u64, f64);
     fn add(&mut self, pass: &Self::Add) {
         self.count.add(&());
         if *pass {
-            self.passed.add(&());
+            self.pass.add(&());
         }
     }
     fn aggregate(&self) -> Self::Aggregate {
         (self.count(), self.passed(), self.ratio())
     }
 }
-impl PassedAggregate {
+impl PassAggregate {
     pub fn new() -> Self {
         Default::default()
     }
@@ -110,7 +110,7 @@ impl PassedAggregate {
         self.count.aggregate()
     }
     pub fn passed(&self) -> u64 {
-        self.passed.aggregate()
+        self.pass.aggregate()
     }
     pub fn ratio(&self) -> f64 {
         self.passed() as f64 / self.count() as f64
@@ -210,7 +210,7 @@ mod tests {
 
     #[test]
     fn passed_aggregate() {
-        let mut agg = PassedAggregate::new();
+        let mut agg = PassAggregate::new();
         for i in 0..1000 {
             agg.add(&(i % 2 == 0));
         }
