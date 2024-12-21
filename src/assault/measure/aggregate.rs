@@ -9,27 +9,6 @@ pub trait Aggregator {
     fn aggregate(&self) -> Self::Aggregate;
 }
 
-#[derive(Debug, Clone)]
-pub struct DurationAggregate {
-    first: SystemTime,
-    last: SystemTime,
-}
-impl Aggregator for DurationAggregate {
-    type Add = SystemTime;
-    type Aggregate = Result<Duration, SystemTimeError>;
-    fn add(&mut self, timestamp: Self::Add) {
-        self.first = self.first.min(timestamp);
-        self.last = self.last.max(timestamp);
-    }
-    fn aggregate(&self) -> Self::Aggregate {
-        self.last.duration_since(self.first)
-    }
-}
-impl DurationAggregate {
-    pub fn new(now: SystemTime) -> Self {
-        Self { first: now, last: now }
-    }
-}
 #[derive(Debug, Clone, Default)]
 pub struct CountAggregate {
     count: u64,
@@ -81,6 +60,28 @@ impl PassedAggregate {
     }
     pub fn ratio(&self) -> f64 {
         self.passed() as f64 / self.count() as f64
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct DurationAggregate {
+    first: SystemTime,
+    last: SystemTime,
+}
+impl Aggregator for DurationAggregate {
+    type Add = SystemTime;
+    type Aggregate = Result<Duration, SystemTimeError>;
+    fn add(&mut self, timestamp: Self::Add) {
+        self.first = self.first.min(timestamp);
+        self.last = self.last.max(timestamp);
+    }
+    fn aggregate(&self) -> Self::Aggregate {
+        self.last.duration_since(self.first)
+    }
+}
+impl DurationAggregate {
+    pub fn new(now: SystemTime) -> Self {
+        Self { first: now, last: now }
     }
 }
 
