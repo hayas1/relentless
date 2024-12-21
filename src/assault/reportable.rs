@@ -16,7 +16,11 @@ use crate::{
     },
 };
 
-use super::{destinations::Destinations, measure::aggregate::EvaluateAggregate, messages::Messages};
+use super::{
+    destinations::Destinations,
+    measure::aggregate::{Aggregator, EvaluateAggregate},
+    messages::Messages,
+};
 
 /// TODO document
 #[derive(Debug, Clone)]
@@ -86,6 +90,9 @@ impl<T, Q: Clone + Coalesce, P: Clone + Coalesce> Reportable for CaseReport<T, Q
         let allowed = self.testcase.coalesce().attr.allow;
         self.pass() || !strict && allowed
     }
+    fn aggregate(&self) -> EvaluateAggregate {
+        self.aggregate.clone()
+    }
 }
 
 pub trait Reportable {
@@ -103,6 +110,16 @@ pub trait Reportable {
             unreachable!("a reportable without children should implement its own method");
         } else {
             self.sub_reportable().iter().all(|r| r.allow(strict))
+        }
+    }
+    fn aggregate(&self) -> EvaluateAggregate {
+        if self.sub_reportable().is_empty() {
+            unreachable!("a reportable without children should implement its own method");
+        } else {
+            self.sub_reportable().iter().map(|r| r.aggregate()).fold(Default::default(), |mut agg, b| {
+                agg.merge(&b);
+                agg
+            })
         }
     }
     fn skip_report(&self, cmd: &Relentless) -> bool {
