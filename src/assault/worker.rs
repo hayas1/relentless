@@ -22,7 +22,7 @@ use super::{
     error::{RequestError, RequestResult},
     evaluator::Evaluator,
     factory::RequestFactory,
-    measure::aggregate::{Aggregator, EvaluateAggregate, ResponseAggregate},
+    measure::aggregate::{Aggregator, EvaluateAggregate},
     messages::Messages,
     service::measure::MeasureLayer,
 };
@@ -143,16 +143,14 @@ where
             .requests(cmd, destinations, case)
             .await?
             .fold((0, Messages::new(), evaluate_aggregate), |(p, mut msg, mut agg), res| async move {
-                let metrics = res.iter().map(|(d, r)| Some((d, r.as_ref().ok()?.metrics().clone()))).collect();
+                let metrics = res.iter().map(|(d, r)| (d, r.as_ref().ok().map(|r| r.metrics().clone()))).collect();
                 let pass = case.setting.response.evaluate(res, &mut msg).await;
-                if let Some(m) = metrics {
-                    agg.add(&(pass, m)); // TODO error handling: if RequestResult = Timeout
-                }
+                agg.add(&(pass, metrics)); // TODO timeout request will be not measured
                 (p + pass as usize, msg, agg)
             })
             .await;
 
-        Ok(CaseReport::new(testcase, passed, messages))
+        Ok(CaseReport::new(testcase, passed, messages, aggregate))
     }
 
     pub async fn requests<'a>(

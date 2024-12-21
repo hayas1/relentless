@@ -16,10 +16,10 @@ use crate::{
     },
 };
 
-use super::{destinations::Destinations, messages::Messages};
+use super::{destinations::Destinations, measure::aggregate::EvaluateAggregate, messages::Messages};
 
 /// TODO document
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct Report<T, Q, P> {
     pub report: Vec<WorkerReport<T, Q, P>>,
 }
@@ -38,7 +38,7 @@ impl<T, Q: Clone + Coalesce, P: Clone + Coalesce> Reportable for Report<T, Q, P>
 }
 
 /// TODO document
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct WorkerReport<T, Q, P> {
     pub config: Coalesced<WorkerConfig<Q, P>, Destinations<http_serde_priv::Uri>>,
     pub report: Vec<CaseReport<T, Q, P>>,
@@ -58,15 +58,21 @@ impl<T, Q: Clone + Coalesce, P: Clone + Coalesce> Reportable for WorkerReport<T,
 }
 
 /// TODO document
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct CaseReport<T, Q, P> {
     pub testcase: Coalesced<Testcase<Q, P>, Setting<Q, P>>,
     pub passed: usize,
     pub messages: Messages<T>,
+    aggregate: EvaluateAggregate,
 }
 impl<T, Q, P> CaseReport<T, Q, P> {
-    pub fn new(testcase: Coalesced<Testcase<Q, P>, Setting<Q, P>>, passed: usize, messages: Messages<T>) -> Self {
-        Self { testcase, passed, messages }
+    pub fn new(
+        testcase: Coalesced<Testcase<Q, P>, Setting<Q, P>>,
+        passed: usize,
+        messages: Messages<T>,
+        aggregate: EvaluateAggregate,
+    ) -> Self {
+        Self { testcase, passed, messages, aggregate }
     }
 }
 impl<T, Q: Clone + Coalesce, P: Clone + Coalesce> Reportable for CaseReport<T, Q, P> {

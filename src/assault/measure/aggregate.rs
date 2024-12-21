@@ -14,22 +14,27 @@ pub trait Aggregator {
     fn aggregate(&self) -> Self::Aggregate;
 }
 
+#[derive(Debug, Clone)]
 pub struct EvaluateAggregate {
     passed: PassAggregate,
     destinations: Destinations<ResponseAggregate>,
 }
 impl Aggregator for EvaluateAggregate {
-    type Add = (bool, Destinations<<ResponseAggregate as Aggregator>::Add>);
+    type Add = (bool, Destinations<Option<<ResponseAggregate as Aggregator>::Add>>);
     type Aggregate =
         (<PassAggregate as Aggregator>::Aggregate, Destinations<<ResponseAggregate as Aggregator>::Aggregate>);
 
     fn add(&mut self, (pass, dst): &Self::Add) {
         self.passed.add(pass);
-        self.destinations.iter_mut().for_each(|(d, r)| r.add(&dst[d])); // TODO error handling
+        self.destinations.iter_mut().for_each(|(d, r)| {
+            // TODO handle index access error ?
+            if let Some(a) = dst[d].as_ref() {
+                r.add(a);
+            }
+        });
     }
     fn merge(&mut self, other: &Self) {
         self.passed.merge(&other.passed);
-        // TODO error handling
         self.destinations.iter_mut().for_each(|(d, r)| r.merge(&other.destinations[d]));
     }
     fn aggregate(&self) -> Self::Aggregate {
