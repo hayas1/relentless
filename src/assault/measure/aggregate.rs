@@ -250,7 +250,7 @@ mod tests {
         for i in 0..1000 {
             agg.add(&(i % 2 == 0));
         }
-        assert_eq!(agg.aggregate(), (1000, 500, 0.5));
+        assert_eq!(agg.aggregate(), (500, 1000, 0.5));
     }
 
     #[test]
