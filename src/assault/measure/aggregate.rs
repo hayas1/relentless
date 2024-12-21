@@ -10,7 +10,7 @@ use super::metrics::MeasuredResponse;
 pub trait Aggregator {
     type Add;
     type Aggregate;
-    fn add(&mut self, add: Self::Add);
+    fn add(&mut self, add: &Self::Add);
     fn aggregate(&self) -> Self::Aggregate;
 }
 
@@ -31,11 +31,11 @@ impl<Res> Aggregator for ResponseAggregate<Res> {
         <BytesAggregate as Aggregator>::Aggregate,
         <LatencyAggregate as Aggregator>::Aggregate,
     );
-    fn add(&mut self, res: Self::Add) {
-        self.count.add(());
-        self.duration.add(res.timestamp());
-        self.bytes.add(());
-        self.latency.add(res.latency());
+    fn add(&mut self, res: &Self::Add) {
+        self.count.add(&());
+        self.duration.add(&res.timestamp());
+        self.bytes.add(&());
+        self.latency.add(&res.latency());
     }
     fn aggregate(&self) -> Self::Aggregate {
         (
@@ -70,7 +70,7 @@ pub struct CountAggregate {
 impl Aggregator for CountAggregate {
     type Add = ();
     type Aggregate = u64;
-    fn add(&mut self, (): Self::Add) {
+    fn add(&mut self, (): &Self::Add) {
         self.count += 1;
     }
     fn aggregate(&self) -> Self::Aggregate {
@@ -91,10 +91,10 @@ pub struct PassedAggregate {
 impl Aggregator for PassedAggregate {
     type Add = bool;
     type Aggregate = (u64, u64, f64);
-    fn add(&mut self, pass: Self::Add) {
-        self.count.add(());
-        if pass {
-            self.passed.add(());
+    fn add(&mut self, pass: &Self::Add) {
+        self.count.add(&());
+        if *pass {
+            self.passed.add(&());
         }
     }
     fn aggregate(&self) -> Self::Aggregate {
@@ -125,9 +125,9 @@ pub struct DurationAggregate {
 impl Aggregator for DurationAggregate {
     type Add = SystemTime;
     type Aggregate = Result<Duration, SystemTimeError>;
-    fn add(&mut self, timestamp: Self::Add) {
-        self.first = self.first.min(timestamp);
-        self.last = self.last.max(timestamp);
+    fn add(&mut self, timestamp: &Self::Add) {
+        self.first = self.first.min(*timestamp);
+        self.last = self.last.max(*timestamp);
     }
     fn aggregate(&self) -> Self::Aggregate {
         self.last.duration_since(self.first)
@@ -146,7 +146,7 @@ pub struct BytesAggregate {
 impl Aggregator for BytesAggregate {
     type Add = ();
     type Aggregate = ();
-    fn add(&mut self, _: Self::Add) {}
+    fn add(&mut self, _: &Self::Add) {}
     fn aggregate(&self) -> Self::Aggregate {}
 }
 
@@ -160,7 +160,7 @@ pub struct LatencyAggregate {
 impl Aggregator for LatencyAggregate {
     type Add = Duration;
     type Aggregate = (Duration, Duration, Vec<Duration>, Duration);
-    fn add(&mut self, latency: Self::Add) {
+    fn add(&mut self, latency: &Self::Add) {
         let nanos = latency.as_secs_f64();
         self.min.add(nanos);
         self.mean.add(nanos);
@@ -203,7 +203,7 @@ mod tests {
     fn count_aggregate() {
         let mut agg = CountAggregate::new();
         for _ in 0..1000 {
-            agg.add(());
+            agg.add(&());
         }
         assert_eq!(agg.aggregate(), 1000);
     }
@@ -212,7 +212,7 @@ mod tests {
     fn passed_aggregate() {
         let mut agg = PassedAggregate::new();
         for i in 0..1000 {
-            agg.add(i % 2 == 0);
+            agg.add(&(i % 2 == 0));
         }
         assert_eq!(agg.aggregate(), (1000, 500, 0.5));
     }
@@ -221,7 +221,7 @@ mod tests {
     fn duration_aggregate() {
         let mut agg = DurationAggregate::new(SystemTime::UNIX_EPOCH);
         for i in 0..1000 {
-            agg.add(SystemTime::UNIX_EPOCH + Duration::from_millis(i));
+            agg.add(&(SystemTime::UNIX_EPOCH + Duration::from_millis(i)));
         }
         assert_eq!(agg.aggregate().unwrap(), Duration::from_millis(999));
     }
@@ -230,7 +230,7 @@ mod tests {
     fn latency_aggregate() {
         let mut agg = LatencyAggregate::new([0.5, 0.9, 0.99]);
         for i in 1..1000 {
-            agg.add(Duration::from_millis(i));
+            agg.add(&Duration::from_millis(i));
         }
         assert_eq!(
             agg.aggregate(),
