@@ -1,6 +1,6 @@
 use std::time::{Duration, SystemTime, SystemTimeError};
 
-use average::{Estimate, Max, Mean, Min, Quantile};
+use hdrhistogram::Histogram;
 
 use crate::assault::destinations::Destinations;
 
@@ -178,10 +178,8 @@ impl Aggregator for BytesAggregate {
 
 #[derive(Debug, Clone)]
 pub struct LatencyAggregate {
-    min: Min,
-    mean: Mean,
-    quantile: Vec<Quantile>,
-    max: Max,
+    quantile: Vec<f64>,
+    hist: Histogram<u64>,
 }
 pub type MinLatency = Duration;
 pub type MeanLatency = Duration;
@@ -191,11 +189,7 @@ impl Aggregator for LatencyAggregate {
     type Add = Duration;
     type Aggregate = (MinLatency, MeanLatency, QuantileLatencies, MaxLatency);
     fn add(&mut self, latency: &Self::Add) {
-        let nanos = latency.as_secs_f64();
-        self.min.add(nanos);
-        self.mean.add(nanos);
-        self.quantile.iter_mut().for_each(|q| q.add(nanos));
-        self.max.add(nanos);
+        self.hist += latency.as_nanos() as u64; // TODO overflow ?
     }
     fn aggregate(&self) -> Self::Aggregate {
         (self.min(), self.mean(), self.quantile(), self.max())
@@ -203,25 +197,25 @@ impl Aggregator for LatencyAggregate {
 }
 impl LatencyAggregate {
     pub fn new<I: IntoIterator<Item = f64>>(quantile: I) -> Self {
-        Self {
-            min: Min::new(),
-            mean: Mean::new(),
-            quantile: quantile.into_iter().map(Quantile::new).collect(),
-            max: Max::new(),
-        }
+        let quantile = quantile.into_iter().collect();
+        let hist = Histogram::new(3).unwrap_or_else(|_| todo!());
+        Self { quantile, hist }
     }
 
     pub fn min(&self) -> MinLatency {
-        Duration::from_secs_f64(self.min.min())
+        Duration::from_nanos(self.hist.min())
     }
     pub fn mean(&self) -> MeanLatency {
-        Duration::from_secs_f64(self.mean.mean())
+        Duration::from_nanos(self.hist.mean() as u64)
     }
     pub fn quantile(&self) -> QuantileLatencies {
-        self.quantile.iter().map(|q| Duration::from_secs_f64(q.quantile())).collect()
+        self.quantile.iter().map(|q| self.value_at_quantile(*q)).collect()
+    }
+    pub fn value_at_quantile(&self, quantile: f64) -> Duration {
+        Duration::from_nanos(self.hist.value_at_quantile(quantile))
     }
     pub fn max(&self) -> MaxLatency {
-        Duration::from_secs_f64(self.max.max())
+        Duration::from_nanos(self.hist.max())
     }
 }
 
@@ -262,14 +256,19 @@ mod tests {
         for i in 1..1000 {
             agg.add(&Duration::from_millis(i));
         }
-        assert_eq!(
-            agg.aggregate(),
-            (
-                Duration::from_millis(1),
-                Duration::from_millis(500),
-                vec![Duration::from_millis(500), Duration::from_millis(899), Duration::from_millis(989)],
-                Duration::from_millis(999)
-            )
-        );
+
+        let (min, mean, quantile, max) = agg.aggregate();
+        let tolerance = Duration::from_millis(1);
+
+        assert!(min.abs_diff(Duration::from_millis(1)) < tolerance);
+        assert!(mean.abs_diff(Duration::from_millis(500)) < tolerance);
+        for (q, p) in quantile.iter().zip(vec![
+            Duration::from_millis(500),
+            Duration::from_millis(900),
+            Duration::from_millis(990),
+        ]) {
+            assert!(q.abs_diff(p) < tolerance);
+        }
+        assert!(max.abs_diff(Duration::from_millis(1000)) < tolerance);
     }
 }
