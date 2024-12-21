@@ -26,16 +26,19 @@ impl Aggregator for EvaluateAggregate {
 
     fn add(&mut self, (pass, dst): &Self::Add) {
         self.passed.add(pass);
-        self.destinations.iter_mut().for_each(|(d, r)| {
-            // TODO handle index access error ?
-            if let Some(a) = dst[d].as_ref() {
-                r.add(a);
+        dst.iter().for_each(|(d, metrics)| {
+            if let Some(m) = metrics {
+                self.destinations.entry(d.to_string()).or_default().add(m);
+            } else {
+                // TODO can we skip the None metrics?
             }
         });
     }
     fn merge(&mut self, other: &Self) {
         self.passed.merge(&other.passed);
-        self.destinations.iter_mut().for_each(|(d, r)| r.merge(&other.destinations[d]));
+        other.destinations.iter().for_each(|(d, r)| {
+            self.destinations.entry(d.to_string()).or_default().merge(r);
+        })
     }
     fn aggregate(&self) -> Self::Aggregate {
         (
