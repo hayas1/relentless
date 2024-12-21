@@ -50,12 +50,13 @@ pub struct ResponseAggregate<Res> {
     latency: LatencyAggregate,
     phantom: PhantomData<Res>,
 }
+pub type Rps = f64;
 impl<Res> Aggregator for ResponseAggregate<Res> {
     type Add = MeasuredResponse<Res>;
     type Aggregate = (
         <CountAggregate as Aggregator>::Aggregate,
         <DurationAggregate as Aggregator>::Aggregate,
-        Result<f64, SystemTimeError>,
+        Result<Rps, SystemTimeError>,
         <BytesAggregate as Aggregator>::Aggregate,
         <LatencyAggregate as Aggregator>::Aggregate,
     );
@@ -86,18 +87,19 @@ impl<Res> ResponseAggregate<Res> {
         }
     }
 
-    pub fn rps(&self) -> Result<f64, SystemTimeError> {
+    pub fn rps(&self) -> Result<Rps, SystemTimeError> {
         Ok(self.count.aggregate() as f64 / self.duration.aggregate()?.as_secs_f64())
     }
 }
 
 #[derive(Debug, Clone, Default)]
 pub struct CountAggregate {
-    count: u64,
+    count: Count,
 }
+pub type Count = u64;
 impl Aggregator for CountAggregate {
     type Add = ();
-    type Aggregate = u64;
+    type Aggregate = Count;
     fn add(&mut self, (): &Self::Add) {
         self.count += 1;
     }
@@ -116,9 +118,11 @@ pub struct PassAggregate {
     pass: CountAggregate,
     count: CountAggregate,
 }
+pub type Pass = u64;
+pub type PassRate = f64;
 impl Aggregator for PassAggregate {
     type Add = bool;
-    type Aggregate = (u64, u64, f64);
+    type Aggregate = (Pass, Count, PassRate);
     fn add(&mut self, pass: &Self::Add) {
         if *pass {
             self.pass.add(&());
@@ -134,13 +138,13 @@ impl PassAggregate {
         Default::default()
     }
 
-    pub fn count(&self) -> u64 {
+    pub fn count(&self) -> Count {
         self.count.aggregate()
     }
-    pub fn passed(&self) -> u64 {
+    pub fn passed(&self) -> Pass {
         self.pass.aggregate()
     }
-    pub fn ratio(&self) -> f64 {
+    pub fn ratio(&self) -> PassRate {
         self.passed() as f64 / self.count() as f64
     }
 }
@@ -185,9 +189,13 @@ pub struct LatencyAggregate {
     quantile: Vec<Quantile>,
     max: Max,
 }
+pub type MinLatency = Duration;
+pub type MeanLatency = Duration;
+pub type QuantileLatencies = Vec<Duration>;
+pub type MaxLatency = Duration;
 impl Aggregator for LatencyAggregate {
     type Add = Duration;
-    type Aggregate = (Duration, Duration, Vec<Duration>, Duration);
+    type Aggregate = (MinLatency, MeanLatency, QuantileLatencies, MaxLatency);
     fn add(&mut self, latency: &Self::Add) {
         let nanos = latency.as_secs_f64();
         self.min.add(nanos);
@@ -209,16 +217,16 @@ impl LatencyAggregate {
         }
     }
 
-    pub fn min(&self) -> Duration {
+    pub fn min(&self) -> MinLatency {
         Duration::from_secs_f64(self.min.min())
     }
-    pub fn mean(&self) -> Duration {
+    pub fn mean(&self) -> MeanLatency {
         Duration::from_secs_f64(self.mean.mean())
     }
-    pub fn quantile(&self) -> Vec<Duration> {
+    pub fn quantile(&self) -> QuantileLatencies {
         self.quantile.iter().map(|q| Duration::from_secs_f64(q.quantile())).collect()
     }
-    pub fn max(&self) -> Duration {
+    pub fn max(&self) -> MaxLatency {
         Duration::from_secs_f64(self.max.max())
     }
 }
