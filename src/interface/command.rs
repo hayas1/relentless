@@ -224,7 +224,7 @@ where
 {
     use crate::error::WithContext;
 
-    let (name, destination) = s.split_once('=').context(RunCommandError::KeyValueFormat(s.to_string()))?; // TODO!!!
+    let (name, destination) = s.split_once('=').context(RunCommandError::KeyValueFormat(s.to_string()))?;
     Ok((name.parse().map_err(Wrap::wrapping)?, destination.parse().map_err(Wrap::wrapping)?))
 }
 
