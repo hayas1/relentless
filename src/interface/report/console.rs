@@ -16,6 +16,32 @@ use crate::{
 pub trait ConsoleReport: Reportable {
     type Error;
     fn console_report<W: std::io::Write>(&self, cmd: &Relentless, w: &mut ReportWriter<W>) -> Result<(), Self::Error>;
+    fn console_aggregate<W: std::io::Write, F: Fn(std::fmt::Error) -> Self::Error + Clone>(
+        &self,
+        cmd: &Relentless,
+        w: &mut ReportWriter<W>,
+        e: F, // TODO where Self::Error: From<std::io::Error> ?
+    ) -> Result<(), Self::Error> {
+        let ((passed, count, pass_rate), requests) = self.aggregate().aggregate();
+        let (req, duration, rps, _bytes, latency) = requests;
+        let (min, mean, quantile, max) = latency;
+        write!(w, "passed: {}/{} ({:.2}%)\t", passed, count, pass_rate * 100.).map_err(e.clone())?;
+        writeln!(
+            w,
+            "rps: {}/{:?} ({:.2}req/s)",
+            req,
+            duration.unwrap_or_else(|_| todo!()),
+            rps.unwrap_or_else(|_| todo!())
+        )
+        .map_err(e.clone())?;
+        writeln!(
+            w,
+            "min={:.3?} mean={:.3?} p50={:.3?} p90={:.3?} p99={:.3?} max={:.3?}",
+            min, mean, quantile[0], quantile[1], quantile[2], max
+        )
+        .map_err(e.clone())?;
+        Ok(())
+    }
 }
 
 impl<T: Display, Q: Clone + Coalesce, P: Clone + Coalesce> ConsoleReport for Report<T, Q, P> {
@@ -28,24 +54,7 @@ impl<T: Display, Q: Clone + Coalesce, P: Clone + Coalesce> ConsoleReport for Rep
             }
         }
 
-        let ((passed, count, pass_rate), requests) = self.aggregate().aggregate();
-        let (req, duration, rps, _bytes, latency) = requests;
-        let (min, mean, quantile, max) = latency;
-        write!(w, "passed: {}/{} ({:.2}%)\t", passed, count, pass_rate * 100.).map_err(Wrap::wrapping)?;
-        writeln!(
-            w,
-            "rps: {}/{:?} ({:.2}req/s)",
-            req,
-            duration.unwrap_or_else(|_| todo!()),
-            rps.unwrap_or_else(|_| todo!())
-        )
-        .map_err(Wrap::wrapping)?;
-        writeln!(
-            w,
-            "min={:.3?} mean={:.3?} p50={:.3?} p90={:.3?} p99={:.3?} max={:.3?}",
-            min, mean, quantile[0], quantile[1], quantile[2], max
-        )
-        .map_err(Wrap::wrapping)?;
+        self.console_aggregate(cmd, w, Wrap::error)?;
         Ok(())
     }
 }
@@ -100,6 +109,8 @@ impl<T: Display, Q: Clone + Coalesce, P: Clone + Coalesce> ConsoleReport for Wor
             }
             Ok::<_, Wrap>(())
         })?;
+
+        w.scope(|w| self.console_aggregate(cmd, w, Wrap::wrapping))?;
         Ok(())
     }
 }
@@ -144,6 +155,8 @@ impl<T: Display, Q: Clone + Coalesce, P: Clone + Coalesce> ConsoleReport for Cas
                 })
             })?;
         }
+
+        w.scope(|w| self.console_aggregate(cmd, w, Wrap::wrapping))?;
         Ok(())
     }
 }
