@@ -2,7 +2,7 @@ use std::fmt::{Display, Write as _};
 
 use crate::{
     assault::{
-        measure::aggregate::Aggregator,
+        measure::aggregate::Aggregate,
         reportable::{CaseReport, Report, ReportWriter, Reportable, WorkerReport},
     },
     error::Wrap,

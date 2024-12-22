@@ -18,7 +18,7 @@ use crate::{
 
 use super::{
     destinations::Destinations,
-    measure::aggregate::{Aggregator, EvaluateAggregate},
+    measure::aggregate::{Aggregate, EvaluateAggregator},
     messages::Messages,
 };
 
@@ -67,14 +67,14 @@ pub struct CaseReport<T, Q, P> {
     testcase: Coalesced<Testcase<Q, P>, Setting<Q, P>>,
     pub(crate) passed: usize,
     messages: Messages<T>,
-    aggregate: EvaluateAggregate,
+    aggregate: EvaluateAggregator,
 }
 impl<T, Q, P> CaseReport<T, Q, P> {
     pub fn new(
         testcase: Coalesced<Testcase<Q, P>, Setting<Q, P>>,
         passed: usize,
         messages: Messages<T>,
-        aggregate: EvaluateAggregate,
+        aggregate: EvaluateAggregator,
     ) -> Self {
         Self { testcase, passed, messages, aggregate }
     }
@@ -97,7 +97,7 @@ impl<T, Q: Clone + Coalesce, P: Clone + Coalesce> Reportable for CaseReport<T, Q
         let allowed = self.testcase.coalesce().attr.allow;
         self.pass() || !strict && allowed
     }
-    fn aggregate(&self) -> EvaluateAggregate {
+    fn aggregate(&self) -> EvaluateAggregator {
         self.aggregate.clone()
     }
 }
@@ -119,7 +119,7 @@ pub trait Reportable {
             self.sub_reportable().iter().all(|r| r.allow(strict))
         }
     }
-    fn aggregate(&self) -> EvaluateAggregate {
+    fn aggregate(&self) -> EvaluateAggregator {
         if self.sub_reportable().is_empty() {
             unreachable!("a reportable without children should implement its own method");
         } else {

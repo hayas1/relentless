@@ -22,7 +22,7 @@ use super::{
     error::{RequestError, RequestResult},
     evaluator::Evaluator,
     factory::RequestFactory,
-    measure::aggregate::{Aggregator, EvaluateAggregate},
+    measure::aggregate::{Aggregate, EvaluateAggregator},
     messages::Messages,
     service::measure::MeasureLayer,
 };
@@ -138,7 +138,7 @@ where
         testcase: Coalesced<Testcase<Q, P>, Setting<Q, P>>,
     ) -> WrappedResult<CaseReport<P::Message, Q, P>> {
         let case = &testcase.coalesce();
-        let evaluate_aggregate = EvaluateAggregate::new(destinations, None, vec![0.50, 0.90, 0.99]);
+        let evaluate_aggregate = EvaluateAggregator::new(destinations, None, vec![0.50, 0.90, 0.99]);
 
         let (passed, messages, aggregate) = self
             .requests(cmd, destinations, case)
