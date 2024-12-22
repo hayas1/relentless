@@ -1,8 +1,14 @@
-use std::fmt::{Display, Write as _};
+use std::{
+    fmt::{Display, Write as _},
+    time::Duration,
+};
 
 use crate::{
     assault::{
-        measure::aggregate::{Aggregate, EvaluateAggregate, LatencyAggregate, PassAggregate, ResponseAggregate},
+        measure::{
+            aggregate::{Aggregate, EvaluateAggregate, LatencyAggregate, PassAggregate, ResponseAggregate},
+            threshold::Classified,
+        },
         reportable::{CaseReport, Report, ReportWriter, Reportable, WorkerReport},
     },
     error::Wrap,
@@ -13,6 +19,19 @@ use crate::{
     },
 };
 
+// TODO trait ?
+pub fn style_classified(class: &Classified) -> console::Style {
+    match class {
+        Classified::Good => console::Style::new().green(),
+        Classified::Allow => console::Style::new().cyan(),
+        Classified::Warn => console::Style::new().yellow(),
+        Classified::Bad => console::Style::new().red(),
+    }
+}
+pub fn apply_style_classified(duration: &Duration) -> console::StyledObject<std::time::Duration> {
+    style_classified(&Classified::latency(*duration)).apply_to(*duration)
+}
+
 pub trait ConsoleReport: Reportable {
     type Error;
     fn console_report<W: std::io::Write>(&self, cmd: &Relentless, w: &mut ReportWriter<W>) -> Result<(), Self::Error>;
@@ -22,26 +41,46 @@ pub trait ConsoleReport: Reportable {
         w: &mut ReportWriter<W>,
         e: F, // TODO where Self::Error: From<std::io::Error> ?
     ) -> Result<(), Self::Error> {
-        let EvaluateAggregate { pass, response } = self.aggregate().aggregate();
-        let PassAggregate { pass, count, pass_rate } = pass;
-        let ResponseAggregate { req, duration, rps, latency, .. } = response;
-        let LatencyAggregate { min, mean, quantile, max } = latency;
+        let EvaluateAggregate { pass: pass_agg, response } = self.aggregate().aggregate();
+        let PassAggregate { pass, count, pass_rate } = &pass_agg;
+        let ResponseAggregate { req, duration, rps, latency, .. } = &response;
+        let LatencyAggregate { min, mean, quantile, max } = &latency;
 
-        write!(w, "passed: {}/{} ({:.2}%)\t", pass, count, pass_rate * 100.).map_err(e.clone())?;
-        writeln!(
-            w,
-            "rps: {}/{:?} ({:.2}req/s)",
+        let mut buf1 = String::new();
+        write!(
+            buf1,
+            "pass-rt: {}/{}={:.2}{}",
+            pass,
+            count,
+            style_classified(&Classified::pass_agg(&pass_agg)).apply_to(pass_rate * 100.),
+            style_classified(&Classified::pass_agg(&pass_agg)).apply_to("%"),
+        )
+        .map_err(e.clone())?;
+        write!(buf1, "    ").map_err(e.clone())?;
+        write!(
+            buf1,
+            "rps: {}/{:.2?}={:.2}{}",
             req,
-            duration.unwrap_or_else(|| todo!()),
-            rps.unwrap_or_else(|| todo!())
+            duration.unwrap_or_default(),
+            style_classified(&Classified::response_agg(&response)).apply_to(rps.unwrap_or_default()),
+            style_classified(&Classified::response_agg(&response)).apply_to("req/s"),
         )
         .map_err(e.clone())?;
-        writeln!(
-            w,
-            "min={:.3?} mean={:.3?} p50={:.3?} p90={:.3?} p99={:.3?} max={:.3?}",
-            min, mean, quantile[0], quantile[1], quantile[2], max
+        let mut buf2 = String::new();
+        write!(
+            buf2,
+            "latency: min={:.3?} mean={:.3?} p50={:.3?} p90={:.3?} p99={:.3?} max={:.3?}",
+            apply_style_classified(min),
+            apply_style_classified(mean),
+            apply_style_classified(&quantile[0]),
+            apply_style_classified(&quantile[1]),
+            apply_style_classified(&quantile[2]),
+            apply_style_classified(max),
         )
         .map_err(e.clone())?;
+
+        writeln!(w, "{}", buf1).map_err(e.clone())?;
+        writeln!(w, "{}", buf2).map_err(e.clone())?;
         Ok(())
     }
 }
