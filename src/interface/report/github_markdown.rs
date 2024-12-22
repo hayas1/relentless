@@ -17,6 +17,14 @@ pub trait GithubMarkdownReport: Reportable {
         cmd: &Relentless,
         w: &mut ReportWriter<W>,
     ) -> Result<(), Self::Error>;
+    fn console_aggregate<W: std::io::Write, F: Fn(std::fmt::Error) -> Self::Error + Clone>(
+        &self,
+        cmd: &Relentless,
+        w: &mut ReportWriter<W>,
+        e: F, // TODO where Self::Error: From<std::io::Error> ?
+    ) -> Result<(), Self::Error> {
+        todo!()
+    }
 }
 
 impl<T: Display, Q: Clone + Coalesce, P: Clone + Coalesce> GithubMarkdownReport for Report<T, Q, P> {
