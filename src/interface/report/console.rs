@@ -82,6 +82,12 @@ pub trait ConsoleReport: Reportable {
     }
 }
 
+pub enum RelentlessConsoleReport {}
+impl RelentlessConsoleReport {
+    pub const NAME_DEFAULT: &'_ str = "configs";
+
+    pub const SUMMARY_EMOJI: console::Emoji<'_, '_> = console::Emoji("💥", "");
+}
 impl<T: Display, Q: Clone + Coalesce, P: Clone + Coalesce> ConsoleReport for Report<T, Q, P> {
     type Error = crate::Error;
     fn console_report<W: std::io::Write>(&self, cmd: &Relentless, w: &mut ReportWriter<W>) -> Result<(), Self::Error> {
@@ -92,7 +98,14 @@ impl<T: Display, Q: Clone + Coalesce, P: Clone + Coalesce> ConsoleReport for Rep
             }
         }
 
-        self.console_aggregate(cmd, w, Wrap::error)?;
+        writeln!(
+            w,
+            "{} {}",
+            RelentlessConsoleReport::SUMMARY_EMOJI,
+            console::style("summery of all requests in configs").bold(),
+        )
+        .map_err(Wrap::wrapping)?;
+        w.scope(|w| self.console_aggregate(cmd, w, Wrap::error))?;
         Ok(())
     }
 }
@@ -103,6 +116,8 @@ impl WorkerConsoleReport {
     pub const NAME_EMOJI: console::Emoji<'_, '_> = console::Emoji("🚀", "");
     pub const DESTINATION_EMOJI: console::Emoji<'_, '_> = console::Emoji("🌐", ":");
     pub const OVERWRITE_DESTINATION_EMOJI: console::Emoji<'_, '_> = console::Emoji("👉", "->");
+
+    pub const SUMMARY_EMOJI: console::Emoji<'_, '_> = console::Emoji("💥", "");
 }
 
 impl<T: Display, Q: Clone + Coalesce, P: Clone + Coalesce> ConsoleReport for WorkerReport<T, Q, P> {
@@ -148,7 +163,16 @@ impl<T: Display, Q: Clone + Coalesce, P: Clone + Coalesce> ConsoleReport for Wor
             Ok::<_, Wrap>(())
         })?;
 
-        w.scope(|w| self.console_aggregate(cmd, w, Wrap::wrapping))?;
+        w.scope(|w| {
+            writeln!(
+                w,
+                "{} {}",
+                WorkerConsoleReport::SUMMARY_EMOJI,
+                console::style("summery of all requests in testcases").bold(),
+            )
+            .map_err(Wrap::wrapping)?;
+            w.scope(|w| self.console_aggregate(cmd, w, Wrap::wrapping))
+        })?;
         Ok(())
     }
 }
@@ -161,6 +185,8 @@ impl CaseConsoleReport {
     pub const DESCRIPTION_EMOJI: console::Emoji<'_, '_> = console::Emoji("📝", "");
     pub const ALLOW_EMOJI: console::Emoji<'_, '_> = console::Emoji("👀", "");
     pub const MESSAGE_EMOJI: console::Emoji<'_, '_> = console::Emoji("💬", "");
+
+    pub const SUMMARY_EMOJI: console::Emoji<'_, '_> = console::Emoji("💥", "");
 }
 
 impl<T: Display, Q: Clone + Coalesce, P: Clone + Coalesce> ConsoleReport for CaseReport<T, Q, P> {
@@ -194,7 +220,16 @@ impl<T: Display, Q: Clone + Coalesce, P: Clone + Coalesce> ConsoleReport for Cas
             })?;
         }
 
-        w.scope(|w| self.console_aggregate(cmd, w, Wrap::wrapping))?;
+        w.scope(|w| {
+            writeln!(
+                w,
+                "{} {}",
+                CaseConsoleReport::SUMMARY_EMOJI,
+                console::style("summery of all requests in repeats").bold(),
+            )
+            .map_err(Wrap::wrapping)?;
+            w.scope(|w| self.console_aggregate(cmd, w, Wrap::wrapping))
+        })?;
         Ok(())
     }
 }
