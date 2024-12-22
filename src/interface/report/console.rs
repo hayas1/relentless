@@ -19,7 +19,7 @@ use crate::{
     },
 };
 
-// TODO trait ?
+// TODO trait ? use classified for another style ?
 pub fn style_classified(class: &Classified) -> console::Style {
     match class {
         Classified::Good => console::Style::new().green(),
@@ -46,9 +46,8 @@ pub trait ConsoleReport: Reportable {
         let ResponseAggregate { req, duration, rps, latency, .. } = &response;
         let LatencyAggregate { min, mean, quantile, max } = &latency;
 
-        let mut buf1 = String::new();
         write!(
-            buf1,
+            w,
             "pass-rt: {}/{}={:.2}{}",
             pass,
             count,
@@ -56,9 +55,9 @@ pub trait ConsoleReport: Reportable {
             style_classified(&Classified::pass_agg(&pass_agg)).apply_to("%"),
         )
         .map_err(e.clone())?;
-        write!(buf1, "    ").map_err(e.clone())?;
-        write!(
-            buf1,
+        write!(w, "    ").map_err(e.clone())?;
+        writeln!(
+            w,
             "rps: {}/{:.2?}={:.2}{}",
             req,
             duration.unwrap_or_default(),
@@ -66,9 +65,9 @@ pub trait ConsoleReport: Reportable {
             style_classified(&Classified::response_agg(&response)).apply_to("req/s"),
         )
         .map_err(e.clone())?;
-        let mut buf2 = String::new();
-        write!(
-            buf2,
+
+        writeln!(
+            w,
             "latency: min={:.3?} mean={:.3?} p50={:.3?} p90={:.3?} p99={:.3?} max={:.3?}",
             apply_style_classified(min),
             apply_style_classified(mean),
@@ -79,8 +78,6 @@ pub trait ConsoleReport: Reportable {
         )
         .map_err(e.clone())?;
 
-        writeln!(w, "{}", buf1).map_err(e.clone())?;
-        writeln!(w, "{}", buf2).map_err(e.clone())?;
         Ok(())
     }
 }
