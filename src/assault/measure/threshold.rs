@@ -14,7 +14,7 @@ impl Classified {
     pub fn pass_agg(pass: &PassAggregate) -> Self {
         if pass.count == pass.pass {
             Self::Good
-        } else if pass.pass_rate > 0.7 {
+        } else if pass.pass_rate > 0.8 {
             Self::Allow
         } else if pass.pass_rate > 0.5 {
             Self::Warn
