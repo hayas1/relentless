@@ -17,15 +17,20 @@ pub trait Aggregate: Default {
 
 #[derive(Debug, Clone, Default)]
 pub struct EvaluateAggregator {
-    passed: PassAggregator,
+    pass: PassAggregator,
     destinations: Destinations<ResponseAggregator>,
+}
+#[derive(Debug, Clone, PartialEq, PartialOrd, Default)]
+pub struct EvaluateAggregate {
+    pub pass: PassAggregate,
+    pub response: ResponseAggregate,
 }
 impl Aggregate for EvaluateAggregator {
     type Add = (bool, Destinations<Option<<ResponseAggregator as Aggregate>::Add>>);
-    type Aggregate = (<PassAggregator as Aggregate>::Aggregate, <ResponseAggregator as Aggregate>::Aggregate);
+    type Aggregate = EvaluateAggregate;
 
     fn add(&mut self, (pass, dst): &Self::Add) {
-        self.passed.add(pass);
+        self.pass.add(pass);
         dst.iter().for_each(|(d, metrics)| {
             if let Some(m) = metrics {
                 self.destinations.entry(d.to_string()).or_default().add(m);
@@ -35,29 +40,30 @@ impl Aggregate for EvaluateAggregator {
         });
     }
     fn merge(&mut self, other: &Self) {
-        self.passed.merge(&other.passed);
+        self.pass.merge(&other.pass);
         other.destinations.iter().for_each(|(d, r)| {
             self.destinations.entry(d.to_string()).or_default().merge(r);
         })
     }
     fn aggregate(&self) -> Self::Aggregate {
-        (
-            self.passed.aggregate(),
-            self.destinations
-                .values()
-                .fold(ResponseAggregator::default(), |mut agg, r| {
-                    agg.merge(r);
-                    agg
-                })
-                .aggregate(),
-        )
+        EvaluateAggregate { pass: self.pass.aggregate(), response: self.aggregate_responses() }
     }
 }
 impl EvaluateAggregator {
     pub fn new<T, I: IntoIterator<Item = f64>>(dst: &Destinations<T>, now: Option<SystemTime>, quantile: I) -> Self {
         let percentile: Vec<_> = quantile.into_iter().collect();
         let destinations = dst.keys().map(|d| (d, ResponseAggregator::new(now, percentile.iter().copied()))).collect();
-        Self { passed: PassAggregator::new(), destinations }
+        Self { pass: PassAggregator::new(), destinations }
+    }
+
+    pub fn aggregate_responses(&self) -> ResponseAggregate {
+        self.destinations
+            .values()
+            .fold(ResponseAggregator::default(), |mut agg, r| {
+                agg.merge(r);
+                agg
+            })
+            .aggregate()
     }
 }
 
@@ -68,16 +74,17 @@ pub struct ResponseAggregator {
     bytes: BytesAggregator,
     latency: LatencyAggregator,
 }
-pub type Rps = f64;
+#[derive(Debug, Clone, PartialEq, PartialOrd, Default)]
+pub struct ResponseAggregate {
+    pub req: u64,
+    pub duration: Option<Duration>,
+    pub rps: Option<f64>,
+    pub bytes: BytesAggregate,
+    pub latency: LatencyAggregate,
+}
 impl Aggregate for ResponseAggregator {
     type Add = Metrics;
-    type Aggregate = (
-        <CountAggregator as Aggregate>::Aggregate,
-        <DurationAggregator as Aggregate>::Aggregate,
-        Result<Rps, SystemTimeError>,
-        <BytesAggregator as Aggregate>::Aggregate,
-        <LatencyAggregator as Aggregate>::Aggregate,
-    );
+    type Aggregate = ResponseAggregate;
     fn add(&mut self, res: &Self::Add) {
         self.count.add(&());
         self.duration.add(&res.timestamp());
@@ -91,13 +98,13 @@ impl Aggregate for ResponseAggregator {
         self.latency.merge(&other.latency);
     }
     fn aggregate(&self) -> Self::Aggregate {
-        (
-            self.count.aggregate(),
-            self.duration.aggregate(),
-            self.rps(),
-            self.bytes.aggregate(),
-            self.latency.aggregate(),
-        )
+        ResponseAggregate {
+            req: self.count.aggregate(),
+            duration: self.duration.aggregate().ok(),
+            rps: self.rps().ok(),
+            bytes: self.bytes.aggregate(),
+            latency: self.latency.aggregate(),
+        }
     }
 }
 impl ResponseAggregator {
@@ -110,19 +117,18 @@ impl ResponseAggregator {
         }
     }
 
-    pub fn rps(&self) -> Result<Rps, SystemTimeError> {
+    pub fn rps(&self) -> Result<f64, SystemTimeError> {
         Ok(self.count.aggregate() as f64 / self.duration.aggregate()?.as_secs_f64())
     }
 }
 
 #[derive(Debug, Clone, Default)]
 pub struct CountAggregator {
-    count: Count,
+    count: u64,
 }
-pub type Count = u64;
 impl Aggregate for CountAggregator {
     type Add = ();
-    type Aggregate = Count;
+    type Aggregate = u64;
     fn add(&mut self, (): &Self::Add) {
         self.count += 1;
     }
@@ -144,11 +150,15 @@ pub struct PassAggregator {
     pass: CountAggregator,
     count: CountAggregator,
 }
-pub type Pass = u64;
-pub type PassRate = f64;
+#[derive(Debug, Clone, PartialEq, PartialOrd, Default)]
+pub struct PassAggregate {
+    pub pass: u64,
+    pub count: u64,
+    pub pass_rate: f64,
+}
 impl Aggregate for PassAggregator {
     type Add = bool;
-    type Aggregate = (Pass, Count, PassRate);
+    type Aggregate = PassAggregate;
     fn add(&mut self, pass: &Self::Add) {
         if *pass {
             self.pass.add(&());
@@ -160,7 +170,7 @@ impl Aggregate for PassAggregator {
         self.count.merge(&other.count);
     }
     fn aggregate(&self) -> Self::Aggregate {
-        (self.passed(), self.count(), self.ratio())
+        PassAggregate { pass: self.pass(), count: self.count(), pass_rate: self.ratio() }
     }
 }
 impl PassAggregator {
@@ -168,14 +178,14 @@ impl PassAggregator {
         Default::default()
     }
 
-    pub fn count(&self) -> Count {
+    pub fn count(&self) -> u64 {
         self.count.aggregate()
     }
-    pub fn passed(&self) -> Pass {
+    pub fn pass(&self) -> u64 {
         self.pass.aggregate()
     }
-    pub fn ratio(&self) -> PassRate {
-        self.passed() as f64 / self.count() as f64
+    pub fn ratio(&self) -> f64 {
+        self.pass() as f64 / self.count() as f64
     }
 }
 
@@ -202,10 +212,10 @@ impl Aggregate for DurationAggregator {
         }
     }
     fn aggregate(&self) -> Self::Aggregate {
-        match &self.start_end {
-            None => Ok(Duration::from_secs(0)),
-            Some((start, end)) => Ok(end.duration_since(*start)?),
-        }
+        Ok(match &self.start_end {
+            None => Duration::from_secs(0),
+            Some((start, end)) => end.duration_since(*start)?,
+        })
     }
 }
 impl DurationAggregator {
@@ -218,12 +228,16 @@ impl DurationAggregator {
 pub struct BytesAggregator {
     // TODO implement
 }
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash)]
+pub struct BytesAggregate {}
 impl Aggregate for BytesAggregator {
     type Add = ();
-    type Aggregate = ();
+    type Aggregate = BytesAggregate;
     fn add(&mut self, _: &Self::Add) {}
     fn merge(&mut self, _: &Self) {}
-    fn aggregate(&self) -> Self::Aggregate {}
+    fn aggregate(&self) -> Self::Aggregate {
+        Default::default()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -231,13 +245,16 @@ pub struct LatencyAggregator {
     quantile: Vec<f64>,
     hist: Histogram<u64>,
 }
-pub type MinLatency = Duration;
-pub type MeanLatency = Duration;
-pub type QuantileLatencies = Vec<Duration>;
-pub type MaxLatency = Duration;
+#[derive(Debug, Clone, PartialEq, PartialOrd, Default)]
+pub struct LatencyAggregate {
+    pub min: Duration,
+    pub mean: Duration,
+    pub quantile: Vec<Duration>,
+    pub max: Duration,
+}
 impl Aggregate for LatencyAggregator {
     type Add = Duration;
-    type Aggregate = (MinLatency, MeanLatency, QuantileLatencies, MaxLatency);
+    type Aggregate = LatencyAggregate;
     fn add(&mut self, latency: &Self::Add) {
         self.hist += latency.as_nanos() as u64; // TODO overflow ?
     }
@@ -246,7 +263,7 @@ impl Aggregate for LatencyAggregator {
         self.hist += &other.hist;
     }
     fn aggregate(&self) -> Self::Aggregate {
-        (self.min(), self.mean(), self.quantile(), self.max())
+        LatencyAggregate { min: self.min(), mean: self.mean(), quantile: self.quantile(), max: self.max() }
     }
 }
 impl Default for LatencyAggregator {
@@ -261,19 +278,19 @@ impl LatencyAggregator {
         Self { quantile, hist }
     }
 
-    pub fn min(&self) -> MinLatency {
+    pub fn min(&self) -> Duration {
         Duration::from_nanos(self.hist.min())
     }
-    pub fn mean(&self) -> MeanLatency {
+    pub fn mean(&self) -> Duration {
         Duration::from_nanos(self.hist.mean() as u64)
     }
-    pub fn quantile(&self) -> QuantileLatencies {
+    pub fn quantile(&self) -> Vec<Duration> {
         self.quantile.iter().map(|q| self.value_at_quantile(*q)).collect()
     }
     pub fn value_at_quantile(&self, quantile: f64) -> Duration {
         Duration::from_nanos(self.hist.value_at_quantile(quantile))
     }
-    pub fn max(&self) -> MaxLatency {
+    pub fn max(&self) -> Duration {
         Duration::from_nanos(self.hist.max())
     }
 }
@@ -297,7 +314,7 @@ mod tests {
         for i in 0..1000 {
             agg.add(&(i % 2 == 0));
         }
-        assert_eq!(agg.aggregate(), (500, 1000, 0.5));
+        assert_eq!(agg.aggregate(), PassAggregate { pass: 500, count: 1000, pass_rate: 0.5 });
     }
 
     #[test]
@@ -317,7 +334,7 @@ mod tests {
         }
 
         let tolerance = Duration::from_millis(1);
-        let (min, mean, quantile, max) = agg.aggregate();
+        let LatencyAggregate { min, mean, quantile, max } = agg.aggregate();
 
         assert!(min.abs_diff(Duration::from_millis(1)) < tolerance);
         assert!(mean.abs_diff(Duration::from_millis(500)) < tolerance);
@@ -343,8 +360,8 @@ mod tests {
         }
 
         let tolerance = Duration::from_millis(1);
-        let (min1, mean1, quantile1, max1) = agg1.aggregate();
-        let (min2, mean2, quantile2, max2) = agg2.aggregate();
+        let LatencyAggregate { min: min1, mean: mean1, quantile: quantile1, max: max1 } = agg1.aggregate();
+        let LatencyAggregate { min: min2, mean: mean2, quantile: quantile2, max: max2 } = agg2.aggregate();
 
         assert!(min1.abs_diff(Duration::from_millis(1)) < tolerance);
         assert!(mean1.abs_diff(Duration::from_millis(250)) < tolerance);
@@ -369,7 +386,7 @@ mod tests {
         assert!(max2.abs_diff(Duration::from_millis(1000)) < tolerance);
 
         agg1.merge(&agg2);
-        let (min, mean, quantile, max) = agg1.aggregate();
+        let LatencyAggregate { min, mean, quantile, max } = agg1.aggregate();
         assert!(min.abs_diff(Duration::from_millis(1)) < tolerance);
         assert!(mean.abs_diff(Duration::from_millis(500)) < tolerance);
         for (q, p) in quantile.iter().zip(vec![
@@ -380,5 +397,10 @@ mod tests {
             assert!(q.abs_diff(p) < tolerance);
         }
         assert!(max.abs_diff(Duration::from_millis(1000)) < tolerance);
+    }
+
+    #[test]
+    fn request_aggregate() {
+        todo!()
     }
 }

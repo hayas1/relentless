@@ -2,7 +2,7 @@ use std::fmt::{Display, Write as _};
 
 use crate::{
     assault::{
-        measure::aggregate::Aggregate,
+        measure::aggregate::{Aggregate, EvaluateAggregate, LatencyAggregate, PassAggregate, ResponseAggregate},
         reportable::{CaseReport, Report, ReportWriter, Reportable, WorkerReport},
     },
     error::Wrap,
@@ -22,16 +22,18 @@ pub trait ConsoleReport: Reportable {
         w: &mut ReportWriter<W>,
         e: F, // TODO where Self::Error: From<std::io::Error> ?
     ) -> Result<(), Self::Error> {
-        let ((passed, count, pass_rate), requests) = self.aggregate().aggregate();
-        let (req, duration, rps, _bytes, latency) = requests;
-        let (min, mean, quantile, max) = latency;
-        write!(w, "passed: {}/{} ({:.2}%)\t", passed, count, pass_rate * 100.).map_err(e.clone())?;
+        let EvaluateAggregate { pass, response } = self.aggregate().aggregate();
+        let PassAggregate { pass, count, pass_rate } = pass;
+        let ResponseAggregate { req, duration, rps, latency, .. } = response;
+        let LatencyAggregate { min, mean, quantile, max } = latency;
+
+        write!(w, "passed: {}/{} ({:.2}%)\t", pass, count, pass_rate * 100.).map_err(e.clone())?;
         writeln!(
             w,
             "rps: {}/{:?} ({:.2}req/s)",
             req,
-            duration.unwrap_or_else(|_| todo!()),
-            rps.unwrap_or_else(|_| todo!())
+            duration.unwrap_or_else(|| todo!()),
+            rps.unwrap_or_else(|| todo!())
         )
         .map_err(e.clone())?;
         writeln!(
