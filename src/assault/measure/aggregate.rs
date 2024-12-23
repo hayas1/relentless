@@ -274,7 +274,7 @@ impl Default for LatencyAggregator {
 impl LatencyAggregator {
     pub fn new<I: IntoIterator<Item = f64>>(quantile: I) -> Self {
         let quantile = quantile.into_iter().collect();
-        let hist = Histogram::new(3).unwrap_or_else(|_| todo!());
+        let hist = Histogram::new(3).unwrap_or_else(|e| unreachable!("{}", e));
         Self { quantile, hist }
     }
 
