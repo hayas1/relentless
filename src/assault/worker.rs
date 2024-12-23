@@ -20,7 +20,7 @@ use crate::{
 use super::{
     destinations::Destinations,
     error::{RequestError, RequestResult},
-    evaluator::Evaluator,
+    evaluate::Evaluate,
     factory::RequestFactory,
     measure::aggregate::{Aggregate, EvaluateAggregator},
     messages::Messages,
@@ -37,7 +37,7 @@ impl<Q, P, S, Req> Control<Q, P, S, Req>
 where
     Q: Configuration + Coalesce + RequestFactory<Req>,
     Q::Error: std::error::Error + Send + Sync + 'static,
-    P: Configuration + Coalesce + Evaluator<S::Response>,
+    P: Configuration + Coalesce + Evaluate<S::Response>,
     S: Service<Req> + Clone + Send + 'static,
     S::Error: std::error::Error + Send + Sync + 'static,
     S::Future: Send + 'static,
@@ -78,7 +78,7 @@ impl<Q, P, S, Req> Worker<Q, P, S, Req>
 where
     Q: Configuration + Coalesce + RequestFactory<Req>,
     Q::Error: std::error::Error + Send + Sync + 'static,
-    P: Configuration + Coalesce + Evaluator<S::Response>,
+    P: Configuration + Coalesce + Evaluate<S::Response>,
     S: Service<Req> + Clone + Send + 'static,
     S::Error: std::error::Error + Send + Sync + 'static,
     S::Future: Send + 'static,
@@ -121,7 +121,7 @@ impl<Q, P, S, Req> Case<Q, P, S, Req>
 where
     Q: Configuration + Coalesce + RequestFactory<Req>,
     Q::Error: std::error::Error + Send + Sync + 'static,
-    P: Configuration + Coalesce + Evaluator<S::Response>,
+    P: Configuration + Coalesce + Evaluate<S::Response>,
     S: Service<Req> + Clone + Send + 'static,
     S::Error: std::error::Error + Send + Sync + 'static,
     S::Future: Send + 'static,

@@ -5,7 +5,7 @@ use serde_json::Value;
 use crate::{
     assault::{
         destinations::{AllOr, Destinations},
-        evaluator::Acceptable,
+        evaluate::Acceptable,
         messages::Messages,
     },
     error::{EvaluateError, WrappedResult},
@@ -14,7 +14,7 @@ use crate::{
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
-pub struct JsonEvaluate {
+pub struct JsonEvaluator {
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub ignore: Vec<String>,
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
@@ -24,13 +24,13 @@ pub struct JsonEvaluate {
 }
 
 #[cfg(feature = "json")]
-impl Acceptable<&Bytes> for JsonEvaluate {
+impl Acceptable<&Bytes> for JsonEvaluator {
     type Message = EvaluateError;
     fn accept(&self, bytes: &Destinations<&Bytes>, msg: &mut Messages<EvaluateError>) -> bool {
         self.accept_json(bytes, msg)
     }
 }
-impl JsonEvaluate {
+impl JsonEvaluator {
     pub fn accept_json(&self, bytes: &Destinations<&Bytes>, msg: &mut Messages<EvaluateError>) -> bool {
         let Some(patched) = msg.push_if_err(self.patched(bytes).map_err(EvaluateError::FailToPatchJson)) else {
             return false;

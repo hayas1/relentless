@@ -12,7 +12,7 @@ use crate::interface::report::console::ConsoleReport;
 use crate::{
     assault::{
         destinations::Destinations,
-        evaluator::Evaluator,
+        evaluate::Evaluate,
         factory::RequestFactory,
         reportable::{Report, ReportWriter, Reportable},
         service::record::{RecordLayer, RecordService},
@@ -207,11 +207,11 @@ impl Relentless {
         &self,
         configs: Vec<Config<HttpRequest, HttpResponse>>,
         service: S,
-    ) -> crate::Result<Report<<HttpResponse as Evaluator<S::Response>>::Message, HttpRequest, HttpResponse>>
+    ) -> crate::Result<Report<<HttpResponse as Evaluate<S::Response>>::Message, HttpRequest, HttpResponse>>
     where
         HttpRequest: RequestFactory<Req>,
         <HttpRequest as RequestFactory<Req>>::Error: std::error::Error + Send + Sync + 'static,
-        HttpResponse: Evaluator<S::Response>,
+        HttpResponse: Evaluate<S::Response>,
         S: Service<Req> + Clone + Send + 'static,
         S::Error: std::error::Error + Send + Sync + 'static,
         S::Future: Send + 'static,
