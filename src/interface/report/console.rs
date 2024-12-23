@@ -66,17 +66,12 @@ pub trait ConsoleReport: Reportable {
         )
         .map_err(e.clone())?;
 
-        writeln!(
-            w,
-            "latency: min={:.3?} mean={:.3?} p50={:.3?} p90={:.3?} p99={:.3?} max={:.3?}",
-            apply_style_classified(min),
-            apply_style_classified(mean),
-            apply_style_classified(&quantile[0]),
-            apply_style_classified(&quantile[1]),
-            apply_style_classified(&quantile[2]),
-            apply_style_classified(max),
-        )
-        .map_err(e.clone())?;
+        write!(w, "latency: min={:.3?} mean={:.3?} ", apply_style_classified(min), apply_style_classified(mean),)
+            .map_err(e.clone())?;
+        for (percentile, quantile) in cmd.percentile_set().iter().zip(quantile) {
+            write!(w, "p{}={:.3?} ", percentile, apply_style_classified(quantile)).map_err(e.clone())?;
+        }
+        writeln!(w, "max={:.3?}", apply_style_classified(max),).map_err(e.clone())?;
 
         Ok(())
     }

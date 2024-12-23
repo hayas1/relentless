@@ -1,4 +1,4 @@
-use std::{collections::HashSet, fmt::Display, io::Write, path::PathBuf, process::ExitCode};
+use std::{fmt::Display, io::Write, path::PathBuf, process::ExitCode};
 
 #[cfg(feature = "cli")]
 use clap::{Parser, ValueEnum};
@@ -86,6 +86,10 @@ pub struct Relentless {
     #[cfg_attr(feature = "cli", arg(short, long, num_args=0.., value_delimiter = ' '))]
     pub measure: Option<Vec<WorkerKind>>, // TODO remove duplicate in advance
 
+    /// measure percentile for latency
+    #[cfg_attr(feature = "cli", arg(short, long, num_args=0.., value_delimiter = ' ', value_parser = clap::value_parser!(u8).range(0..=100)))]
+    pub percentile: Option<Vec<u8>>,
+
     /// requests per second
     #[cfg_attr(feature = "cli", arg(long))]
     pub rps: Option<usize>,
@@ -128,13 +132,26 @@ impl Relentless {
             .collect::<Result<Destinations<_>, _>>()
     }
 
-    pub fn measure_set(&self) -> HashSet<WorkerKind> {
+    pub fn measure_set(&self) -> Vec<WorkerKind> {
         let default = vec![WorkerKind::Configs];
-        let v = self.measure.as_ref().unwrap_or(&default);
-        v.iter().cloned().collect()
+        let mut v = self.measure.as_ref().unwrap_or(&default).clone();
+        v.sort_unstable();
+        v.dedup();
+        v
     }
     pub fn is_measure(&self, apply_to: WorkerKind) -> bool {
         self.measure_set().contains(&apply_to)
+    }
+
+    pub fn percentile_set(&self) -> Vec<u8> {
+        let default = vec![50, 90, 99];
+        let mut v = self.percentile.as_ref().unwrap_or(&default).clone();
+        v.sort_unstable();
+        v.dedup();
+        v
+    }
+    pub fn quantile_set(&self) -> Vec<f64> {
+        self.percentile_set().iter().map(|&p| p as f64 / 100.).collect()
     }
 
     /// TODO document
@@ -338,7 +355,7 @@ mod tests {
             "examples/config/assault.yaml",
             "examples/config/compare.yaml",
         ]) {
-            Ok(cmd) => assert_eq!(cmd.measure_set(), vec![WorkerKind::Configs].into_iter().collect()),
+            Ok(cmd) => assert_eq!(cmd.measure_set(), vec![WorkerKind::Configs]),
             Err(_) => panic!("no specified measure should be default value"),
         };
 
@@ -349,7 +366,7 @@ mod tests {
             "examples/config/compare.yaml",
             "-m",
         ]) {
-            Ok(cmd) => assert_eq!(cmd.measure_set(), vec![].into_iter().collect()),
+            Ok(cmd) => assert_eq!(cmd.measure_set(), vec![]),
             Err(_) => panic!("no specified measure with empty should be no measure"),
         };
 
@@ -363,7 +380,7 @@ mod tests {
             "testcases",
         ]) {
             Ok(cmd) => {
-                assert_eq!(cmd.measure_set(), vec![WorkerKind::Repeats, WorkerKind::Testcases].into_iter().collect())
+                assert_eq!(cmd.measure_set(), vec![WorkerKind::Repeats, WorkerKind::Testcases])
             }
             Err(_) => panic!("specified measure should be measured"),
         };
