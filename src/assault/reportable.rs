@@ -97,7 +97,7 @@ impl<T, Q: Clone + Coalesce, P: Clone + Coalesce> Reportable for CaseReport<T, Q
         let allowed = self.testcase.coalesce().attr.allow;
         self.pass() || !strict && allowed
     }
-    fn aggregate(&self) -> EvaluateAggregator {
+    fn aggregator(&self) -> EvaluateAggregator {
         self.aggregate.clone()
     }
 }
@@ -119,11 +119,11 @@ pub trait Reportable {
             self.sub_reportable().iter().all(|r| r.allow(strict))
         }
     }
-    fn aggregate(&self) -> EvaluateAggregator {
+    fn aggregator(&self) -> EvaluateAggregator {
         if self.sub_reportable().is_empty() {
             unreachable!("a reportable without children should implement its own method");
         } else {
-            self.sub_reportable().iter().map(|r| r.aggregate()).fold(Default::default(), |mut agg, b| {
+            self.sub_reportable().iter().map(|r| r.aggregator()).fold(Default::default(), |mut agg, b| {
                 agg.merge(&b);
                 agg
             })
