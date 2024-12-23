@@ -8,10 +8,10 @@ use crate::assault::evaluate::json::JsonEvaluate;
 use crate::{
     assault::{
         destinations::{AllOr, Destinations},
+        error::RequestResult,
         evaluate::plaintext::PlaintextEvaluate,
         evaluator::{Acceptable, Evaluator},
         messages::Messages,
-        error::RequestResult,
     },
     error::EvaluateError,
     interface::helper::{coalesce::Coalesce, http_serde_priv, is_default::IsDefault},

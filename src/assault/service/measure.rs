@@ -8,8 +8,8 @@ use std::{
 use tower::{timeout::error::Elapsed, Layer, Service};
 
 use crate::assault::{
-    measure::metrics::MeasuredResponse,
     error::{RequestError, RequestResult},
+    measure::metrics::MeasuredResponse,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash)]
