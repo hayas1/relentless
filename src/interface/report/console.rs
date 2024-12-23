@@ -79,7 +79,7 @@ pub trait ConsoleReport: Reportable {
 
 pub enum RelentlessConsoleReport {}
 impl RelentlessConsoleReport {
-    pub const NAME_DEFAULT: &'_ str = "configs";
+    pub const NAME_DEFAULT: &str = "configs";
 
     pub const SUMMARY_EMOJI: console::Emoji<'_, '_> = console::Emoji("💥", "");
 }
@@ -118,7 +118,6 @@ impl WorkerConsoleReport {
 
     pub const SUMMARY_EMOJI: console::Emoji<'_, '_> = console::Emoji("💥", "");
 }
-
 impl<T: Display, Q: Clone + Coalesce, P: Clone + Coalesce> ConsoleReport for WorkerReport<T, Q, P> {
     type Error = Wrap; // TODO crate::Error ?
     fn console_report<W: std::io::Write>(&self, cmd: &Relentless, w: &mut ReportWriter<W>) -> Result<(), Self::Error> {
@@ -190,7 +189,6 @@ impl CaseConsoleReport {
 
     pub const SUMMARY_EMOJI: console::Emoji<'_, '_> = console::Emoji("💥", "");
 }
-
 impl<T: Display, Q: Clone + Coalesce, P: Clone + Coalesce> ConsoleReport for CaseReport<T, Q, P> {
     type Error = Wrap; // TODO crate::Error ?
     fn console_report<W: std::io::Write>(&self, cmd: &Relentless, w: &mut ReportWriter<W>) -> Result<(), Self::Error> {
