@@ -255,10 +255,12 @@ impl Aggregate for LatencyAggregator {
     type Add = Duration;
     type Aggregate = LatencyAggregate;
     fn add(&mut self, latency: &Self::Add) {
-        self.hist += latency.as_nanos() as u64; // TODO overflow ?
+        self.hist += latency.as_micros() as u64;
     }
     fn merge(&mut self, other: &Self) {
-        self.quantile = other.quantile.clone(); // Default quantile will be empty, so give priority to other
+        // TODO Default quantile will be empty, so give priority to other
+        // TODO `Aggregate` trait should do not have `aggregate` method, but have `sub_aggregator` method ?
+        self.quantile = other.quantile.clone();
         self.hist += &other.hist;
     }
     fn aggregate(&self) -> Self::Aggregate {
@@ -278,19 +280,19 @@ impl LatencyAggregator {
     }
 
     pub fn min(&self) -> Duration {
-        Duration::from_nanos(self.hist.min())
+        Duration::from_micros(self.hist.min())
     }
     pub fn mean(&self) -> Duration {
-        Duration::from_nanos(self.hist.mean() as u64)
+        Duration::from_micros(self.hist.mean() as u64)
     }
     pub fn quantile(&self) -> Vec<Duration> {
         self.quantile.iter().map(|q| self.value_at_quantile(*q)).collect()
     }
     pub fn value_at_quantile(&self, quantile: f64) -> Duration {
-        Duration::from_nanos(self.hist.value_at_quantile(quantile))
+        Duration::from_micros(self.hist.value_at_quantile(quantile))
     }
     pub fn max(&self) -> Duration {
-        Duration::from_nanos(self.hist.max())
+        Duration::from_micros(self.hist.max())
     }
 }
 
