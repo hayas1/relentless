@@ -298,6 +298,8 @@ pub enum RunCommandError {
     CannotReadSomeConfigs(Vec<Config<HttpRequest, HttpResponse>>),
     #[error("cannot specify format")]
     CannotSpecifyFormat,
+    #[error("nan is not number")]
+    NanPercentile,
 }
 
 #[derive(Error, Debug, Clone, PartialEq, Eq)]

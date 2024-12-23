@@ -146,7 +146,7 @@ impl Relentless {
     pub fn percentile_set(&self) -> Vec<f64> {
         let default = vec![50., 90., 99.];
         let mut v = self.percentile.as_ref().unwrap_or(&default).clone();
-        v.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        v.sort_by(|a, b| a.partial_cmp(b).unwrap_or_else(|| unreachable!("{}", RunCommandError::NanPercentile)));
         v.dedup();
         v
     }
