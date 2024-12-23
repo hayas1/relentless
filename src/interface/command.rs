@@ -38,7 +38,7 @@ pub async fn execute() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sy
     Ok(cmd.exit_code(&rep))
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Default, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 #[cfg_attr(feature = "cli", derive(Parser))]
 #[cfg_attr(feature = "cli", clap(version, about, arg_required_else_help = true))]
 pub struct Relentless {
@@ -87,8 +87,8 @@ pub struct Relentless {
     pub measure: Option<Vec<WorkerKind>>, // TODO remove duplicate in advance
 
     /// measure percentile for latency
-    #[cfg_attr(feature = "cli", arg(short, long, num_args=0.., value_delimiter = ' ', value_parser = clap::value_parser!(u8).range(0..=100)))]
-    pub percentile: Option<Vec<u8>>,
+    #[cfg_attr(feature = "cli", arg(short, long, num_args=0.., value_delimiter = ' '))]
+    pub percentile: Option<Vec<f64>>,
 
     /// requests per second
     #[cfg_attr(feature = "cli", arg(long))]
@@ -143,15 +143,15 @@ impl Relentless {
         self.measure_set().contains(&apply_to)
     }
 
-    pub fn percentile_set(&self) -> Vec<u8> {
-        let default = vec![50, 90, 99];
+    pub fn percentile_set(&self) -> Vec<f64> {
+        let default = vec![50., 90., 99.];
         let mut v = self.percentile.as_ref().unwrap_or(&default).clone();
-        v.sort_unstable();
+        v.sort_by(|a, b| a.partial_cmp(b).unwrap());
         v.dedup();
         v
     }
     pub fn quantile_set(&self) -> Vec<f64> {
-        self.percentile_set().iter().map(|&p| p as f64 / 100.).collect()
+        self.percentile_set().iter().map(|p| p / 100.).collect()
     }
 
     /// TODO document
@@ -384,6 +384,58 @@ mod tests {
             }
             Err(_) => panic!("specified measure should be measured"),
         };
+    }
+
+    #[test]
+    #[cfg(feature = "cli")]
+    fn test_parse_percentile() {
+        match Relentless::try_parse_from([
+            "relentless",
+            "--file",
+            "examples/config/assault.yaml",
+            "examples/config/compare.yaml",
+        ]) {
+            Ok(cmd) => assert_eq!(cmd.percentile_set(), vec![50., 90., 99.]),
+            Err(_) => panic!("no specified percentile should be default value"),
+        };
+
+        match Relentless::try_parse_from([
+            "relentless",
+            "--file",
+            "examples/config/assault.yaml",
+            "examples/config/compare.yaml",
+            "-p",
+        ]) {
+            Ok(cmd) => assert_eq!(cmd.percentile_set(), Vec::<f64>::new()),
+            Err(_) => panic!("no specified percentile with empty should not be measured"),
+        };
+
+        match Relentless::try_parse_from([
+            "relentless",
+            "--file",
+            "examples/config/assault.yaml",
+            "examples/config/compare.yaml",
+            "--percentile",
+            "95",
+            "99",
+            "99.9",
+        ]) {
+            Ok(cmd) => assert_eq!(cmd.percentile_set(), vec![95., 99., 99.9]),
+            Err(_) => panic!("specified percentile should be measured"),
+        };
+
+        match Relentless::try_parse_from([
+            "relentless",
+            "--file",
+            "examples/config/assault.yaml",
+            "examples/config/compare.yaml",
+            "-p90",
+            "-p99",
+            "-p99.9",
+        ]) {
+            Ok(cmd) => assert_eq!(cmd.percentile_set(), vec![90., 99., 99.9]),
+            Err(_) => panic!("specified percentile should be measured"),
+        }
     }
 
     #[test]
