@@ -22,6 +22,39 @@ use super::{
     messages::Messages,
 };
 
+pub trait Reportable {
+    // TODO https://std-dev-guide.rust-lang.org/policy/specialization.html
+    fn sub_reportable(&self) -> Vec<&dyn Reportable>;
+    fn pass(&self) -> bool {
+        if self.sub_reportable().is_empty() {
+            unreachable!("a reportable without children should implement its own method");
+        } else {
+            self.sub_reportable().iter().all(|r| r.pass())
+        }
+    }
+    fn allow(&self, strict: bool) -> bool {
+        if self.sub_reportable().is_empty() {
+            unreachable!("a reportable without children should implement its own method");
+        } else {
+            self.sub_reportable().iter().all(|r| r.allow(strict))
+        }
+    }
+    fn aggregator(&self) -> EvaluateAggregator {
+        if self.sub_reportable().is_empty() {
+            unreachable!("a reportable without children should implement its own method");
+        } else {
+            self.sub_reportable().iter().map(|r| r.aggregator()).fold(Default::default(), |mut agg, b| {
+                agg.merge(&b);
+                agg
+            })
+        }
+    }
+    fn skip_report(&self, cmd: &Relentless) -> bool {
+        let Relentless { strict, ng_only, report_format, .. } = cmd;
+        matches!(report_format, ReportFormat::NullDevice) || *ng_only && self.allow(*strict)
+    }
+}
+
 /// TODO document
 #[derive(Debug, Clone)]
 pub struct Report<T, Q, P> {
@@ -99,39 +132,6 @@ impl<T, Q: Clone + Coalesce, P: Clone + Coalesce> Reportable for CaseReport<T, Q
     }
     fn aggregator(&self) -> EvaluateAggregator {
         self.aggregate.clone()
-    }
-}
-
-pub trait Reportable {
-    // TODO https://std-dev-guide.rust-lang.org/policy/specialization.html
-    fn sub_reportable(&self) -> Vec<&dyn Reportable>;
-    fn pass(&self) -> bool {
-        if self.sub_reportable().is_empty() {
-            unreachable!("a reportable without children should implement its own method");
-        } else {
-            self.sub_reportable().iter().all(|r| r.pass())
-        }
-    }
-    fn allow(&self, strict: bool) -> bool {
-        if self.sub_reportable().is_empty() {
-            unreachable!("a reportable without children should implement its own method");
-        } else {
-            self.sub_reportable().iter().all(|r| r.allow(strict))
-        }
-    }
-    fn aggregator(&self) -> EvaluateAggregator {
-        if self.sub_reportable().is_empty() {
-            unreachable!("a reportable without children should implement its own method");
-        } else {
-            self.sub_reportable().iter().map(|r| r.aggregator()).fold(Default::default(), |mut agg, b| {
-                agg.merge(&b);
-                agg
-            })
-        }
-    }
-    fn skip_report(&self, cmd: &Relentless) -> bool {
-        let Relentless { strict, ng_only, report_format, .. } = cmd;
-        matches!(report_format, ReportFormat::NullDevice) || *ng_only && self.allow(*strict)
     }
 }
 
