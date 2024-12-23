@@ -297,6 +297,8 @@ impl LatencyAggregator {
 
 #[cfg(test)]
 mod tests {
+    use crate::assault::measure::metrics::MeasuredResponse;
+
     use super::*;
 
     #[test]
@@ -400,7 +402,59 @@ mod tests {
     }
 
     #[test]
-    fn request_aggregate() {
-        todo!()
+    fn evaluate_aggregate() {
+        let mut agg =
+            EvaluateAggregator::new(&Destinations::<()>::new(), Some(SystemTime::UNIX_EPOCH), [0.5, 0.9, 0.99]);
+        for i in 0..1000 {
+            let d = vec![
+                (
+                    "a",
+                    Some(
+                        MeasuredResponse::new(
+                            (),
+                            SystemTime::UNIX_EPOCH + Duration::from_millis(i),
+                            Duration::from_millis(i),
+                        )
+                        .metrics()
+                        .clone(),
+                    ),
+                ),
+                (
+                    "b",
+                    Some(
+                        MeasuredResponse::new(
+                            (),
+                            SystemTime::UNIX_EPOCH + Duration::from_millis(i),
+                            Duration::from_millis(i),
+                        )
+                        .metrics()
+                        .clone(),
+                    ),
+                ),
+            ]
+            .into_iter()
+            .collect();
+            agg.add(&(i % 2 == 0, d));
+        }
+
+        let tolerance = Duration::from_millis(1);
+        let EvaluateAggregate { pass, response } = agg.aggregate();
+        assert_eq!(pass, PassAggregate { pass: 500, count: 1000, pass_rate: 0.5 });
+        let ResponseAggregate { req, duration, rps, bytes, latency } = response;
+        assert_eq!(req, 2000);
+        assert!(duration.unwrap().abs_diff(Duration::from_millis(999)) < tolerance);
+        assert_eq!(rps, Some(2002.002002002002));
+        assert_eq!(bytes, BytesAggregate {});
+        let LatencyAggregate { min, mean, quantile, max } = latency;
+        assert!(min.abs_diff(Duration::from_millis(0)) < tolerance);
+        assert!(mean.abs_diff(Duration::from_millis(500)) < tolerance);
+        for (q, p) in quantile.iter().zip(vec![
+            Duration::from_millis(500),
+            Duration::from_millis(900),
+            Duration::from_millis(990),
+        ]) {
+            assert!(q.abs_diff(p) < tolerance);
+        }
+        assert!(max.abs_diff(Duration::from_millis(1000)) < tolerance);
     }
 }
