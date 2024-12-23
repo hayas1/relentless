@@ -1,4 +1,4 @@
-use std::{fmt::Display, io::Write, path::PathBuf, process::ExitCode};
+use std::{collections::HashSet, fmt::Display, io::Write, path::PathBuf, process::ExitCode};
 
 #[cfg(feature = "cli")]
 use clap::{Parser, ValueEnum};
@@ -43,7 +43,7 @@ pub async fn execute() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sy
 #[cfg_attr(feature = "cli", clap(version, about, arg_required_else_help = true))]
 pub struct Relentless {
     /// config files of testcases
-    #[cfg_attr(feature = "cli", arg(short, long, num_args=0..))]
+    #[cfg_attr(feature = "cli", arg(short, long, num_args=0.., value_delimiter = ' '))]
     pub file: Vec<PathBuf>,
 
     /// override destinations
@@ -82,6 +82,10 @@ pub struct Relentless {
     #[cfg_attr(feature = "cli", arg(long))]
     pub no_async_repeat: bool,
 
+    /// measure and report metrics for each requests
+    #[cfg_attr(feature = "cli", arg(short, long, num_args=0.., value_delimiter = ' '))]
+    pub measure: Option<Vec<WorkerKind>>, // TODO remove duplicate in advance
+
     /// requests per second
     #[cfg_attr(feature = "cli", arg(long))]
     pub rps: Option<usize>,
@@ -101,6 +105,19 @@ pub enum ReportFormat {
     /// report to markdown
     GithubMarkdown,
 }
+#[cfg_attr(feature = "cli", derive(ValueEnum))]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash, Serialize, Deserialize)]
+pub enum WorkerKind {
+    /// each repeats
+    Repeats,
+
+    /// each testcases
+    Testcases,
+
+    /// each configs
+    #[default]
+    Configs,
+}
 
 impl Relentless {
     pub fn destinations(&self) -> WrappedResult<Destinations<http_serde_priv::Uri>> {
@@ -109,6 +126,15 @@ impl Relentless {
             .iter()
             .map(|(k, v)| Ok((k.to_string(), http_serde_priv::Uri(v.parse()?))))
             .collect::<Result<Destinations<_>, _>>()
+    }
+
+    pub fn measure_set(&self) -> HashSet<WorkerKind> {
+        let default = vec![WorkerKind::Configs];
+        let v = self.measure.as_ref().unwrap_or(&default);
+        v.iter().cloned().collect()
+    }
+    pub fn is_measure(&self, apply_to: WorkerKind) -> bool {
+        self.measure_set().contains(&apply_to)
     }
 
     /// TODO document
@@ -301,6 +327,46 @@ mod tests {
         .unwrap_err()
         .to_string();
         assert!(err_msg.contains(&RunCommandError::KeyValueFormat("key-value".to_string()).to_string()));
+    }
+
+    #[test]
+    #[cfg(feature = "cli")]
+    fn test_parse_measure() {
+        match Relentless::try_parse_from([
+            "relentless",
+            "--file",
+            "examples/config/assault.yaml",
+            "examples/config/compare.yaml",
+        ]) {
+            Ok(cmd) => assert_eq!(cmd.measure_set(), vec![WorkerKind::Configs].into_iter().collect()),
+            Err(_) => panic!("no specified measure should be default value"),
+        };
+
+        match Relentless::try_parse_from([
+            "relentless",
+            "--file",
+            "examples/config/assault.yaml",
+            "examples/config/compare.yaml",
+            "-m",
+        ]) {
+            Ok(cmd) => assert_eq!(cmd.measure_set(), vec![].into_iter().collect()),
+            Err(_) => panic!("no specified measure with empty should be no measure"),
+        };
+
+        match Relentless::try_parse_from([
+            "relentless",
+            "--file",
+            "examples/config/assault.yaml",
+            "examples/config/compare.yaml",
+            "--measure",
+            "repeats",
+            "testcases",
+        ]) {
+            Ok(cmd) => {
+                assert_eq!(cmd.measure_set(), vec![WorkerKind::Repeats, WorkerKind::Testcases].into_iter().collect())
+            }
+            Err(_) => panic!("specified measure should be measured"),
+        };
     }
 
     #[test]

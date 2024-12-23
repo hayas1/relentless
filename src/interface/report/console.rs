@@ -13,7 +13,7 @@ use crate::{
     },
     error::Wrap,
     interface::{
-        command::Relentless,
+        command::{Relentless, WorkerKind},
         config::{Repeat, Testcase, WorkerConfig},
         helper::coalesce::Coalesce,
     },
@@ -58,7 +58,7 @@ pub trait ConsoleReport: Reportable {
         write!(w, "    ").map_err(e.clone())?;
         writeln!(
             w,
-            "rps: {}/{:.2?}={:.2}{}",
+            "rps: {}req/{:.2?}={:.2}{}",
             req,
             duration.unwrap_or_default(),
             style_classified(&Classified::response_agg(&response)).apply_to(rps.unwrap_or_default()),
@@ -98,14 +98,18 @@ impl<T: Display, Q: Clone + Coalesce, P: Clone + Coalesce> ConsoleReport for Rep
             }
         }
 
-        writeln!(
-            w,
-            "{} {}",
-            RelentlessConsoleReport::SUMMARY_EMOJI,
-            console::style("summery of all requests in configs").bold(),
-        )
-        .map_err(Wrap::wrapping)?;
-        w.scope(|w| self.console_aggregate(cmd, w, Wrap::error))?;
+        if cmd.is_measure(WorkerKind::Configs) {
+            writeln!(
+                w,
+                "{} {} {}",
+                RelentlessConsoleReport::SUMMARY_EMOJI,
+                console::style("summery of all requests in configs").bold(),
+                RelentlessConsoleReport::SUMMARY_EMOJI,
+            )
+            .map_err(Wrap::wrapping)?;
+            w.scope(|w| self.console_aggregate(cmd, w, Wrap::error))?;
+        }
+
         Ok(())
     }
 }
@@ -163,16 +167,19 @@ impl<T: Display, Q: Clone + Coalesce, P: Clone + Coalesce> ConsoleReport for Wor
             Ok::<_, Wrap>(())
         })?;
 
-        w.scope(|w| {
-            writeln!(
-                w,
-                "{} {}",
-                WorkerConsoleReport::SUMMARY_EMOJI,
-                console::style("summery of all requests in testcases").bold(),
-            )
-            .map_err(Wrap::wrapping)?;
-            w.scope(|w| self.console_aggregate(cmd, w, Wrap::wrapping))
-        })?;
+        if cmd.is_measure(WorkerKind::Testcases) {
+            w.scope(|w| {
+                writeln!(
+                    w,
+                    "{} {}",
+                    WorkerConsoleReport::SUMMARY_EMOJI,
+                    console::style("summery of all requests in testcases").bold(),
+                )
+                .map_err(Wrap::wrapping)?;
+                w.scope(|w| self.console_aggregate(cmd, w, Wrap::wrapping))
+            })?;
+        }
+
         Ok(())
     }
 }
@@ -220,16 +227,19 @@ impl<T: Display, Q: Clone + Coalesce, P: Clone + Coalesce> ConsoleReport for Cas
             })?;
         }
 
-        w.scope(|w| {
-            writeln!(
-                w,
-                "{} {}",
-                CaseConsoleReport::SUMMARY_EMOJI,
-                console::style("summery of all requests in repeats").bold(),
-            )
-            .map_err(Wrap::wrapping)?;
-            w.scope(|w| self.console_aggregate(cmd, w, Wrap::wrapping))
-        })?;
+        if cmd.is_measure(WorkerKind::Repeats) {
+            w.scope(|w| {
+                writeln!(
+                    w,
+                    "{} {}",
+                    CaseConsoleReport::SUMMARY_EMOJI,
+                    console::style("summery of all requests in repeats").bold(),
+                )
+                .map_err(Wrap::wrapping)?;
+                w.scope(|w| self.console_aggregate(cmd, w, Wrap::wrapping))
+            })?;
+        }
+
         Ok(())
     }
 }
