@@ -1,5 +1,7 @@
 use std::fmt::{Display, Write as _};
 
+use md_style::MdStyle;
+
 use crate::{
     assault::{
         measure::aggregate::{Aggregate, EvaluateAggregate, LatencyAggregate, PassAggregate, ResponseAggregate},
@@ -31,26 +33,21 @@ pub trait GithubMarkdownReport: Reportable {
         let ResponseAggregate { req, duration, rps, latency, .. } = &response;
         let LatencyAggregate { min, mean, quantile, max } = &latency;
 
-        writeln!(w).map_err(e.clone())?;
-        write!(w, "| | min | mean |").map_err(e.clone())?;
-        for percentile in cmd.percentile_set() {
-            write!(w, " p{} |", percentile).map_err(e.clone())?;
-        }
-        writeln!(w, " max |").map_err(e.clone())?;
+        let header: Vec<_> = vec![
+            vec!["min".to_string()],
+            vec!["mean".to_string()],
+            cmd.percentile_set().iter().map(|p| format!("p{}", p)).collect(),
+            vec!["max".to_string()],
+        ]
+        .into_iter()
+        .flatten()
+        .collect();
+        let rows: Vec<_> = vec![&vec![*min], &vec![*mean], quantile, &vec![*max]]
+            .into_iter()
+            .flat_map(|v| v.iter().map(|&d| format!("{:?}", d)))
+            .collect();
+        MdStyle::new(rows).one_line_table(w, &header, Some("latency")).map_err(e.clone())?;
 
-        write!(w, "| --- | --- | --- |").map_err(e.clone())?;
-        for _ in cmd.percentile_set() {
-            write!(w, " --- |").map_err(e.clone())?;
-        }
-        writeln!(w, " --- |").map_err(e.clone())?;
-
-        write!(w, "| latency | {:.3?} | {:.3?} |", min, mean).map_err(e.clone())?;
-        for q in quantile {
-            write!(w, " {:.3?} |", q).map_err(e.clone())?;
-        }
-        writeln!(w, " {:.3?} |", max).map_err(e.clone())?;
-
-        writeln!(w).map_err(e.clone())?;
         write!(w, "pass rate: {}/{}={:.2}%, ", pass, count, pass_rate * 100.).map_err(e.clone())?;
         writeln!(w, "rps: {}req/{:.2?}={:.2}req/s", req, duration.unwrap_or_default(), rps.unwrap_or_default(),)
             .map_err(e.clone())?;
@@ -80,7 +77,7 @@ impl<T: Display, Q: Clone + Coalesce, P: Clone + Coalesce> GithubMarkdownReport 
         }
 
         if cmd.is_measure(WorkerKind::Configs) {
-            write!(
+            writeln!(
                 w,
                 "## {} summery of all requests in configs {}",
                 RelentlessGithubMarkdownReport::SUMMARY_EMOJI,
@@ -184,15 +181,8 @@ impl<T: Display, Q: Clone + Coalesce, P: Clone + Coalesce> GithubMarkdownReport 
         }
         if !self.messages().is_empty() {
             w.scope(|w| {
-                writeln!(w, "<details>")?;
-                w.scope(|w| {
-                    writeln!(w, "<summary> {} message was found </summary>", CaseGithubMarkdownReport::MESSAGE_EMOJI)?;
-                    writeln!(w)?;
-                    writeln!(w, "```")?;
-                    writeln!(w, "{}", &self.messages())?;
-                    writeln!(w, "```")
-                })?;
-                writeln!(w, "</details>")
+                MdStyle::new(format!("```\n{}\n```\n", self.messages()))
+                    .details(w, format!("{} message was found", CaseGithubMarkdownReport::MESSAGE_EMOJI))
             })?;
         }
 
@@ -205,6 +195,7 @@ impl<T: Display, Q: Clone + Coalesce, P: Clone + Coalesce> GithubMarkdownReport 
 }
 
 // TODO put in `helper` module ?
+// TODO implement `Display` and `Debug` for each style ?
 pub mod md_style {
     use std::{
         fmt::{Display, Result as FmtResult, Write as FmtWrite},
@@ -329,20 +320,22 @@ pub mod md_style {
             V: Display,
         {
             // TODO validate: header.len() == self.0.len()
+            if row_header.is_some() {
+                write!(w, "| ")?;
+            }
             for h in header {
-                if row_header.is_some() {
-                    write!(w, "| ")?;
-                }
                 write!(w, "| {} ", h)?;
             }
             writeln!(w, "|")?;
+
+            if row_header.is_some() {
+                write!(w, "| --- ")?;
+            }
             for _ in header {
-                if row_header.is_some() {
-                    write!(w, "| --- ")?;
-                }
                 write!(w, "| --- ")?;
             }
             writeln!(w, "|")?;
+
             if !self.0.is_empty() {
                 if let Some(header) = row_header {
                     write!(w, "| {} ", header)?;
