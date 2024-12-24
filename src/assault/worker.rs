@@ -138,7 +138,7 @@ where
         testcase: Coalesced<Testcase<Q, P>, Setting<Q, P>>,
     ) -> WrappedResult<CaseReport<P::Message, Q, P>> {
         let case = &testcase.coalesce();
-        let evaluate_aggregate = EvaluateAggregator::new(destinations, None, cmd.quantile_set());
+        let evaluate_aggregate = EvaluateAggregator::new(destinations, None);
 
         let (passed, messages, aggregate) = self
             .requests(cmd, destinations, case)

@@ -25,7 +25,7 @@ pub trait ConsoleReport: Reportable {
         w: &mut ReportWriter<W>,
         e: F, // TODO where Self::Error: From<std::io::Error> ?
     ) -> Result<(), Self::Error> {
-        let EvaluateAggregate { pass: pass_agg, response } = self.aggregator().aggregate();
+        let EvaluateAggregate { pass: pass_agg, response } = self.aggregator().aggregate(&cmd.quantile_set());
         let PassAggregate { pass, count, pass_rate } = &pass_agg;
         let ResponseAggregate { req, duration, rps, latency, .. } = &response;
         let LatencyAggregate { min, mean, quantile, max } = &latency;

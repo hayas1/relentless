@@ -26,7 +26,7 @@ pub trait GithubMarkdownReport: Reportable {
         w: &mut ReportWriter<W>,
         e: F, // TODO where Self::Error: From<std::io::Error> ?
     ) -> Result<(), Self::Error> {
-        let EvaluateAggregate { pass: pass_agg, response } = self.aggregator().aggregate();
+        let EvaluateAggregate { pass: pass_agg, response } = self.aggregator().aggregate(&cmd.quantile_set());
         let PassAggregate { pass, count, pass_rate } = &pass_agg;
         let ResponseAggregate { req, duration, rps, latency, .. } = &response;
         let LatencyAggregate { min, mean, quantile, max } = &latency;
@@ -39,7 +39,7 @@ pub trait GithubMarkdownReport: Reportable {
         writeln!(w, " max |").map_err(e.clone())?;
 
         write!(w, "| --- | --- | --- |").map_err(e.clone())?;
-        for _ in quantile {
+        for _ in cmd.percentile_set() {
             write!(w, " --- |").map_err(e.clone())?;
         }
         writeln!(w, " --- |").map_err(e.clone())?;
