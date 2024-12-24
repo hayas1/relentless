@@ -4,7 +4,7 @@ use crate::{
     assault::{
         measure::{
             aggregate::{Aggregate, EvaluateAggregate, LatencyAggregate, PassAggregate, ResponseAggregate},
-            threshold::{Classified, Classify},
+            threshold::{Classification, Classified, Classify},
         },
         reportable::{CaseReport, Report, ReportWriter, Reportable, WorkerReport},
     },
@@ -17,19 +17,20 @@ use crate::{
 };
 
 impl<T> Classified<T> {
+    pub fn styled(&self) -> console::StyledObject<&T> {
+        self.class().apply_style(&**self)
+    }
+}
+impl Classification {
     pub fn style(&self) -> console::Style {
         match self {
-            Classified::Good(_) => console::Style::new().green(),
-            Classified::Allow(_) => console::Style::new().cyan(),
-            Classified::Warn(_) => console::Style::new().yellow(),
-            Classified::Bad(_) => console::Style::new().red(),
+            Classification::Good => console::Style::new().green(),
+            Classification::Allow => console::Style::new().cyan(),
+            Classification::Warn => console::Style::new().yellow(),
+            Classification::Bad => console::Style::new().red(),
         }
     }
-
-    pub fn apply_style(&self) -> console::StyledObject<&T> {
-        self.apply_style_to(&**self)
-    }
-    pub fn apply_style_to<U>(&self, value: U) -> console::StyledObject<U> {
+    pub fn apply_style<U>(&self, value: U) -> console::StyledObject<U> {
         self.style().apply_to(value)
     }
 }
@@ -53,8 +54,8 @@ pub trait ConsoleReport: Reportable {
             "pass-rt: {}/{}={:.2}{}",
             pass,
             count,
-            pass_agg.classify().apply_style_to(pass_rate * 100.),
-            pass_agg.classify().apply_style_to("%"),
+            pass_agg.classify().apply_style(pass_rate * 100.),
+            pass_agg.classify().apply_style("%"),
         )
         .map_err(e.clone())?;
         write!(w, "    ").map_err(e.clone())?;
@@ -63,17 +64,17 @@ pub trait ConsoleReport: Reportable {
             "rps: {}req/{:.2?}={:.2}{}",
             req,
             duration.unwrap_or_default(),
-            response.classify().apply_style_to(rps.unwrap_or_default()),
-            response.classify().apply_style_to("req/s"),
+            response.classify().apply_style(rps.unwrap_or_default()),
+            response.classify().apply_style("req/s"),
         )
         .map_err(e.clone())?;
 
-        write!(w, "latency: min={:.3?} mean={:.3?} ", min.classified().apply_style(), mean.classified().apply_style())
+        write!(w, "latency: min={:.3?} mean={:.3?} ", min.classified().styled(), mean.classified().styled())
             .map_err(e.clone())?;
         for (percentile, quantile) in cmd.percentile_set().iter().zip(quantile) {
-            write!(w, "p{}={:.3?} ", percentile, quantile.classified().apply_style()).map_err(e.clone())?;
+            write!(w, "p{}={:.3?} ", percentile, quantile.classified().styled()).map_err(e.clone())?;
         }
-        writeln!(w, "max={:.3?}", max.classified().apply_style()).map_err(e.clone())?;
+        writeln!(w, "max={:.3?}", max.classified().styled()).map_err(e.clone())?;
 
         Ok(())
     }

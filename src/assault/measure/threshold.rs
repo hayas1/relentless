@@ -6,75 +6,74 @@ use std::{
 use super::aggregate::{PassAggregate, ResponseAggregate};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum Classified<T> {
-    Good(T),
-    Allow(T),
-    Warn(T),
-    Bad(T),
+pub enum Classification {
+    Good,
+    Allow,
+    Warn,
+    Bad,
 }
-impl<T> Deref for Classified<T> {
-    type Target = T;
-    fn deref(&self) -> &Self::Target {
-        match self {
-            Classified::Good(t) => t,
-            Classified::Allow(t) => t,
-            Classified::Warn(t) => t,
-            Classified::Bad(t) => t,
-        }
-    }
-}
-impl<T> DerefMut for Classified<T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        match self {
-            Classified::Good(t) => t,
-            Classified::Allow(t) => t,
-            Classified::Warn(t) => t,
-            Classified::Bad(t) => t,
-        }
-    }
-}
+
 pub trait Classify {
-    fn classify(&self) -> Classified<()>;
+    fn classify(&self) -> Classification;
     fn classified(self) -> Classified<Self>
     where
         Self: Sized,
     {
         match self.classify() {
-            Classified::Good(()) => Classified::Good(self),
-            Classified::Allow(()) => Classified::Allow(self),
-            Classified::Warn(()) => Classified::Warn(self),
-            Classified::Bad(()) => Classified::Bad(self),
+            Classification::Good => Classified(Classification::Good, self),
+            Classification::Allow => Classified(Classification::Allow, self),
+            Classification::Warn => Classified(Classification::Warn, self),
+            Classification::Bad => Classified(Classification::Bad, self),
         }
     }
 }
 impl Classify for PassAggregate {
-    fn classify(&self) -> Classified<()> {
+    fn classify(&self) -> Classification {
         if self.count == self.pass {
-            Classified::Good(())
+            Classification::Good
         } else if self.pass_rate > 0.8 {
-            Classified::Allow(())
+            Classification::Allow
         } else if self.pass_rate > 0.5 {
-            Classified::Warn(())
+            Classification::Warn
         } else {
-            Classified::Bad(())
+            Classification::Bad
         }
     }
 }
 impl Classify for ResponseAggregate {
-    fn classify(&self) -> Classified<()> {
-        Classified::Good(())
+    fn classify(&self) -> Classification {
+        Classification::Good
     }
 }
 impl Classify for Duration {
-    fn classify(&self) -> Classified<()> {
+    fn classify(&self) -> Classification {
         if self > &Duration::from_secs(3) {
-            Classified::Bad(())
+            Classification::Bad
         } else if self > &Duration::from_secs(1) {
-            Classified::Warn(())
+            Classification::Warn
         } else if self > &Duration::from_millis(200) {
-            Classified::Allow(())
+            Classification::Allow
         } else {
-            Classified::Good(())
+            Classification::Good
         }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Classified<T>(Classification, T);
+impl<T> Deref for Classified<T> {
+    type Target = T;
+    fn deref(&self) -> &Self::Target {
+        &self.1
+    }
+}
+impl<T> DerefMut for Classified<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.1
+    }
+}
+impl<T> Classified<T> {
+    pub fn class(&self) -> Classification {
+        self.0.clone()
     }
 }
