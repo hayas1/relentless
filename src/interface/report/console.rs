@@ -16,25 +16,6 @@ use crate::{
     },
 };
 
-impl<T> Classified<T> {
-    pub fn styled(&self) -> console::StyledObject<&T> {
-        self.class().apply_style(&**self)
-    }
-}
-impl Classification {
-    pub fn style(&self) -> console::Style {
-        match self {
-            Classification::Good => console::Style::new().green(),
-            Classification::Allow => console::Style::new().cyan(),
-            Classification::Warn => console::Style::new().yellow(),
-            Classification::Bad => console::Style::new().red(),
-        }
-    }
-    pub fn apply_style<U>(&self, value: U) -> console::StyledObject<U> {
-        self.style().apply_to(value)
-    }
-}
-
 pub trait ConsoleReport: Reportable {
     type Error;
     fn console_report<W: std::io::Write>(&self, cmd: &Relentless, w: &mut ReportWriter<W>) -> Result<(), Self::Error>;
@@ -198,8 +179,7 @@ impl<T: Display, Q: Clone + Coalesce, P: Clone + Coalesce> ConsoleReport for Cas
         let Testcase { description, target, setting, .. } = self.testcase().coalesce();
 
         let side = if self.pass() { CaseConsoleReport::PASS_EMOJI } else { CaseConsoleReport::FAIL_EMOJI };
-        let target = console::style(&target);
-        write!(w, "{} {} ", side, if self.pass() { target.green() } else { target.red() })?;
+        write!(w, "{} {} ", side, self.classify().apply_style(target))?;
         if let Repeat(Some(ref repeat)) = setting.repeat {
             write!(w, "{}{}/{} ", CaseConsoleReport::REPEAT_EMOJI, self.passed, repeat)?;
         }
@@ -210,12 +190,22 @@ impl<T: Display, Q: Clone + Coalesce, P: Clone + Coalesce> ConsoleReport for Cas
         }
         if !self.pass() && self.allow(cmd.strict) {
             w.scope(|w| {
-                writeln!(w, "{} {}", CaseConsoleReport::ALLOW_EMOJI, console::style("this testcase is allowed").green())
+                writeln!(
+                    w,
+                    "{} {}",
+                    CaseConsoleReport::ALLOW_EMOJI,
+                    Classification::Good.apply_style("this testcase is allowed")
+                )
             })?;
         }
         if !self.messages().is_empty() {
             w.scope(|w| {
-                writeln!(w, "{} {}", CaseConsoleReport::MESSAGE_EMOJI, console::style("message was found").yellow())?;
+                writeln!(
+                    w,
+                    "{} {}",
+                    CaseConsoleReport::MESSAGE_EMOJI,
+                    self.messages().classify().apply_style("message was found")
+                )?;
                 w.scope(|w| {
                     let message = &self.messages();
                     writeln!(w, "{}", console::style(message).dim())
@@ -237,5 +227,24 @@ impl<T: Display, Q: Clone + Coalesce, P: Clone + Coalesce> ConsoleReport for Cas
         }
 
         Ok(())
+    }
+}
+
+impl<T> Classified<T> {
+    pub fn styled(&self) -> console::StyledObject<&T> {
+        self.class().apply_style(&**self)
+    }
+}
+impl Classification {
+    pub fn style(&self) -> console::Style {
+        match self {
+            Classification::Good => console::Style::new().green(),
+            Classification::Allow => console::Style::new().cyan(),
+            Classification::Warn => console::Style::new().yellow(),
+            Classification::Bad => console::Style::new().red(),
+        }
+    }
+    pub fn apply_style<U>(&self, value: U) -> console::StyledObject<U> {
+        self.style().apply_to(value)
     }
 }

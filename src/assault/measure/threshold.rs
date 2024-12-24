@@ -3,8 +3,11 @@ use std::{
     time::Duration,
 };
 
+use crate::assault::{messages::Messages, reportable::Reportable};
+
 use super::aggregate::{PassAggregate, ResponseAggregate};
 
+// TODO better implementation ?
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Classification {
     Good,
@@ -24,6 +27,24 @@ pub trait Classify {
             Classification::Allow => Classified(Classification::Allow, self),
             Classification::Warn => Classified(Classification::Warn, self),
             Classification::Bad => Classified(Classification::Bad, self),
+        }
+    }
+}
+impl<T: Reportable> Classify for T {
+    fn classify(&self) -> Classification {
+        if self.pass() {
+            Classification::Good
+        } else {
+            Classification::Bad
+        }
+    }
+}
+impl<M> Classify for Messages<M> {
+    fn classify(&self) -> Classification {
+        if self.is_empty() {
+            Classification::Good
+        } else {
+            Classification::Warn
         }
     }
 }
