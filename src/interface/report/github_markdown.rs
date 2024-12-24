@@ -31,7 +31,6 @@ pub trait GithubMarkdownReport: Reportable {
         let ResponseAggregate { req, duration, rps, latency, .. } = &response;
         let LatencyAggregate { min, mean, quantile, max } = &latency;
 
-        writeln!(w).map_err(e.clone())?;
         write!(w, "| | min | mean |").map_err(e.clone())?;
         for percentile in cmd.percentile_set() {
             write!(w, " p{} |", percentile).map_err(e.clone())?;
@@ -80,7 +79,7 @@ impl<T: Display, Q: Clone + Coalesce, P: Clone + Coalesce> GithubMarkdownReport 
         }
 
         if cmd.is_measure(WorkerKind::Configs) {
-            write!(
+            writeln!(
                 w,
                 "## {} summery of all requests in configs {}",
                 RelentlessGithubMarkdownReport::SUMMARY_EMOJI,
