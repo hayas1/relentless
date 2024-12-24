@@ -169,7 +169,7 @@ impl Aggregate for PassAggregator {
         self.count.merge(&other.count);
     }
     fn aggregate(&self) -> Self::Aggregate {
-        PassAggregate { pass: self.pass(), count: self.count(), pass_rate: self.ratio() }
+        PassAggregate { pass: self.pass(), count: self.count(), pass_rate: self.pass_rate() }
     }
 }
 impl PassAggregator {
@@ -183,7 +183,7 @@ impl PassAggregator {
     pub fn pass(&self) -> u64 {
         self.pass.aggregate()
     }
-    pub fn ratio(&self) -> f64 {
+    pub fn pass_rate(&self) -> f64 {
         self.pass() as f64 / self.count() as f64
     }
 }
