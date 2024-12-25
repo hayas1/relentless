@@ -1,7 +1,7 @@
 use super::{destinations::Destinations, error::RequestResult, messages::Messages};
 
 #[allow(async_fn_in_trait)] // TODO #[warn(async_fn_in_trait)] by default
-pub trait Evaluator<Res> {
+pub trait Evaluate<Res> {
     type Message;
     async fn evaluate(&self, res: Destinations<RequestResult<Res>>, msg: &mut Messages<Self::Message>) -> bool;
 }

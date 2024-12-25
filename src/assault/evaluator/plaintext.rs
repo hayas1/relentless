@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     assault::{
         destinations::{AllOr, Destinations},
-        evaluator::Acceptable,
+        evaluate::Acceptable,
         messages::Messages,
     },
     error::EvaluateError,
@@ -13,10 +13,10 @@ use crate::{
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
-pub struct PlaintextEvaluate {
+pub struct PlaintextEvaluator {
     pub regex: Option<AllOr<String>>,
 }
-impl Acceptable<&Bytes> for PlaintextEvaluate {
+impl Acceptable<&Bytes> for PlaintextEvaluator {
     type Message = EvaluateError;
     fn accept(&self, bytes: &Destinations<&Bytes>, msg: &mut Messages<Self::Message>) -> bool {
         let _ = msg; // TODO dest[d] can be failed

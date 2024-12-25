@@ -216,9 +216,9 @@ impl Format {
 mod tests {
     use crate::assault::destinations::AllOr;
     #[cfg(feature = "json")]
-    use crate::assault::evaluate::json::JsonEvaluate;
+    use crate::assault::evaluator::json::JsonEvaluator;
     use crate::implement::service_http::{
-        evaluate::{BodyEvaluate, HeaderEvaluate, HttpResponse},
+        evaluate::{HttpBody, HttpHeaders, HttpResponse},
         factory::HttpRequest,
     };
 
@@ -239,7 +239,7 @@ mod tests {
                 name: Some("example".to_string()),
                 setting: Setting {
                     request: HttpRequest::default(),
-                    response: HttpResponse { header: HeaderEvaluate::Ignore, ..Default::default() },
+                    response: HttpResponse { header: HttpHeaders::Ignore, ..Default::default() },
                     ..Default::default()
                 },
                 ..Default::default()
@@ -250,7 +250,7 @@ mod tests {
                 setting: Setting {
                     request: HttpRequest::default(),
                     response: HttpResponse {
-                        body: BodyEvaluate::Json(JsonEvaluate {
+                        body: HttpBody::Json(JsonEvaluator {
                             ignore: vec!["/datetime".to_string()],
                             // patch: Some(PatchTo::All(
                             //     serde_json::from_value(
@@ -312,7 +312,7 @@ mod tests {
             Setting {
                 request: HttpRequest::default(),
                 response: HttpResponse {
-                    body: BodyEvaluate::Json(JsonEvaluate {
+                    body: HttpBody::Json(JsonEvaluator {
                         ignore: vec![],
                         patch: Some(AllOr::All(
                             serde_json::from_value(
@@ -355,7 +355,7 @@ mod tests {
             Setting {
                 request: HttpRequest::default(),
                 response: HttpResponse {
-                    body: BodyEvaluate::Json(JsonEvaluate {
+                    body: HttpBody::Json(JsonEvaluator {
                         ignore: vec![],
                         patch: Some(AllOr::Destinations(Destinations::from_iter([
                             (

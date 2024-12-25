@@ -4,13 +4,13 @@ use http_body_util::{BodyExt, Collected};
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "json")]
-use crate::assault::evaluate::json::JsonEvaluate;
+use crate::assault::evaluator::json::JsonEvaluator;
 use crate::{
     assault::{
         destinations::{AllOr, Destinations},
         error::RequestResult,
-        evaluate::plaintext::PlaintextEvaluate,
-        evaluator::{Acceptable, Evaluator},
+        evaluate::{Acceptable, Evaluate},
+        evaluator::plaintext::PlaintextEvaluator,
         messages::Messages,
     },
     error::EvaluateError,
@@ -22,17 +22,17 @@ use crate::{
 pub struct HttpResponse {
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
-    pub status: StatusEvaluate,
+    pub status: HttpStatus,
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
-    pub header: HeaderEvaluate,
+    pub header: HttpHeaders,
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
-    pub body: BodyEvaluate,
+    pub body: HttpBody,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
-pub enum StatusEvaluate {
+pub enum HttpStatus {
     #[default]
     OkOrEqual,
     Expect(AllOr<http_serde_priv::StatusCode>),
@@ -40,7 +40,7 @@ pub enum StatusEvaluate {
 }
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
-pub enum HeaderEvaluate {
+pub enum HttpHeaders {
     #[default]
     AnyOrEqual,
     Expect(AllOr<http_serde_priv::HeaderMap>),
@@ -48,12 +48,12 @@ pub enum HeaderEvaluate {
 }
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
-pub enum BodyEvaluate {
+pub enum HttpBody {
     #[default]
     AnyOrEqual,
-    Plaintext(PlaintextEvaluate),
+    Plaintext(PlaintextEvaluator),
     #[cfg(feature = "json")]
-    Json(JsonEvaluate),
+    Json(JsonEvaluator),
 }
 
 impl Coalesce for HttpResponse {
@@ -65,7 +65,7 @@ impl Coalesce for HttpResponse {
         }
     }
 }
-impl Coalesce for StatusEvaluate {
+impl Coalesce for HttpStatus {
     fn coalesce(self, other: &Self) -> Self {
         if self.is_default() {
             other.clone()
@@ -74,7 +74,7 @@ impl Coalesce for StatusEvaluate {
         }
     }
 }
-impl Coalesce for HeaderEvaluate {
+impl Coalesce for HttpHeaders {
     fn coalesce(self, other: &Self) -> Self {
         if self.is_default() {
             other.clone()
@@ -83,7 +83,7 @@ impl Coalesce for HeaderEvaluate {
         }
     }
 }
-impl Coalesce for BodyEvaluate {
+impl Coalesce for HttpBody {
     fn coalesce(self, other: &Self) -> Self {
         if self.is_default() {
             other.clone()
@@ -93,7 +93,7 @@ impl Coalesce for BodyEvaluate {
     }
 }
 
-impl<B> Evaluator<http::Response<B>> for HttpResponse
+impl<B> Evaluate<http::Response<B>> for HttpResponse
 where
     B: Body,
     B::Error: std::error::Error + Sync + Send + 'static,
@@ -151,17 +151,17 @@ impl HttpResponse {
     }
 }
 
-impl Acceptable<&http::StatusCode> for StatusEvaluate {
+impl Acceptable<&http::StatusCode> for HttpStatus {
     type Message = EvaluateError;
     fn accept(&self, status: &Destinations<&http::StatusCode>, msg: &mut Messages<Self::Message>) -> bool {
         let acceptable = match &self {
-            StatusEvaluate::OkOrEqual => Self::assault_or_compare(status, |(_, s)| s.is_success()),
-            StatusEvaluate::Expect(AllOr::All(code)) => Self::validate_all(status, |(_, s)| s == &&**code),
-            StatusEvaluate::Expect(AllOr::Destinations(code)) => {
+            HttpStatus::OkOrEqual => Self::assault_or_compare(status, |(_, s)| s.is_success()),
+            HttpStatus::Expect(AllOr::All(code)) => Self::validate_all(status, |(_, s)| s == &&**code),
+            HttpStatus::Expect(AllOr::Destinations(code)) => {
                 // TODO subset ?
                 status == &code.iter().map(|(d, c)| (d.to_string(), &**c)).collect()
             }
-            StatusEvaluate::Ignore => true,
+            HttpStatus::Ignore => true,
         };
         if !acceptable {
             msg.push_err(EvaluateError::UnacceptableStatus);
@@ -170,17 +170,17 @@ impl Acceptable<&http::StatusCode> for StatusEvaluate {
     }
 }
 
-impl Acceptable<&http::HeaderMap> for HeaderEvaluate {
+impl Acceptable<&http::HeaderMap> for HttpHeaders {
     type Message = EvaluateError;
     fn accept(&self, headers: &Destinations<&http::HeaderMap>, msg: &mut Messages<Self::Message>) -> bool {
         let acceptable = match &self {
-            HeaderEvaluate::AnyOrEqual => Self::assault_or_compare(headers, |_| true),
-            HeaderEvaluate::Expect(AllOr::All(header)) => Self::validate_all(headers, |(_, h)| h == &&**header),
-            HeaderEvaluate::Expect(AllOr::Destinations(header)) => {
+            HttpHeaders::AnyOrEqual => Self::assault_or_compare(headers, |_| true),
+            HttpHeaders::Expect(AllOr::All(header)) => Self::validate_all(headers, |(_, h)| h == &&**header),
+            HttpHeaders::Expect(AllOr::Destinations(header)) => {
                 // TODO subset ?
                 headers == &header.iter().map(|(d, h)| (d.to_string(), &**h)).collect()
             }
-            HeaderEvaluate::Ignore => true,
+            HttpHeaders::Ignore => true,
         };
         if !acceptable {
             msg.push_err(EvaluateError::UnacceptableHeaderMap);
@@ -189,14 +189,14 @@ impl Acceptable<&http::HeaderMap> for HeaderEvaluate {
     }
 }
 
-impl Acceptable<&Bytes> for BodyEvaluate {
+impl Acceptable<&Bytes> for HttpBody {
     type Message = EvaluateError;
     fn accept(&self, body: &Destinations<&Bytes>, msg: &mut Messages<Self::Message>) -> bool {
         match &self {
-            BodyEvaluate::AnyOrEqual => Self::assault_or_compare(body, |_| true),
-            BodyEvaluate::Plaintext(p) => p.accept(body, msg),
+            HttpBody::AnyOrEqual => Self::assault_or_compare(body, |_| true),
+            HttpBody::Plaintext(p) => p.accept(body, msg),
             #[cfg(feature = "json")]
-            BodyEvaluate::Json(e) => e.accept(body, msg),
+            HttpBody::Json(e) => e.accept(body, msg),
         }
     }
 }
