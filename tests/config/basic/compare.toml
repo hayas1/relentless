@@ -22,17 +22,17 @@ target = "/health/rich"
 [[testcases]]
 target = "/counter/increment"
 setting.repeat = 10
-attr = { allow = true }
+setting.allow = true
 
 [[testcases]]
 target = "/counter/increment/10"
 setting.repeat = 10
-attr = { allow = true }
+setting.allow = true
 
 [[testcases]]
 target = "/counter/decrement"
 setting.repeat = 10
-attr = { allow = true }
+setting.allow = true
 
 [[testcases]]
 target = "/counter/decrement/10"

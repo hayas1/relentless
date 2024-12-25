@@ -24,5 +24,4 @@ target = "/health/rich"
 [[testcases]]
 target = "/health/disabled"
 description = "this endpoint will respond with 503 service unavailable"
-setting = { request = { method = "GET" }, repeat = 1 }
-attr = { allow = true }
+setting = { request = { method = "GET" }, repeat = 1, allow = true }

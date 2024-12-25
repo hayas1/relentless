@@ -4,5 +4,5 @@ destinations:
 
 testcases:
   - target: /health/disabled
-    attr:
+    setting:
       allow: true

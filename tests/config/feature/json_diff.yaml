@@ -14,5 +14,4 @@ testcases:
             patch:
               - op: remove
                 path: /datetime
-    attr:
       allow: true

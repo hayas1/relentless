@@ -10,7 +10,7 @@ response = { header = "ignore" }
 [[testcases]]
 target = "/counter/increment"
 setting.repeat = 10
-attr = { allow = true }
+setting.allow = true
 
 [[testcases]]
 target = "/health/rich"
@@ -28,7 +28,7 @@ setting.response.body.json.ignore = [
 [[testcases]]
 target = "/information"
 description = "do not ignore datetime and hostname (must be failed, so attr allowed)"
-attr = { allow = true }
+setting.allow = true
 
 [[testcases]]
 target = "/information"
@@ -48,4 +48,4 @@ description = "remove actual datetime only (must be failed, so attr allowed)"
 setting.response.body.json.patch = { actual = [
     { op = "remove", path = "/datetime" },
 ] }
-attr = { allow = true }
+setting.allow = true
