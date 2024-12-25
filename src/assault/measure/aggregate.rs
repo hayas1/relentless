@@ -1,4 +1,4 @@
-use std::time::{Duration, SystemTime, SystemTimeError};
+use std::time::{Duration, Instant};
 
 use hdrhistogram::Histogram;
 
@@ -51,7 +51,7 @@ impl Aggregate for EvaluateAggregator {
     }
 }
 impl EvaluateAggregator {
-    pub fn new<T>(dst: &Destinations<T>, now: Option<SystemTime>) -> Self {
+    pub fn new<T>(dst: &Destinations<T>, now: Option<Instant>) -> Self {
         let destinations = dst.keys().map(|d| (d, ResponseAggregator::new(now))).collect();
         Self { pass: PassAggregator::new(), destinations }
     }
@@ -77,8 +77,8 @@ pub struct ResponseAggregator {
 #[derive(Debug, Clone, PartialEq, PartialOrd, Default)]
 pub struct ResponseAggregate {
     pub req: u64,
-    pub duration: Option<Duration>,
-    pub rps: Option<f64>,
+    pub duration: Duration,
+    pub rps: f64,
     pub bytes: BytesAggregate,
     pub latency: LatencyAggregate,
 }
@@ -88,7 +88,7 @@ impl Aggregate for ResponseAggregator {
     type Aggregate = ResponseAggregate;
     fn add(&mut self, res: &Self::Add) {
         self.count.add(&());
-        self.duration.add(&res.timestamp());
+        self.duration.add(&res.start_instant());
         self.bytes.add(&());
         self.latency.add(&res.latency());
     }
@@ -101,15 +101,15 @@ impl Aggregate for ResponseAggregator {
     fn aggregate(&self, query: &Self::Query) -> Self::Aggregate {
         ResponseAggregate {
             req: self.count.aggregate(&()),
-            duration: self.duration.aggregate(&()).ok(),
-            rps: self.rps().ok(),
+            duration: self.duration.aggregate(&()),
+            rps: self.rps(),
             bytes: self.bytes.aggregate(&()),
             latency: self.latency.aggregate(query),
         }
     }
 }
 impl ResponseAggregator {
-    pub fn new(now: Option<SystemTime>) -> Self {
+    pub fn new(now: Option<Instant>) -> Self {
         Self {
             count: CountAggregator::new(),
             duration: DurationAggregator::new(now),
@@ -118,8 +118,8 @@ impl ResponseAggregator {
         }
     }
 
-    pub fn rps(&self) -> Result<f64, SystemTimeError> {
-        Ok(self.count.aggregate(&()) as f64 / self.duration.aggregate(&())?.as_secs_f64())
+    pub fn rps(&self) -> f64 {
+        self.count.aggregate(&()) as f64 / self.duration.aggregate(&()).as_secs_f64()
     }
 }
 
@@ -194,12 +194,12 @@ impl PassAggregator {
 
 #[derive(Debug, Clone, Default)]
 pub struct DurationAggregator {
-    start_end: Option<(SystemTime, SystemTime)>,
+    start_end: Option<(Instant, Instant)>,
 }
 impl Aggregate for DurationAggregator {
-    type Add = SystemTime;
+    type Add = Instant;
     type Query = ();
-    type Aggregate = Result<Duration, SystemTimeError>;
+    type Aggregate = Duration;
     fn add(&mut self, timestamp: &Self::Add) {
         match self.start_end {
             None => self.start_end = Some((*timestamp, *timestamp)),
@@ -216,14 +216,14 @@ impl Aggregate for DurationAggregator {
         }
     }
     fn aggregate(&self, (): &Self::Query) -> Self::Aggregate {
-        Ok(match &self.start_end {
+        match &self.start_end {
             None => Duration::from_secs(0),
-            Some((start, end)) => end.duration_since(*start)?,
-        })
+            Some((start, end)) => end.duration_since(*start),
+        }
     }
 }
 impl DurationAggregator {
-    pub fn new(now: Option<SystemTime>) -> Self {
+    pub fn new(now: Option<Instant>) -> Self {
         Self { start_end: now.map(|t| (t, t)) }
     }
 }
@@ -302,7 +302,7 @@ impl LatencyAggregator {
 
 #[cfg(test)]
 mod tests {
-    use std::time::Instant;
+    use std::time::{Instant, SystemTime};
 
     use crate::assault::measure::metrics::MeasuredResponse;
 
@@ -328,11 +328,12 @@ mod tests {
 
     #[test]
     fn duration_aggregate() {
-        let mut agg = DurationAggregator::new(Some(SystemTime::UNIX_EPOCH));
+        let base_instant = Instant::now();
+        let mut agg = DurationAggregator::new(Some(base_instant));
         for i in 0..1000 {
-            agg.add(&(SystemTime::UNIX_EPOCH + Duration::from_millis(i)));
+            agg.add(&(base_instant + Duration::from_millis(i)));
         }
-        assert_eq!(agg.aggregate(&()).unwrap(), Duration::from_millis(999));
+        assert_eq!(agg.aggregate(&()), Duration::from_millis(999));
     }
 
     #[test]
@@ -413,7 +414,7 @@ mod tests {
     #[test]
     fn evaluate_aggregate() {
         let base_instant = Instant::now();
-        let mut agg = EvaluateAggregator::new(&Destinations::<()>::new(), Some(SystemTime::UNIX_EPOCH));
+        let mut agg = EvaluateAggregator::new(&Destinations::<()>::new(), Some(base_instant));
         for i in 0..1000 {
             let d = vec![
                 (
@@ -451,8 +452,8 @@ mod tests {
         assert_eq!(pass, PassAggregate { pass: 500, count: 1000, pass_rate: 0.5 });
         let ResponseAggregate { req, duration, rps, bytes, latency } = response;
         assert_eq!(req, 2000);
-        assert!(duration.unwrap().abs_diff(Duration::from_millis(999)) < tolerance);
-        assert_eq!(rps, Some(2002.002002002002));
+        assert!(duration.abs_diff(Duration::from_millis(999)) < tolerance);
+        assert_eq!(rps, 2002.002002002002);
         assert_eq!(bytes, BytesAggregate {});
         let LatencyAggregate { min, mean, quantile, max } = latency;
         assert!(min.abs_diff(Duration::from_millis(0)) < tolerance);

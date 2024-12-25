@@ -44,8 +44,8 @@ pub trait ConsoleReport: Reportable {
             w,
             "rps: {}req/{:.2?}={:.2}{}",
             req,
-            duration.unwrap_or_default(),
-            response.classify().apply_style(rps.unwrap_or_default()),
+            duration,
+            response.classify().apply_style(rps),
             response.classify().apply_style("req/s"),
         )
         .map_err(e.clone())?;

@@ -44,4 +44,12 @@ impl Metrics {
     pub fn end_timestamp(&self) -> SystemTime {
         self.timestamp + self.latency()
     }
+    pub fn start_instant(&self) -> Instant {
+        let (start, _) = self.duration;
+        start
+    }
+    pub fn end_instant(&self) -> Instant {
+        let (_, end) = self.duration;
+        end
+    }
 }

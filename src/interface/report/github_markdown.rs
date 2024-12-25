@@ -51,8 +51,7 @@ pub trait GithubMarkdownReport: Reportable {
 
         writeln!(w).map_err(e.clone())?;
         write!(w, "pass rate: {}/{}={:.2}%, ", pass, count, pass_rate * 100.).map_err(e.clone())?;
-        writeln!(w, "rps: {}req/{:.2?}={:.2}req/s", req, duration.unwrap_or_default(), rps.unwrap_or_default(),)
-            .map_err(e.clone())?;
+        writeln!(w, "rps: {}req/{:.2?}={:.2}req/s", req, duration, rps).map_err(e.clone())?;
 
         Ok(())
     }
