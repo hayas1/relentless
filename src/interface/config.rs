@@ -54,6 +54,8 @@ pub struct Setting<Q, P> {
     pub repeat: Repeat,
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub timeout: Option<Duration>, // TODO parse from string? https://crates.io/crates/humantime ?
+    #[serde(default, skip_serializing_if = "IsDefault::is_default")]
+    pub allow: Option<bool>,
 
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub response: P,
@@ -94,14 +96,6 @@ pub struct Testcase<Q, P> {
 
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     pub setting: Setting<Q, P>,
-    #[serde(default, skip_serializing_if = "IsDefault::is_default")]
-    pub attr: Attribute,
-}
-#[derive(Debug, Clone, PartialEq, Eq, Default, Hash, Serialize, Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "kebab-case")]
-pub struct Attribute {
-    #[serde(default, skip_serializing_if = "IsDefault::is_default")]
-    pub allow: bool,
 }
 
 impl<Q: Configuration, P: Configuration> Config<Q, P> {
@@ -144,6 +138,7 @@ impl<Q: Coalesce, P: Coalesce> Coalesce for Setting<Q, P> {
             template: if self.template.is_empty() { other.template.clone() } else { self.template },
             repeat: self.repeat.coalesce(&other.repeat),
             timeout: self.timeout.or(other.timeout),
+            allow: self.allow.or(other.allow),
             response: self.response.coalesce(&other.response),
         }
     }
@@ -249,6 +244,7 @@ mod tests {
                 target: "/information".to_string(),
                 setting: Setting {
                     request: HttpRequest::default(),
+                    allow: Some(true),
                     response: HttpResponse {
                         body: HttpBody::Json(JsonEvaluator {
                             ignore: vec!["/datetime".to_string()],
@@ -276,7 +272,6 @@ mod tests {
                     },
                     ..Default::default()
                 },
-                attr: Attribute { allow: true },
             }],
         };
         let yaml = serde_yaml::to_string(&example).unwrap();
