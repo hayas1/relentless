@@ -31,5 +31,4 @@ testcases:
             patch:
             - {"op": "test", "path": "/status", "value": "200 NG"}
             - {"op": "test", "path": "/code", "value": 200}
-    attr:
       allow: true

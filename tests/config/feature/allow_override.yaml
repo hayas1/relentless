@@ -1,4 +1,4 @@
-name: test config for allow
+name: test config for allow override
 destinations:
   test-api: http://localhost:3000
 setting:
@@ -8,3 +8,5 @@ testcases:
   - target: /health/disabled
   - target: /health/disabled
   - target: /health/disabled
+    setting:
+      allow: false

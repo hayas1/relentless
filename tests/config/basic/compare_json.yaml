@@ -10,7 +10,6 @@ testcases:
   - target: /counter/increment
     setting:
       repeat: 10
-    attr:
       allow: true
   - target: /health/rich
   - target: /information
@@ -26,7 +25,7 @@ testcases:
             - /uri
   - target: /information
     description: do not ignore datetime and hostname (must be failed, so attr allowed)
-    attr:
+    setting:
       allow: true
   - target: /information
     description: patch datetime and hostname and uri
@@ -51,5 +50,4 @@ testcases:
               actual:
               - op: remove
                 path: /datetime
-    attr:
       allow: true

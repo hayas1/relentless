@@ -23,4 +23,4 @@ setting.response.body.json.patch = [
     { op = "test", path = "/status", value = "200 NG" },
     { op = "test", path = "/code", value = 200 },
 ]
-attr = { allow = true }
+setting.allow = true

@@ -127,7 +127,7 @@ impl<T, Q: Clone + Coalesce, P: Clone + Coalesce> Reportable for CaseReport<T, Q
         self.passed == self.testcase.coalesce().setting.repeat.times()
     }
     fn allow(&self, strict: bool) -> bool {
-        let allowed = self.testcase.coalesce().attr.allow;
+        let allowed = matches!(self.testcase.coalesce().setting.allow, Some(true));
         self.pass() || !strict && allowed
     }
     fn aggregator(&self) -> EvaluateAggregator {
