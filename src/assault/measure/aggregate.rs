@@ -423,7 +423,7 @@ mod tests {
                         MeasuredResponse::new(
                             (),
                             SystemTime::UNIX_EPOCH + Duration::from_millis(i),
-                            (base_instant, base_instant + Duration::from_millis(i)),
+                            (base_instant + Duration::from_millis(i), base_instant + Duration::from_millis(2 * i)),
                         )
                         .metrics()
                         .clone(),
@@ -435,7 +435,7 @@ mod tests {
                         MeasuredResponse::new(
                             (),
                             SystemTime::UNIX_EPOCH + Duration::from_millis(i),
-                            (base_instant, base_instant + Duration::from_millis(i)),
+                            (base_instant + Duration::from_millis(i), base_instant + Duration::from_millis(2 * i)),
                         )
                         .metrics()
                         .clone(),
