@@ -2,7 +2,7 @@ use std::{
     future::Future,
     pin::Pin,
     task::{Context, Poll},
-    time::SystemTime,
+    time::{Instant, SystemTime},
 };
 
 use tower::{timeout::error::Elapsed, Layer, Service};
@@ -46,8 +46,9 @@ where
         let fut = self.inner.call(req);
         Box::pin(async {
             let timestamp = SystemTime::now();
+            let start = Instant::now();
             let result = fut.await;
-            let latency = timestamp.elapsed().map_err(RequestError::FailToMeasureLatency)?; // TODO this error should be allowed?
+            let end = Instant::now();
 
             let response = result.map_err(|error| {
                 let boxed: Box<dyn std::error::Error + Send + Sync> = error.into();
@@ -55,7 +56,7 @@ where
                     match err {
                         RequestError::InnerServiceError(e) => {
                             if e.is::<Elapsed>() {
-                                RequestError::Timeout(latency)
+                                RequestError::Timeout(end.duration_since(start))
                             } else {
                                 RequestError::InnerServiceError(boxed)
                             }
@@ -66,7 +67,7 @@ where
                     RequestError::Unknown(boxed)
                 }
             })?;
-            Ok(MeasuredResponse::new(response, timestamp, latency))
+            Ok(MeasuredResponse::new(response, timestamp, (start, end)))
         })
     }
 }

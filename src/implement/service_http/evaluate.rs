@@ -203,7 +203,7 @@ impl Acceptable<&Bytes> for BodyEvaluate {
 
 #[cfg(test)]
 mod tests {
-    use std::time::SystemTime;
+    use std::time::{Instant, SystemTime};
 
     use crate::assault::measure::metrics::MeasuredResponse;
 
@@ -217,7 +217,7 @@ mod tests {
             http::Response::builder().status(http::StatusCode::OK).body(http_body_util::Empty::<Bytes>::new()).unwrap();
         let responses = Destinations::from_iter(vec![(
             "test".to_string(),
-            Ok(MeasuredResponse::new(ok, SystemTime::now(), Default::default())),
+            Ok(MeasuredResponse::new(ok, SystemTime::now(), (Instant::now(), Instant::now()))),
         )]);
         let mut msg = Messages::new();
         let result = evaluator.evaluate(responses, &mut msg).await;
@@ -230,7 +230,7 @@ mod tests {
             .unwrap();
         let responses = Destinations::from_iter(vec![(
             "test".to_string(),
-            Ok(MeasuredResponse::new(unavailable, SystemTime::now(), Default::default())),
+            Ok(MeasuredResponse::new(unavailable, SystemTime::now(), (Instant::now(), Instant::now()))),
         )]);
         let mut msg = Messages::new();
         let result = evaluator.evaluate(responses, &mut msg).await;

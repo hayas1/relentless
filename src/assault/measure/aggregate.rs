@@ -302,6 +302,8 @@ impl LatencyAggregator {
 
 #[cfg(test)]
 mod tests {
+    use std::time::Instant;
+
     use crate::assault::measure::metrics::MeasuredResponse;
 
     use super::*;
@@ -410,6 +412,7 @@ mod tests {
 
     #[test]
     fn evaluate_aggregate() {
+        let base_instant = Instant::now();
         let mut agg = EvaluateAggregator::new(&Destinations::<()>::new(), Some(SystemTime::UNIX_EPOCH));
         for i in 0..1000 {
             let d = vec![
@@ -419,7 +422,7 @@ mod tests {
                         MeasuredResponse::new(
                             (),
                             SystemTime::UNIX_EPOCH + Duration::from_millis(i),
-                            Duration::from_millis(i),
+                            (base_instant, base_instant + Duration::from_millis(i)),
                         )
                         .metrics()
                         .clone(),
@@ -431,7 +434,7 @@ mod tests {
                         MeasuredResponse::new(
                             (),
                             SystemTime::UNIX_EPOCH + Duration::from_millis(i),
-                            Duration::from_millis(i),
+                            (base_instant, base_instant + Duration::from_millis(i)),
                         )
                         .metrics()
                         .clone(),

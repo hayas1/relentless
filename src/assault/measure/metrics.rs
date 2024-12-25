@@ -1,16 +1,14 @@
-use std::time::{Duration, SystemTime};
+use std::time::{Duration, Instant, SystemTime};
 
-use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct MeasuredResponse<Res> {
     response: Res,
     metrics: Metrics,
 }
 impl<Res> MeasuredResponse<Res> {
-    pub fn new(response: Res, timestamp: SystemTime, latency: Duration) -> Self {
+    pub fn new(response: Res, timestamp: SystemTime, duration: (Instant, Instant)) -> Self {
         let bytes = 0; // TODO implement
-        let metrics = Metrics { timestamp, latency, bytes };
+        let metrics = Metrics { bytes, timestamp, duration };
         Self { response, metrics }
     }
 
@@ -29,20 +27,21 @@ impl<Res> MeasuredResponse<Res> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Metrics {
-    timestamp: SystemTime,
-    latency: Duration,
     bytes: usize,
+    timestamp: SystemTime,
+    duration: (Instant, Instant),
 }
 impl Metrics {
     pub fn timestamp(&self) -> SystemTime {
         self.timestamp
     }
-    pub fn end_timestamp(&self) -> SystemTime {
-        self.timestamp + self.latency
-    }
     pub fn latency(&self) -> Duration {
-        self.latency
+        let (start, end) = self.duration;
+        end.duration_since(start)
+    }
+    pub fn end_timestamp(&self) -> SystemTime {
+        self.timestamp + self.latency()
     }
 }
