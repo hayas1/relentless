@@ -101,6 +101,14 @@ async fn test_allow_config() {
         format!("  {} this testcase is allowed", CaseConsoleReport::ALLOW_EMOJI),
         format!("  {} message was found", CaseConsoleReport::MESSAGE_EMOJI),
         format!("    status{} is not acceptable", ""),
+        format!("{} /health/disabled", CaseConsoleReport::FAIL_EMOJI),
+        format!("  {} this testcase is allowed", CaseConsoleReport::ALLOW_EMOJI),
+        format!("  {} message was found", CaseConsoleReport::MESSAGE_EMOJI),
+        format!("    status{} is not acceptable", ""),
+        format!("{} /health/disabled", CaseConsoleReport::FAIL_EMOJI),
+        format!("  {} this testcase is allowed", CaseConsoleReport::ALLOW_EMOJI),
+        format!("  {} message was found", CaseConsoleReport::MESSAGE_EMOJI),
+        format!("    status{} is not acceptable", ""),
     ] {
         assert!(out.contains(&line));
     }
