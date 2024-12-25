@@ -44,6 +44,8 @@ jsonptr = { version = "0.6.3", optional = true }
 clap = { version = "4.5.23", features = ["derive"], optional = true }
 console = { version = "0.15.10", optional = true }
 nom = "7.1.3"
+# average = "0.15.1" # Quantile (that use p2 algorithm) do not impl Extend
+hdrhistogram = "7.5.4"
 
 
 [dev-dependencies]

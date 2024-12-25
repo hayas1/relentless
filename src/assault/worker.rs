@@ -19,10 +19,11 @@ use crate::{
 
 use super::{
     destinations::Destinations,
+    error::{RequestError, RequestResult},
     evaluator::Evaluator,
     factory::RequestFactory,
+    measure::aggregate::{Aggregate, EvaluateAggregator},
     messages::Messages,
-    metrics::{RequestError, RequestResult},
     service::measure::MeasureLayer,
 };
 
@@ -137,18 +138,20 @@ where
         testcase: Coalesced<Testcase<Q, P>, Setting<Q, P>>,
     ) -> WrappedResult<CaseReport<P::Message, Q, P>> {
         let case = &testcase.coalesce();
+        let evaluate_aggregate = EvaluateAggregator::new(destinations, None);
 
-        let (passed, messages) = self
+        let (passed, messages, aggregate) = self
             .requests(cmd, destinations, case)
             .await?
-            .fold((0, Messages::new()), |(p, mut msg), res| async move {
-                // TODO aggregate latency, byte size, etc...
+            .fold((0, Messages::new(), evaluate_aggregate), |(p, mut msg, mut agg), res| async move {
+                let metrics = res.iter().map(|(d, r)| (d, r.as_ref().ok().map(|r| r.metrics().clone()))).collect();
                 let pass = case.setting.response.evaluate(res, &mut msg).await;
-                (p + pass as usize, msg)
+                agg.add(&(pass, metrics)); // TODO timeout request will be not measured
+                (p + pass as usize, msg, agg)
             })
             .await;
 
-        Ok(CaseReport::new(testcase, passed, messages))
+        Ok(CaseReport::new(testcase, passed, messages, aggregate))
     }
 
     pub async fn requests<'a>(

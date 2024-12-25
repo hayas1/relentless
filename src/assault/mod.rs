@@ -5,6 +5,7 @@ pub mod factory;
 pub mod messages;
 pub mod service;
 
-pub mod metrics;
+pub mod error;
+pub mod measure;
 pub mod reportable;
 pub mod worker;

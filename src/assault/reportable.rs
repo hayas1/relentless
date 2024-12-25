@@ -16,10 +16,47 @@ use crate::{
     },
 };
 
-use super::{destinations::Destinations, messages::Messages};
+use super::{
+    destinations::Destinations,
+    measure::aggregate::{Aggregate, EvaluateAggregator},
+    messages::Messages,
+};
+
+pub trait Reportable {
+    // TODO https://std-dev-guide.rust-lang.org/policy/specialization.html
+    fn sub_reportable(&self) -> Vec<&dyn Reportable>;
+    fn pass(&self) -> bool {
+        if self.sub_reportable().is_empty() {
+            unreachable!("a reportable without children should implement its own method");
+        } else {
+            self.sub_reportable().iter().all(|r| r.pass())
+        }
+    }
+    fn allow(&self, strict: bool) -> bool {
+        if self.sub_reportable().is_empty() {
+            unreachable!("a reportable without children should implement its own method");
+        } else {
+            self.sub_reportable().iter().all(|r| r.allow(strict))
+        }
+    }
+    fn aggregator(&self) -> EvaluateAggregator {
+        if self.sub_reportable().is_empty() {
+            unreachable!("a reportable without children should implement its own method");
+        } else {
+            self.sub_reportable().iter().map(|r| r.aggregator()).fold(Default::default(), |mut agg, b| {
+                agg.merge(&b);
+                agg
+            })
+        }
+    }
+    fn skip_report(&self, cmd: &Relentless) -> bool {
+        let Relentless { strict, ng_only, report_format, .. } = cmd;
+        matches!(report_format, ReportFormat::NullDevice) || *ng_only && self.allow(*strict)
+    }
+}
 
 /// TODO document
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct Report<T, Q, P> {
     pub report: Vec<WorkerReport<T, Q, P>>,
 }
@@ -38,7 +75,7 @@ impl<T, Q: Clone + Coalesce, P: Clone + Coalesce> Reportable for Report<T, Q, P>
 }
 
 /// TODO document
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct WorkerReport<T, Q, P> {
     pub config: Coalesced<WorkerConfig<Q, P>, Destinations<http_serde_priv::Uri>>,
     pub report: Vec<CaseReport<T, Q, P>>,
@@ -58,15 +95,28 @@ impl<T, Q: Clone + Coalesce, P: Clone + Coalesce> Reportable for WorkerReport<T,
 }
 
 /// TODO document
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct CaseReport<T, Q, P> {
-    pub testcase: Coalesced<Testcase<Q, P>, Setting<Q, P>>,
-    pub passed: usize,
-    pub messages: Messages<T>,
+    testcase: Coalesced<Testcase<Q, P>, Setting<Q, P>>,
+    pub(crate) passed: usize,
+    messages: Messages<T>,
+    aggregate: EvaluateAggregator,
 }
 impl<T, Q, P> CaseReport<T, Q, P> {
-    pub fn new(testcase: Coalesced<Testcase<Q, P>, Setting<Q, P>>, passed: usize, messages: Messages<T>) -> Self {
-        Self { testcase, passed, messages }
+    pub fn new(
+        testcase: Coalesced<Testcase<Q, P>, Setting<Q, P>>,
+        passed: usize,
+        messages: Messages<T>,
+        aggregate: EvaluateAggregator,
+    ) -> Self {
+        Self { testcase, passed, messages, aggregate }
+    }
+
+    pub fn testcase(&self) -> &Coalesced<Testcase<Q, P>, Setting<Q, P>> {
+        &self.testcase
+    }
+    pub fn messages(&self) -> &Messages<T> {
+        &self.messages
     }
 }
 impl<T, Q: Clone + Coalesce, P: Clone + Coalesce> Reportable for CaseReport<T, Q, P> {
@@ -80,35 +130,15 @@ impl<T, Q: Clone + Coalesce, P: Clone + Coalesce> Reportable for CaseReport<T, Q
         let allowed = self.testcase.coalesce().attr.allow;
         self.pass() || !strict && allowed
     }
-}
-
-pub trait Reportable {
-    // TODO https://std-dev-guide.rust-lang.org/policy/specialization.html
-    fn sub_reportable(&self) -> Vec<&dyn Reportable>;
-    fn pass(&self) -> bool {
-        if self.sub_reportable().is_empty() {
-            unreachable!("a reportable without children should implement its own method");
-        } else {
-            self.sub_reportable().iter().all(|r| r.pass())
-        }
-    }
-    fn allow(&self, strict: bool) -> bool {
-        if self.sub_reportable().is_empty() {
-            unreachable!("a reportable without children should implement its own method");
-        } else {
-            self.sub_reportable().iter().all(|r| r.allow(strict))
-        }
-    }
-    fn skip_report(&self, cmd: &Relentless) -> bool {
-        let Relentless { strict, ng_only, report_format, .. } = cmd;
-        matches!(report_format, ReportFormat::NullDevice) || *ng_only && self.allow(*strict)
+    fn aggregator(&self) -> EvaluateAggregator {
+        self.aggregate.clone()
     }
 }
 
 pub struct ReportWriter<W> {
-    pub indent: usize,
-    pub buf: W,
-    pub at_start_line: bool,
+    indent: usize,
+    buf: W,
+    at_start_line: bool,
 }
 impl ReportWriter<BufWriter<Stdout>> {
     pub fn with_stdout(indent: usize) -> Self {

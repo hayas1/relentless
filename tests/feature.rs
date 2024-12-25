@@ -1,15 +1,22 @@
 #![cfg(all(feature = "json", feature = "yaml", feature = "console-report"))]
 use axum::{body::Body, http::Request};
 use http_body_util::BodyExt;
-use relentless::interface::{command::Relentless, report::console::CaseConsoleReport};
+use relentless::interface::{
+    command::{Relentless, WorkerKind},
+    report::console::{CaseConsoleReport, RelentlessConsoleReport},
+};
 
 use relentless_dev_server::route::{self, counter::CounterResponse};
 use tower::ServiceExt;
 
 #[tokio::test]
 async fn test_repeat_config() {
-    let relentless =
-        Relentless { file: vec!["tests/config/feature/repeat.yaml".into()], no_color: true, ..Default::default() };
+    let relentless = Relentless {
+        file: vec!["tests/config/feature/repeat.yaml".into()],
+        no_color: true,
+        no_async_testcases: true,
+        ..Default::default()
+    };
     let configs = relentless.configs().unwrap();
     let service = route::app_with(Default::default());
     let report = relentless.assault_with::<_, Request<Body>>(configs, service.clone()).await.unwrap();
@@ -258,22 +265,27 @@ async fn test_async_config() {
 
     // TODO test for 5 times
     for line in [
+        // 1
         format!("{} /wait/500/ns {}1000/1000 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
         format!("{} /wait/500/us {}100/100 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
         format!("{} /wait/500/ms {}10/10 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
         format!("{} /wait/1/s {}5/5 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
+        // 2
         format!("{} /wait/500/ns {}1000/1000 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
         format!("{} /wait/500/us {}100/100 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
         format!("{} /wait/500/ms {}10/10 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
         format!("{} /wait/1/s {}5/5 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
+        // 3
         format!("{} /wait/500/ns {}1000/1000 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
         format!("{} /wait/500/us {}100/100 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
         format!("{} /wait/500/ms {}10/10 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
         format!("{} /wait/1/s {}5/5 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
+        // 4
         format!("{} /wait/500/ns {}1000/1000 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
         format!("{} /wait/500/us {}100/100 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
         format!("{} /wait/500/ms {}10/10 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
         format!("{} /wait/1/s {}5/5 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
+        // 5
         format!("{} /wait/500/ns {}1000/1000 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
         format!("{} /wait/500/us {}100/100 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
         format!("{} /wait/500/ms {}10/10 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
@@ -283,4 +295,81 @@ async fn test_async_config() {
     }
     assert!(relentless.pass(&report));
     assert!(relentless.allow(&report));
+}
+
+#[tokio::test]
+async fn test_measure_config() {
+    let relentless = Relentless {
+        file: vec!["tests/config/feature/measure.yaml".into(); 3],
+        no_color: true,
+        measure: Some(vec![WorkerKind::Repeats, WorkerKind::Testcases, WorkerKind::Configs]),
+        percentile: Some(vec![5., 50., 90., 95., 99., 99.9]),
+        ..Default::default()
+    };
+    let configs = relentless.configs().unwrap();
+    let service = route::app_with(Default::default());
+    let report = relentless.assault_with::<_, Request<Body>>(configs, service).await.unwrap();
+
+    let mut buf = Vec::new();
+    relentless.report_with(&report, &mut buf).unwrap();
+    let out = String::from_utf8_lossy(&buf);
+
+    // TODO test for 3 times
+    for line in [
+        // 1
+        format!("  {} /health {}100/100 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
+        format!("    {} summery of all requests in repeats", RelentlessConsoleReport::SUMMARY_EMOJI),
+        format!("      pass-rt: 100/100={:.2}%    rps: 100req/", 100.),
+        format!("      latency: min={}", ""),
+        format!("  {} /health {}1000/1000 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
+        format!("      pass-rt: 1000/1000={:.2}%    rps: 1000req/", 100.),
+        format!("      latency: min={}", ""),
+        format!("  {} /health {}10000/10000 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
+        format!("      pass-rt: 10000/10000={:.2}%    rps: 10000req/", 100.),
+        format!("      latency: min={}", ""),
+        format!("  {} summery of all requests in testcases", RelentlessConsoleReport::SUMMARY_EMOJI),
+        format!("    pass-rt: 11100/11100={:.2}%    rps: 11100req/", 100.),
+        format!("    latency: min={}", ""),
+        // 2
+        format!("  {} /health {}100/100 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
+        format!("    {} summery of all requests in repeats", RelentlessConsoleReport::SUMMARY_EMOJI),
+        format!("      pass-rt: 100/100={:.2}%    rps: 100req/", 100.),
+        format!(" p5={}", ""),
+        format!("  {} /health {}1000/1000 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
+        format!("      pass-rt: 1000/1000={:.2}%    rps: 1000req/", 100.),
+        format!(" p5={}", ""),
+        format!("  {} /health {}10000/10000 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
+        format!("      pass-rt: 10000/10000={:.2}%    rps: 10000req/", 100.),
+        format!(" p5={}", ""),
+        format!("  {} summery of all requests in testcases", RelentlessConsoleReport::SUMMARY_EMOJI),
+        format!("    pass-rt: 11100/11100={:.2}%    rps: 11100req/", 100.),
+        format!(" p5={}", ""),
+        // 3
+        format!("  {} /health {}100/100 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
+        format!("    {} summery of all requests in repeats", RelentlessConsoleReport::SUMMARY_EMOJI),
+        format!("      pass-rt: 100/100={:.2}%    rps: 100req/", 100.),
+        format!(" p99.9={}", ""),
+        format!("  {} /health {}1000/1000 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
+        format!("      pass-rt: 1000/1000={:.2}%    rps: 1000req/", 100.),
+        format!(" p99.9={}", ""),
+        format!("  {} /health {}10000/10000 ", CaseConsoleReport::PASS_EMOJI, CaseConsoleReport::REPEAT_EMOJI),
+        format!("      pass-rt: 10000/10000={:.2}%    rps: 10000req/", 100.),
+        format!(" p99.9={}", ""),
+        format!("  {} summery of all requests in testcases", RelentlessConsoleReport::SUMMARY_EMOJI),
+        format!("    pass-rt: 11100/11100={:.2}%    rps: 11100req/", 100.),
+        format!(" p99.9={}", ""),
+        // summery
+        format!(
+            "{} summery of all requests in configs {}",
+            RelentlessConsoleReport::SUMMARY_EMOJI,
+            RelentlessConsoleReport::SUMMARY_EMOJI,
+        ),
+        format!("  pass-rt: 33300/33300={:.2}%    rps: 33300req/", 100.),
+        format!("  latency: min={}", ""),
+    ] {
+        assert!(out.contains(&line));
+    }
+    assert!(relentless.pass(&report));
+    assert!(relentless.allow(&report));
+    println!("{}", out);
 }

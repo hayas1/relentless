@@ -7,7 +7,7 @@ use std::{
 use thiserror::Error;
 
 use crate::{
-    assault::metrics::RequestError,
+    assault::error::RequestError,
     implement::service_http::{evaluate::HttpResponse, factory::HttpRequest},
     interface::config::Config,
 };
@@ -298,6 +298,8 @@ pub enum RunCommandError {
     CannotReadSomeConfigs(Vec<Config<HttpRequest, HttpResponse>>),
     #[error("cannot specify format")]
     CannotSpecifyFormat,
+    #[error("nan is not number")]
+    NanPercentile,
 }
 
 #[derive(Error, Debug, Clone, PartialEq, Eq)]

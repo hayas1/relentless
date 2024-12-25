@@ -8,10 +8,10 @@ use crate::assault::evaluate::json::JsonEvaluate;
 use crate::{
     assault::{
         destinations::{AllOr, Destinations},
+        error::RequestResult,
         evaluate::plaintext::PlaintextEvaluate,
         evaluator::{Acceptable, Evaluator},
         messages::Messages,
-        metrics::RequestResult,
     },
     error::EvaluateError,
     interface::helper::{coalesce::Coalesce, http_serde_priv, is_default::IsDefault},
@@ -203,9 +203,9 @@ impl Acceptable<&Bytes> for BodyEvaluate {
 
 #[cfg(test)]
 mod tests {
-    use std::time::SystemTime;
+    use std::time::{Instant, SystemTime};
 
-    use crate::assault::metrics::MeasuredResponse;
+    use crate::assault::measure::metrics::MeasuredResponse;
 
     use super::*;
 
@@ -217,7 +217,7 @@ mod tests {
             http::Response::builder().status(http::StatusCode::OK).body(http_body_util::Empty::<Bytes>::new()).unwrap();
         let responses = Destinations::from_iter(vec![(
             "test".to_string(),
-            Ok(MeasuredResponse::new(ok, SystemTime::now(), Default::default())),
+            Ok(MeasuredResponse::new(ok, SystemTime::now(), (Instant::now(), Instant::now()))),
         )]);
         let mut msg = Messages::new();
         let result = evaluator.evaluate(responses, &mut msg).await;
@@ -230,7 +230,7 @@ mod tests {
             .unwrap();
         let responses = Destinations::from_iter(vec![(
             "test".to_string(),
-            Ok(MeasuredResponse::new(unavailable, SystemTime::now(), Default::default())),
+            Ok(MeasuredResponse::new(unavailable, SystemTime::now(), (Instant::now(), Instant::now()))),
         )]);
         let mut msg = Messages::new();
         let result = evaluator.evaluate(responses, &mut msg).await;
