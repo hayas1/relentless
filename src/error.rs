@@ -31,6 +31,11 @@ impl<T> From<Context<T>> for RelentlessError {
         RelentlessError { source }
     }
 }
+impl From<crate::new_error::RelentlessError> for RelentlessError {
+    fn from(e: crate::new_error::RelentlessError) -> Self {
+        RelentlessError { source: Box::new(e) }
+    }
+}
 impl RelentlessError {
     pub fn wrap<E>(e: E) -> Self
     where
