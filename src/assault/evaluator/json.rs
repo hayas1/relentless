@@ -8,7 +8,7 @@ use crate::{
         evaluate::Acceptable,
         messages::Messages,
     },
-    error::{EvaluateError, WrappedResult},
+    error::EvaluateError,
     interface::{config::Severity, helper::is_default::IsDefault},
 };
 
@@ -26,13 +26,13 @@ pub struct JsonEvaluator {
 #[cfg(feature = "json")]
 impl Acceptable<&Bytes> for JsonEvaluator {
     type Message = EvaluateError;
-    fn accept(&self, bytes: &Destinations<&Bytes>, msg: &mut Messages<EvaluateError>) -> bool {
+    fn accept(&self, bytes: &Destinations<&Bytes>, msg: &mut Messages<Self::Message>) -> bool {
         self.accept_json(bytes, msg)
     }
 }
 impl JsonEvaluator {
     pub fn accept_json(&self, bytes: &Destinations<&Bytes>, msg: &mut Messages<EvaluateError>) -> bool {
-        let Some(patched) = msg.push_if_err(self.patched(bytes).map_err(EvaluateError::FailToPatchJson)) else {
+        let Some(patched) = msg.push_if_err(self.patched(bytes)) else {
             return false;
         };
         let values: Vec<_> = patched.into_values().collect();
@@ -40,14 +40,14 @@ impl JsonEvaluator {
         values.windows(2).all(|w| self.json_compare((&w[0], &w[1]), msg))
     }
 
-    pub fn patched(&self, bytes: &Destinations<&Bytes>) -> WrappedResult<Destinations<Value>> {
+    pub fn patched(&self, bytes: &Destinations<&Bytes>) -> Result<Destinations<Value>, EvaluateError> {
         bytes
             .iter()
             .map(|(name, b)| {
-                let mut value = serde_json::from_slice(b)?;
+                let mut value = serde_json::from_slice(b).map_err(EvaluateError::FailToParseJson)?;
                 if let Err(e) = self.patch(name, &mut value) {
                     if self.patch_fail.is_none() && bytes.len() == 1 || self.patch_fail > Some(Severity::Warn) {
-                        Err(e)?;
+                        Err(EvaluateError::FailToPatchJson(e))?;
                     }
                 }
                 Ok((name.clone(), value))
@@ -87,4 +87,14 @@ impl JsonEvaluator {
             .map(ToString::to_string)
             .collect()
     }
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum JsonEvaluateError {
+    #[error("{0}")]
+    FailToPatchJson(json_patch::PatchError),
+    #[error("{0}")]
+    FailToParseJson(serde_json::Error),
+    #[error("diff in `{0}`")]
+    Diff(String),
 }

@@ -337,7 +337,10 @@ pub enum EvaluateError {
 
     #[cfg(feature = "json")]
     #[error("{0}")]
-    FailToPatchJson(Wrap),
+    FailToPatchJson(json_patch::PatchError),
+    #[cfg(feature = "json")]
+    #[error("{0}")]
+    FailToParseJson(serde_json::Error),
     #[cfg(feature = "json")]
     #[error("diff in `{0}`")]
     Diff(String),

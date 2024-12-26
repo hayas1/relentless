@@ -3,6 +3,8 @@ use std::{
     fmt::{Display, Result as FmtResult},
 };
 
+use crate::error::{EvaluateError, Wrap};
+
 pub type RelentlessResult<T> = Result<T, RelentlessError>;
 #[derive(Debug)]
 pub struct RelentlessError {
@@ -25,16 +27,21 @@ impl Display for RelentlessError {
 }
 
 pub trait Context<T> {
-    fn context(self, context: ErrorContext) -> Result<T, RelentlessError>;
+    fn context<C: Into<ErrorContext>>(self, context: C) -> RelentlessResult<T>;
 }
 impl<T, E: StdError + Send + Sync + 'static> Context<T> for Result<T, E> {
-    fn context(self, context: ErrorContext) -> Result<T, RelentlessError> {
-        self.map_err(|e| RelentlessError { source: Some(Box::new(e)), context })
+    fn context<C: Into<ErrorContext>>(self, context: C) -> RelentlessResult<T> {
+        self.map_err(|e| RelentlessError { source: Some(Box::new(e)), context: context.into() })
+    }
+}
+impl<T> Context<T> for Result<T, Wrap> {
+    fn context<C: Into<ErrorContext>>(self, context: C) -> RelentlessResult<T> {
+        self.map_err(|e| RelentlessError { source: Some(e.source()), context: context.into() })
     }
 }
 impl<T> Context<T> for Option<T> {
-    fn context(self, context: ErrorContext) -> Result<T, RelentlessError> {
-        self.ok_or(RelentlessError { source: None, context })
+    fn context<C: Into<ErrorContext>>(self, context: C) -> RelentlessResult<T> {
+        self.ok_or(RelentlessError { source: None, context: context.into() })
     }
 }
 
@@ -53,5 +60,10 @@ impl Display for ErrorContext {
             ErrorContext::Assault => write!(f, "assault error"),
             ErrorContext::Evaluate => write!(f, "evaluate error"),
         }
+    }
+}
+impl From<EvaluateError> for ErrorContext {
+    fn from(_: EvaluateError) -> Self {
+        Self::Evaluate
     }
 }
