@@ -10,6 +10,7 @@ use crate::{
     assault::error::RequestError,
     implement::service_http::{evaluate::HttpResponse, factory::HttpRequest},
     interface::config::Config,
+    new_error::JsonEvaluateError,
 };
 
 pub type RelentlessResult<T, E = RelentlessError> = Result<T, E>;
@@ -336,14 +337,8 @@ pub enum EvaluateError {
     UnacceptableHeaderMap,
 
     #[cfg(feature = "json")]
-    #[error("{0}")]
-    FailToPatchJson(json_patch::PatchError),
-    #[cfg(feature = "json")]
-    #[error("{0}")]
-    FailToParseJson(serde_json::Error),
-    #[cfg(feature = "json")]
-    #[error("diff in `{0}`")]
-    Diff(String),
+    #[error(transparent)]
+    JsonEvaluateError(JsonEvaluateError),
 
     #[error(transparent)]
     RequestError(RequestError),

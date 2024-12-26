@@ -3,67 +3,43 @@ use std::{
     fmt::{Display, Result as FmtResult},
 };
 
-use crate::error::{EvaluateError, Wrap};
-
 pub type RelentlessResult<T> = Result<T, RelentlessError>;
 #[derive(Debug)]
 pub struct RelentlessError {
-    source: Option<Box<dyn StdError + Send + Sync + 'static>>,
-    context: ErrorContext,
+    source: Box<dyn StdError + Send + Sync + 'static>,
 }
 impl StdError for RelentlessError {
     fn source(&self) -> Option<&(dyn StdError + 'static)> {
-        self.source.as_ref().map(|e| &**e as _)
+        Some(self.source.as_ref())
     }
 }
 impl Display for RelentlessError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> FmtResult {
-        if let Some(source) = &self.source {
-            write!(f, "{}: {}", self.context, source)
-        } else {
-            write!(f, "{}", self.context)
-        }
+        write!(f, "{}", self.source)
     }
 }
 
-pub trait Context<T> {
-    fn context<C: Into<ErrorContext>>(self, context: C) -> RelentlessResult<T>;
+#[derive(Debug)]
+pub enum JsonEvaluateError {
+    FailToPatchJson(json_patch::PatchError),
+    FailToParseJson(serde_json::Error),
+    Diff(String),
 }
-impl<T, E: StdError + Send + Sync + 'static> Context<T> for Result<T, E> {
-    fn context<C: Into<ErrorContext>>(self, context: C) -> RelentlessResult<T> {
-        self.map_err(|e| RelentlessError { source: Some(Box::new(e)), context: context.into() })
-    }
-}
-impl<T> Context<T> for Result<T, Wrap> {
-    fn context<C: Into<ErrorContext>>(self, context: C) -> RelentlessResult<T> {
-        self.map_err(|e| RelentlessError { source: Some(e.source()), context: context.into() })
-    }
-}
-impl<T> Context<T> for Option<T> {
-    fn context<C: Into<ErrorContext>>(self, context: C) -> RelentlessResult<T> {
-        self.ok_or(RelentlessError { source: None, context: context.into() })
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum ErrorContext {
-    RunCommand,
-    Template,
-    Assault,
-    Evaluate,
-}
-impl Display for ErrorContext {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl StdError for JsonEvaluateError {
+    fn source(&self) -> Option<&(dyn StdError + 'static)> {
         match self {
-            ErrorContext::RunCommand => write!(f, "run command error"),
-            ErrorContext::Template => write!(f, "template error"),
-            ErrorContext::Assault => write!(f, "assault error"),
-            ErrorContext::Evaluate => write!(f, "evaluate error"),
+            Self::FailToPatchJson(e) => Some(e),
+            Self::FailToParseJson(e) => Some(e),
+            Self::Diff(_) => None,
         }
     }
 }
-impl From<EvaluateError> for ErrorContext {
-    fn from(_: EvaluateError) -> Self {
-        Self::Evaluate
+impl Display for JsonEvaluateError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> FmtResult {
+        match self {
+            Self::FailToPatchJson(e) => write!(f, "{}", e),
+            Self::FailToParseJson(e) => write!(f, "{}", e),
+            Self::Diff(e) => write!(f, "diff in `{}`", e),
+        }
     }
 }

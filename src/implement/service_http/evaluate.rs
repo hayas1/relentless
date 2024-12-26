@@ -196,7 +196,12 @@ impl Acceptable<&Bytes> for HttpBody {
             HttpBody::AnyOrEqual => Self::assault_or_compare(body, |_| true),
             HttpBody::Plaintext(p) => p.accept(body, msg),
             #[cfg(feature = "json")]
-            HttpBody::Json(e) => e.accept(body, msg),
+            HttpBody::Json(e) => {
+                let mut json_msg = Messages::new();
+                let accept = e.accept(body, &mut json_msg);
+                msg.extend(json_msg.into_iter().map(EvaluateError::JsonEvaluateError));
+                accept
+            }
         }
     }
 }
