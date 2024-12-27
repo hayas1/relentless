@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     assault::factory::RequestFactory,
-    error::{Wrap, WrappedResult},
+    error2::IntoResult,
     interface::{
         helper::{coalesce::Coalesce, http_serde_priv, is_default::IsDefault},
         template::Template,
@@ -40,16 +40,16 @@ pub enum HttpBody {
     Json(HashMap<String, String>),
 }
 impl HttpBody {
-    pub fn body_with_headers<ReqB>(&self, template: &Template) -> WrappedResult<(ReqB, HeaderMap)>
+    pub fn body_with_headers<ReqB>(&self, template: &Template) -> crate::Result2<(ReqB, HeaderMap)>
     where
         ReqB: Body,
         Self: BodyFactory<ReqB>,
-        Wrap: From<<Self as BodyFactory<ReqB>>::Error>,
+        <Self as BodyFactory<ReqB>>::Error: std::error::Error + Send + Sync + 'static,
     {
         let mut headers = HeaderMap::new();
         self.content_type()
             .map(|t| headers.insert(CONTENT_TYPE, t.as_ref().parse().unwrap_or_else(|_| unreachable!())));
-        let body = self.produce(template)?;
+        let body = self.produce(template).box_err()?;
         body.size_hint().exact().filter(|size| *size > 0).map(|size| headers.insert(CONTENT_LENGTH, size.into())); // TODO remove ?
         Ok((body, headers))
     }
@@ -86,7 +86,7 @@ impl<B> RequestFactory<http::Request<B>> for HttpRequest
 where
     B: Body,
     HttpBody: BodyFactory<B>,
-    Wrap: From<<HttpBody as BodyFactory<B>>::Error>,
+    <HttpBody as BodyFactory<B>>::Error: std::error::Error + Send + Sync + 'static,
 {
     type Error = crate::Error;
     fn produce(
@@ -96,17 +96,14 @@ where
         template: &Template,
     ) -> Result<http::Request<B>, Self::Error> {
         let HttpRequest { no_additional_headers, method, headers, body } = self;
-        let uri = http::uri::Builder::from(destination.clone())
-            .path_and_query(template.render(target)?)
-            .build()
-            .map_err(Wrap::error)?;
+        let uri =
+            http::uri::Builder::from(destination.clone()).path_and_query(template.render(target)?).build().box_err()?;
         let unwrapped_method = method.as_ref().map(|m| (**m).clone()).unwrap_or_default();
         let unwrapped_headers: HeaderMap = headers.as_ref().map(|h| (**h).clone()).unwrap_or_default();
         // .into_iter().map(|(k, v)| (k, template.render_as_string(v))).collect(); // TODO template with header
         let (actual_body, additional_headers) = body.clone().body_with_headers(template)?;
 
-        let mut request =
-            http::Request::builder().uri(uri).method(unwrapped_method).body(actual_body).map_err(Wrap::error)?;
+        let mut request = http::Request::builder().uri(uri).method(unwrapped_method).body(actual_body).box_err()?;
         let header_map = request.headers_mut();
         header_map.extend(unwrapped_headers);
         if !no_additional_headers {
@@ -130,7 +127,7 @@ where
             HttpBody::Empty => Ok(Default::default()),
             HttpBody::Plaintext(s) => Ok(Bytes::from(template.render(s).unwrap_or(s.to_string())).into()),
             #[cfg(feature = "json")]
-            HttpBody::Json(_) => Ok(Bytes::from(serde_json::to_vec(&self).map_err(Wrap::error)?).into()),
+            HttpBody::Json(_) => Ok(Bytes::from(serde_json::to_vec(&self).box_err()?).into()),
         }
     }
 }
