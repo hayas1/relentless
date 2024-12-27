@@ -35,6 +35,7 @@ impl From<crate::error2::RelentlessError> for RelentlessError {
         RelentlessError { source: Box::new(e) }
     }
 }
+impl IntoRelentlessError for RelentlessError {}
 impl RelentlessError {
     pub fn wrap<E>(e: E) -> Self
     where
@@ -150,6 +151,11 @@ impl Wrap {
             }
             None => None,
         }
+    }
+}
+impl From<Wrap> for crate::Error2 {
+    fn from(e: Wrap) -> Self {
+        crate::Error::from(e).into()
     }
 }
 

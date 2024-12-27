@@ -100,7 +100,7 @@ impl<Q: Configuration, P: Configuration> Config<Q, P> {
     pub fn read<A: AsRef<Path>>(path: A) -> WrappedResult<Self> {
         Ok(Format::from_path(path.as_ref())?
             .deserialize_testcase(path.as_ref())
-            .map_err(|e| e.context(path.as_ref().display().to_string()))?)
+            .map_err(|e| InterfaceError::CannotReadConfig(path.as_ref().display().to_string(), e.into()))?)
     }
     pub fn read_str(s: &str, format: Format) -> WrappedResult<Self> {
         format.deserialize_testcase_str(s)

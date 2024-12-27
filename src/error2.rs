@@ -64,7 +64,7 @@ pub enum InterfaceError {
     UndefinedSerializeFormat,
     KeyValueFormat(String),
     UnknownFormatExtension(String),
-    // CannotReadSomeConfigs(Vec<Config<HttpRequest, HttpResponse>>),
+    CannotReadConfig(String, RelentlessError),
     CannotSpecifyFormat,
     NanPercentile,
 }
@@ -75,7 +75,7 @@ impl Error for InterfaceError {
             Self::UndefinedSerializeFormat => None,
             Self::KeyValueFormat(_) => None,
             Self::UnknownFormatExtension(_) => None,
-            // Self::CannotReadSomeConfigs(_) => None,
+            Self::CannotReadConfig(_, e) => Some(e),
             Self::CannotSpecifyFormat => None,
             Self::NanPercentile => None,
         }
@@ -87,7 +87,7 @@ impl Display for InterfaceError {
             Self::UndefinedSerializeFormat => write!(f, "at least one serde format is required"),
             Self::KeyValueFormat(s) => write!(f, "should be KEY=VALUE format, but `{}` has no `=`", s),
             Self::UnknownFormatExtension(s) => write!(f, "`{}` is unknown extension format", s),
-            // Self::CannotReadSomeConfigs(_) => write!(f, "cannot read some configs"),
+            Self::CannotReadConfig(s, e) => write!(f, "[{}] {}", s, e),
             Self::CannotSpecifyFormat => write!(f, "cannot specify format"),
             Self::NanPercentile => write!(f, "nan is not number"),
         }
