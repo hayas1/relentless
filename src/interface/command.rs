@@ -19,7 +19,7 @@ use crate::{
         worker::Control,
     },
     error::{Wrap, WrappedResult},
-    error2::InterfaceError,
+    error2::{InterfaceError, IntoResult},
     implement::service_http::{evaluate::HttpResponse, factory::HttpRequest},
 };
 
@@ -257,7 +257,7 @@ where
     U::Err: std::error::Error + Send + Sync + 'static,
 {
     let (name, destination) = s.split_once('=').ok_or_else(|| InterfaceError::KeyValueFormat(s.to_string()))?;
-    Ok((name.parse().map_err(crate::Error2::boxed)?, destination.parse().map_err(crate::Error2::boxed)?))
+    Ok((name.parse().box_err()?, destination.parse().box_err()?))
 }
 
 #[cfg(test)]

@@ -8,7 +8,11 @@ use std::{
 
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
-use crate::{assault::destinations::Destinations, error2::InterfaceError, interface::template::Template};
+use crate::{
+    assault::destinations::Destinations,
+    error2::{InterfaceError, IntoResult},
+    interface::template::Template,
+};
 
 use super::helper::{coalesce::Coalesce, http_serde_priv, is_default::IsDefault, transpose};
 
@@ -170,16 +174,11 @@ impl Format {
     ) -> crate::Result2<Config<Q, P>> {
         match self {
             #[cfg(feature = "json")]
-            Format::Json => Ok(serde_json::from_reader(File::open(path).map_err(crate::Error2::boxed)?)
-                .map_err(crate::Error2::boxed)?),
+            Format::Json => Ok(serde_json::from_reader(File::open(path).box_err()?).box_err()?),
             #[cfg(feature = "yaml")]
-            Format::Yaml => Ok(serde_yaml::from_reader(File::open(path).map_err(crate::Error2::boxed)?)
-                .map_err(crate::Error2::boxed)?),
+            Format::Yaml => Ok(serde_yaml::from_reader(File::open(path).box_err()?).box_err()?),
             #[cfg(feature = "toml")]
-            Format::Toml => {
-                Ok(toml::from_str(&read_to_string(path).map_err(crate::Error2::boxed)?)
-                    .map_err(crate::Error2::boxed)?)
-            }
+            Format::Toml => Ok(toml::from_str(&read_to_string(path).box_err()?).box_err()?),
             #[cfg(not(any(feature = "json", feature = "yaml", feature = "toml")))]
             _ => {
                 use crate::error::WithContext;
@@ -194,11 +193,11 @@ impl Format {
     ) -> crate::Result2<Config<Q, P>> {
         match self {
             #[cfg(feature = "json")]
-            Format::Json => Ok(serde_json::from_str(content).map_err(crate::Error2::boxed)?),
+            Format::Json => Ok(serde_json::from_str(content).box_err()?),
             #[cfg(feature = "yaml")]
-            Format::Yaml => Ok(serde_yaml::from_str(content).map_err(crate::Error2::boxed)?),
+            Format::Yaml => Ok(serde_yaml::from_str(content).box_err()?),
             #[cfg(feature = "toml")]
-            Format::Toml => Ok(toml::from_str(content).map_err(crate::Error2::boxed)?),
+            Format::Toml => Ok(toml::from_str(content).box_err()?),
             #[cfg(not(any(feature = "json", feature = "yaml", feature = "toml")))]
             _ => {
                 use crate::error::WithContext;

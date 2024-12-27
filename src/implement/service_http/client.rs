@@ -7,6 +7,8 @@ use std::{
 
 use tower::Service;
 
+use crate::error2::IntoResult;
+
 pub const APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),);
 
 #[derive(Debug, Default)]
@@ -24,7 +26,7 @@ impl<ReqB, ResB> Clone for DefaultHttpClient<ReqB, ResB> {
 impl<ReqB, ResB> DefaultHttpClient<ReqB, ResB> {
     pub async fn new() -> crate::Result2<Self> {
         // TODO use hyper ? continue to use reqwest's rich client?
-        let client = reqwest::Client::builder().user_agent(APP_USER_AGENT).build().map_err(crate::Error2::boxed)?;
+        let client = reqwest::Client::builder().user_agent(APP_USER_AGENT).build().box_err()?;
         Ok(Self { client, phantom: PhantomData })
     }
 }

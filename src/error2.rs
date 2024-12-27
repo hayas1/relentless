@@ -2,6 +2,7 @@ use std::{
     error::Error,
     fmt::{Display, Result as FmtResult},
     ops::{Deref, DerefMut},
+    task::Poll,
 };
 
 use regex::Regex;
@@ -56,6 +57,24 @@ impl<E: Error + Send + Sync + 'static> IntoRelentlessError for Box<E> {
 impl<E: IntoRelentlessError> From<E> for RelentlessError {
     fn from(e: E) -> Self {
         e.into_relentless_error()
+    }
+}
+
+// From<Error> implementation will be conflict (similar issue https://github.com/dtolnay/anyhow/issues/25#issuecomment-544140480)
+pub trait IntoResult<T> {
+    type Result;
+    fn box_err(self) -> Self::Result;
+}
+impl<T, E: Error + Send + Sync + 'static> IntoResult<T> for Result<T, E> {
+    type Result = RelentlessResult<T>;
+    fn box_err(self) -> Self::Result {
+        self.map_err(RelentlessError::boxed)
+    }
+}
+impl<T, E: Error + Send + Sync + 'static> IntoResult<T> for Poll<Result<T, E>> {
+    type Result = Poll<RelentlessResult<T>>;
+    fn box_err(self) -> Self::Result {
+        self.map_err(RelentlessError::boxed)
     }
 }
 
