@@ -15,7 +15,7 @@ async fn test_github_markdown_report_format() {
         report_format: ReportFormat::GithubMarkdown,
         ..Default::default()
     };
-    let configs = relentless.configs().unwrap();
+    let (configs, _) = relentless.configs();
     let service = route::app_with(Default::default());
     let report = relentless.assault_with::<_, Request<Body>>(configs, service).await.unwrap();
 
@@ -48,7 +48,7 @@ async fn test_github_markdown_measure() {
         percentile: Some(vec![50., 99.]),
         ..Default::default()
     };
-    let configs = relentless.configs().unwrap();
+    let (configs, _) = relentless.configs();
     let service = route::app_with(Default::default());
     let report = relentless.assault_with::<_, Request<Body>>(configs, service).await.unwrap();
 

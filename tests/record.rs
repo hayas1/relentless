@@ -11,7 +11,7 @@ async fn test_record_config() {
         output_record: Some("tests/record_test_directory".into()),
         ..Default::default()
     };
-    let configs = relentless.configs().unwrap();
+    let (configs, _) = relentless.configs();
     let service = route::app_with(Default::default());
     let record_service = relentless.build_service::<_, Request<Body>>(service);
     let report = relentless.assault_with::<_, Request<Body>>(configs, record_service).await.unwrap();
