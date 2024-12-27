@@ -70,20 +70,8 @@ pub struct Relentless {
     #[cfg_attr(feature = "cli", arg(short, long))]
     pub output_record: Option<PathBuf>,
 
-    /// without async for each configs
-    #[cfg_attr(feature = "cli", arg(long))]
-    pub no_async_configs: bool,
-
-    /// without async for each testcases
-    #[cfg_attr(feature = "cli", arg(long))]
-    pub no_async_testcases: bool,
-
-    /// without async for each repeats of requests
-    #[cfg_attr(feature = "cli", arg(long))]
-    pub no_async_repeat: bool,
-
-    /// without async for each repeats of requests
-    #[cfg_attr(feature = "cli", arg(long))]
+    /// without async for each requests
+    #[cfg_attr(feature = "cli", arg(long, num_args=0.., value_delimiter = ' '))]
     pub no_async: Vec<WorkerKind>, // TODO dedup in advance
 
     /// measure and report metrics for each requests

@@ -7,7 +7,7 @@ use crate::{
     assault::reportable::{CaseReport, Report, WorkerReport},
     error::{Wrap, WrappedResult},
     interface::{
-        command::Relentless,
+        command::{Relentless, WorkerKind},
         config::{Config, Configuration, Setting, Testcase},
         helper::{
             coalesce::{Coalesce, Coalesced},
@@ -53,7 +53,7 @@ where
         cmd: &Relentless,
         configs: Vec<Config<Q, P>>,
     ) -> WrappedResult<Report<P::Message, Q, P>> {
-        let configs_buffer = if cmd.no_async_configs { 1 } else { configs.len() };
+        let configs_buffer = if cmd.is_no_async(WorkerKind::Configs) { 1 } else { configs.len() };
 
         let report = stream::iter(configs)
             .map(|config| {
@@ -94,7 +94,7 @@ where
         config: Config<Q, P>,
     ) -> WrappedResult<WorkerReport<P::Message, Q, P>> {
         let worker_config = Coalesced::tuple(config.worker_config, cmd.destinations()?);
-        let testcase_buffer = if cmd.no_async_testcases { 1 } else { config.testcases.len() };
+        let testcase_buffer = if cmd.is_no_async(WorkerKind::Testcases) { 1 } else { config.testcases.len() };
 
         let report = stream::iter(config.testcases)
             .map(|testcase| {
@@ -163,7 +163,7 @@ where
         let Testcase { target, setting, .. } = testcase;
         let client = self.client.clone();
 
-        let repeat_buffer = if cmd.no_async_repeat { 1 } else { setting.repeat.times() };
+        let repeat_buffer = if cmd.is_no_async(WorkerKind::Repeats) { 1 } else { setting.repeat.times() };
         Ok(Self::request_stream(destinations, target, setting)
             .map(move |repeating| {
                 let client = client.clone();
