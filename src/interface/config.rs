@@ -8,9 +8,7 @@ use std::{
 
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
-use crate::{
-    assault::destinations::Destinations, error::WrappedResult, error2::InterfaceError, interface::template::Template,
-};
+use crate::{assault::destinations::Destinations, error2::InterfaceError, interface::template::Template};
 
 use super::helper::{coalesce::Coalesce, http_serde_priv, is_default::IsDefault, transpose};
 
@@ -97,12 +95,12 @@ pub struct Testcase<Q, P> {
 }
 
 impl<Q: Configuration, P: Configuration> Config<Q, P> {
-    pub fn read<A: AsRef<Path>>(path: A) -> WrappedResult<Self> {
+    pub fn read<A: AsRef<Path>>(path: A) -> crate::Result2<Self> {
         Ok(Format::from_path(path.as_ref())?
             .deserialize_testcase(path.as_ref())
-            .map_err(|e| InterfaceError::CannotReadConfig(path.as_ref().display().to_string(), e.into()))?)
+            .map_err(|e| InterfaceError::CannotReadConfig(path.as_ref().display().to_string(), e))?)
     }
-    pub fn read_str(s: &str, format: Format) -> WrappedResult<Self> {
+    pub fn read_str(s: &str, format: Format) -> crate::Result2<Self> {
         format.deserialize_testcase_str(s)
     }
 }
@@ -152,7 +150,7 @@ pub enum Format {
     Toml,
 }
 impl Format {
-    pub fn from_path<A: AsRef<Path>>(path: A) -> WrappedResult<Self> {
+    pub fn from_path<A: AsRef<Path>>(path: A) -> crate::Result2<Self> {
         let basename = path.as_ref().extension().and_then(|ext| ext.to_str());
         match basename {
             #[cfg(feature = "json")]
@@ -169,14 +167,17 @@ impl Format {
     pub fn deserialize_testcase<A: AsRef<Path>, Q: Configuration, P: Configuration>(
         &self,
         path: A,
-    ) -> WrappedResult<Config<Q, P>> {
+    ) -> crate::Result2<Config<Q, P>> {
         match self {
             #[cfg(feature = "json")]
-            Format::Json => Ok(serde_json::from_reader(File::open(path)?)?),
+            Format::Json => Ok(serde_json::from_reader(File::open(path).map_err(InterfaceError::IoError)?)
+                .map_err(InterfaceError::JsonError)?),
             #[cfg(feature = "yaml")]
-            Format::Yaml => Ok(serde_yaml::from_reader(File::open(path)?)?),
+            Format::Yaml => Ok(serde_yaml::from_reader(File::open(path).map_err(InterfaceError::IoError)?)
+                .map_err(InterfaceError::YamlError)?),
             #[cfg(feature = "toml")]
-            Format::Toml => Ok(toml::from_str(&read_to_string(path)?)?),
+            Format::Toml => Ok(toml::from_str(&read_to_string(path).map_err(InterfaceError::IoError)?)
+                .map_err(InterfaceError::TomlError)?),
             #[cfg(not(any(feature = "json", feature = "yaml", feature = "toml")))]
             _ => {
                 use crate::error::WithContext;
@@ -188,14 +189,14 @@ impl Format {
     pub fn deserialize_testcase_str<Q: Configuration, P: Configuration>(
         &self,
         content: &str,
-    ) -> WrappedResult<Config<Q, P>> {
+    ) -> crate::Result2<Config<Q, P>> {
         match self {
             #[cfg(feature = "json")]
-            Format::Json => Ok(serde_json::from_str(content)?),
+            Format::Json => Ok(serde_json::from_str(content).map_err(InterfaceError::JsonError)?),
             #[cfg(feature = "yaml")]
-            Format::Yaml => Ok(serde_yaml::from_str(content)?),
+            Format::Yaml => Ok(serde_yaml::from_str(content).map_err(InterfaceError::YamlError)?),
             #[cfg(feature = "toml")]
-            Format::Toml => Ok(toml::from_str(content)?),
+            Format::Toml => Ok(toml::from_str(content).map_err(InterfaceError::TomlError)?),
             #[cfg(not(any(feature = "json", feature = "yaml", feature = "toml")))]
             _ => {
                 use crate::error::WithContext;

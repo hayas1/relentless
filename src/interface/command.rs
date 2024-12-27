@@ -158,7 +158,7 @@ impl Relentless {
     }
 
     /// TODO document
-    pub fn configs(&self) -> (Vec<Config<HttpRequest, HttpResponse>>, Vec<Wrap>) {
+    pub fn configs(&self) -> (Vec<Config<HttpRequest, HttpResponse>>, Vec<crate::Error2>) {
         let Self { file, .. } = self;
         let (ok, err): (Vec<_>, _) = file.iter().map(Config::read).partition(Result::is_ok);
         let (configs, errors) =
