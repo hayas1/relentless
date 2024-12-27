@@ -60,6 +60,41 @@ impl<E: IntoRelentlessError> From<E> for RelentlessError {
 }
 
 #[derive(Debug)]
+pub enum InterfaceError {
+    UndefinedSerializeFormat,
+    KeyValueFormat(String),
+    UnknownFormatExtension(String),
+    // CannotReadSomeConfigs(Vec<Config<HttpRequest, HttpResponse>>),
+    CannotSpecifyFormat,
+    NanPercentile,
+}
+impl IntoRelentlessError for InterfaceError {}
+impl Error for InterfaceError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::UndefinedSerializeFormat => None,
+            Self::KeyValueFormat(_) => None,
+            Self::UnknownFormatExtension(_) => None,
+            // Self::CannotReadSomeConfigs(_) => None,
+            Self::CannotSpecifyFormat => None,
+            Self::NanPercentile => None,
+        }
+    }
+}
+impl Display for InterfaceError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> FmtResult {
+        match self {
+            Self::UndefinedSerializeFormat => write!(f, "at least one serde format is required"),
+            Self::KeyValueFormat(s) => write!(f, "should be KEY=VALUE format, but `{}` has no `=`", s),
+            Self::UnknownFormatExtension(s) => write!(f, "`{}` is unknown extension format", s),
+            // Self::CannotReadSomeConfigs(_) => write!(f, "cannot read some configs"),
+            Self::CannotSpecifyFormat => write!(f, "cannot specify format"),
+            Self::NanPercentile => write!(f, "nan is not number"),
+        }
+    }
+}
+
+#[derive(Debug)]
 pub enum AssaultError {
     CannotSpecifyService,
 }

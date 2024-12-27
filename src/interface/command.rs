@@ -18,7 +18,8 @@ use crate::{
         service::record::{RecordLayer, RecordService},
         worker::Control,
     },
-    error::{IntoContext, MultiWrap, RunCommandError, Wrap, WrappedResult},
+    error::{Wrap, WrappedResult},
+    error2::InterfaceError,
     implement::service_http::{evaluate::HttpResponse, factory::HttpRequest},
 };
 
@@ -148,7 +149,7 @@ impl Relentless {
     pub fn percentile_set(&self) -> Vec<f64> {
         let default = vec![50., 90., 99.];
         let mut v = self.percentile.as_ref().unwrap_or(&default).clone();
-        v.sort_by(|a, b| a.partial_cmp(b).unwrap_or_else(|| unreachable!("{}", RunCommandError::NanPercentile)));
+        v.sort_by(|a, b| a.partial_cmp(b).unwrap_or_else(|| unreachable!("{}", InterfaceError::NanPercentile)));
         v.dedup();
         v
     }
@@ -157,33 +158,12 @@ impl Relentless {
     }
 
     /// TODO document
-    pub fn configs(&self) -> WrappedResult<Vec<Config<HttpRequest, HttpResponse>>> {
+    pub fn configs(&self) -> (Vec<Config<HttpRequest, HttpResponse>>, Vec<Wrap>) {
         let Self { file, .. } = self;
-        let (ok, err): (_, Vec<_>) = file.iter().map(Config::read).partition(Result::is_ok);
-        let (configs, errors): (_, MultiWrap) =
+        let (ok, err): (Vec<_>, _) = file.iter().map(Config::read).partition(Result::is_ok);
+        let (configs, errors) =
             (ok.into_iter().map(Result::unwrap).collect(), err.into_iter().map(Result::unwrap_err).collect());
-        if errors.is_empty() {
-            Ok(configs)
-        } else {
-            Err(errors.context(RunCommandError::CannotReadSomeConfigs(configs)))?
-        }
-    }
-
-    /// TODO document
-    pub fn configs_filtered<W: Write>(&self, mut write: W) -> WrappedResult<Vec<Config<HttpRequest, HttpResponse>>> {
-        match self.configs() {
-            Ok(configs) => Ok(configs),
-            Err(e) => {
-                if let Some((RunCommandError::CannotReadSomeConfigs(configs), source)) =
-                    e.downcast_context_ref::<_, MultiWrap>()
-                {
-                    writeln!(write, "{}", source)?;
-                    Ok(configs.to_vec())
-                } else {
-                    Err(e)?
-                }
-            }
-        }
+        (configs, errors)
     }
 
     /// TODO document
@@ -202,7 +182,10 @@ impl Relentless {
         &self,
     ) -> crate::Result<Report<crate::implement::service_http::error::HttpEvaluateError, HttpRequest, HttpResponse>>
     {
-        let configs = self.configs_filtered(std::io::stderr())?;
+        let (configs, cannot_read) = self.configs();
+        for err in cannot_read {
+            eprintln!("{}", err);
+        }
         let service = self.build_service(DefaultHttpClient::<reqwest::Body, reqwest::Body>::new().await?);
         let report = self.assault_with(configs, service).await?;
         Ok(report)
@@ -273,7 +256,7 @@ where
     U: std::str::FromStr,
     U::Err: std::error::Error + Send + Sync + 'static,
 {
-    let (name, destination) = s.split_once('=').ok_or_else(|| RunCommandError::KeyValueFormat(s.to_string()))?;
+    let (name, destination) = s.split_once('=').ok_or_else(|| InterfaceError::KeyValueFormat(s.to_string()))?;
     Ok((name.parse().map_err(crate::Error2::boxed)?, destination.parse().map_err(crate::Error2::boxed)?))
 }
 
@@ -349,7 +332,7 @@ mod tests {
         ])
         .unwrap_err()
         .to_string();
-        assert!(err_msg.contains(&RunCommandError::KeyValueFormat("key-value".to_string()).to_string()));
+        assert!(err_msg.contains(&InterfaceError::KeyValueFormat("key-value".to_string()).to_string()));
     }
 
     #[test]
@@ -452,10 +435,13 @@ mod tests {
             report_format: ReportFormat::NullDevice,
             ..Default::default()
         };
-        let mut buf = Vec::new();
-        let configs = cmd.configs_filtered(&mut buf).unwrap();
+        let (configs, e) = cmd.configs();
         assert_eq!(configs.len(), glob::glob("tests/config/parse/valid_*.yaml").unwrap().filter(Result::is_ok).count());
 
+        let mut buf = Vec::new();
+        for err in e {
+            writeln!(buf, "{}", err).unwrap();
+        }
         let warn = String::from_utf8_lossy(&buf);
         assert!(warn.contains("tests/config/parse/invalid_simple_string.yaml"));
         assert!(warn.contains("tests/config/parse/invalid_different_struct.yaml"));

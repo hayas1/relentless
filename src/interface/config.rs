@@ -9,9 +9,7 @@ use std::{
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
-    assault::destinations::Destinations,
-    error::{RunCommandError, WrappedResult},
-    interface::template::Template,
+    assault::destinations::Destinations, error::WrappedResult, error2::InterfaceError, interface::template::Template,
 };
 
 use super::helper::{coalesce::Coalesce, http_serde_priv, is_default::IsDefault, transpose};
@@ -163,8 +161,8 @@ impl Format {
             Some("yaml" | "yml") => Ok(Format::Yaml),
             #[cfg(feature = "toml")]
             Some("toml") => Ok(Format::Toml),
-            Some(ext) => Err(RunCommandError::UnknownFormatExtension(ext.to_string()))?,
-            _ => Err(RunCommandError::CannotSpecifyFormat)?,
+            Some(ext) => Err(InterfaceError::UnknownFormatExtension(ext.to_string()))?,
+            _ => Err(InterfaceError::CannotSpecifyFormat)?,
         }
     }
 
@@ -182,7 +180,7 @@ impl Format {
             #[cfg(not(any(feature = "json", feature = "yaml", feature = "toml")))]
             _ => {
                 use crate::error::WithContext;
-                Err(RunCommandError::UndefinedSerializeFormat).context(path.as_ref().display().to_string())?
+                Err(InterfaceError::UndefinedSerializeFormat).context(path.as_ref().display().to_string())?
             }
         }
     }
@@ -201,7 +199,7 @@ impl Format {
             #[cfg(not(any(feature = "json", feature = "yaml", feature = "toml")))]
             _ => {
                 use crate::error::WithContext;
-                Err(RunCommandError::UndefinedSerializeFormat).context(content.to_string())?
+                Err(InterfaceError::UndefinedSerializeFormat).context(content.to_string())?
             }
         }
     }
@@ -223,7 +221,7 @@ mod tests {
     #[cfg(not(any(feature = "json", feature = "yaml", feature = "toml")))]
     fn test_no_default_features() {
         let err = Config::<HttpRequest, HttpResponse>::read("path/to/config.yaml").unwrap_err();
-        assert_eq!(err.downcast_ref(), Some(&RunCommandError::UnknownFormatExtension("yaml".to_string())));
+        assert_eq!(err.downcast_ref(), Some(&InterfaceError::UnknownFormatExtension("yaml".to_string())));
     }
 
     #[test]
