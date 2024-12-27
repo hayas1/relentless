@@ -67,14 +67,6 @@ pub enum InterfaceError {
     CannotReadConfig(String, RelentlessError),
     CannotSpecifyFormat,
     NanPercentile,
-
-    IoError(std::io::Error),
-    #[cfg(feature = "json")]
-    JsonError(serde_json::Error),
-    #[cfg(feature = "yaml")]
-    YamlError(serde_yaml::Error),
-    #[cfg(feature = "toml")]
-    TomlError(toml::de::Error),
 }
 impl IntoRelentlessError for InterfaceError {}
 impl Error for InterfaceError {
@@ -86,14 +78,6 @@ impl Error for InterfaceError {
             Self::CannotReadConfig(_, e) => Some(e),
             Self::CannotSpecifyFormat => None,
             Self::NanPercentile => None,
-
-            Self::IoError(e) => Some(e),
-            #[cfg(feature = "json")]
-            Self::JsonError(e) => Some(e),
-            #[cfg(feature = "yaml")]
-            Self::YamlError(e) => Some(e),
-            #[cfg(feature = "toml")]
-            Self::TomlError(e) => Some(e),
         }
     }
 }
@@ -106,14 +90,6 @@ impl Display for InterfaceError {
             Self::CannotReadConfig(s, e) => write!(f, "[{}] {}", s, e),
             Self::CannotSpecifyFormat => write!(f, "cannot specify format"),
             Self::NanPercentile => write!(f, "nan is not number"),
-
-            Self::IoError(e) => write!(f, "{}", e),
-            #[cfg(feature = "json")]
-            Self::JsonError(e) => write!(f, "{}", e),
-            #[cfg(feature = "yaml")]
-            Self::YamlError(e) => write!(f, "{}", e),
-            #[cfg(feature = "toml")]
-            Self::TomlError(e) => write!(f, "{}", e),
         }
     }
 }
