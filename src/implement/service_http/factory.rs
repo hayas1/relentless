@@ -88,7 +88,7 @@ where
     HttpBody: BodyFactory<B>,
     <HttpBody as BodyFactory<B>>::Error: std::error::Error + Send + Sync + 'static,
 {
-    type Error = crate::Error;
+    type Error = crate::Error2;
     fn produce(
         &self,
         destination: &http::Uri,
@@ -121,7 +121,7 @@ impl<B> BodyFactory<B> for HttpBody
 where
     B: Body + From<Bytes> + Default,
 {
-    type Error = crate::Error;
+    type Error = crate::Error2;
     fn produce(&self, template: &Template) -> Result<B, Self::Error> {
         match self {
             HttpBody::Empty => Ok(Default::default()),
