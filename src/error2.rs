@@ -27,6 +27,11 @@ pub trait IntoRelentlessError: Sized + StdError + Send + Sync + 'static {
         RelentlessError { source: Box::new(self) }
     }
 }
+impl<E: StdError + Send + Sync + 'static> IntoRelentlessError for Box<E> {
+    fn into_relentless_error(self) -> RelentlessError {
+        RelentlessError { source: self }
+    }
+}
 impl<E: IntoRelentlessError> From<E> for RelentlessError {
     fn from(e: E) -> Self {
         e.into_relentless_error()
