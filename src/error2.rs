@@ -211,3 +211,26 @@ impl Display for JsonEvaluateError {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_error_conversion() {
+        fn f() -> RelentlessResult<()> {
+            Err(InterfaceError::UndefinedSerializeFormat)?
+        }
+        let err = f().unwrap_err();
+        assert!(matches!(err.downcast_ref().unwrap(), InterfaceError::UndefinedSerializeFormat));
+    }
+
+    #[test]
+    fn test_box_error_conversion() {
+        fn f() -> RelentlessResult<()> {
+            Err(std::io::Error::new(std::io::ErrorKind::Other, "test")).box_err()?
+        }
+        let err = f().unwrap_err();
+        assert!(matches!(err.downcast_ref().unwrap(), std::io::Error { .. }));
+    }
+}
