@@ -1,5 +1,5 @@
 use std::{
-    error::Error as StdError,
+    error::Error,
     fmt::{Display, Result as FmtResult},
 };
 
@@ -8,10 +8,10 @@ use regex::Regex;
 pub type RelentlessResult<T> = Result<T, RelentlessError>;
 #[derive(Debug)]
 pub struct RelentlessError {
-    source: Box<dyn StdError + Send + Sync + 'static>,
+    source: Box<dyn Error + Send + Sync + 'static>,
 }
-impl StdError for RelentlessError {
-    fn source(&self) -> Option<&(dyn StdError + 'static)> {
+impl Error for RelentlessError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
         Some(self.source.as_ref())
     }
 }
@@ -22,12 +22,12 @@ impl Display for RelentlessError {
 }
 
 // TODO derive ?
-pub trait IntoRelentlessError: Sized + StdError + Send + Sync + 'static {
+pub trait IntoRelentlessError: Sized + Error + Send + Sync + 'static {
     fn into_relentless_error(self) -> RelentlessError {
         RelentlessError { source: Box::new(self) }
     }
 }
-impl<E: StdError + Send + Sync + 'static> IntoRelentlessError for Box<E> {
+impl<E: Error + Send + Sync + 'static> IntoRelentlessError for Box<E> {
     fn into_relentless_error(self) -> RelentlessError {
         RelentlessError { source: self }
     }
@@ -44,8 +44,8 @@ pub enum PlaintextEvaluateError {
     FailToMatch(Regex, String),
 }
 impl IntoRelentlessError for PlaintextEvaluateError {}
-impl StdError for PlaintextEvaluateError {
-    fn source(&self) -> Option<&(dyn StdError + 'static)> {
+impl Error for PlaintextEvaluateError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::FailToCompileRegex(e) => Some(e),
             Self::FailToMatch(_, _) => None,
@@ -71,8 +71,8 @@ pub enum JsonEvaluateError {
 #[cfg(feature = "json")]
 impl IntoRelentlessError for JsonEvaluateError {}
 #[cfg(feature = "json")]
-impl StdError for JsonEvaluateError {
-    fn source(&self) -> Option<&(dyn StdError + 'static)> {
+impl Error for JsonEvaluateError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::FailToPatchJson(e) => Some(e),
             Self::FailToParseJson(e) => Some(e),
