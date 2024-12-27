@@ -20,11 +20,13 @@ impl Display for RelentlessError {
 }
 
 #[derive(Debug)]
+#[cfg(feature = "json")]
 pub enum JsonEvaluateError {
     FailToPatchJson(json_patch::PatchError),
     FailToParseJson(serde_json::Error),
     Diff(String),
 }
+#[cfg(feature = "json")]
 impl StdError for JsonEvaluateError {
     fn source(&self) -> Option<&(dyn StdError + 'static)> {
         match self {
@@ -34,6 +36,7 @@ impl StdError for JsonEvaluateError {
         }
     }
 }
+#[cfg(feature = "json")]
 impl Display for JsonEvaluateError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> FmtResult {
         match self {

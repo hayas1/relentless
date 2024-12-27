@@ -23,7 +23,6 @@ pub struct JsonEvaluator {
     pub patch_fail: Option<Severity>,
 }
 
-#[cfg(feature = "json")]
 impl Acceptable<&Bytes> for JsonEvaluator {
     type Message = JsonEvaluateError;
     fn accept(&self, bytes: &Destinations<&Bytes>, msg: &mut Messages<Self::Message>) -> bool {
