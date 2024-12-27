@@ -18,7 +18,6 @@ use crate::{
         service::record::{RecordLayer, RecordService},
         worker::Control,
     },
-    error::{Wrap, WrappedResult},
     error2::{InterfaceError, IntoResult},
     implement::service_http::{evaluate::HttpResponse, factory::HttpRequest},
 };
@@ -117,11 +116,11 @@ pub enum WorkerKind {
 }
 
 impl Relentless {
-    pub fn destinations(&self) -> WrappedResult<Destinations<http_serde_priv::Uri>> {
+    pub fn destinations(&self) -> crate::Result2<Destinations<http_serde_priv::Uri>> {
         let Self { destination, .. } = self;
         destination
             .iter()
-            .map(|(k, v)| Ok((k.to_string(), http_serde_priv::Uri(v.parse()?))))
+            .map(|(k, v)| Ok((k.to_string(), http_serde_priv::Uri(v.parse().box_err()?))))
             .collect::<Result<Destinations<_>, _>>()
     }
 
@@ -180,7 +179,7 @@ impl Relentless {
     #[cfg(all(feature = "default-http-client", feature = "cli"))]
     pub async fn assault(
         &self,
-    ) -> crate::Result<Report<crate::implement::service_http::error::HttpEvaluateError, HttpRequest, HttpResponse>>
+    ) -> crate::Result2<Report<crate::implement::service_http::error::HttpEvaluateError, HttpRequest, HttpResponse>>
     {
         let (configs, cannot_read) = self.configs();
         for err in cannot_read {
@@ -195,7 +194,7 @@ impl Relentless {
         &self,
         configs: Vec<Config<HttpRequest, HttpResponse>>,
         service: S,
-    ) -> crate::Result<Report<<HttpResponse as Evaluate<S::Response>>::Message, HttpRequest, HttpResponse>>
+    ) -> crate::Result2<Report<<HttpResponse as Evaluate<S::Response>>::Message, HttpRequest, HttpResponse>>
     where
         HttpRequest: RequestFactory<Req>,
         <HttpRequest as RequestFactory<Req>>::Error: std::error::Error + Send + Sync + 'static,
@@ -203,7 +202,6 @@ impl Relentless {
         S: Service<Req> + Clone + Send + 'static,
         S::Error: std::error::Error + Send + Sync + 'static,
         S::Future: Send + 'static,
-        Wrap: From<<HttpRequest as RequestFactory<Req>>::Error> + From<<S as Service<Req>>::Error>,
     {
         let control = Control::new(service);
         let report = control.assault(self, configs).await?;
