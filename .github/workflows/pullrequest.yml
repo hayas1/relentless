@@ -79,8 +79,9 @@ jobs:
         set -euo pipefail
         {
           cargo run --features cli -- \
-            -f tests/config/basic/*.yaml -d actual=http://localhost:3001 -r github-markdown \
-            --no-color --ng-only --no-async-testcases --no-async-repeat
+            -f tests/config/basic/*.yaml -d actual=http://localhost:3001 \
+            -s testcases repeats -r github-markdown \
+            --no-color --ng-only
         } > target/report.txt
     - name: Comment on pull request
       if: failure()
