@@ -1,6 +1,6 @@
 use std::{
     error::Error,
-    fmt::{Display, Result as FmtResult},
+    fmt::Display,
     ops::{Deref, DerefMut},
     task::Poll,
 };
@@ -29,7 +29,7 @@ impl Error for RelentlessError {
     }
 }
 impl Display for RelentlessError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> FmtResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.source)
     }
 }
@@ -101,7 +101,7 @@ impl Error for InterfaceError {
     }
 }
 impl Display for InterfaceError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> FmtResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::UndefinedSerializeFormat => write!(f, "at least one serde format is required"),
             Self::KeyValueFormat(s) => write!(f, "should be KEY=VALUE format, but `{}` has no `=`", s),
@@ -130,7 +130,7 @@ impl Error for TemplateError {
     }
 }
 impl Display for TemplateError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> FmtResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::NomParseError(s) => write!(f, "{}", s),
             Self::RemainingTemplate(s) => write!(f, "remaining template: {}", s),
@@ -152,7 +152,7 @@ impl Error for AssaultError {
     }
 }
 impl Display for AssaultError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> FmtResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::CannotSpecifyService => write!(f, "cannot specify service"),
         }
@@ -174,7 +174,7 @@ impl Error for PlaintextEvaluateError {
     }
 }
 impl Display for PlaintextEvaluateError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> FmtResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::FailToCompileRegex(e) => write!(f, "{}", e),
             Self::FailToMatch(re, haystack) => write!(f, "regex `{}` does not match `{}`", re, haystack),
@@ -203,7 +203,7 @@ impl Error for JsonEvaluateError {
 }
 #[cfg(feature = "json")]
 impl Display for JsonEvaluateError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> FmtResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::FailToPatchJson(e) => write!(f, "{}", e),
             Self::FailToParseJson(e) => write!(f, "{}", e),
