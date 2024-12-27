@@ -114,6 +114,32 @@ impl Display for InterfaceError {
 }
 
 #[derive(Debug)]
+pub enum TemplateError {
+    NomParseError(String),
+    RemainingTemplate(String),
+    VariableNotDefined(String),
+}
+impl IntoRelentlessError for TemplateError {}
+impl Error for TemplateError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::NomParseError(_) => None,
+            Self::RemainingTemplate(_) => None,
+            Self::VariableNotDefined(_) => None,
+        }
+    }
+}
+impl Display for TemplateError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> FmtResult {
+        match self {
+            Self::NomParseError(s) => write!(f, "{}", s),
+            Self::RemainingTemplate(s) => write!(f, "remaining template: {}", s),
+            Self::VariableNotDefined(s) => write!(f, "variable `{}` is not defined", s),
+        }
+    }
+}
+
+#[derive(Debug)]
 pub enum AssaultError {
     CannotSpecifyService,
 }
