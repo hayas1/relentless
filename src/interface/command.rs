@@ -266,17 +266,15 @@ impl Relentless {
 }
 
 #[cfg(feature = "cli")]
-pub fn parse_key_value<T, U>(s: &str) -> crate::Result<(T, U)>
+pub fn parse_key_value<T, U>(s: &str) -> crate::Result2<(T, U)>
 where
     T: std::str::FromStr,
     T::Err: std::error::Error + Send + Sync + 'static,
     U: std::str::FromStr,
     U::Err: std::error::Error + Send + Sync + 'static,
 {
-    use crate::error::WithContext;
-
-    let (name, destination) = s.split_once('=').context(RunCommandError::KeyValueFormat(s.to_string()))?;
-    Ok((name.parse().map_err(Wrap::wrapping)?, destination.parse().map_err(Wrap::wrapping)?))
+    let (name, destination) = s.split_once('=').ok_or_else(|| RunCommandError::KeyValueFormat(s.to_string()))?;
+    Ok((name.parse().map_err(crate::Error2::boxed)?, destination.parse().map_err(crate::Error2::boxed)?))
 }
 
 #[cfg(test)]

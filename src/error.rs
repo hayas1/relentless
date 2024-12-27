@@ -6,6 +6,7 @@ use std::{
 use thiserror::Error;
 
 use crate::{
+    error2::IntoRelentlessError,
     implement::service_http::{evaluate::HttpResponse, factory::HttpRequest},
     interface::config::Config,
 };
@@ -304,6 +305,7 @@ pub enum RunCommandError {
     #[error("nan is not number")]
     NanPercentile,
 }
+impl IntoRelentlessError for RunCommandError {}
 
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum TemplateError {
