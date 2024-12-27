@@ -195,7 +195,7 @@ impl Acceptable<&Bytes> for HttpBody {
     fn accept(&self, body: &Destinations<&Bytes>, msg: &mut Messages<Self::Message>) -> bool {
         match &self {
             HttpBody::AnyOrEqual => Self::assault_or_compare(body, |_| true),
-            HttpBody::Plaintext(p) => Self::sub_accept(p, body, msg, |_| unreachable!()),
+            HttpBody::Plaintext(p) => Self::sub_accept(p, body, msg, HttpEvaluateError::PlaintextEvaluateError),
             #[cfg(feature = "json")]
             HttpBody::Json(e) => Self::sub_accept(e, body, msg, HttpEvaluateError::JsonEvaluateError),
         }

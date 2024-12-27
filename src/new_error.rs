@@ -3,6 +3,8 @@ use std::{
     fmt::{Display, Result as FmtResult},
 };
 
+use regex::Regex;
+
 pub type RelentlessResult<T> = Result<T, RelentlessError>;
 #[derive(Debug)]
 pub struct RelentlessError {
@@ -16,6 +18,28 @@ impl StdError for RelentlessError {
 impl Display for RelentlessError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> FmtResult {
         write!(f, "{}", self.source)
+    }
+}
+
+#[derive(Debug)]
+pub enum PlaintextEvaluateError {
+    FailToCompileRegex(regex::Error),
+    FailToMatch(Regex, String),
+}
+impl StdError for PlaintextEvaluateError {
+    fn source(&self) -> Option<&(dyn StdError + 'static)> {
+        match self {
+            Self::FailToCompileRegex(e) => Some(e),
+            Self::FailToMatch(_, _) => None,
+        }
+    }
+}
+impl Display for PlaintextEvaluateError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> FmtResult {
+        match self {
+            Self::FailToCompileRegex(e) => write!(f, "{}", e),
+            Self::FailToMatch(re, haystack) => write!(f, "regex `{}` does not match `{}`", re, haystack),
+        }
     }
 }
 

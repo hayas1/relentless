@@ -1,6 +1,9 @@
 use thiserror::Error;
 
-use crate::{assault::error::RequestError, new_error::JsonEvaluateError};
+use crate::{
+    assault::error::RequestError,
+    new_error::{JsonEvaluateError, PlaintextEvaluateError},
+};
 
 #[derive(Error, Debug)]
 pub enum HttpEvaluateError {
@@ -14,6 +17,8 @@ pub enum HttpEvaluateError {
 
     #[error(transparent)]
     FailToCollectBody(Box<dyn std::error::Error + Send + Sync>),
+    #[error(transparent)]
+    PlaintextEvaluateError(#[from] PlaintextEvaluateError),
     #[cfg(feature = "json")]
     #[error(transparent)]
     JsonEvaluateError(#[from] JsonEvaluateError),

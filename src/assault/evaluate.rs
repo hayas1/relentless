@@ -25,7 +25,7 @@ pub trait Acceptable<T> {
     fn assault_or_compare<F>(d: &Destinations<T>, f: F) -> bool
     where
         T: PartialEq,
-        F: Fn((&String, &T)) -> bool,
+        F: FnMut((&String, &T)) -> bool,
     {
         if d.len() == 1 {
             Self::validate_all(d, f)
@@ -35,7 +35,7 @@ pub trait Acceptable<T> {
     }
     fn validate_all<F>(d: &Destinations<T>, f: F) -> bool
     where
-        F: Fn((&String, &T)) -> bool,
+        F: FnMut((&String, &T)) -> bool,
     {
         d.iter().all(f)
     }
