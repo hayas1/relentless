@@ -1,6 +1,7 @@
 use std::{
     error::Error,
     fmt::{Display, Result as FmtResult},
+    ops::{Deref, DerefMut},
 };
 
 use regex::Regex;
@@ -10,6 +11,17 @@ pub type RelentlessResult<T> = Result<T, RelentlessError>;
 pub struct RelentlessError {
     source: Box<dyn Error + Send + Sync + 'static>,
 }
+impl Deref for RelentlessError {
+    type Target = Box<dyn Error + Send + Sync + 'static>;
+    fn deref(&self) -> &Self::Target {
+        &self.source
+    }
+}
+impl DerefMut for RelentlessError {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.source
+    }
+}
 impl Error for RelentlessError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         Some(self.source.as_ref())
@@ -18,6 +30,15 @@ impl Error for RelentlessError {
 impl Display for RelentlessError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> FmtResult {
         write!(f, "{}", self.source)
+    }
+}
+impl RelentlessError {
+    pub fn boxed<E: Error + Send + Sync + 'static>(error: E) -> Self {
+        RelentlessError { source: error.into() }
+    }
+    pub fn into_source(self) -> Box<dyn Error + Send + Sync> {
+        // TODO is this method needed?
+        self.source
     }
 }
 
