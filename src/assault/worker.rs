@@ -19,11 +19,11 @@ use crate::{
 
 use super::{
     destinations::Destinations,
-    result::{RequestError, RequestResult},
     evaluate::Evaluate,
     factory::RequestFactory,
     measure::aggregate::{Aggregate, EvaluateAggregator},
     messages::Messages,
+    result::{RequestError, RequestResult},
     service::measure::MeasureLayer,
 };
 
