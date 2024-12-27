@@ -227,14 +227,17 @@ impl Relentless {
         Ok(report)
     }
 
-    pub fn report<M: Display>(&self, report: &Report<M, HttpRequest, HttpResponse>) -> crate::Result<ExitCode> {
+    pub fn report<M: Display>(
+        &self,
+        report: &Report<M, HttpRequest, HttpResponse>,
+    ) -> Result<ExitCode, std::fmt::Error> {
         self.report_with(report, std::io::stdout())
     }
     pub fn report_with<M: Display, W: Write>(
         &self,
         report: &Report<M, HttpRequest, HttpResponse>,
         mut write: W,
-    ) -> crate::Result<ExitCode> {
+    ) -> Result<ExitCode, std::fmt::Error> {
         let Self { no_color, report_format, .. } = self;
         #[cfg(feature = "console-report")]
         console::set_colors_enabled(!no_color);
