@@ -9,6 +9,7 @@ pub trait Evaluate<Res> {
 pub trait Acceptable<T> {
     type Message;
     fn accept(&self, dest: &Destinations<T>, msg: &mut Messages<Self::Message>) -> bool;
+    // TODO infallible
     fn sub_accept<U, A: Acceptable<U>, F: Fn(A::Message) -> Self::Message>(
         acceptable: &A,
         dest: &Destinations<U>,

@@ -198,7 +198,10 @@ impl Relentless {
 
     /// TODO document
     #[cfg(all(feature = "default-http-client", feature = "cli"))]
-    pub async fn assault(&self) -> crate::Result<Report<crate::error::EvaluateError, HttpRequest, HttpResponse>> {
+    pub async fn assault(
+        &self,
+    ) -> crate::Result<Report<crate::implement::service_http::error::HttpEvaluateError, HttpRequest, HttpResponse>>
+    {
         let configs = self.configs_filtered(std::io::stderr())?;
         let service = self.build_service(DefaultHttpClient::<reqwest::Body, reqwest::Body>::new().await?);
         let report = self.assault_with(configs, service).await?;

@@ -1,14 +1,13 @@
+use std::convert::Infallible;
+
 use bytes::Bytes;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    assault::{
-        destinations::{AllOr, Destinations},
-        evaluate::Acceptable,
-        messages::Messages,
-    },
-    error::EvaluateError,
+use crate::assault::{
+    destinations::{AllOr, Destinations},
+    evaluate::Acceptable,
+    messages::Messages,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -17,7 +16,7 @@ pub struct PlaintextEvaluator {
     pub regex: Option<AllOr<String>>,
 }
 impl Acceptable<&Bytes> for PlaintextEvaluator {
-    type Message = EvaluateError;
+    type Message = Infallible;
     fn accept(&self, bytes: &Destinations<&Bytes>, msg: &mut Messages<Self::Message>) -> bool {
         let _ = msg; // TODO dest[d] can be failed
         match &self.regex {
