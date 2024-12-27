@@ -21,11 +21,24 @@ impl Display for RelentlessError {
     }
 }
 
+// TODO derive ?
+pub trait IntoRelentlessError: Sized + StdError + Send + Sync + 'static {
+    fn into_relentless_error(self) -> RelentlessError {
+        RelentlessError { source: Box::new(self) }
+    }
+}
+impl<E: IntoRelentlessError> From<E> for RelentlessError {
+    fn from(e: E) -> Self {
+        e.into_relentless_error()
+    }
+}
+
 #[derive(Debug)]
 pub enum PlaintextEvaluateError {
     FailToCompileRegex(regex::Error),
     FailToMatch(Regex, String),
 }
+impl IntoRelentlessError for PlaintextEvaluateError {}
 impl StdError for PlaintextEvaluateError {
     fn source(&self) -> Option<&(dyn StdError + 'static)> {
         match self {
@@ -50,6 +63,8 @@ pub enum JsonEvaluateError {
     FailToParseJson(serde_json::Error),
     Diff(String),
 }
+#[cfg(feature = "json")]
+impl IntoRelentlessError for JsonEvaluateError {}
 #[cfg(feature = "json")]
 impl StdError for JsonEvaluateError {
     fn source(&self) -> Option<&(dyn StdError + 'static)> {
