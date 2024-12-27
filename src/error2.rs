@@ -60,6 +60,26 @@ impl<E: IntoRelentlessError> From<E> for RelentlessError {
 }
 
 #[derive(Debug)]
+pub enum AssaultError {
+    CannotSpecifyService,
+}
+impl IntoRelentlessError for AssaultError {}
+impl Error for AssaultError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::CannotSpecifyService => None,
+        }
+    }
+}
+impl Display for AssaultError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> FmtResult {
+        match self {
+            Self::CannotSpecifyService => write!(f, "cannot specify service"),
+        }
+    }
+}
+
+#[derive(Debug)]
 pub enum PlaintextEvaluateError {
     FailToCompileRegex(regex::Error),
     FailToMatch(Regex, String),
