@@ -1,16 +1,13 @@
 use std::{
     fmt::{Debug, Display},
     ops::{Deref, DerefMut},
-    time::Duration,
 };
 
 use thiserror::Error;
 
 use crate::{
-    assault::error::RequestError,
     implement::service_http::{evaluate::HttpResponse, factory::HttpRequest},
     interface::config::Config,
-    new_error::JsonEvaluateError,
 };
 
 pub type RelentlessResult<T, E = RelentlessError> = Result<T, E>;
@@ -322,26 +319,6 @@ pub enum TemplateError {
 pub enum AssaultError {
     #[error("cannot specify service")]
     CannotSpecifyService,
-}
-
-#[derive(Error, Debug)]
-pub enum EvaluateError {
-    #[error("request timeout: {}s", .0.as_secs_f64())]
-    RequestTimeout(Duration),
-
-    #[error("fail to collect body: {0}")]
-    FailToCollectBody(Wrap),
-    #[error("status is not acceptable")]
-    UnacceptableStatus,
-    #[error("header map is not acceptable")]
-    UnacceptableHeaderMap,
-
-    #[cfg(feature = "json")]
-    #[error(transparent)]
-    JsonEvaluateError(JsonEvaluateError),
-
-    #[error(transparent)]
-    RequestError(RequestError),
 }
 
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
