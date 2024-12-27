@@ -82,13 +82,17 @@ pub struct Relentless {
     #[cfg_attr(feature = "cli", arg(long))]
     pub no_async_repeat: bool,
 
+    /// without async for each repeats of requests
+    #[cfg_attr(feature = "cli", arg(long))]
+    pub no_async: Vec<WorkerKind>, // TODO dedup in advance
+
     /// measure and report metrics for each requests
     #[cfg_attr(feature = "cli", arg(short, long, num_args=0.., value_delimiter = ' '))]
-    pub measure: Option<Vec<WorkerKind>>, // TODO remove duplicate in advance
+    pub measure: Option<Vec<WorkerKind>>, // TODO dedup in advance
 
     /// measure percentile for latency
     #[cfg_attr(feature = "cli", arg(short, long, num_args=0.., value_delimiter = ' '))]
-    pub percentile: Option<Vec<f64>>,
+    pub percentile: Option<Vec<f64>>, // TODO dedup in advance
 
     /// requests per second
     #[cfg_attr(feature = "cli", arg(long))]
@@ -130,6 +134,16 @@ impl Relentless {
             .iter()
             .map(|(k, v)| Ok((k.to_string(), http_serde_priv::Uri(v.parse()?))))
             .collect::<Result<Destinations<_>, _>>()
+    }
+
+    pub fn no_async_set(&self) -> Vec<WorkerKind> {
+        let mut v = self.no_async.clone();
+        v.sort_unstable();
+        v.dedup();
+        v
+    }
+    pub fn is_no_async(&self, kind: WorkerKind) -> bool {
+        self.no_async_set().contains(&kind)
     }
 
     pub fn measure_set(&self) -> Vec<WorkerKind> {
