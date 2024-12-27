@@ -16,12 +16,16 @@ use crate::{
 };
 
 pub trait ConsoleReport: Reportable {
-    type Error;
-    fn console_report<W: std::io::Write>(&self, cmd: &Relentless, w: &mut ReportWriter<W>) -> Result<(), Self::Error>;
-    fn console_aggregate<W: std::io::Write>(&self, cmd: &Relentless, w: &mut ReportWriter<W>) -> Result<(), Self::Error>
-    where
-        Self::Error: From<std::fmt::Error>,
-    {
+    fn console_report<W: std::io::Write>(
+        &self,
+        cmd: &Relentless,
+        w: &mut ReportWriter<W>,
+    ) -> Result<(), std::fmt::Error>;
+    fn console_aggregate<W: std::io::Write>(
+        &self,
+        cmd: &Relentless,
+        w: &mut ReportWriter<W>,
+    ) -> Result<(), std::fmt::Error> {
         let EvaluateAggregate { pass: pass_agg, response } = self.aggregator().aggregate(&cmd.quantile_set());
         let PassAggregate { pass, count, pass_rate } = &pass_agg;
         let ResponseAggregate { req, duration, rps, latency, .. } = &response;
@@ -62,8 +66,11 @@ impl RelentlessConsoleReport {
     pub const SUMMARY_EMOJI: console::Emoji<'_, '_> = console::Emoji("💥", "");
 }
 impl<T: Display, Q: Clone + Coalesce, P: Clone + Coalesce> ConsoleReport for Report<T, Q, P> {
-    type Error = std::fmt::Error;
-    fn console_report<W: std::io::Write>(&self, cmd: &Relentless, w: &mut ReportWriter<W>) -> Result<(), Self::Error> {
+    fn console_report<W: std::io::Write>(
+        &self,
+        cmd: &Relentless,
+        w: &mut ReportWriter<W>,
+    ) -> Result<(), std::fmt::Error> {
         for report in &self.report {
             if !report.skip_report(cmd) {
                 report.console_report(cmd, w)?;
@@ -96,8 +103,11 @@ impl WorkerConsoleReport {
     pub const SUMMARY_EMOJI: console::Emoji<'_, '_> = console::Emoji("💥", "");
 }
 impl<T: Display, Q: Clone + Coalesce, P: Clone + Coalesce> ConsoleReport for WorkerReport<T, Q, P> {
-    type Error = std::fmt::Error;
-    fn console_report<W: std::io::Write>(&self, cmd: &Relentless, w: &mut ReportWriter<W>) -> Result<(), Self::Error> {
+    fn console_report<W: std::io::Write>(
+        &self,
+        cmd: &Relentless,
+        w: &mut ReportWriter<W>,
+    ) -> Result<(), std::fmt::Error> {
         let WorkerConfig { name, destinations, .. } = self.config.coalesce();
 
         writeln!(
@@ -166,8 +176,11 @@ impl CaseConsoleReport {
     pub const SUMMARY_EMOJI: console::Emoji<'_, '_> = console::Emoji("💥", "");
 }
 impl<T: Display, Q: Clone + Coalesce, P: Clone + Coalesce> ConsoleReport for CaseReport<T, Q, P> {
-    type Error = std::fmt::Error;
-    fn console_report<W: std::io::Write>(&self, cmd: &Relentless, w: &mut ReportWriter<W>) -> Result<(), Self::Error> {
+    fn console_report<W: std::io::Write>(
+        &self,
+        cmd: &Relentless,
+        w: &mut ReportWriter<W>,
+    ) -> Result<(), std::fmt::Error> {
         let Testcase { description, target, setting, .. } = self.testcase().coalesce();
 
         let side = if self.pass() { CaseConsoleReport::PASS_EMOJI } else { CaseConsoleReport::FAIL_EMOJI };

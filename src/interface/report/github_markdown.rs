@@ -13,16 +13,16 @@ use crate::{
 };
 
 pub trait GithubMarkdownReport: Reportable {
-    type Error;
     fn github_markdown_report<W: std::io::Write>(
         &self,
         cmd: &Relentless,
         w: &mut ReportWriter<W>,
-    ) -> Result<(), Self::Error>;
-    fn console_aggregate<W: std::io::Write>(&self, cmd: &Relentless, w: &mut ReportWriter<W>) -> Result<(), Self::Error>
-    where
-        Self::Error: From<std::fmt::Error>,
-    {
+    ) -> Result<(), std::fmt::Error>;
+    fn console_aggregate<W: std::io::Write>(
+        &self,
+        cmd: &Relentless,
+        w: &mut ReportWriter<W>,
+    ) -> Result<(), std::fmt::Error> {
         let EvaluateAggregate { pass: pass_agg, response } = self.aggregator().aggregate(&cmd.quantile_set());
         let PassAggregate { pass, count, pass_rate } = &pass_agg;
         let ResponseAggregate { req, duration, rps, latency, .. } = &response;
@@ -61,12 +61,11 @@ impl RelentlessGithubMarkdownReport {
     pub const SUMMARY_EMOJI: &str = ":boom:";
 }
 impl<T: Display, Q: Clone + Coalesce, P: Clone + Coalesce> GithubMarkdownReport for Report<T, Q, P> {
-    type Error = std::fmt::Error;
     fn github_markdown_report<W: std::io::Write>(
         &self,
         cmd: &Relentless,
         w: &mut ReportWriter<W>,
-    ) -> Result<(), Self::Error> {
+    ) -> Result<(), std::fmt::Error> {
         for report in &self.report {
             if !report.skip_report(cmd) {
                 report.github_markdown_report(cmd, w)?;
@@ -96,12 +95,11 @@ impl WorkerGithubMarkdownReport {
     pub const OVERWRITE_DESTINATION_EMOJI: &str = ":point_right:";
 }
 impl<T: Display, Q: Clone + Coalesce, P: Clone + Coalesce> GithubMarkdownReport for WorkerReport<T, Q, P> {
-    type Error = std::fmt::Error;
     fn github_markdown_report<W: std::io::Write>(
         &self,
         cmd: &Relentless,
         w: &mut ReportWriter<W>,
-    ) -> Result<(), Self::Error> {
+    ) -> Result<(), std::fmt::Error> {
         let WorkerConfig { name, destinations, .. } = self.config.coalesce();
 
         writeln!(
@@ -154,12 +152,11 @@ impl CaseGithubMarkdownReport {
     pub const MESSAGE_EMOJI: &str = ":speech_balloon:";
 }
 impl<T: Display, Q: Clone + Coalesce, P: Clone + Coalesce> GithubMarkdownReport for CaseReport<T, Q, P> {
-    type Error = std::fmt::Error;
     fn github_markdown_report<W: std::io::Write>(
         &self,
         cmd: &Relentless,
         w: &mut ReportWriter<W>,
-    ) -> Result<(), Self::Error> {
+    ) -> Result<(), std::fmt::Error> {
         let Testcase { description, target, setting, .. } = self.testcase().coalesce();
 
         let side =
