@@ -9,6 +9,17 @@ pub trait Evaluate<Res> {
 pub trait Acceptable<T> {
     type Message;
     fn accept(&self, dest: &Destinations<T>, msg: &mut Messages<Self::Message>) -> bool;
+    fn sub_accept<U, A: Acceptable<U>, F: Fn(A::Message) -> Self::Message>(
+        acceptable: &A,
+        dest: &Destinations<U>,
+        msg: &mut Messages<Self::Message>,
+        convert: F,
+    ) -> bool {
+        let mut sub_msg = Messages::new();
+        let accept = acceptable.accept(dest, &mut sub_msg);
+        msg.extend(sub_msg.into_iter().map(convert));
+        accept
+    }
 
     fn assault_or_compare<F>(d: &Destinations<T>, f: F) -> bool
     where
