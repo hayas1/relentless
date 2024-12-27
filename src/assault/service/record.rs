@@ -16,8 +16,6 @@ use http_body::Body;
 use http_body_util::{BodyExt, Collected};
 use tower::{Layer, Service};
 
-use crate::error2::RelentlessError;
-
 #[allow(async_fn_in_trait)] // TODO #[warn(async_fn_in_trait)] by default
 pub trait Recordable: Sized {
     type Error;
@@ -137,11 +135,11 @@ where
     S::Error: std::error::Error + Send + Sync + 'static,
 {
     type Response = S::Response;
-    type Error = RelentlessError;
+    type Error = crate::Error2;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.inner.poll_ready(cx).map_err(RelentlessError::boxed)
+        self.inner.poll_ready(cx).map_err(crate::Error2::boxed)
     }
 
     fn call(&mut self, request: http::Request<ReqB>) -> Self::Future {
@@ -161,47 +159,47 @@ where
                 // once consume body for record, and reconstruct for request
                 let (req_parts, req_body) = request.into_parts();
                 let req_bytes =
-                    BodyExt::collect(req_body).await.map(Collected::to_bytes).map_err(RelentlessError::boxed)?;
+                    BodyExt::collect(req_body).await.map(Collected::to_bytes).map_err(crate::Error2::boxed)?;
                 let recordable_raw_req = http::Request::from_parts(req_parts.clone(), ReqB::from(req_bytes.clone()));
                 recordable_raw_req
-                    .record_raw(&mut File::create(path_raw_req.with_extension("txt")).map_err(RelentlessError::boxed)?)
+                    .record_raw(&mut File::create(path_raw_req.with_extension("txt")).map_err(crate::Error2::boxed)?)
                     .await
-                    .map_err(RelentlessError::boxed)?;
+                    .map_err(crate::Error2::boxed)?;
                 let recordable_req = http::Request::from_parts(req_parts.clone(), ReqB::from(req_bytes.clone()));
                 let req_record_extension = recordable_req.extension();
                 recordable_req
                     .record(
                         &mut File::create(path_req.with_extension(req_record_extension))
-                            .map_err(RelentlessError::boxed)?,
+                            .map_err(crate::Error2::boxed)?,
                     )
                     .await
-                    .map_err(RelentlessError::boxed)?;
+                    .map_err(crate::Error2::boxed)?;
                 let req = http::Request::from_parts(req_parts, ReqB::from(req_bytes));
 
                 // once consume body for record, and reconstruct for response
-                let res = cloned_inner.call(req).await.map_err(RelentlessError::boxed)?;
+                let res = cloned_inner.call(req).await.map_err(crate::Error2::boxed)?;
                 let (res_parts, res_body) = res.into_parts();
                 let res_bytes =
-                    BodyExt::collect(res_body).await.map(Collected::to_bytes).map_err(RelentlessError::boxed)?;
+                    BodyExt::collect(res_body).await.map(Collected::to_bytes).map_err(crate::Error2::boxed)?;
                 let recordable_raw_res = http::Response::from_parts(res_parts.clone(), ResB::from(res_bytes.clone()));
                 recordable_raw_res
-                    .record_raw(&mut File::create(path_raw_res.with_extension("txt")).map_err(RelentlessError::boxed)?)
+                    .record_raw(&mut File::create(path_raw_res.with_extension("txt")).map_err(crate::Error2::boxed)?)
                     .await
-                    .map_err(RelentlessError::boxed)?;
+                    .map_err(crate::Error2::boxed)?;
                 let recordable_res = http::Response::from_parts(res_parts.clone(), ReqB::from(res_bytes.clone()));
                 let res_record_extension = recordable_res.extension();
                 recordable_res
                     .record(
                         &mut File::create(path_res.with_extension(res_record_extension))
-                            .map_err(RelentlessError::boxed)?,
+                            .map_err(crate::Error2::boxed)?,
                     )
                     .await
-                    .map_err(RelentlessError::boxed)?;
+                    .map_err(crate::Error2::boxed)?;
                 Ok(http::Response::from_parts(res_parts, ResB::from(res_bytes)))
             })
         } else {
             let fut = self.inner.call(request);
-            Box::pin(async move { fut.await.map_err(RelentlessError::boxed) })
+            Box::pin(async move { fut.await.map_err(crate::Error2::boxed) })
         }
     }
 }
