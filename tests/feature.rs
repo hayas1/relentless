@@ -14,7 +14,7 @@ async fn test_repeat_config() {
     let relentless = Relentless {
         file: vec!["tests/config/feature/repeat.yaml".into()],
         no_color: true,
-        no_async: vec![WorkerKind::Testcases],
+        sequential: vec![WorkerKind::Testcases],
         ..Default::default()
     };
     let configs = relentless.configs().unwrap();

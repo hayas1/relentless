@@ -51,7 +51,7 @@ pub struct Relentless {
     pub destination: Vec<(String, String)>, // TODO HashMap<String, Uri>, but clap won't parse HashMap
 
     /// allow invalid testcases
-    #[cfg_attr(feature = "cli", arg(short, long))]
+    #[cfg_attr(feature = "cli", arg(long))]
     pub strict: bool,
 
     /// report only failed testcases
@@ -71,8 +71,8 @@ pub struct Relentless {
     pub output_record: Option<PathBuf>,
 
     /// without async for each requests
-    #[cfg_attr(feature = "cli", arg(long, num_args=0.., value_delimiter = ' '))]
-    pub no_async: Vec<WorkerKind>, // TODO dedup in advance
+    #[cfg_attr(feature = "cli", arg(short, long, num_args=0.., value_delimiter = ' '))]
+    pub sequential: Vec<WorkerKind>, // TODO dedup in advance
 
     /// measure and report metrics for each requests
     #[cfg_attr(feature = "cli", arg(short, long, num_args=0.., value_delimiter = ' '))]
@@ -124,14 +124,14 @@ impl Relentless {
             .collect::<Result<Destinations<_>, _>>()
     }
 
-    pub fn no_async_set(&self) -> Vec<WorkerKind> {
-        let mut v = self.no_async.clone();
+    pub fn sequential_set(&self) -> Vec<WorkerKind> {
+        let mut v = self.sequential.clone();
         v.sort_unstable();
         v.dedup();
         v
     }
-    pub fn is_no_async(&self, kind: WorkerKind) -> bool {
-        self.no_async_set().contains(&kind)
+    pub fn is_sequential(&self, kind: WorkerKind) -> bool {
+        self.sequential_set().contains(&kind)
     }
 
     pub fn measure_set(&self) -> Vec<WorkerKind> {
