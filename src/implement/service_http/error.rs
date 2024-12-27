@@ -1,7 +1,7 @@
 use thiserror::Error;
 
 use crate::{
-    assault::error::RequestError,
+    assault::result::RequestError,
     new_error::{JsonEvaluateError, PlaintextEvaluateError},
 };
 

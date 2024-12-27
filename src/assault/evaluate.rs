@@ -1,4 +1,4 @@
-use super::{destinations::Destinations, error::RequestResult, messages::Messages};
+use super::{destinations::Destinations, messages::Messages, result::RequestResult};
 
 #[allow(async_fn_in_trait)] // TODO #[warn(async_fn_in_trait)] by default
 pub trait Evaluate<Res> {

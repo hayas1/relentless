@@ -8,7 +8,7 @@ use std::{
 use tower::{timeout::error::Elapsed, Layer, Service};
 
 use crate::assault::{
-    error::{RequestError, RequestResult},
+    result::{RequestError, RequestResult},
     measure::metrics::MeasuredResponse,
 };
 
