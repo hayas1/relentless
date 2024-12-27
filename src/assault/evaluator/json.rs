@@ -8,8 +8,8 @@ use crate::{
         evaluate::Acceptable,
         messages::Messages,
     },
+    error2::JsonEvaluateError,
     interface::{config::Severity, helper::is_default::IsDefault},
-    new_error::JsonEvaluateError,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]

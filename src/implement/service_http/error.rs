@@ -2,7 +2,7 @@ use thiserror::Error;
 
 use crate::{
     assault::result::RequestError,
-    new_error::{JsonEvaluateError, PlaintextEvaluateError},
+    error2::{JsonEvaluateError, PlaintextEvaluateError},
 };
 
 #[derive(Error, Debug)]

@@ -66,6 +66,6 @@ pub mod assault;
 pub mod error;
 pub mod implement;
 pub mod interface;
-pub mod new_error;
+pub mod error2;
 
 pub use {error::RelentlessError as Error, error::RelentlessResult as Result};

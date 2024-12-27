@@ -29,8 +29,8 @@ impl<T> From<Context<T>> for RelentlessError {
         RelentlessError { source }
     }
 }
-impl From<crate::new_error::RelentlessError> for RelentlessError {
-    fn from(e: crate::new_error::RelentlessError) -> Self {
+impl From<crate::error2::RelentlessError> for RelentlessError {
+    fn from(e: crate::error2::RelentlessError) -> Self {
         RelentlessError { source: Box::new(e) }
     }
 }

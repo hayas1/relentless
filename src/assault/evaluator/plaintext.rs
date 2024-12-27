@@ -8,7 +8,7 @@ use crate::{
         evaluate::Acceptable,
         messages::Messages,
     },
-    new_error::PlaintextEvaluateError,
+    error2::PlaintextEvaluateError,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
