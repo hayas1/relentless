@@ -54,8 +54,8 @@ testcases:
     setting:
       template:
         token:
-          server1: secret-auth-token
-          server2: secret-auth-token
+          server1: VERY_SENSITIVE_TOKEN
+          server2: VERY_SENSITIVE_TOKEN
       request:
         headers:
           Authorization: Bearer ${token}
@@ -63,6 +63,6 @@ testcases:
         body:
           json:
             patch:
-            - {op: test, path: "/0/authorization", value: "Bearer secret-auth-token"}
+            - {op: test, path: "/0/authorization", value: "Bearer VERY_SENSITIVE_TOKEN"}
             patch-fail: deny
 

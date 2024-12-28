@@ -192,6 +192,27 @@ async fn test_headers_config() {
 }
 
 #[tokio::test]
+async fn test_header_from_env_config() {
+    let relentless = Relentless {
+        file: vec!["tests/config/feature/header_from_env.yaml".into()],
+        no_color: true,
+        ..Default::default()
+    };
+    std::env::set_var("TOKEN", "VERY_SENSITIVE_TOKEN");
+    let (configs, _) = relentless.configs();
+    let service = route::app_with(Default::default());
+    let report = relentless.assault_with::<_, Request<Body>>(configs, service).await.unwrap();
+
+    let mut buf = Vec::new();
+    relentless.report_with(&report, &mut buf).unwrap();
+    let out = String::from_utf8_lossy(&buf);
+
+    assert!(out.contains(&format!("{} /echo/headers", CaseConsoleReport::PASS_EMOJI)));
+    assert!(relentless.pass(&report));
+    assert!(relentless.allow(&report));
+}
+
+#[tokio::test]
 async fn test_fail_headers_config() {
     let relentless = Relentless {
         file: vec!["tests/config/feature/fail_validate_headers.yaml".into()],
