@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use bytes::Bytes;
 use http::{
     header::{CONTENT_LENGTH, CONTENT_TYPE},
@@ -8,6 +6,7 @@ use http::{
 use http_body::Body;
 use mime::{Mime, APPLICATION_JSON, TEXT_PLAIN};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 use crate::{
     assault::factory::RequestFactory,
@@ -41,7 +40,7 @@ pub enum HttpBody {
     Empty,
     Plaintext(String),
     #[cfg(feature = "json")]
-    Json(HashMap<String, String>),
+    Json(Value),
 }
 impl HttpBody {
     pub fn body_with_headers<ReqB>(&self, template: &Template) -> crate::Result<(ReqB, HeaderMap)>
@@ -131,13 +130,7 @@ where
             HttpBody::Empty => Ok(Default::default()),
             HttpBody::Plaintext(s) => Ok(Bytes::from(template.render(s).unwrap_or(s.to_string())).into()),
             #[cfg(feature = "json")]
-            HttpBody::Json(m) => Ok(Bytes::from(
-                serde_json::to_vec(
-                    &m.iter().map(|(k, v)| (k, template.render(v).unwrap_or(v.to_string()))).collect::<HashMap<_, _>>(),
-                )
-                .box_err()?,
-            )
-            .into()),
+            HttpBody::Json(v) => Ok(Bytes::from(template.render(&v.to_string()).unwrap_or(v.to_string())).into()), // TODO recursive ?
         }
     }
 }

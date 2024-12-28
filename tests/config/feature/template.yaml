@@ -28,3 +28,23 @@ testcases:
             regex:
               server1: ^hello server1$
               server2: ^hello server2$
+  - target: /echo/json
+    setting:
+      template:
+        var:
+          server1: server1
+          server2: server2
+      request:
+        method: POST
+        body:
+          json:
+            server: ${server}
+      response:
+        body:
+          json:
+            patch:
+              server1:
+                - {op: test, path: "/server", value: "server1"}
+              server2:
+                - {op: test, path: "/server", value: "server2"}
+
