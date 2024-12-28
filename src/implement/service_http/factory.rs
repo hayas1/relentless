@@ -6,6 +6,7 @@ use http::{
 use http_body::Body;
 use mime::{Mime, APPLICATION_JSON, TEXT_PLAIN};
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "json")]
 use serde_json::Value;
 
 use crate::{
