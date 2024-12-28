@@ -150,7 +150,10 @@ where
             HttpBody::Empty => Ok(Default::default()),
             HttpBody::Plaintext(s) => Ok(Bytes::from(template.render(s).unwrap_or(s.to_string())).into()),
             #[cfg(feature = "json")]
-            HttpBody::Json(v) => Ok(Bytes::from(template.render(&v.to_string()).unwrap_or(v.to_string())).into()), // TODO recursive ?
+            HttpBody::Json(v) => {
+                Ok(Bytes::from(serde_json::to_vec(&template.render_json_recursive(v).as_ref().unwrap_or(v)).box_err()?)
+                    .into())
+            }
         }
     }
 }

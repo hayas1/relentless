@@ -45,8 +45,10 @@ testcases:
             patch:
               server1:
                 - {op: test, path: "/server", value: "server1"}
+                - {op: replace, path: "/server", value: "server"}
               server2:
                 - {op: test, path: "/server", value: "server2"}
+                - {op: replace, path: "/server", value: "server"}
             patch-fail: error
   - target: /echo/headers
     setting:
