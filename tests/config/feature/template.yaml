@@ -49,7 +49,7 @@ testcases:
               server2:
                 - {op: test, path: "/server", value: "server2"}
                 - {op: replace, path: "/server", value: "server"}
-            patch-fail: error
+            patch-fail: deny
   - target: /echo/headers
     setting:
       template:
@@ -64,5 +64,5 @@ testcases:
           json:
             patch:
             - {op: test, path: "/0/authorization", value: "Bearer secret-auth-token"}
-            patch-fail: error
+            patch-fail: deny
 
