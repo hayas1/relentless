@@ -22,16 +22,20 @@ use crate::{
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct HttpRequest {
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
+    #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
     pub no_additional_headers: bool,
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
+    #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
     pub method: Option<http_serde_priv::Method>,
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
+    #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
     pub headers: Option<http_serde_priv::HeaderMap>,
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
+    #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
     pub body: HttpBody,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "kebab-case", untagged)]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub enum HttpBody {
     #[default]
     Empty,
@@ -127,7 +131,13 @@ where
             HttpBody::Empty => Ok(Default::default()),
             HttpBody::Plaintext(s) => Ok(Bytes::from(template.render(s).unwrap_or(s.to_string())).into()),
             #[cfg(feature = "json")]
-            HttpBody::Json(_) => Ok(Bytes::from(serde_json::to_vec(&self).box_err()?).into()),
+            HttpBody::Json(m) => Ok(Bytes::from(
+                serde_json::to_vec(
+                    &m.iter().map(|(k, v)| (k, template.render(v).unwrap_or(v.to_string()))).collect::<HashMap<_, _>>(),
+                )
+                .box_err()?,
+            )
+            .into()),
         }
     }
 }

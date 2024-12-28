@@ -7,7 +7,8 @@ testcases:
     setting:
       request:
         method: POST
-        body: hello world
+        body:
+          plaintext: hello world
       response:
         body:
           plaintext:
@@ -17,9 +18,10 @@ testcases:
       request:
         method: POST
         body:
-          foo: hoge
-          bar: fuga
-          baz: piyo
+          json:
+            foo: hoge
+            bar: fuga
+            baz: piyo
       response:
         body:
           json:
@@ -37,9 +39,10 @@ testcases:
         no-additional-headers: true
         method: POST
         body:
-          foo: hoge
-          bar: fuga
-          baz: piyo
+          json:
+            foo: hoge
+            bar: fuga
+            baz: piyo
       response:
         status:
           expect: 415

@@ -20,7 +20,8 @@ testcases:
           server2: server2
       request:
         method: POST
-        body: hello ${var}
+        body:
+          plaintext: hello ${var}
       response:
         body:
           plaintext:
