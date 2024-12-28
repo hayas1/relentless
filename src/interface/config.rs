@@ -83,7 +83,7 @@ impl Repeat {
 pub enum Severity {
     Allow,
     Warn,
-    Error,
+    Deny,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -260,7 +260,7 @@ mod tests {
                                         .unwrap(),
                                 ),
                             ]))),
-                            patch_fail: Some(Severity::Error),
+                            patch_fail: Some(Severity::Deny),
                         }),
                         ..Default::default()
                     },

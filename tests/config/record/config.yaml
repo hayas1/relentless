@@ -8,7 +8,8 @@ testcases:
     setting:
       request:
         method: POST
-        body: hello world
+        body:
+          plaintext: hello world
       response:
         body:
           plaintext:

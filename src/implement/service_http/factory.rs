@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use bytes::Bytes;
 use http::{
     header::{CONTENT_LENGTH, CONTENT_TYPE},
@@ -8,6 +6,8 @@ use http::{
 use http_body::Body;
 use mime::{Mime, APPLICATION_JSON, TEXT_PLAIN};
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "json")]
+use serde_json::Value;
 
 use crate::{
     assault::factory::RequestFactory,
@@ -22,22 +22,26 @@ use crate::{
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct HttpRequest {
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
+    #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
     pub no_additional_headers: bool,
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
+    #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
     pub method: Option<http_serde_priv::Method>,
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
+    #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
     pub headers: Option<http_serde_priv::HeaderMap>,
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
+    #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
     pub body: HttpBody,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "kebab-case", untagged)]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub enum HttpBody {
     #[default]
     Empty,
     Plaintext(String),
     #[cfg(feature = "json")]
-    Json(HashMap<String, String>),
+    Json(Value),
 }
 impl HttpBody {
     pub fn body_with_headers<ReqB>(&self, template: &Template) -> crate::Result<(ReqB, HeaderMap)>
@@ -99,8 +103,24 @@ where
         let uri =
             http::uri::Builder::from(destination.clone()).path_and_query(template.render(target)?).build().box_err()?;
         let unwrapped_method = method.as_ref().map(|m| (**m).clone()).unwrap_or_default();
-        let unwrapped_headers: HeaderMap = headers.as_ref().map(|h| (**h).clone()).unwrap_or_default();
-        // .into_iter().map(|(k, v)| (k, template.render_as_string(v))).collect(); // TODO template with header
+        let unwrapped_headers: HeaderMap = headers
+            .as_ref()
+            .map(|h| {
+                (**h)
+                    .clone()
+                    .into_iter()
+                    .fold((None, HeaderMap::default()), |(prev, mut map), (k, v)| {
+                        // duplicate key will cause None https://docs.rs/http/latest/http/header/struct.HeaderMap.html#impl-IntoIterator-for-HeaderMap%3CT%3E
+                        let curr = k.or(prev);
+                        map.insert(
+                            curr.as_ref().unwrap_or_else(|| unreachable!()),
+                            template.render_as_string(v.clone()).map(From::from).unwrap_or(v),
+                        );
+                        (curr, map)
+                    })
+                    .1
+            })
+            .unwrap_or_default();
         let (actual_body, additional_headers) = body.clone().body_with_headers(template)?;
 
         let mut request = http::Request::builder().uri(uri).method(unwrapped_method).body(actual_body).box_err()?;
@@ -127,7 +147,10 @@ where
             HttpBody::Empty => Ok(Default::default()),
             HttpBody::Plaintext(s) => Ok(Bytes::from(template.render(s).unwrap_or(s.to_string())).into()),
             #[cfg(feature = "json")]
-            HttpBody::Json(_) => Ok(Bytes::from(serde_json::to_vec(&self).box_err()?).into()),
+            HttpBody::Json(v) => {
+                Ok(Bytes::from(serde_json::to_vec(&template.render_json_recursive(v).as_ref().unwrap_or(v)).box_err()?)
+                    .into())
+            }
         }
     }
 }

@@ -15,6 +15,8 @@ use nom::{
     IResult,
 };
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "json")]
+use serde_json::Value;
 
 use crate::error::{IntoResult, TemplateError};
 
@@ -64,6 +66,24 @@ impl Template {
         T::Err: std::error::Error + Send + Sync + 'static,
     {
         T::from_str(&self.render(&String::from_utf8_lossy(input.as_ref()))?).box_err()
+    }
+
+    #[cfg(feature = "json")]
+    pub fn render_json_recursive(&self, input: &Value) -> crate::Result<Value> {
+        match input {
+            Value::Object(m) => Ok(Value::Object(
+                m.iter()
+                    .map(|(k, v)| self.render_json_recursive(v).map(|v| (k.clone(), v)))
+                    .collect::<Result<_, _>>()?,
+            )),
+            Value::Array(v) => {
+                Ok(Value::Array(v.iter().map(|v| self.render_json_recursive(v)).collect::<Result<_, _>>()?))
+            }
+            Value::String(s) => Ok(Value::String(self.render(s)?)),
+            Value::Number(n) => Ok(Value::Number(n.clone())),
+            Value::Bool(b) => Ok(Value::Bool(*b)),
+            Value::Null => Ok(Value::Null),
+        }
     }
 }
 
