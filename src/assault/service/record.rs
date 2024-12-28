@@ -16,7 +16,7 @@ use http_body::Body;
 use http_body_util::{BodyExt, Collected};
 use tower::{Layer, Service};
 
-use crate::error2::IntoResult;
+use crate::error::IntoResult;
 
 #[allow(async_fn_in_trait)] // TODO #[warn(async_fn_in_trait)] by default
 pub trait Recordable: Sized {
@@ -137,7 +137,7 @@ where
     S::Error: std::error::Error + Send + Sync + 'static,
 {
     type Response = S::Response;
-    type Error = crate::Error2;
+    type Error = crate::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {

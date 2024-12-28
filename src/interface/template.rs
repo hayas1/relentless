@@ -16,7 +16,7 @@ use nom::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::error2::{IntoResult, TemplateError};
+use crate::error::{IntoResult, TemplateError};
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct Template {
@@ -52,13 +52,13 @@ impl Template {
         Default::default()
     }
 
-    pub fn render(&self, input: &str) -> crate::Result2<String> {
+    pub fn render(&self, input: &str) -> crate::Result<String> {
         let variables = Variable::split(input)?;
         let assigned = variables.iter().map(|v| v.assign(self)).collect::<Result<Vec<_>, _>>()?;
         Ok(assigned.join(""))
     }
 
-    pub fn render_as_string<T>(&self, input: T) -> crate::Result2<T>
+    pub fn render_as_string<T>(&self, input: T) -> crate::Result<T>
     where
         T: AsRef<[u8]> + FromStr,
         T::Err: std::error::Error + Send + Sync + 'static,
@@ -76,7 +76,7 @@ pub enum Variable {
 }
 
 impl Variable {
-    pub fn split(input: &str) -> crate::Result2<Vec<Self>> {
+    pub fn split(input: &str) -> crate::Result<Vec<Self>> {
         let (remain, parsed) = Self::parse(input).map_err(|e| TemplateError::NomParseError(e.to_string()))?;
         remain
             .is_empty() // TODO check is_empty by nom's function?
@@ -84,7 +84,7 @@ impl Variable {
             .ok_or_else(|| TemplateError::RemainingTemplate(remain.to_string()).into())
     }
 
-    pub fn assign(&self, defined: &Template) -> crate::Result2<String> {
+    pub fn assign(&self, defined: &Template) -> crate::Result<String> {
         match self {
             Self::Literal(text) => Ok(text.clone()),
             Self::Defined(key) => Ok(defined.get(key).ok_or(TemplateError::VariableNotDefined(key.clone()))?.clone()),

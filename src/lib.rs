@@ -63,8 +63,8 @@
 //! <https://hayas1.github.io/relentless/tarpaulin-report.html>
 
 pub mod assault;
-pub mod error2;
+pub mod error;
 pub mod implement;
 pub mod interface;
 
-pub use {error2::RelentlessError as Error2, error2::RelentlessResult as Result2};
+pub use {error::RelentlessError as Error, error::RelentlessResult as Result};

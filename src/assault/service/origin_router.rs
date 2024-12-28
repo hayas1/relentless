@@ -3,7 +3,7 @@ use std::{collections::HashMap, future::Future, marker::PhantomData, pin::Pin, t
 use http::uri::Authority;
 use tower::Service;
 
-use crate::error2::{AssaultError, IntoResult};
+use crate::error::{AssaultError, IntoResult};
 
 #[derive(Debug, PartialEq, Eq, Default)]
 pub struct OriginRouter<S, B> {
@@ -33,7 +33,7 @@ where
     S::Error: std::error::Error + Send + Sync + 'static,
 {
     type Response = S::Response;
-    type Error = crate::Error2;
+    type Error = crate::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
     fn poll_ready(&mut self, cx: &mut std::task::Context<'_>) -> Poll<Result<(), Self::Error>> {

@@ -8,7 +8,7 @@ use crate::{
         evaluate::Acceptable,
         messages::Messages,
     },
-    error2::JsonEvaluateError,
+    error::JsonEvaluateError,
     interface::{config::Severity, helper::is_default::IsDefault},
 };
 

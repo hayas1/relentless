@@ -10,7 +10,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
     assault::destinations::Destinations,
-    error2::{InterfaceError, IntoResult},
+    error::{InterfaceError, IntoResult},
     interface::template::Template,
 };
 
@@ -99,12 +99,12 @@ pub struct Testcase<Q, P> {
 }
 
 impl<Q: Configuration, P: Configuration> Config<Q, P> {
-    pub fn read<A: AsRef<Path>>(path: A) -> crate::Result2<Self> {
+    pub fn read<A: AsRef<Path>>(path: A) -> crate::Result<Self> {
         Ok(Format::from_path(path.as_ref())?
             .deserialize_testcase(path.as_ref())
             .map_err(|e| InterfaceError::CannotReadConfig(path.as_ref().display().to_string(), e))?)
     }
-    pub fn read_str(s: &str, format: Format) -> crate::Result2<Self> {
+    pub fn read_str(s: &str, format: Format) -> crate::Result<Self> {
         format.deserialize_testcase_str(s)
     }
 }
@@ -154,7 +154,7 @@ pub enum Format {
     Toml,
 }
 impl Format {
-    pub fn from_path<A: AsRef<Path>>(path: A) -> crate::Result2<Self> {
+    pub fn from_path<A: AsRef<Path>>(path: A) -> crate::Result<Self> {
         let basename = path.as_ref().extension().and_then(|ext| ext.to_str());
         match basename {
             #[cfg(feature = "json")]
@@ -171,7 +171,7 @@ impl Format {
     pub fn deserialize_testcase<A: AsRef<Path>, Q: Configuration, P: Configuration>(
         &self,
         path: A,
-    ) -> crate::Result2<Config<Q, P>> {
+    ) -> crate::Result<Config<Q, P>> {
         match self {
             #[cfg(feature = "json")]
             Format::Json => Ok(serde_json::from_reader(File::open(path).box_err()?).box_err()?),
@@ -187,7 +187,7 @@ impl Format {
     pub fn deserialize_testcase_str<Q: Configuration, P: Configuration>(
         &self,
         content: &str,
-    ) -> crate::Result2<Config<Q, P>> {
+    ) -> crate::Result<Config<Q, P>> {
         match self {
             #[cfg(feature = "json")]
             Format::Json => Ok(serde_json::from_str(content).box_err()?),

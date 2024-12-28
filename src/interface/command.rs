@@ -18,7 +18,7 @@ use crate::{
         service::record::{RecordLayer, RecordService},
         worker::Control,
     },
-    error2::{InterfaceError, IntoResult},
+    error::{InterfaceError, IntoResult},
     implement::service_http::{evaluate::HttpResponse, factory::HttpRequest},
 };
 
@@ -116,7 +116,7 @@ pub enum WorkerKind {
 }
 
 impl Relentless {
-    pub fn destinations(&self) -> crate::Result2<Destinations<http_serde_priv::Uri>> {
+    pub fn destinations(&self) -> crate::Result<Destinations<http_serde_priv::Uri>> {
         let Self { destination, .. } = self;
         destination
             .iter()
@@ -157,7 +157,7 @@ impl Relentless {
     }
 
     /// TODO document
-    pub fn configs(&self) -> (Vec<Config<HttpRequest, HttpResponse>>, Vec<crate::Error2>) {
+    pub fn configs(&self) -> (Vec<Config<HttpRequest, HttpResponse>>, Vec<crate::Error>) {
         let Self { file, .. } = self;
         let (ok, err): (Vec<_>, _) = file.iter().map(Config::read).partition(Result::is_ok);
         let (configs, errors) =
@@ -179,7 +179,7 @@ impl Relentless {
     #[cfg(all(feature = "default-http-client", feature = "cli"))]
     pub async fn assault(
         &self,
-    ) -> crate::Result2<Report<crate::implement::service_http::error::HttpEvaluateError, HttpRequest, HttpResponse>>
+    ) -> crate::Result<Report<crate::implement::service_http::error::HttpEvaluateError, HttpRequest, HttpResponse>>
     {
         let (configs, cannot_read) = self.configs();
         for err in cannot_read {
@@ -194,7 +194,7 @@ impl Relentless {
         &self,
         configs: Vec<Config<HttpRequest, HttpResponse>>,
         service: S,
-    ) -> crate::Result2<Report<<HttpResponse as Evaluate<S::Response>>::Message, HttpRequest, HttpResponse>>
+    ) -> crate::Result<Report<<HttpResponse as Evaluate<S::Response>>::Message, HttpRequest, HttpResponse>>
     where
         HttpRequest: RequestFactory<Req>,
         <HttpRequest as RequestFactory<Req>>::Error: std::error::Error + Send + Sync + 'static,
@@ -247,7 +247,7 @@ impl Relentless {
 }
 
 #[cfg(feature = "cli")]
-pub fn parse_key_value<T, U>(s: &str) -> crate::Result2<(T, U)>
+pub fn parse_key_value<T, U>(s: &str) -> crate::Result<(T, U)>
 where
     T: std::str::FromStr,
     T::Err: std::error::Error + Send + Sync + 'static,
