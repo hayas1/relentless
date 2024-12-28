@@ -51,7 +51,7 @@ where
         cmd: &Relentless,
         configs: Vec<Config<Q, P>>,
     ) -> crate::Result<Report<P::Message, Q, P>> {
-        let configs_buffer = if cmd.is_sequential(WorkerKind::Configs) { 1 } else { configs.len() };
+        let configs_buffer = if cmd.is_sequential(WorkerKind::Configs) { 1 } else { configs.len().max(1) };
 
         let report = stream::iter(configs)
             .map(|config| {
@@ -91,7 +91,7 @@ where
         config: Config<Q, P>,
     ) -> crate::Result<WorkerReport<P::Message, Q, P>> {
         let worker_config = Coalesced::tuple(config.worker_config, cmd.destinations()?);
-        let testcase_buffer = if cmd.is_sequential(WorkerKind::Testcases) { 1 } else { config.testcases.len() };
+        let testcase_buffer = if cmd.is_sequential(WorkerKind::Testcases) { 1 } else { config.testcases.len().max(1) };
 
         let report = stream::iter(config.testcases)
             .map(|testcase| {
@@ -159,7 +159,7 @@ where
         let Testcase { target, setting, .. } = testcase;
         let client = self.client.clone();
 
-        let repeat_buffer = if cmd.is_sequential(WorkerKind::Repeats) { 1 } else { setting.repeat.times() };
+        let repeat_buffer = if cmd.is_sequential(WorkerKind::Repeats) { 1 } else { setting.repeat.times().max(1) };
         Ok(Self::request_stream(destinations, target, setting)
             .map(move |repeating| {
                 let client = client.clone();
