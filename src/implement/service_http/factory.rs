@@ -114,11 +114,7 @@ where
                         let curr = k.or(prev);
                         map.insert(
                             curr.as_ref().unwrap_or_else(|| unreachable!()),
-                            if template.is_empty() {
-                                v
-                            } else {
-                                template.render_as_string(v.clone()).map(From::from).unwrap_or(v)
-                            },
+                            template.render_as_string(v.clone()).map(From::from).unwrap_or(v),
                         );
                         (curr, map)
                     })
