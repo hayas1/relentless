@@ -102,8 +102,28 @@ where
         let uri =
             http::uri::Builder::from(destination.clone()).path_and_query(template.render(target)?).build().box_err()?;
         let unwrapped_method = method.as_ref().map(|m| (**m).clone()).unwrap_or_default();
-        let unwrapped_headers: HeaderMap = headers.as_ref().map(|h| (**h).clone()).unwrap_or_default();
-        // .into_iter().map(|(k, v)| (k, template.render_as_string(v))).collect(); // TODO template with header
+        let unwrapped_headers: HeaderMap = headers
+            .as_ref()
+            .map(|h| {
+                (**h)
+                    .clone()
+                    .into_iter()
+                    .fold((None, HeaderMap::default()), |(prev, mut map), (k, v)| {
+                        // duplicate key will cause None https://docs.rs/http/latest/http/header/struct.HeaderMap.html#impl-IntoIterator-for-HeaderMap%3CT%3E
+                        let curr = k.or(prev);
+                        map.insert(
+                            curr.as_ref().unwrap_or_else(|| unreachable!()),
+                            if template.is_empty() {
+                                v
+                            } else {
+                                template.render_as_string(v.clone()).map(From::from).unwrap_or(v)
+                            },
+                        );
+                        (curr, map)
+                    })
+                    .1
+            })
+            .unwrap_or_default();
         let (actual_body, additional_headers) = body.clone().body_with_headers(template)?;
 
         let mut request = http::Request::builder().uri(uri).method(unwrapped_method).body(actual_body).box_err()?;

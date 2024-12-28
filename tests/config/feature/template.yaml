@@ -28,10 +28,10 @@ testcases:
             regex:
               server1: ^hello server1$
               server2: ^hello server2$
-  - target: /echo/json
+  - target: /echo/body
     setting:
       template:
-        var:
+        server:
           server1: server1
           server2: server2
       request:
@@ -47,4 +47,20 @@ testcases:
                 - {op: test, path: "/server", value: "server1"}
               server2:
                 - {op: test, path: "/server", value: "server2"}
+            patch-fail: error
+  - target: /echo/headers
+    setting:
+      template:
+        token:
+          server1: secret-auth-token
+          server2: secret-auth-token
+      request:
+        headers:
+          Authorization: Bearer ${token}
+      response:
+        body:
+          json:
+            patch:
+            - {op: test, path: "/0/authorization", value: "Bearer secret-auth-token"}
+            patch-fail: error
 
