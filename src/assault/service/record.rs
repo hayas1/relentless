@@ -1,4 +1,5 @@
 // ##### TODO record to sqlite or duckdb with measure.rs #####
+// **DEPRECATED** record request / response is experimental feature
 
 use std::{
     fs::File,
@@ -15,7 +16,7 @@ use http_body::Body;
 use http_body_util::{BodyExt, Collected};
 use tower::{Layer, Service};
 
-use crate::error::{Wrap, WrappedResult};
+use crate::error::IntoResult;
 
 #[allow(async_fn_in_trait)] // TODO #[warn(async_fn_in_trait)] by default
 pub trait Recordable: Sized {
@@ -127,18 +128,20 @@ impl<S, ReqB, ResB> Service<http::Request<ReqB>> for RecordService<S>
 where
     ReqB: Body + From<Bytes> + Send + 'static,
     ReqB::Data: Send,
+    ReqB::Error: std::error::Error + Send + Sync + 'static,
     ResB: Body + From<Bytes> + Send,
     ResB::Data: Send,
+    ResB::Error: std::error::Error + Send + Sync + 'static,
     S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Clone + Send + 'static,
     S::Future: Send + 'static,
-    Wrap: From<S::Error> + From<ReqB::Error> + From<ResB::Error>,
+    S::Error: std::error::Error + Send + Sync + 'static,
 {
     type Response = S::Response;
     type Error = crate::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.inner.poll_ready(cx).map_err(crate::Error::wrap)
+        self.inner.poll_ready(cx).box_err()
     }
 
     fn call(&mut self, request: http::Request<ReqB>) -> Self::Future {
@@ -155,36 +158,42 @@ where
         if let Some(((path_raw_req, path_req), (path_raw_res, path_res))) = paths {
             let mut cloned_inner = self.inner.clone();
             Box::pin(async move {
-                let response: WrappedResult<_> = async move {
-                    // once consume body for record, and reconstruct for request
-                    let (req_parts, req_body) = request.into_parts();
-                    let req_bytes = BodyExt::collect(req_body).await.map(Collected::to_bytes)?;
-                    let recordable_raw_req =
-                        http::Request::from_parts(req_parts.clone(), ReqB::from(req_bytes.clone()));
-                    recordable_raw_req.record_raw(&mut File::create(path_raw_req.with_extension("txt"))?).await?;
-                    let recordable_req = http::Request::from_parts(req_parts.clone(), ReqB::from(req_bytes.clone()));
-                    let req_record_extension = recordable_req.extension();
-                    recordable_req.record(&mut File::create(path_req.with_extension(req_record_extension))?).await?;
-                    let req = http::Request::from_parts(req_parts, ReqB::from(req_bytes));
+                // once consume body for record, and reconstruct for request
+                let (req_parts, req_body) = request.into_parts();
+                let req_bytes = BodyExt::collect(req_body).await.map(Collected::to_bytes).box_err()?;
+                let recordable_raw_req = http::Request::from_parts(req_parts.clone(), ReqB::from(req_bytes.clone()));
+                recordable_raw_req
+                    .record_raw(&mut File::create(path_raw_req.with_extension("txt")).box_err()?)
+                    .await
+                    .box_err()?;
+                let recordable_req = http::Request::from_parts(req_parts.clone(), ReqB::from(req_bytes.clone()));
+                let req_record_extension = recordable_req.extension();
+                recordable_req
+                    .record(&mut File::create(path_req.with_extension(req_record_extension)).box_err()?)
+                    .await
+                    .box_err()?;
+                let req = http::Request::from_parts(req_parts, ReqB::from(req_bytes));
 
-                    // once consume body for record, and reconstruct for response
-                    let res = cloned_inner.call(req).await?;
-                    let (res_parts, res_body) = res.into_parts();
-                    let res_bytes = BodyExt::collect(res_body).await.map(Collected::to_bytes)?;
-                    let recordable_raw_res =
-                        http::Response::from_parts(res_parts.clone(), ResB::from(res_bytes.clone()));
-                    recordable_raw_res.record_raw(&mut File::create(path_raw_res.with_extension("txt"))?).await?;
-                    let recordable_res = http::Response::from_parts(res_parts.clone(), ReqB::from(res_bytes.clone()));
-                    let res_record_extension = recordable_res.extension();
-                    recordable_res.record(&mut File::create(path_res.with_extension(res_record_extension))?).await?;
-                    Ok(http::Response::from_parts(res_parts, ResB::from(res_bytes)))
-                }
-                .await;
-                Ok(response?)
+                // once consume body for record, and reconstruct for response
+                let res = cloned_inner.call(req).await.box_err()?;
+                let (res_parts, res_body) = res.into_parts();
+                let res_bytes = BodyExt::collect(res_body).await.map(Collected::to_bytes).box_err()?;
+                let recordable_raw_res = http::Response::from_parts(res_parts.clone(), ResB::from(res_bytes.clone()));
+                recordable_raw_res
+                    .record_raw(&mut File::create(path_raw_res.with_extension("txt")).box_err()?)
+                    .await
+                    .box_err()?;
+                let recordable_res = http::Response::from_parts(res_parts.clone(), ReqB::from(res_bytes.clone()));
+                let res_record_extension = recordable_res.extension();
+                recordable_res
+                    .record(&mut File::create(path_res.with_extension(res_record_extension)).box_err()?)
+                    .await
+                    .box_err()?;
+                Ok(http::Response::from_parts(res_parts, ResB::from(res_bytes)))
             })
         } else {
             let fut = self.inner.call(request);
-            Box::pin(async move { fut.await.map_err(crate::Error::wrap) })
+            Box::pin(async move { fut.await.box_err() })
         }
     }
 }

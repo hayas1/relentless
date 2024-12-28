@@ -3,7 +3,7 @@ use std::{collections::HashMap, future::Future, marker::PhantomData, pin::Pin, t
 use http::uri::Authority;
 use tower::Service;
 
-use crate::error::{AssaultError, Wrap};
+use crate::error::{AssaultError, IntoResult};
 
 #[derive(Debug, PartialEq, Eq, Default)]
 pub struct OriginRouter<S, B> {
@@ -30,16 +30,18 @@ where
     Req: From<http::Request<B>> + Into<http::Request<B>>,
     S: Service<Req>,
     S::Future: Send + 'static,
-    Wrap: From<S::Error> + Send + 'static,
+    S::Error: std::error::Error + Send + Sync + 'static,
 {
     type Response = S::Response;
     type Error = crate::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
     fn poll_ready(&mut self, cx: &mut std::task::Context<'_>) -> Poll<Result<(), Self::Error>> {
-        match self.map.values_mut().try_fold(true, |sum, s| {
-            Ok(sum && matches!(s.poll_ready(cx).map_err(crate::Error::wrap)?, Poll::Ready(())))
-        }) {
+        match self
+            .map
+            .values_mut()
+            .try_fold(true, |sum, s| Ok(sum && matches!(s.poll_ready(cx).box_err()?, Poll::Ready(()))))
+        {
             Ok(true) => Poll::Ready(Ok(())),
             Ok(false) => Poll::Pending,
             Err(e) => Poll::Ready(Err(e)),
@@ -50,9 +52,9 @@ where
         let request: http::Request<B> = req.into();
         if let Some(s) = request.uri().authority().and_then(|a| self.map.get_mut(a)) {
             let fut = s.call(request.into());
-            Box::pin(async { fut.await.map_err(crate::Error::wrap) })
+            Box::pin(async { fut.await.box_err() })
         } else {
-            Box::pin(async { Err(Wrap::error(AssaultError::CannotSpecifyService)) })
+            Box::pin(async { Err(AssaultError::CannotSpecifyService)? })
         }
     }
 }

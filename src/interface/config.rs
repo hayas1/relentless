@@ -10,7 +10,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
     assault::destinations::Destinations,
-    error::{RunCommandError, WrappedResult},
+    error::{InterfaceError, IntoResult},
     interface::template::Template,
 };
 
@@ -99,12 +99,12 @@ pub struct Testcase<Q, P> {
 }
 
 impl<Q: Configuration, P: Configuration> Config<Q, P> {
-    pub fn read<A: AsRef<Path>>(path: A) -> WrappedResult<Self> {
+    pub fn read<A: AsRef<Path>>(path: A) -> crate::Result<Self> {
         Ok(Format::from_path(path.as_ref())?
             .deserialize_testcase(path.as_ref())
-            .map_err(|e| e.context(path.as_ref().display().to_string()))?)
+            .map_err(|e| InterfaceError::CannotReadConfig(path.as_ref().display().to_string(), e))?)
     }
-    pub fn read_str(s: &str, format: Format) -> WrappedResult<Self> {
+    pub fn read_str(s: &str, format: Format) -> crate::Result<Self> {
         format.deserialize_testcase_str(s)
     }
 }
@@ -154,7 +154,7 @@ pub enum Format {
     Toml,
 }
 impl Format {
-    pub fn from_path<A: AsRef<Path>>(path: A) -> WrappedResult<Self> {
+    pub fn from_path<A: AsRef<Path>>(path: A) -> crate::Result<Self> {
         let basename = path.as_ref().extension().and_then(|ext| ext.to_str());
         match basename {
             #[cfg(feature = "json")]
@@ -163,46 +163,40 @@ impl Format {
             Some("yaml" | "yml") => Ok(Format::Yaml),
             #[cfg(feature = "toml")]
             Some("toml") => Ok(Format::Toml),
-            Some(ext) => Err(RunCommandError::UnknownFormatExtension(ext.to_string()))?,
-            _ => Err(RunCommandError::CannotSpecifyFormat)?,
+            Some(ext) => Err(InterfaceError::UnknownFormatExtension(ext.to_string()))?,
+            _ => Err(InterfaceError::CannotSpecifyFormat)?,
         }
     }
 
     pub fn deserialize_testcase<A: AsRef<Path>, Q: Configuration, P: Configuration>(
         &self,
         path: A,
-    ) -> WrappedResult<Config<Q, P>> {
+    ) -> crate::Result<Config<Q, P>> {
         match self {
             #[cfg(feature = "json")]
-            Format::Json => Ok(serde_json::from_reader(File::open(path)?)?),
+            Format::Json => Ok(serde_json::from_reader(File::open(path).box_err()?).box_err()?),
             #[cfg(feature = "yaml")]
-            Format::Yaml => Ok(serde_yaml::from_reader(File::open(path)?)?),
+            Format::Yaml => Ok(serde_yaml::from_reader(File::open(path).box_err()?).box_err()?),
             #[cfg(feature = "toml")]
-            Format::Toml => Ok(toml::from_str(&read_to_string(path)?)?),
+            Format::Toml => Ok(toml::from_str(&read_to_string(path).box_err()?).box_err()?),
             #[cfg(not(any(feature = "json", feature = "yaml", feature = "toml")))]
-            _ => {
-                use crate::error::WithContext;
-                Err(RunCommandError::UndefinedSerializeFormat).context(path.as_ref().display().to_string())?
-            }
+            _ => Err(InterfaceError::UndefinedSerializeFormatPath(path.as_ref().display().to_string()))?,
         }
     }
 
     pub fn deserialize_testcase_str<Q: Configuration, P: Configuration>(
         &self,
         content: &str,
-    ) -> WrappedResult<Config<Q, P>> {
+    ) -> crate::Result<Config<Q, P>> {
         match self {
             #[cfg(feature = "json")]
-            Format::Json => Ok(serde_json::from_str(content)?),
+            Format::Json => Ok(serde_json::from_str(content).box_err()?),
             #[cfg(feature = "yaml")]
-            Format::Yaml => Ok(serde_yaml::from_str(content)?),
+            Format::Yaml => Ok(serde_yaml::from_str(content).box_err()?),
             #[cfg(feature = "toml")]
-            Format::Toml => Ok(toml::from_str(content)?),
+            Format::Toml => Ok(toml::from_str(content).box_err()?),
             #[cfg(not(any(feature = "json", feature = "yaml", feature = "toml")))]
-            _ => {
-                use crate::error::WithContext;
-                Err(RunCommandError::UndefinedSerializeFormat).context(content.to_string())?
-            }
+            _ => Err(InterfaceError::UndefinedSerializeFormatContent(content.to_string()))?,
         }
     }
 }
@@ -223,7 +217,7 @@ mod tests {
     #[cfg(not(any(feature = "json", feature = "yaml", feature = "toml")))]
     fn test_no_default_features() {
         let err = Config::<HttpRequest, HttpResponse>::read("path/to/config.yaml").unwrap_err();
-        assert_eq!(err.downcast_ref(), Some(&RunCommandError::UnknownFormatExtension("yaml".to_string())));
+        assert!(matches!(err.downcast_ref().unwrap(), InterfaceError::UnknownFormatExtension(s) if s == "yaml"));
     }
 
     #[test]

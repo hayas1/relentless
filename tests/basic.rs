@@ -15,7 +15,7 @@ async fn test_example_yaml_config() {
         report_format: ReportFormat::NullDevice,
         ..Default::default()
     };
-    let configs = relentless.configs().unwrap();
+    let (configs, _) = relentless.configs();
     let service = route::app_with(Default::default());
     let report = relentless.assault_with::<_, http::Request<Body>>(configs, service).await.unwrap();
 
@@ -32,8 +32,8 @@ fn test_same_basic_yaml_toml_config() {
 
     let yam = Relentless { file: yaml, ..Default::default() };
     let tom = Relentless { file: toml, ..Default::default() };
-    assert_json_diff::assert_json_eq!(yam.configs().unwrap(), tom.configs().unwrap());
-    assert_eq!(yam.configs().unwrap(), tom.configs().unwrap());
+    assert_json_diff::assert_json_eq!(yam.configs().0, tom.configs().0);
+    assert_eq!(yam.configs().0, tom.configs().0);
 }
 
 #[tokio::test]
@@ -45,7 +45,7 @@ async fn test_basic_yaml_config() {
         report_format: ReportFormat::NullDevice,
         ..Default::default()
     };
-    let configs = relentless.configs().unwrap();
+    let (configs, _) = relentless.configs();
     let (actual, expect) = (route::app_with(Default::default()), route::app_with(Default::default()));
     let service = OriginRouter::new(
         [(Authority::from_static("localhost:3001"), actual), (Authority::from_static("localhost:3000"), expect)]
@@ -67,7 +67,7 @@ async fn test_basic_toml_config() {
         report_format: ReportFormat::NullDevice,
         ..Default::default()
     };
-    let configs = relentless.configs().unwrap();
+    let (configs, _) = relentless.configs();
     let (actual, expect) = (route::app_with(Default::default()), route::app_with(Default::default()));
     let service = OriginRouter::new(
         [(Authority::from_static("localhost:3001"), actual), (Authority::from_static("localhost:3000"), expect)]

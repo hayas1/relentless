@@ -8,7 +8,6 @@ use crate::{
         },
         reportable::{CaseReport, Report, ReportWriter, Reportable, WorkerReport},
     },
-    error::Wrap,
     interface::{
         command::{Relentless, WorkerKind},
         config::{Repeat, Testcase, WorkerConfig},
@@ -17,14 +16,16 @@ use crate::{
 };
 
 pub trait ConsoleReport: Reportable {
-    type Error;
-    fn console_report<W: std::io::Write>(&self, cmd: &Relentless, w: &mut ReportWriter<W>) -> Result<(), Self::Error>;
-    fn console_aggregate<W: std::io::Write, F: Fn(std::fmt::Error) -> Self::Error + Clone>(
+    fn console_report<W: std::io::Write>(
         &self,
         cmd: &Relentless,
         w: &mut ReportWriter<W>,
-        e: F, // TODO where Self::Error: From<std::io::Error> ?
-    ) -> Result<(), Self::Error> {
+    ) -> Result<(), std::fmt::Error>;
+    fn console_aggregate<W: std::io::Write>(
+        &self,
+        cmd: &Relentless,
+        w: &mut ReportWriter<W>,
+    ) -> Result<(), std::fmt::Error> {
         let EvaluateAggregate { pass: pass_agg, response } = self.aggregator().aggregate(&cmd.quantile_set());
         let PassAggregate { pass, count, pass_rate } = &pass_agg;
         let ResponseAggregate { req, duration, rps, latency, .. } = &response;
@@ -37,9 +38,8 @@ pub trait ConsoleReport: Reportable {
             count,
             pass_agg.classify().apply_style(pass_rate * 100.),
             pass_agg.classify().apply_style("%"),
-        )
-        .map_err(e.clone())?;
-        write!(w, "    ").map_err(e.clone())?;
+        )?;
+        write!(w, "    ")?;
         writeln!(
             w,
             "rps: {}req/{:.2?}={:.2}{}",
@@ -47,15 +47,13 @@ pub trait ConsoleReport: Reportable {
             duration,
             response.classify().apply_style(rps),
             response.classify().apply_style("req/s"),
-        )
-        .map_err(e.clone())?;
+        )?;
 
-        write!(w, "latency: min={:.3?} mean={:.3?} ", min.classified().styled(), mean.classified().styled())
-            .map_err(e.clone())?;
+        write!(w, "latency: min={:.3?} mean={:.3?} ", min.classified().styled(), mean.classified().styled())?;
         for (percentile, quantile) in cmd.percentile_set().iter().zip(quantile) {
-            write!(w, "p{}={:.3?} ", percentile, quantile.classified().styled()).map_err(e.clone())?;
+            write!(w, "p{}={:.3?} ", percentile, quantile.classified().styled())?;
         }
-        writeln!(w, "max={:.3?}", max.classified().styled()).map_err(e.clone())?;
+        writeln!(w, "max={:.3?}", max.classified().styled())?;
 
         Ok(())
     }
@@ -68,12 +66,15 @@ impl RelentlessConsoleReport {
     pub const SUMMARY_EMOJI: console::Emoji<'_, '_> = console::Emoji("💥", "");
 }
 impl<T: Display, Q: Clone + Coalesce, P: Clone + Coalesce> ConsoleReport for Report<T, Q, P> {
-    type Error = crate::Error;
-    fn console_report<W: std::io::Write>(&self, cmd: &Relentless, w: &mut ReportWriter<W>) -> Result<(), Self::Error> {
+    fn console_report<W: std::io::Write>(
+        &self,
+        cmd: &Relentless,
+        w: &mut ReportWriter<W>,
+    ) -> Result<(), std::fmt::Error> {
         for report in &self.report {
             if !report.skip_report(cmd) {
                 report.console_report(cmd, w)?;
-                writeln!(w).map_err(Wrap::wrapping)?;
+                writeln!(w)?;
             }
         }
 
@@ -84,9 +85,8 @@ impl<T: Display, Q: Clone + Coalesce, P: Clone + Coalesce> ConsoleReport for Rep
                 RelentlessConsoleReport::SUMMARY_EMOJI,
                 console::style("summery of all requests in configs").bold(),
                 RelentlessConsoleReport::SUMMARY_EMOJI,
-            )
-            .map_err(Wrap::wrapping)?;
-            w.scope(|w| self.console_aggregate(cmd, w, Wrap::error))?;
+            )?;
+            w.scope(|w| self.console_aggregate(cmd, w))?;
         }
 
         Ok(())
@@ -103,8 +103,11 @@ impl WorkerConsoleReport {
     pub const SUMMARY_EMOJI: console::Emoji<'_, '_> = console::Emoji("💥", "");
 }
 impl<T: Display, Q: Clone + Coalesce, P: Clone + Coalesce> ConsoleReport for WorkerReport<T, Q, P> {
-    type Error = Wrap; // TODO crate::Error ?
-    fn console_report<W: std::io::Write>(&self, cmd: &Relentless, w: &mut ReportWriter<W>) -> Result<(), Self::Error> {
+    fn console_report<W: std::io::Write>(
+        &self,
+        cmd: &Relentless,
+        w: &mut ReportWriter<W>,
+    ) -> Result<(), std::fmt::Error> {
         let WorkerConfig { name, destinations, .. } = self.config.coalesce();
 
         writeln!(
@@ -133,7 +136,7 @@ impl<T: Display, Q: Clone + Coalesce, P: Clone + Coalesce> ConsoleReport for Wor
                     }
                 }
             }
-            Ok::<_, Wrap>(())
+            write!(w, "") // TODO type annotations needed
         })?;
 
         w.scope(|w| {
@@ -142,7 +145,7 @@ impl<T: Display, Q: Clone + Coalesce, P: Clone + Coalesce> ConsoleReport for Wor
                     report.console_report(cmd, w)?;
                 }
             }
-            Ok::<_, Wrap>(())
+            write!(w, "") // TODO type annotations needed
         })?;
 
         if cmd.is_measure(WorkerKind::Testcases) {
@@ -152,9 +155,8 @@ impl<T: Display, Q: Clone + Coalesce, P: Clone + Coalesce> ConsoleReport for Wor
                     "{} {}",
                     WorkerConsoleReport::SUMMARY_EMOJI,
                     console::style("summery of all requests in testcases").bold(),
-                )
-                .map_err(Wrap::wrapping)?;
-                w.scope(|w| self.console_aggregate(cmd, w, Wrap::wrapping))
+                )?;
+                w.scope(|w| self.console_aggregate(cmd, w))
             })?;
         }
 
@@ -174,8 +176,11 @@ impl CaseConsoleReport {
     pub const SUMMARY_EMOJI: console::Emoji<'_, '_> = console::Emoji("💥", "");
 }
 impl<T: Display, Q: Clone + Coalesce, P: Clone + Coalesce> ConsoleReport for CaseReport<T, Q, P> {
-    type Error = Wrap; // TODO crate::Error ?
-    fn console_report<W: std::io::Write>(&self, cmd: &Relentless, w: &mut ReportWriter<W>) -> Result<(), Self::Error> {
+    fn console_report<W: std::io::Write>(
+        &self,
+        cmd: &Relentless,
+        w: &mut ReportWriter<W>,
+    ) -> Result<(), std::fmt::Error> {
         let Testcase { description, target, setting, .. } = self.testcase().coalesce();
 
         let side = if self.pass() { CaseConsoleReport::PASS_EMOJI } else { CaseConsoleReport::FAIL_EMOJI };
@@ -220,9 +225,8 @@ impl<T: Display, Q: Clone + Coalesce, P: Clone + Coalesce> ConsoleReport for Cas
                     "{} {}",
                     CaseConsoleReport::SUMMARY_EMOJI,
                     console::style("summery of all requests in repeats").bold(),
-                )
-                .map_err(Wrap::wrapping)?;
-                w.scope(|w| self.console_aggregate(cmd, w, Wrap::wrapping))
+                )?;
+                w.scope(|w| self.console_aggregate(cmd, w))
             })?;
         }
 

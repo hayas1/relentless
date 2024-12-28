@@ -8,14 +8,15 @@ use crate::assault::evaluator::json::JsonEvaluator;
 use crate::{
     assault::{
         destinations::{AllOr, Destinations},
-        error::RequestResult,
         evaluate::{Acceptable, Evaluate},
         evaluator::plaintext::PlaintextEvaluator,
         messages::Messages,
+        result::RequestResult,
     },
-    error::EvaluateError,
     interface::helper::{coalesce::Coalesce, http_serde_priv, is_default::IsDefault},
 };
+
+use super::error::HttpEvaluateError;
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
@@ -98,13 +99,13 @@ where
     B: Body,
     B::Error: std::error::Error + Sync + Send + 'static,
 {
-    type Message = EvaluateError;
+    type Message = HttpEvaluateError;
     async fn evaluate(
         &self,
         res: Destinations<RequestResult<http::Response<B>>>,
         msg: &mut Messages<Self::Message>,
     ) -> bool {
-        let Some(responses) = msg.response_destinations_with(res, EvaluateError::RequestError) else {
+        let Some(responses) = msg.response_destinations_with(res, HttpEvaluateError::RequestError) else {
             return false;
         };
         let Some(parts) = msg.push_if_err(HttpResponse::unzip_parts(responses).await) else {
@@ -115,7 +116,7 @@ where
     }
 }
 impl Acceptable<(http::StatusCode, http::HeaderMap, Bytes)> for HttpResponse {
-    type Message = EvaluateError;
+    type Message = HttpEvaluateError;
     fn accept(
         &self,
         parts: &Destinations<(http::StatusCode, http::HeaderMap, Bytes)>,
@@ -133,7 +134,7 @@ impl Acceptable<(http::StatusCode, http::HeaderMap, Bytes)> for HttpResponse {
 impl HttpResponse {
     pub async fn unzip_parts<B>(
         responses: Destinations<http::Response<B>>,
-    ) -> Result<Destinations<(http::StatusCode, http::HeaderMap, Bytes)>, EvaluateError>
+    ) -> Result<Destinations<(http::StatusCode, http::HeaderMap, Bytes)>, HttpEvaluateError>
     where
         B: Body,
         B::Error: std::error::Error + Sync + Send + 'static,
@@ -144,7 +145,7 @@ impl HttpResponse {
             let bytes = BodyExt::collect(body)
                 .await
                 .map(Collected::to_bytes)
-                .map_err(|e| EvaluateError::FailToCollectBody(e.into()))?;
+                .map_err(|e| HttpEvaluateError::FailToCollectBody(e.into()))?;
             parts.insert(name, (status, headers, bytes));
         }
         Ok(parts)
@@ -152,7 +153,7 @@ impl HttpResponse {
 }
 
 impl Acceptable<&http::StatusCode> for HttpStatus {
-    type Message = EvaluateError;
+    type Message = HttpEvaluateError;
     fn accept(&self, status: &Destinations<&http::StatusCode>, msg: &mut Messages<Self::Message>) -> bool {
         let acceptable = match &self {
             HttpStatus::OkOrEqual => Self::assault_or_compare(status, |(_, s)| s.is_success()),
@@ -164,14 +165,14 @@ impl Acceptable<&http::StatusCode> for HttpStatus {
             HttpStatus::Ignore => true,
         };
         if !acceptable {
-            msg.push_err(EvaluateError::UnacceptableStatus);
+            msg.push_err(HttpEvaluateError::UnacceptableStatus);
         }
         acceptable
     }
 }
 
 impl Acceptable<&http::HeaderMap> for HttpHeaders {
-    type Message = EvaluateError;
+    type Message = HttpEvaluateError;
     fn accept(&self, headers: &Destinations<&http::HeaderMap>, msg: &mut Messages<Self::Message>) -> bool {
         let acceptable = match &self {
             HttpHeaders::AnyOrEqual => Self::assault_or_compare(headers, |_| true),
@@ -183,20 +184,20 @@ impl Acceptable<&http::HeaderMap> for HttpHeaders {
             HttpHeaders::Ignore => true,
         };
         if !acceptable {
-            msg.push_err(EvaluateError::UnacceptableHeaderMap);
+            msg.push_err(HttpEvaluateError::UnacceptableHeaderMap);
         }
         acceptable
     }
 }
 
 impl Acceptable<&Bytes> for HttpBody {
-    type Message = EvaluateError;
+    type Message = HttpEvaluateError;
     fn accept(&self, body: &Destinations<&Bytes>, msg: &mut Messages<Self::Message>) -> bool {
         match &self {
             HttpBody::AnyOrEqual => Self::assault_or_compare(body, |_| true),
-            HttpBody::Plaintext(p) => p.accept(body, msg),
+            HttpBody::Plaintext(p) => Self::sub_accept(p, body, msg, HttpEvaluateError::PlaintextEvaluateError),
             #[cfg(feature = "json")]
-            HttpBody::Json(e) => e.accept(body, msg),
+            HttpBody::Json(e) => Self::sub_accept(e, body, msg, HttpEvaluateError::JsonEvaluateError),
         }
     }
 }
@@ -235,7 +236,7 @@ mod tests {
         let mut msg = Messages::new();
         let result = evaluator.evaluate(responses, &mut msg).await;
         assert!(!result);
-        assert!(matches!(msg.as_slice(), [EvaluateError::UnacceptableStatus]));
+        assert!(matches!(msg.as_slice(), [HttpEvaluateError::UnacceptableStatus]));
     }
 
     // TODO more tests

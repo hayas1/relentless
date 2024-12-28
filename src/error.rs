@@ -1,441 +1,243 @@
 use std::{
-    fmt::{Debug, Display},
+    error::Error,
+    fmt::Display,
     ops::{Deref, DerefMut},
-    time::Duration,
+    task::Poll,
 };
 
-use thiserror::Error;
+use regex::Regex;
 
-use crate::{
-    assault::error::RequestError,
-    implement::service_http::{evaluate::HttpResponse, factory::HttpRequest},
-    interface::config::Config,
-};
-
-pub type RelentlessResult<T, E = RelentlessError> = Result<T, E>;
-
-#[derive(Error, Debug)]
-#[error(transparent)]
+pub type RelentlessResult<T> = Result<T, RelentlessError>;
+#[derive(Debug)]
 pub struct RelentlessError {
-    #[from]
-    source: Box<dyn std::error::Error + Send + Sync>,
+    source: Box<dyn Error + Send + Sync + 'static>,
 }
-impl From<Wrap> for RelentlessError {
-    fn from(wrap: Wrap) -> Self {
-        RelentlessError { source: wrap.0 }
-    }
-}
-impl<T> From<Context<T>> for RelentlessError {
-    fn from(context: Context<T>) -> Self {
-        let source = context.source;
-        RelentlessError { source }
-    }
-}
-impl RelentlessError {
-    pub fn wrap<E>(e: E) -> Self
-    where
-        Wrap: From<E>,
-    {
-        Self::from(Wrap::from(e))
-    }
-    pub fn is<E: std::error::Error + Send + Sync + 'static>(&self) -> bool {
-        self.source.is::<E>()
-    }
-    pub fn downcast<E: std::error::Error + Send + Sync + 'static>(
-        self,
-    ) -> Result<Box<E>, Box<dyn std::error::Error + Send + Sync>> {
-        self.source.downcast()
-    }
-    pub fn downcast_ref<E: std::error::Error + Send + Sync + 'static>(&self) -> Option<&E> {
-        self.source.downcast_ref()
-    }
-    pub fn downcast_mut<E: std::error::Error + Send + Sync + 'static>(&mut self) -> Option<&mut E> {
-        self.source.downcast_mut()
-    }
-}
-
-pub type WrappedResult<T, E = Wrap> = Result<T, E>;
-
-#[derive(Debug)]
-pub struct Wrap(pub Box<dyn std::error::Error + Send + Sync>);
-impl<E: std::error::Error + Send + Sync + 'static> From<E> for Wrap {
-    fn from(e: E) -> Self {
-        Self::new(Box::new(e))
-    }
-}
-impl Display for Wrap {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Display::fmt(&*self.0, f)
-    }
-}
-impl Deref for Wrap {
-    type Target = Box<dyn std::error::Error + Send + Sync>;
+impl Deref for RelentlessError {
+    type Target = Box<dyn Error + Send + Sync + 'static>;
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.source
     }
 }
-impl DerefMut for Wrap {
+impl DerefMut for RelentlessError {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+        &mut self.source
     }
 }
-impl Wrap {
-    pub fn new(e: Box<dyn std::error::Error + Send + Sync>) -> Self {
-        Self(e)
-    }
-    pub fn wrapping<E: std::error::Error + Send + Sync + 'static>(e: E) -> Self {
-        Self::from(e)
-    }
-    pub fn error<E: std::error::Error + Send + Sync + 'static>(e: E) -> crate::Error {
-        Self::from(e).into()
-    }
-
-    pub fn source(self) -> Box<dyn std::error::Error + Send + Sync> {
-        self.0
-    }
-    pub fn context<T>(self, context: T) -> Context<T> {
-        Context { context, source: self.0 }
-    }
-    pub fn is<E: std::error::Error + Send + Sync + 'static>(&self) -> bool {
-        self.0.is::<E>()
-    }
-    pub fn downcast<E: std::error::Error + Send + Sync + 'static>(
-        self,
-    ) -> Result<Box<E>, Box<dyn std::error::Error + Send + Sync>> {
-        self.0.downcast()
-    }
-    pub fn downcast_ref<E: std::error::Error + Send + Sync + 'static>(&self) -> Option<&E> {
-        self.0.downcast_ref()
-    }
-    pub fn downcast_mut<E: std::error::Error + Send + Sync + 'static>(&mut self) -> Option<&mut E> {
-        self.0.downcast_mut()
-    }
-
-    pub fn is_context<C: Display + Debug + 'static>(&self) -> bool {
-        self.0.is::<Context<C>>()
-    }
-    pub fn downcast_context<C: Display + Debug + 'static, E: std::error::Error + Send + Sync + 'static>(
-        self,
-    ) -> Result<(C, Box<E>), Box<dyn std::error::Error + Send + Sync>> {
-        match self.0.downcast::<Context<C>>() {
-            Ok(c) => {
-                let (context, source) = c.unpack();
-                Ok((context, source.downcast()?))
-            }
-            Err(source) => Err(source),
-        }
-    }
-    pub fn downcast_context_ref<C: Display + Debug + 'static, E: std::error::Error + Send + Sync + 'static>(
-        &self,
-    ) -> Option<(&C, &E)> {
-        match self.0.downcast_ref::<Context<C>>() {
-            Some(c) => {
-                let (context, source) = c.unpack_ref();
-                Some((context, source.downcast_ref()?))
-            }
-            None => None,
-        }
-    }
-    pub fn downcast_context_mut<C: Display + Debug + 'static, E: std::error::Error + Send + Sync + 'static>(
-        &mut self,
-    ) -> Option<(&C, &mut E)> {
-        match self.0.downcast_mut::<Context<C>>() {
-            Some(c) => {
-                let (context, source) = c.unpack_mut();
-                Some((context, source.downcast_mut()?))
-            }
-            None => None,
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct MultiWrap<W = Wrap>(pub Vec<W>);
-impl<W: Display> Display for MultiWrap<W> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let (m, n) = (self.0.len(), 3);
-        for (i, wrap) in self.0[..n.min(m)].iter().enumerate() {
-            if i < n.min(m) - 1 {
-                writeln!(f, "{}", wrap)?;
-            } else {
-                write!(f, "{}", wrap)?;
-            }
-        }
-        if m > n {
-            writeln!(f)?;
-            write!(f, "... and {} more", m - n)?;
-        }
-        Ok(())
-    }
-}
-impl<W: std::error::Error + 'static> std::error::Error for MultiWrap<W> {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        // TODO multiple sources ?
-        self.0.first().map(|w| w as _)
-    }
-}
-impl std::error::Error for MultiWrap<Wrap> {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        // TODO multiple sources ?
-        self.0.first().map(|w| w.0.as_ref() as _)
-    }
-}
-impl<W> FromIterator<W> for MultiWrap<W> {
-    fn from_iter<T: IntoIterator<Item = W>>(iter: T) -> Self {
-        Self(iter.into_iter().collect())
-    }
-}
-impl<W> Deref for MultiWrap<W> {
-    type Target = Vec<W>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-impl<W> DerefMut for MultiWrap<W> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-pub trait IntoContext: std::error::Error + Send + Sync {
-    fn context<C>(self, context: C) -> Context<C>;
-}
-impl<E: std::error::Error + Send + Sync + 'static> IntoContext for E {
-    fn context<C>(self, context: C) -> Context<C> {
-        Context { context, source: Box::new(self) }
-    }
-}
-#[derive(Debug)]
-pub struct Context<C> {
-    context: C,
-    source: Box<dyn std::error::Error + Send + Sync>,
-}
-impl<C: Display + Debug> std::error::Error for Context<C> {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+impl Error for RelentlessError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
         Some(self.source.as_ref())
     }
 }
-impl<C: Display> Display for Context<C> {
+impl Display for RelentlessError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "{}:", self.context)?;
         write!(f, "{}", self.source)
     }
 }
-impl<C> Context<C> {
-    pub fn unpack(self) -> (C, Box<dyn std::error::Error + Send + Sync>) {
-        (self.context, self.source)
+impl RelentlessError {
+    pub fn boxed<E: Error + Send + Sync + 'static>(error: E) -> Self {
+        RelentlessError { source: error.into() }
     }
-    #[allow(clippy::borrowed_box)] // TODO
-    pub fn unpack_ref(&self) -> (&C, &Box<dyn std::error::Error + Send + Sync>) {
-        (&self.context, &self.source)
-    }
-    pub fn unpack_mut(&mut self) -> (&C, &mut Box<dyn std::error::Error + Send + Sync>) {
-        (&self.context, &mut self.source)
-    }
-    pub fn context_ref(&self) -> &C {
-        &self.context
-    }
-    pub fn context_mut(&mut self) -> &mut C {
-        &mut self.context
-    }
-    pub fn downcast<E: std::error::Error + Send + Sync + 'static>(
-        self,
-    ) -> Result<Box<E>, Box<dyn std::error::Error + Send + Sync>> {
-        self.source.downcast()
-    }
-    pub fn downcast_ref<E: std::error::Error + Send + Sync + 'static>(&self) -> Option<&E> {
-        self.source.downcast_ref()
-    }
-    pub fn downcast_mut<E: std::error::Error + Send + Sync + 'static>(&mut self) -> Option<&mut E> {
-        self.source.downcast_mut()
+    pub fn into_source(self) -> Box<dyn Error + Send + Sync> {
+        // TODO is this method needed?
+        self.source
     }
 }
 
-pub trait WithContext<T, E, C> {
-    type Err;
-    fn context(self, context: C) -> Result<T, Self::Err>;
-    fn context_with<F>(self, f: F) -> Result<T, Self::Err>
-    where
-        F: FnOnce(&E) -> C;
-}
-impl<T, E: IntoContext, C> WithContext<T, E, C> for Result<T, E> {
-    type Err = Context<C>;
-    fn context(self, context: C) -> Result<T, <Self as WithContext<T, E, C>>::Err> {
-        self.context_with(|_| context)
-    }
-    fn context_with<F>(self, f: F) -> Result<T, <Self as WithContext<T, E, C>>::Err>
-    where
-        F: FnOnce(&E) -> C,
-    {
-        self.map_err(|e| {
-            let context = f(&e);
-            e.context(context)
-        })
+// TODO derive ?
+pub trait IntoRelentlessError: Sized + Error + Send + Sync + 'static {
+    fn into_relentless_error(self) -> RelentlessError {
+        RelentlessError { source: Box::new(self) }
     }
 }
-impl<T, C: std::error::Error + Send + Sync + 'static> WithContext<T, (), C> for Option<T> {
-    type Err = Wrap;
-    fn context(self, context: C) -> Result<T, <Self as WithContext<T, (), C>>::Err> {
-        self.context_with(|_| context)
+impl<E: Error + Send + Sync + 'static> IntoRelentlessError for Box<E> {
+    fn into_relentless_error(self) -> RelentlessError {
+        RelentlessError { source: self }
     }
-    fn context_with<F>(self, f: F) -> Result<T, <Self as WithContext<T, (), C>>::Err>
-    where
-        F: FnOnce(&()) -> C,
-    {
-        self.ok_or_else(|| f(&()).into())
+}
+impl<E: IntoRelentlessError> From<E> for RelentlessError {
+    fn from(e: E) -> Self {
+        e.into_relentless_error()
     }
 }
 
-#[derive(Error, Debug, Clone, PartialEq, Eq)]
-pub enum RunCommandError {
-    #[error("at least one serde format is required")]
-    UndefinedSerializeFormat,
-    #[error("should be KEY=VALUE format, but `{0}` has no '='")]
+// From<Error> implementation will be conflict (similar issue https://github.com/dtolnay/anyhow/issues/25#issuecomment-544140480)
+pub trait IntoResult<T> {
+    type Result;
+    fn box_err(self) -> Self::Result;
+}
+impl<T, E: Error + Send + Sync + 'static> IntoResult<T> for Result<T, E> {
+    type Result = RelentlessResult<T>;
+    fn box_err(self) -> Self::Result {
+        self.map_err(RelentlessError::boxed)
+    }
+}
+impl<T, E: Error + Send + Sync + 'static> IntoResult<T> for Poll<Result<T, E>> {
+    type Result = Poll<RelentlessResult<T>>;
+    fn box_err(self) -> Self::Result {
+        self.map_err(RelentlessError::boxed)
+    }
+}
+
+#[derive(Debug)]
+pub enum InterfaceError {
+    UndefinedSerializeFormatPath(String),
+    UndefinedSerializeFormatContent(String),
     KeyValueFormat(String),
-    #[error("`{0}` is unknown extension format")]
     UnknownFormatExtension(String),
-    #[error("cannot read some configs")]
-    CannotReadSomeConfigs(Vec<Config<HttpRequest, HttpResponse>>),
-    #[error("cannot specify format")]
+    CannotReadConfig(String, RelentlessError),
     CannotSpecifyFormat,
-    #[error("nan is not number")]
     NanPercentile,
 }
+impl IntoRelentlessError for InterfaceError {}
+impl Error for InterfaceError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::UndefinedSerializeFormatPath(_) => None,
+            Self::UndefinedSerializeFormatContent(_) => None,
+            Self::KeyValueFormat(_) => None,
+            Self::UnknownFormatExtension(_) => None,
+            Self::CannotReadConfig(_, e) => Some(e),
+            Self::CannotSpecifyFormat => None,
+            Self::NanPercentile => None,
+        }
+    }
+}
+impl Display for InterfaceError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::UndefinedSerializeFormatPath(s) => {
+                write!(f, "no serde format is enabled for path `{}`", s)
+            }
+            Self::UndefinedSerializeFormatContent(s) => {
+                write!(f, "no serde format is enabled for content `{}`", s)
+            }
+            Self::KeyValueFormat(s) => write!(f, "should be KEY=VALUE format, but `{}` has no `=`", s),
+            Self::UnknownFormatExtension(s) => write!(f, "`{}` is unknown extension format", s),
+            Self::CannotReadConfig(s, e) => write!(f, "[{}] {}", s, e),
+            Self::CannotSpecifyFormat => write!(f, "cannot specify format"),
+            Self::NanPercentile => write!(f, "nan is not number"),
+        }
+    }
+}
 
-#[derive(Error, Debug, Clone, PartialEq, Eq)]
+#[derive(Debug)]
 pub enum TemplateError {
-    #[error("{0}")]
     NomParseError(String),
-    #[error("remaining template: {0}")]
     RemainingTemplate(String),
-    #[error("variable `{0}` is not defined")]
     VariableNotDefined(String),
 }
+impl IntoRelentlessError for TemplateError {}
+impl Error for TemplateError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::NomParseError(_) => None,
+            Self::RemainingTemplate(_) => None,
+            Self::VariableNotDefined(_) => None,
+        }
+    }
+}
+impl Display for TemplateError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NomParseError(s) => write!(f, "{}", s),
+            Self::RemainingTemplate(s) => write!(f, "remaining template: {}", s),
+            Self::VariableNotDefined(s) => write!(f, "variable `{}` is not defined", s),
+        }
+    }
+}
 
-#[derive(Error, Debug, Clone, PartialEq, Eq)]
+#[derive(Debug)]
 pub enum AssaultError {
-    #[error("cannot specify service")]
     CannotSpecifyService,
 }
-
-#[derive(Error, Debug)]
-pub enum EvaluateError {
-    #[error("request timeout: {}s", .0.as_secs_f64())]
-    RequestTimeout(Duration),
-
-    #[error("fail to collect body: {0}")]
-    FailToCollectBody(Wrap),
-    #[error("status is not acceptable")]
-    UnacceptableStatus,
-    #[error("header map is not acceptable")]
-    UnacceptableHeaderMap,
-
-    #[cfg(feature = "json")]
-    #[error("{0}")]
-    FailToPatchJson(Wrap),
-    #[cfg(feature = "json")]
-    #[error("diff in `{0}`")]
-    Diff(String),
-
-    #[error(transparent)]
-    RequestError(RequestError),
+impl IntoRelentlessError for AssaultError {}
+impl Error for AssaultError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::CannotSpecifyService => None,
+        }
+    }
+}
+impl Display for AssaultError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::CannotSpecifyService => write!(f, "cannot specify service"),
+        }
+    }
 }
 
-#[derive(Error, Debug, Clone, PartialEq, Eq)]
-pub enum ReportError {}
+#[derive(Debug)]
+pub enum PlaintextEvaluateError {
+    FailToCompileRegex(regex::Error),
+    FailToMatch(Regex, String),
+}
+impl IntoRelentlessError for PlaintextEvaluateError {}
+impl Error for PlaintextEvaluateError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::FailToCompileRegex(e) => Some(e),
+            Self::FailToMatch(_, _) => None,
+        }
+    }
+}
+impl Display for PlaintextEvaluateError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::FailToCompileRegex(e) => write!(f, "{}", e),
+            Self::FailToMatch(re, haystack) => write!(f, "regex `{}` does not match `{}`", re, haystack),
+        }
+    }
+}
+
+#[derive(Debug)]
+#[cfg(feature = "json")]
+pub enum JsonEvaluateError {
+    FailToPatchJson(json_patch::PatchError),
+    FailToParseJson(serde_json::Error),
+    Diff(String),
+}
+#[cfg(feature = "json")]
+impl IntoRelentlessError for JsonEvaluateError {}
+#[cfg(feature = "json")]
+impl Error for JsonEvaluateError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::FailToPatchJson(e) => Some(e),
+            Self::FailToParseJson(e) => Some(e),
+            Self::Diff(_) => None,
+        }
+    }
+}
+#[cfg(feature = "json")]
+impl Display for JsonEvaluateError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::FailToPatchJson(e) => write!(f, "{}", e),
+            Self::FailToParseJson(e) => write!(f, "{}", e),
+            Self::Diff(e) => write!(f, "diff in `{}`", e),
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_wrap() {
-        fn wrap_any_error() -> WrappedResult<()> {
-            Err(RunCommandError::CannotSpecifyFormat)?
+    fn test_error_conversion() {
+        fn f() -> RelentlessResult<()> {
+            Err(InterfaceError::UndefinedSerializeFormatPath("test".to_string()))?
         }
-
-        assert_eq!(wrap_any_error().unwrap_err().downcast_ref(), Some(&RunCommandError::CannotSpecifyFormat));
+        let err = f().unwrap_err();
+        assert!(matches!(err.downcast_ref().unwrap(), InterfaceError::UndefinedSerializeFormatPath(s) if s == "test"));
     }
 
     #[test]
-    fn test_nested_context() {
-        fn nested_context() -> WrappedResult<()> {
-            Err(RunCommandError::CannotSpecifyFormat).context(true).context("two").context(3)?
+    fn test_box_error_conversion() {
+        fn f() -> RelentlessResult<()> {
+            Err(std::io::Error::new(std::io::ErrorKind::Other, "test")).box_err()?
         }
-
-        let err = nested_context().unwrap_err();
-        let Context { context: 3, source } = err.downcast_ref().unwrap() else { panic!() };
-        let Context { context: "two", source } = source.downcast_ref().unwrap() else { panic!() };
-        let Context { context: true, source } = source.downcast_ref().unwrap() else { panic!() };
-        assert_eq!(source.downcast_ref(), Some(&RunCommandError::CannotSpecifyFormat));
-    }
-
-    #[test]
-    fn test_crate_error() {
-        fn crate_error() -> crate::Result<()> {
-            fn wrapped() -> WrappedResult<()> {
-                Err(RunCommandError::CannotSpecifyFormat)?
-            }
-            Ok(wrapped()?)
-        }
-
-        assert_eq!(crate_error().unwrap_err().downcast_ref(), Some(&RunCommandError::CannotSpecifyFormat));
-    }
-
-    #[test]
-    fn test_multi_wrap() {
-        fn multi_wrap(n: usize) -> WrappedResult<()> {
-            Err((0..n).map(|_| RunCommandError::CannotSpecifyFormat.into()).collect::<MultiWrap>())?
-        }
-
-        assert_eq!(multi_wrap(0).unwrap_err().to_string(), "");
-        assert_eq!(
-            multi_wrap(1).unwrap_err().to_string(),
-            [format!("{}", RunCommandError::CannotSpecifyFormat)].join("\n")
-        );
-        assert_eq!(
-            multi_wrap(2).unwrap_err().to_string(),
-            [format!("{}", RunCommandError::CannotSpecifyFormat), format!("{}", RunCommandError::CannotSpecifyFormat),]
-                .join("\n")
-        );
-        assert_eq!(
-            multi_wrap(3).unwrap_err().to_string(),
-            [
-                format!("{}", RunCommandError::CannotSpecifyFormat),
-                format!("{}", RunCommandError::CannotSpecifyFormat),
-                format!("{}", RunCommandError::CannotSpecifyFormat),
-            ]
-            .join("\n")
-        );
-        assert_eq!(
-            multi_wrap(4).unwrap_err().to_string(),
-            [
-                &format!("{}", RunCommandError::CannotSpecifyFormat),
-                &format!("{}", RunCommandError::CannotSpecifyFormat),
-                &format!("{}", RunCommandError::CannotSpecifyFormat),
-                r#"... and 1 more"#,
-            ]
-            .join("\n")
-        );
-        assert_eq!(
-            multi_wrap(5).unwrap_err().to_string(),
-            [
-                &format!("{}", RunCommandError::CannotSpecifyFormat),
-                &format!("{}", RunCommandError::CannotSpecifyFormat),
-                &format!("{}", RunCommandError::CannotSpecifyFormat),
-                r#"... and 2 more"#,
-            ]
-            .join("\n")
-        );
-        assert_eq!(
-            multi_wrap(100).unwrap_err().to_string(),
-            [
-                &format!("{}", RunCommandError::CannotSpecifyFormat),
-                &format!("{}", RunCommandError::CannotSpecifyFormat),
-                &format!("{}", RunCommandError::CannotSpecifyFormat),
-                r#"... and 97 more"#,
-            ]
-            .join("\n")
-        );
+        let err = f().unwrap_err();
+        assert!(matches!(err.downcast_ref().unwrap(), std::io::Error { .. }));
     }
 }

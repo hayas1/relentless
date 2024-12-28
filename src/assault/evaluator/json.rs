@@ -8,7 +8,7 @@ use crate::{
         evaluate::Acceptable,
         messages::Messages,
     },
-    error::{EvaluateError, WrappedResult},
+    error::JsonEvaluateError,
     interface::{config::Severity, helper::is_default::IsDefault},
 };
 
@@ -23,16 +23,15 @@ pub struct JsonEvaluator {
     pub patch_fail: Option<Severity>,
 }
 
-#[cfg(feature = "json")]
 impl Acceptable<&Bytes> for JsonEvaluator {
-    type Message = EvaluateError;
-    fn accept(&self, bytes: &Destinations<&Bytes>, msg: &mut Messages<EvaluateError>) -> bool {
+    type Message = JsonEvaluateError;
+    fn accept(&self, bytes: &Destinations<&Bytes>, msg: &mut Messages<Self::Message>) -> bool {
         self.accept_json(bytes, msg)
     }
 }
 impl JsonEvaluator {
-    pub fn accept_json(&self, bytes: &Destinations<&Bytes>, msg: &mut Messages<EvaluateError>) -> bool {
-        let Some(patched) = msg.push_if_err(self.patched(bytes).map_err(EvaluateError::FailToPatchJson)) else {
+    pub fn accept_json(&self, bytes: &Destinations<&Bytes>, msg: &mut Messages<JsonEvaluateError>) -> bool {
+        let Some(patched) = msg.push_if_err(self.patched(bytes)) else {
             return false;
         };
         let values: Vec<_> = patched.into_values().collect();
@@ -40,14 +39,14 @@ impl JsonEvaluator {
         values.windows(2).all(|w| self.json_compare((&w[0], &w[1]), msg))
     }
 
-    pub fn patched(&self, bytes: &Destinations<&Bytes>) -> WrappedResult<Destinations<Value>> {
+    pub fn patched(&self, bytes: &Destinations<&Bytes>) -> Result<Destinations<Value>, JsonEvaluateError> {
         bytes
             .iter()
             .map(|(name, b)| {
-                let mut value = serde_json::from_slice(b)?;
+                let mut value = serde_json::from_slice(b).map_err(JsonEvaluateError::FailToParseJson)?;
                 if let Err(e) = self.patch(name, &mut value) {
                     if self.patch_fail.is_none() && bytes.len() == 1 || self.patch_fail > Some(Severity::Warn) {
-                        Err(e)?;
+                        Err(JsonEvaluateError::FailToPatchJson(e))?;
                     }
                 }
                 Ok((name.clone(), value))
@@ -64,13 +63,13 @@ impl JsonEvaluator {
         json_patch::patch_unsafe(value, patch)
     }
 
-    pub fn json_compare(&self, (va, vb): (&Value, &Value), msg: &mut Messages<EvaluateError>) -> bool {
+    pub fn json_compare(&self, (va, vb): (&Value, &Value), msg: &mut Messages<JsonEvaluateError>) -> bool {
         let diff = json_patch::diff(va, vb);
         let pointers = Self::pointers(&diff);
         diff.iter()
             .zip(pointers)
             .filter(|(_op, path)| !self.ignore.contains(path))
-            .fold(true, |_acc, (_op, path)| msg.push_unacceptable(EvaluateError::Diff(path)))
+            .fold(true, |_acc, (_op, path)| msg.push_unacceptable(JsonEvaluateError::Diff(path)))
     }
 
     pub fn pointers(p: &json_patch::Patch) -> Vec<String> {

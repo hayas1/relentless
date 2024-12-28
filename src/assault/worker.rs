@@ -5,7 +5,6 @@ use tower::{timeout::TimeoutLayer, Service, ServiceBuilder, ServiceExt};
 
 use crate::{
     assault::reportable::{CaseReport, Report, WorkerReport},
-    error::{Wrap, WrappedResult},
     interface::{
         command::{Relentless, WorkerKind},
         config::{Config, Configuration, Setting, Testcase},
@@ -19,11 +18,11 @@ use crate::{
 
 use super::{
     destinations::Destinations,
-    error::{RequestError, RequestResult},
     evaluate::Evaluate,
     factory::RequestFactory,
     measure::aggregate::{Aggregate, EvaluateAggregator},
     messages::Messages,
+    result::{RequestError, RequestResult},
     service::measure::MeasureLayer,
 };
 
@@ -41,7 +40,6 @@ where
     S: Service<Req> + Clone + Send + 'static,
     S::Error: std::error::Error + Send + Sync + 'static,
     S::Future: Send + 'static,
-    Wrap: From<Q::Error> + From<S::Error>,
 {
     /// TODO document
     pub fn new(client: S) -> Self {
@@ -52,7 +50,7 @@ where
         self,
         cmd: &Relentless,
         configs: Vec<Config<Q, P>>,
-    ) -> WrappedResult<Report<P::Message, Q, P>> {
+    ) -> crate::Result<Report<P::Message, Q, P>> {
         let configs_buffer = if cmd.is_sequential(WorkerKind::Configs) { 1 } else { configs.len() };
 
         let report = stream::iter(configs)
@@ -82,7 +80,6 @@ where
     S: Service<Req> + Clone + Send + 'static,
     S::Error: std::error::Error + Send + Sync + 'static,
     S::Future: Send + 'static,
-    Wrap: From<Q::Error> + From<S::Error>,
 {
     pub fn new(client: S) -> Self {
         Self { client, phantom: PhantomData }
@@ -92,7 +89,7 @@ where
         self,
         cmd: &Relentless,
         config: Config<Q, P>,
-    ) -> WrappedResult<WorkerReport<P::Message, Q, P>> {
+    ) -> crate::Result<WorkerReport<P::Message, Q, P>> {
         let worker_config = Coalesced::tuple(config.worker_config, cmd.destinations()?);
         let testcase_buffer = if cmd.is_sequential(WorkerKind::Testcases) { 1 } else { config.testcases.len() };
 
@@ -125,7 +122,6 @@ where
     S: Service<Req> + Clone + Send + 'static,
     S::Error: std::error::Error + Send + Sync + 'static,
     S::Future: Send + 'static,
-    Wrap: From<Q::Error> + From<S::Error>,
 {
     pub fn new(client: S) -> Self {
         Self { client, phantom: PhantomData }
@@ -136,7 +132,7 @@ where
         cmd: &Relentless,
         destinations: &Destinations<http_serde_priv::Uri>,
         testcase: Coalesced<Testcase<Q, P>, Setting<Q, P>>,
-    ) -> WrappedResult<CaseReport<P::Message, Q, P>> {
+    ) -> crate::Result<CaseReport<P::Message, Q, P>> {
         let case = &testcase.coalesce();
         let evaluate_aggregate = EvaluateAggregator::new(destinations, None);
 
@@ -159,7 +155,7 @@ where
         cmd: &Relentless,
         destinations: &'a Destinations<http_serde_priv::Uri>,
         testcase: &'a Testcase<Q, P>,
-    ) -> WrappedResult<impl Stream<Item = Destinations<RequestResult<S::Response>>> + 'a> {
+    ) -> crate::Result<impl Stream<Item = Destinations<RequestResult<S::Response>>> + 'a> {
         let Testcase { target, setting, .. } = testcase;
         let client = self.client.clone();
 

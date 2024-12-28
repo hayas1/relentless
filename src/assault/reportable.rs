@@ -4,15 +4,12 @@ use std::{
     process::ExitCode,
 };
 
-use crate::{
-    error::Wrap,
-    interface::{
-        command::{Relentless, ReportFormat},
-        config::{Setting, Testcase, WorkerConfig},
-        helper::{
-            coalesce::{Coalesce, Coalesced},
-            http_serde_priv,
-        },
+use crate::interface::{
+    command::{Relentless, ReportFormat},
+    config::{Setting, Testcase, WorkerConfig},
+    helper::{
+        coalesce::{Coalesce, Coalesced},
+        http_serde_priv,
     },
 };
 
@@ -163,7 +160,6 @@ impl<W> ReportWriter<W> {
     pub fn scope<F, R, E>(&mut self, f: F) -> Result<R, E>
     where
         F: FnOnce(&mut Self) -> Result<R, E>,
-        Wrap: From<E>, // TODO remove wrap constraints
     {
         self.increment();
         let ret = f(self)?;

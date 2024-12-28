@@ -16,7 +16,7 @@ use nom::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::error::{TemplateError, Wrap, WrappedResult};
+use crate::error::{IntoResult, TemplateError};
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct Template {
@@ -52,18 +52,18 @@ impl Template {
         Default::default()
     }
 
-    pub fn render(&self, input: &str) -> WrappedResult<String> {
+    pub fn render(&self, input: &str) -> crate::Result<String> {
         let variables = Variable::split(input)?;
         let assigned = variables.iter().map(|v| v.assign(self)).collect::<Result<Vec<_>, _>>()?;
         Ok(assigned.join(""))
     }
 
-    pub fn render_as_string<T>(&self, input: T) -> WrappedResult<T>
+    pub fn render_as_string<T>(&self, input: T) -> crate::Result<T>
     where
         T: AsRef<[u8]> + FromStr,
-        Wrap: From<T::Err>,
+        T::Err: std::error::Error + Send + Sync + 'static,
     {
-        Ok(T::from_str(&self.render(&String::from_utf8_lossy(input.as_ref()))?)?)
+        T::from_str(&self.render(&String::from_utf8_lossy(input.as_ref()))?).box_err()
     }
 }
 
@@ -76,7 +76,7 @@ pub enum Variable {
 }
 
 impl Variable {
-    pub fn split(input: &str) -> WrappedResult<Vec<Self>> {
+    pub fn split(input: &str) -> crate::Result<Vec<Self>> {
         let (remain, parsed) = Self::parse(input).map_err(|e| TemplateError::NomParseError(e.to_string()))?;
         remain
             .is_empty() // TODO check is_empty by nom's function?
@@ -84,11 +84,11 @@ impl Variable {
             .ok_or_else(|| TemplateError::RemainingTemplate(remain.to_string()).into())
     }
 
-    pub fn assign(&self, defined: &Template) -> WrappedResult<String> {
+    pub fn assign(&self, defined: &Template) -> crate::Result<String> {
         match self {
             Self::Literal(text) => Ok(text.clone()),
             Self::Defined(key) => Ok(defined.get(key).ok_or(TemplateError::VariableNotDefined(key.clone()))?.clone()),
-            Self::Environment(key) => Ok(std::env::var(key)?),
+            Self::Environment(key) => Ok(std::env::var(key).box_err()?),
         }
     }
 
@@ -154,9 +154,9 @@ mod tests {
     fn test_template_render_with_invalid() {
         let template: Template = vec![("foo", "hoge"), ("bar", "fuga"), ("baz", "piyo")].into_iter().collect();
         let error = template.render("foo ${bar baz").unwrap_err();
-        assert_eq!(
+        assert!(matches!(
             error.downcast_ref::<TemplateError>().unwrap(),
-            &TemplateError::RemainingTemplate("${bar baz".to_string())
-        );
+            TemplateError::RemainingTemplate(s) if s == "${bar baz",
+        ));
     }
 }
