@@ -180,10 +180,7 @@ impl Format {
             #[cfg(feature = "toml")]
             Format::Toml => Ok(toml::from_str(&read_to_string(path).box_err()?).box_err()?),
             #[cfg(not(any(feature = "json", feature = "yaml", feature = "toml")))]
-            _ => {
-                use crate::error::WithContext;
-                Err(InterfaceError::UndefinedSerializeFormat).context(path.as_ref().display().to_string())?
-            }
+            _ => Err(InterfaceError::UndefinedSerializeFormatPath(path.as_ref().display().to_string()))?,
         }
     }
 
@@ -199,10 +196,7 @@ impl Format {
             #[cfg(feature = "toml")]
             Format::Toml => Ok(toml::from_str(content).box_err()?),
             #[cfg(not(any(feature = "json", feature = "yaml", feature = "toml")))]
-            _ => {
-                use crate::error::WithContext;
-                Err(InterfaceError::UndefinedSerializeFormat).context(content.to_string())?
-            }
+            _ => Err(InterfaceError::UndefinedSerializeFormatContent(content.to_string()))?,
         }
     }
 }
@@ -223,7 +217,7 @@ mod tests {
     #[cfg(not(any(feature = "json", feature = "yaml", feature = "toml")))]
     fn test_no_default_features() {
         let err = Config::<HttpRequest, HttpResponse>::read("path/to/config.yaml").unwrap_err();
-        assert_eq!(err.downcast_ref(), Some(&InterfaceError::UnknownFormatExtension("yaml".to_string())));
+        assert!(matches!(err.downcast_ref().unwrap(), InterfaceError::UnknownFormatExtension(s) if s == "yaml"));
     }
 
     #[test]

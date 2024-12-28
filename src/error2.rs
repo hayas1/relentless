@@ -80,7 +80,8 @@ impl<T, E: Error + Send + Sync + 'static> IntoResult<T> for Poll<Result<T, E>> {
 
 #[derive(Debug)]
 pub enum InterfaceError {
-    UndefinedSerializeFormat,
+    UndefinedSerializeFormatPath(String),
+    UndefinedSerializeFormatContent(String),
     KeyValueFormat(String),
     UnknownFormatExtension(String),
     CannotReadConfig(String, RelentlessError),
@@ -91,7 +92,8 @@ impl IntoRelentlessError for InterfaceError {}
 impl Error for InterfaceError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
-            Self::UndefinedSerializeFormat => None,
+            Self::UndefinedSerializeFormatPath(_) => None,
+            Self::UndefinedSerializeFormatContent(_) => None,
             Self::KeyValueFormat(_) => None,
             Self::UnknownFormatExtension(_) => None,
             Self::CannotReadConfig(_, e) => Some(e),
@@ -103,7 +105,12 @@ impl Error for InterfaceError {
 impl Display for InterfaceError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::UndefinedSerializeFormat => write!(f, "at least one serde format is required"),
+            Self::UndefinedSerializeFormatPath(s) => {
+                write!(f, "no serde format is enabled for path `{}`", s)
+            }
+            Self::UndefinedSerializeFormatContent(s) => {
+                write!(f, "no serde format is enabled for content `{}`", s)
+            }
             Self::KeyValueFormat(s) => write!(f, "should be KEY=VALUE format, but `{}` has no `=`", s),
             Self::UnknownFormatExtension(s) => write!(f, "`{}` is unknown extension format", s),
             Self::CannotReadConfig(s, e) => write!(f, "[{}] {}", s, e),
@@ -219,10 +226,10 @@ mod tests {
     #[test]
     fn test_error_conversion() {
         fn f() -> RelentlessResult<()> {
-            Err(InterfaceError::UndefinedSerializeFormat)?
+            Err(InterfaceError::UndefinedSerializeFormatPath("test".to_string()))?
         }
         let err = f().unwrap_err();
-        assert!(matches!(err.downcast_ref().unwrap(), InterfaceError::UndefinedSerializeFormat));
+        assert!(matches!(err.downcast_ref().unwrap(), InterfaceError::UndefinedSerializeFormatPath(s) if s == "test"));
     }
 
     #[test]
