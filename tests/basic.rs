@@ -19,7 +19,7 @@ async fn test_example_yaml_config() {
     let service = route::app_with(Default::default());
     let report = relentless.assault_with::<_, http::Request<Body>>(configs, service).await.unwrap();
 
-    assert_eq!(relentless.file.len(), report.sub_reportable().len());
+    assert_eq!(relentless.file.len(), report.sub_reportable().unwrap().len());
     assert!(relentless.allow(&report));
 }
 
@@ -54,7 +54,7 @@ async fn test_basic_yaml_config() {
     );
     let report = relentless.assault_with::<_, http::Request<Body>>(configs, service).await.unwrap();
 
-    assert_eq!(relentless.file.len(), report.sub_reportable().len());
+    assert_eq!(relentless.file.len(), report.sub_reportable().unwrap().len());
     assert!(relentless.allow(&report));
 }
 
@@ -77,6 +77,6 @@ async fn test_basic_toml_config() {
     let report = relentless.assault_with::<_, http::Request<Body>>(configs, service).await.unwrap();
 
     relentless.report(&report).unwrap();
-    assert_eq!(relentless.file.len(), report.sub_reportable().len());
+    assert_eq!(relentless.file.len(), report.sub_reportable().unwrap().len());
     assert!(relentless.allow(&report));
 }
