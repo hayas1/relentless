@@ -453,8 +453,8 @@ mod tests {
         assert_eq!(pass, PassAggregate { pass: 500, count: 1000, pass_rate: 0.5 });
         let ResponseAggregate { req, duration, rps, bytes, latency } = response;
         assert_eq!(req, 2000);
-        assert!(duration.abs_diff(Duration::from_millis(999)) < tolerance);
-        assert_eq!(rps, 2002.002002002002);
+        assert!(duration.abs_diff(Duration::from_millis(1998)) < tolerance);
+        assert_eq!(rps, 1001.001001001001);
         assert_eq!(bytes, BytesAggregate {});
         let LatencyAggregate { min, mean, quantile, max } = latency;
         assert!(min.abs_diff(Duration::from_millis(0)) < tolerance);
