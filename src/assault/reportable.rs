@@ -21,34 +21,36 @@ use super::{
 
 pub trait Reportable {
     // TODO https://std-dev-guide.rust-lang.org/policy/specialization.html
-    fn sub_reportable(&self) -> Vec<&dyn Reportable>;
+    fn sub_reportable(&self) -> Option<Vec<&dyn Reportable>>;
     fn pass(&self) -> bool {
-        if self.sub_reportable().is_empty() {
-            unreachable!("a reportable without children should implement its own method");
+        if let Some(s) = self.sub_reportable() {
+            s.iter().all(|r| r.pass())
         } else {
-            self.sub_reportable().iter().all(|r| r.pass())
+            true
         }
     }
     fn allow(&self, strict: bool) -> bool {
-        if self.sub_reportable().is_empty() {
-            unreachable!("a reportable without children should implement its own method");
+        if let Some(s) = self.sub_reportable() {
+            s.iter().all(|r| r.allow(strict))
         } else {
-            self.sub_reportable().iter().all(|r| r.allow(strict))
+            true
         }
     }
     fn aggregator(&self) -> EvaluateAggregator {
-        if self.sub_reportable().is_empty() {
-            unreachable!("a reportable without children should implement its own method");
-        } else {
-            self.sub_reportable().iter().map(|r| r.aggregator()).fold(Default::default(), |mut agg, b| {
+        if let Some(s) = self.sub_reportable() {
+            s.iter().map(|r| r.aggregator()).fold(EvaluateAggregator::default(), |mut agg, b| {
                 agg.merge(&b);
                 agg
             })
+        } else {
+            EvaluateAggregator::default()
         }
     }
     fn skip_report(&self, cmd: &Relentless) -> bool {
         let Relentless { strict, ng_only, report_format, .. } = cmd;
-        matches!(report_format, ReportFormat::NullDevice) || *ng_only && self.allow(*strict)
+        self.sub_reportable().map(|s| s.is_empty()).unwrap_or(false)
+            || matches!(report_format, ReportFormat::NullDevice)
+            || *ng_only && self.allow(*strict)
     }
 }
 
@@ -66,8 +68,8 @@ impl<T, Q: Clone + Coalesce, P: Clone + Coalesce> Report<T, Q, P> {
     }
 }
 impl<T, Q: Clone + Coalesce, P: Clone + Coalesce> Reportable for Report<T, Q, P> {
-    fn sub_reportable(&self) -> Vec<&dyn Reportable> {
-        self.report.iter().map(|r| r as _).collect()
+    fn sub_reportable(&self) -> Option<Vec<&dyn Reportable>> {
+        Some(self.report.iter().map(|r| r as _).collect())
     }
 }
 
@@ -86,8 +88,8 @@ impl<T, Q, P> WorkerReport<T, Q, P> {
     }
 }
 impl<T, Q: Clone + Coalesce, P: Clone + Coalesce> Reportable for WorkerReport<T, Q, P> {
-    fn sub_reportable(&self) -> Vec<&dyn Reportable> {
-        self.report.iter().map(|r| r as _).collect()
+    fn sub_reportable(&self) -> Option<Vec<&dyn Reportable>> {
+        Some(self.report.iter().map(|r| r as _).collect())
     }
 }
 
@@ -117,8 +119,8 @@ impl<T, Q, P> CaseReport<T, Q, P> {
     }
 }
 impl<T, Q: Clone + Coalesce, P: Clone + Coalesce> Reportable for CaseReport<T, Q, P> {
-    fn sub_reportable(&self) -> Vec<&dyn Reportable> {
-        Vec::new()
+    fn sub_reportable(&self) -> Option<Vec<&dyn Reportable>> {
+        None
     }
     fn pass(&self) -> bool {
         self.passed == self.testcase.coalesce().setting.repeat.times()

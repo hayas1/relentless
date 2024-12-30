@@ -223,13 +223,14 @@ impl Relentless {
         #[cfg(feature = "console-report")]
         console::set_colors_enabled(!no_color);
 
-        match report_format {
-            ReportFormat::NullDevice => (),
+        match (report.skip_report(self), report_format) {
+            (false, ReportFormat::NullDevice) => (),
             #[cfg(feature = "console-report")]
-            ReportFormat::Console => report.console_report(self, &mut ReportWriter::new(0, &mut write))?,
-            ReportFormat::GithubMarkdown => {
+            (false, ReportFormat::Console) => report.console_report(self, &mut ReportWriter::new(0, &mut write))?,
+            (false, ReportFormat::GithubMarkdown) => {
                 report.github_markdown_report(self, &mut ReportWriter::new(0, &mut write))?
             }
+            _ => (),
         };
 
         Ok(report.exit_code(self))
