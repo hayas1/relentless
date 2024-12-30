@@ -38,11 +38,15 @@ relentless -f examples/config/compare.yaml
 ```
 ```sh
 🚀 basic comparison test 🚀
-actual🌐 http://localhost:3000
-expect🌐 http://localhost:3000
-✅ /
-✅ /health
-✅ /healthz
+  actual🌐 http://localhost:3000/
+  expect🌐 http://localhost:3000/
+  ✅ /
+  ✅ /health
+  ✅ /healthz
+
+💥 summery of all requests in configs 💥
+  pass-rt: 3/3=100.00%    rps: 6req/22.37ms=268.23req/s
+  latency: min=2.774ms mean=8.194ms p50=5.219ms p90=22.127ms p99=22.127ms max=22.127ms
 ```
 In this case the actual and expected are the same server, so the request gets the same response and the test passes.
 - Each request is done **concurrently** by default.
