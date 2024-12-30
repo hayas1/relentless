@@ -26,9 +26,9 @@ jobs:
           ${{ steps.cargo-home.outputs.path }}
         key: cargo-${{ hashFiles('**/Cargo.toml') }}
 
-    - run: cargo test --verbose --manifest-path dev/server/Cargo.toml
-    - run: cargo fmt --check --manifest-path dev/server/Cargo.toml
-    - run: cargo clippy --tests --manifest-path dev/server/Cargo.toml -- --deny warnings
+    - run: cargo test --verbose --manifest-path dev/server/http/Cargo.toml
+    - run: cargo fmt --check --manifest-path dev/server/http/Cargo.toml
+    - run: cargo clippy --tests --manifest-path dev/server/http/Cargo.toml -- --deny warnings
 
     - run: cargo test --verbose
     - run: cargo test --verbose --no-default-features
@@ -65,11 +65,11 @@ jobs:
         key: cargo-${{ hashFiles('**/Cargo.toml') }}
 
     - name: Run develop http server (actual)
-      uses: ./.github/actions/run-develop-server
+      uses: ./.github/actions/run-develop-http-server
       with:
         port: 3001
     - name: Run develop http server (expect)
-      uses: ./.github/actions/run-develop-server
+      uses: ./.github/actions/run-develop-http-server
       with:
         port: 3000
 
