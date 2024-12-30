@@ -82,7 +82,7 @@ jobs:
             -f tests/config/basic/*.yaml -d actual=http://localhost:3001 \
             -s testcases repeats -r github-markdown \
             --no-color --ng-only
-        } > target/report.txt
+        } >> target/report.txt
     - name: Comment on pull request
       if: failure()
       env:
