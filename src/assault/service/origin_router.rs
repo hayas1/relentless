@@ -63,7 +63,7 @@ where
 mod tests {
 
     use http_body_util::{BodyExt, Collected, Empty};
-    use relentless_dev_server::route::{self, counter::CounterResponse};
+    use  relentless_dev_server_http::route::{self, counter::CounterResponse};
 
     use super::*;
 
