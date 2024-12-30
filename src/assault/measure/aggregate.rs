@@ -89,6 +89,7 @@ impl Aggregate for ResponseAggregator {
     fn add(&mut self, res: &Self::Add) {
         self.count.add(&());
         self.duration.add(&res.start_instant());
+        self.duration.add(&res.end_instant()); // if not, rps of only 1 request will be inf
         self.bytes.add(&());
         self.latency.add(&res.latency());
     }
