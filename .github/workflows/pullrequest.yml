@@ -73,8 +73,16 @@ jobs:
       with:
         port: 3000
 
-    - name: Run relentless test and comment on pull request
-      id: run-test
+    - name: Run examples e2e test and comment on pull request
+      run: |
+        set -euo pipefail
+        {
+          cargo run --features cli -- \
+            -f examples/config/assault.yaml examples/config/compare.yaml -d actual=http://localhost:3000 \
+            -s testcases repeats -r github-markdown \
+            --no-color --ng-only
+        } >> target/report.txt
+    - name: Run configs e2e test and comment on pull request
       run: |
         set -euo pipefail
         {
@@ -82,7 +90,7 @@ jobs:
             -f tests/config/basic/*.yaml -d actual=http://localhost:3001 \
             -s testcases repeats -r github-markdown \
             --no-color --ng-only
-        } > target/report.txt
+        } >> target/report.txt
     - name: Comment on pull request
       if: failure()
       env:
