@@ -15,6 +15,7 @@ pub fn app(state: AppState) -> Router<Identity> {
 }
 pub fn router(state: AppState) -> Router<Identity> {
     Server::builder()
+        .trace_fn(|_| tracing::info_span!(env!("CARGO_PKG_NAME")))
         .add_service(helloworld::hello_world::greeter_server::GreeterServer::new(helloworld::MyGreeter::default()))
         .add_service(counter::pb::counter_server::CounterServer::new(counter::CounterImpl::default()))
 }

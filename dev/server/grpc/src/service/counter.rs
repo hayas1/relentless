@@ -22,6 +22,7 @@ pub struct CounterImpl {
 
 #[tonic::async_trait]
 impl Counter for CounterImpl {
+    #[tracing::instrument(ret)]
     async fn increment(&self, request: Request<CounterRequest>) -> Result<Response<CounterReply>, Status> {
         let value = request.into_inner().value;
         let mut counter = self.counter.write().map_err(|e| Status::internal(e.to_string()))?;
