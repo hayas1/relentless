@@ -448,9 +448,9 @@ checksum = "e8c02a5121d4ea3eb16a80748c74f5549a5665e4c21333c6098f283870fbdea6"
 
 [[package]]
 name = "fixedbitset"
-version = "0.5.7"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1d674e81391d1e1ab681a28d99df07927c6d4aa5b027d7da16ba32d1d21ecd99"
+checksum = "0ce7134b9999ecaf8bcd65542e436736ef32ddca1b3e06094cb6ec5755203b80"
 
 [[package]]
 name = "flate2"
@@ -1254,9 +1254,9 @@ checksum = "e3148f5046208a5d56bcfc03053e3ca6334e51da8dfb19b6cdc8b306fae3283e"
 
 [[package]]
 name = "petgraph"
-version = "0.6.6"
+version = "0.6.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c94eb96835f05ec51384814c9b2daef83f68486f67a0e2e9680e0f698dca808e"
+checksum = "b4c5cc86750666a3ed20bdaf5ca2a0344f9c67674cae0515bec2da16fbaa47db"
 dependencies = [
  "fixedbitset",
  "indexmap 2.5.0",
@@ -1507,12 +1507,22 @@ version = "0.1.0"
 dependencies = [
  "num",
  "prost",
+ "relentless-dev-server-grpc-entity",
  "tokio",
  "tonic",
- "tonic-build",
  "tower 0.5.2",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "relentless-dev-server-grpc-entity"
+version = "0.1.0"
+dependencies = [
+ "num",
+ "prost",
+ "tonic",
+ "tonic-build",
 ]
 
 [[package]]

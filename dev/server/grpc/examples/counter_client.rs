@@ -1,5 +1,5 @@
 use num::BigInt;
-use relentless_dev_server_grpc::service::counter::pb::{counter_client::CounterClient, CounterRequest};
+use relentless_dev_server_grpc_entity::counter_pb::{counter_client::CounterClient, CounterRequest};
 
 // pub mod pb {
 //     tonic::include_proto!("counter");

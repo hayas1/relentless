@@ -1,3 +1,6 @@
+use relentless_dev_server_grpc_entity::{
+    counter_pb::counter_server::CounterServer, helloworld_pb::greeter_server::GreeterServer,
+};
 use tonic::transport::{server::Router, Server};
 use tower::layer::util::Identity;
 
@@ -16,6 +19,6 @@ pub fn app(state: AppState) -> Router<Identity> {
 pub fn router(state: AppState) -> Router<Identity> {
     Server::builder()
         .trace_fn(|_| tracing::info_span!(env!("CARGO_PKG_NAME")))
-        .add_service(helloworld::hello_world::greeter_server::GreeterServer::new(helloworld::MyGreeter::default()))
-        .add_service(counter::pb::counter_server::CounterServer::new(counter::CounterImpl::default()))
+        .add_service(GreeterServer::new(helloworld::MyGreeter::default()))
+        .add_service(CounterServer::new(counter::CounterImpl::default()))
 }
