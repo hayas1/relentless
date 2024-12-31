@@ -94,3 +94,43 @@ impl From<CounterError> for String {
         value.to_string()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::str::FromStr;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_counter_basic() {
+        let counter = CounterImpl::new(BigInt::from(0));
+
+        assert_eq!(counter.increment(Request::new(1)).await.unwrap().into_inner(), 1);
+        assert_eq!(counter.increment(Request::new(2)).await.unwrap().into_inner(), 3);
+
+        assert_eq!(counter.decrement(Request::new(1)).await.unwrap().into_inner(), 2);
+        assert_eq!(counter.decrement(Request::new(3)).await.unwrap().into_inner(), -1);
+
+        assert_eq!(counter.show(Request::new(())).await.unwrap().into_inner(), -1);
+        assert_eq!(counter.reset(Request::new(())).await.unwrap().into_inner(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_counter_too_large_bigint() {
+        let counter = CounterImpl::new(BigInt::from(0));
+
+        let large = BigInt::from_str("9999999999999999999999999999999").unwrap();
+        assert_eq!(
+            counter.bincrement(Request::new(large.clone().into())).await.unwrap().into_inner(),
+            large.clone().into()
+        );
+
+        assert_eq!(
+            counter.show(Request::new(())).await.unwrap_err().to_string(),
+            Status::invalid_argument(CounterError::TooLarge(large.clone())).to_string(),
+        );
+
+        assert_eq!(counter.breset(Request::new(())).await.unwrap().into_inner(), BigInt::from(0).into());
+        assert_eq!(counter.show(Request::new(())).await.unwrap().into_inner(), 0);
+    }
+}
