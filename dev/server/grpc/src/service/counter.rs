@@ -23,6 +23,13 @@ pub struct CounterImpl {
 #[tonic::async_trait]
 impl Counter for CounterImpl {
     #[tracing::instrument(ret)]
+    async fn incr(&self, request: Request<i64>) -> Result<Response<i64>, Status> {
+        let value = request.into_inner();
+        let mut counter = self.counter.write().map_err(|e| Status::internal(e.to_string()))?;
+        *counter += value;
+        Ok(Response::new(*counter))
+    }
+    #[tracing::instrument(ret)]
     async fn increment(&self, request: Request<CounterRequest>) -> Result<Response<CounterReply>, Status> {
         let value = request.into_inner().value;
         let mut counter = self.counter.write().map_err(|e| Status::internal(e.to_string()))?;

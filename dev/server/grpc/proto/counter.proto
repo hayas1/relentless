@@ -1,7 +1,11 @@
 syntax = "proto3";
 package counter;
 
+import "google/protobuf/wrappers.proto";
+
 service Counter {
+    rpc Incr(google.protobuf.Int64Value) returns (google.protobuf.Int64Value);
+
     rpc Increment (CounterRequest) returns (CounterReply);
 }
 
