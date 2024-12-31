@@ -5,7 +5,7 @@ use std::process::ExitCode;
 async fn main() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sync>> {
     use axum::{body::Body, extract::Request};
     use relentless::interface::command::Relentless;
-    use  relentless_dev_server_http::route;
+    use relentless_dev_server_http::route;
 
     let cmd = Relentless {
         file: vec!["examples/config/assault.yaml".into(), "examples/config/compare.yaml".into()],
