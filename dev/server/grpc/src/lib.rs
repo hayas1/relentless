@@ -7,7 +7,11 @@ pub async fn serve(env: env::Env) -> Result<(), Box<dyn std::error::Error + Send
     let server = service::app_with(env);
 
     tracing::info!("start app on {}", addr);
-    server.serve(addr).await?;
+    server
+        .serve_with_shutdown(addr, async {
+            tokio::signal::ctrl_c().await.expect("failed to install Ctrl+C handler");
+        })
+        .await?;
     tracing::info!("stop app");
 
     Ok(())
