@@ -1314,7 +1314,7 @@ dependencies = [
  "mime",
  "nom",
  "regex",
- "relentless-dev-server",
+ "relentless-dev-server-http",
  "reqwest",
  "serde",
  "serde_json",
@@ -1326,7 +1326,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "relentless-dev-server"
+name = "relentless-dev-server-http"
 version = "0.1.0"
 dependencies = [
  "axum",

@@ -26,10 +26,10 @@ testcases:
 ...more examples in <https://github.com/hayas1/relentless/tree/master/examples/config>
 
 #### Run API for testing
-If you have no API for testing, you can use `relentless-dev-server`
+If you have no API for testing, you can use `relentless-dev-server-http`
 ```sh
-cargo install --git https://github.com/hayas1/relentless relentless-dev-server
-relentless-dev-server
+cargo install --git https://github.com/hayas1/relentless relentless-dev-server-http
+relentless-dev-server-http
 ```
 
 ### Run CLI
@@ -59,7 +59,7 @@ TODO (feature)
 Same config can be used in both binary and library. See [Binary section](#prepare-config).
 
 #### Run API for testing
-Same relentless-dev-server can be used in both binary and library. See [Binary section](#run-api-for-testing).
+Same `relentless-dev-server-http` can be used in both binary and library. See [Binary section](#run-api-for-testing).
 
 ### Run Testing
 TODO <https://github.com/hayas1/relentless/blob/master/tests/tests.rs>
