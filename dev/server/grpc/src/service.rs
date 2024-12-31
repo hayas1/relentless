@@ -10,16 +10,25 @@ use crate::env::Env;
 pub mod counter;
 pub mod helloworld;
 
-pub fn app_with(env: Env) -> Router<Identity> {
-    app(env, 0.into())
+pub async fn app_with(env: Env) -> Router<Identity> {
+    app(env, 0.into()).await
 }
-pub fn app(env: Env, initial_count: BigInt) -> Router<Identity> {
-    router(env, initial_count)
+pub async fn app(env: Env, initial_count: BigInt) -> Router<Identity> {
+    router(env, initial_count).await
 }
-pub fn router(env: Env, initial_count: BigInt) -> Router<Identity> {
+pub async fn router(env: Env, initial_count: BigInt) -> Router<Identity> {
     let _ = env;
+
+    let (mut health_reporter, health_service) = tonic_health::server::health_reporter();
+    health_reporter.set_serving::<GreeterServer<helloworld::MyGreeter>>().await;
+    health_reporter.set_serving::<CounterServer<counter::CounterImpl>>().await;
+
+    let reflection_service = tonic_reflection::server::Builder::configure().build_v1().unwrap();
+
     Server::builder()
         .trace_fn(|_| tracing::info_span!(env!("CARGO_PKG_NAME")))
+        .add_service(health_service)
         .add_service(GreeterServer::new(helloworld::MyGreeter::default()))
         .add_service(CounterServer::new(counter::CounterImpl::new(initial_count)))
+        .add_service(reflection_service)
 }
