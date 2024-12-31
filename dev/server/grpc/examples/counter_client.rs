@@ -1,5 +1,5 @@
 use num::BigInt;
-use relentless_dev_server_grpc_entity::counter_pb::{counter_client::CounterClient, CounterRequest};
+use relentless_dev_server_grpc_entity::counter_pb::counter_client::CounterClient;
 
 // pub mod pb {
 //     tonic::include_proto!("counter");
@@ -9,17 +9,13 @@ use relentless_dev_server_grpc_entity::counter_pb::{counter_client::CounterClien
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut client = CounterClient::connect("http://localhost:50051").await?;
 
-    let request = tonic::Request::new(CounterRequest { value: 1 });
-    let response = client.increment(request).await?;
-    println!("RESPONSE1={:?}", response);
+    let request1 = tonic::Request::new(1);
+    let response1 = client.increment(request1).await?;
+    println!("RESPONSE2={:?}", response1);
 
-    let request2 = tonic::Request::new(2);
-    let response2 = client.incr(request2).await?;
-    println!("RESPONSE2={:?}", response2);
-
-    let request3 = tonic::Request::new(BigInt::from(3).into());
-    let response3: BigInt = client.bincrement(request3).await?.into_inner().into();
-    println!("RESPONSE3={:?}", response3);
+    let request2 = tonic::Request::new(BigInt::from(2).into());
+    let response2: BigInt = client.bincrement(request2).await?.into_inner().into();
+    println!("RESPONSE3={:?}", response2);
 
     Ok(())
 }

@@ -17,16 +17,10 @@ pub struct CounterImpl {
 #[tonic::async_trait]
 impl Counter for CounterImpl {
     #[tracing::instrument(ret)]
-    async fn incr(&self, request: Request<i64>) -> Result<Response<i64>, Status> {
+    async fn increment(&self, request: Request<i64>) -> Result<Response<i64>, Status> {
         let value = request.into_inner();
         let incremented = self.bigint_increment(BigInt::from(value))?;
         Ok(Response::new(incremented.to_i64().unwrap()))
-    }
-    #[tracing::instrument(ret)]
-    async fn increment(&self, request: Request<CounterRequest>) -> Result<Response<CounterReply>, Status> {
-        let CounterRequest { value } = request.into_inner();
-        let incremented = self.bigint_increment(BigInt::from(value))?;
-        Ok(Response::new(CounterReply { value: incremented.to_i64().unwrap() }))
     }
     #[tracing::instrument(ret)]
     async fn bincrement(&self, request: Request<counter_pb::BigInt>) -> Result<Response<counter_pb::BigInt>, Status> {
