@@ -2,18 +2,18 @@ syntax = "proto3";
 package counter;
 
 import "google/protobuf/wrappers.proto";
+import "google/protobuf/empty.proto";
 
 service Counter {
     rpc Increment(google.protobuf.Int64Value) returns (google.protobuf.Int64Value);
     rpc Bincrement (BigInt) returns (BigInt);
-}
+    rpc Decrement(google.protobuf.Int64Value) returns (google.protobuf.Int64Value);
+    rpc Bdecrement (BigInt) returns (BigInt);
 
-message CounterRequest {
-   int64 value = 1;
-}
-
-message CounterReply {
-    int64 value = 1;
+    rpc Show(google.protobuf.Empty) returns (google.protobuf.Int64Value);
+    rpc Bshow(google.protobuf.Empty) returns (BigInt);
+    rpc Reset(google.protobuf.Empty) returns (google.protobuf.Int64Value);
+    rpc Breset(google.protobuf.Empty) returns (BigInt);
 }
 
 enum Sign {

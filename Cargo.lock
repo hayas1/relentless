@@ -1508,6 +1508,7 @@ dependencies = [
  "num",
  "prost",
  "relentless-dev-server-grpc-entity",
+ "thiserror 2.0.9",
  "tokio",
  "tonic",
  "tower 0.5.2",
