@@ -1509,6 +1509,7 @@ dependencies = [
  "tokio",
  "tonic",
  "tonic-build",
+ "tower 0.5.2",
 ]
 
 [[package]]
