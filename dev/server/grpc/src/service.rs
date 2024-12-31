@@ -3,6 +3,7 @@ use tower::layer::util::Identity;
 
 use crate::{env::Env, state::AppState};
 
+pub mod counter;
 pub mod helloworld;
 
 pub fn app_with(env: Env) -> Router<Identity> {
@@ -15,4 +16,5 @@ pub fn app(state: AppState) -> Router<Identity> {
 pub fn router(state: AppState) -> Router<Identity> {
     Server::builder()
         .add_service(helloworld::hello_world::greeter_server::GreeterServer::new(helloworld::MyGreeter::default()))
+        .add_service(counter::counter::counter_server::CounterServer::new(counter::CounterImpl::default()))
 }

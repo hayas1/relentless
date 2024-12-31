@@ -8,6 +8,7 @@ prost = "0.13.4"
 tonic = "0.12.3"
 tower = "0.5.2"
 tokio = { version = "1.42.0", features = ["macros", "rt-multi-thread"] }
+num = "0.4.3"
 
 [build-dependencies]
 tonic-build = "0.12.3"

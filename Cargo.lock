@@ -1505,6 +1505,7 @@ dependencies = [
 name = "relentless-dev-server-grpc"
 version = "0.1.0"
 dependencies = [
+ "num",
  "prost",
  "tokio",
  "tonic",
