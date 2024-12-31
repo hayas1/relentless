@@ -1,13 +1,8 @@
 use std::sync::{Arc, RwLock};
 
 use num::{BigInt, ToPrimitive};
-use relentless_dev_server_grpc_entity::counter_pb::{self, counter_server::Counter, CounterReply, CounterRequest};
+use relentless_dev_server_grpc_entity::counter_pb::{self, counter_server::Counter};
 use tonic::{Request, Response, Status};
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash)]
-pub struct CounterState {
-    pub count: BigInt,
-}
 
 #[derive(Debug, Default)]
 pub struct CounterImpl {
@@ -31,6 +26,10 @@ impl Counter for CounterImpl {
 }
 
 impl CounterImpl {
+    pub fn new(initial_count: BigInt) -> Self {
+        Self { counter: Arc::new(RwLock::new(initial_count)) }
+    }
+
     pub fn bigint_increment(&self, value: BigInt) -> Result<BigInt, Status> {
         let mut counter = self.counter.write().map_err(|e| Status::internal(e.to_string()))?;
         *counter += value;
