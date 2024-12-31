@@ -1,7 +1,7 @@
 use std::sync::{Arc, RwLock};
 
 use num::{BigInt, ToPrimitive};
-use pb::{counter_server::Counter, BInt, CounterReply, CounterRequest};
+use pb::{counter_server::Counter, CounterReply, CounterRequest};
 use tonic::{Request, Response, Status};
 
 pub mod pb {
@@ -25,49 +25,19 @@ pub mod pb {
             }
         }
     }
-    impl From<num::BigInt> for BInt {
+    impl From<num::BigInt> for BigInt {
         fn from(value: num::BigInt) -> Self {
-            let (sign, value) = value.to_bytes_be();
-            BInt { sign: Sign::from(sign).into(), value }
+            let (sign, repr) = value.to_bytes_be();
+            BigInt { sign: Sign::from(sign).into(), repr }
         }
     }
-    impl From<BInt> for num::BigInt {
-        fn from(value: BInt) -> Self {
-            let (sign, value) = (value.sign(), value.value);
-            num::BigInt::from_bytes_be(sign.into(), &value)
+    impl From<BigInt> for num::BigInt {
+        fn from(value: BigInt) -> Self {
+            let (sign, repr) = (value.sign(), value.repr);
+            num::BigInt::from_bytes_be(sign.into(), &repr)
         }
     }
 }
-// impl From<Sign> for pb::Sign {
-//     fn from(sign: Sign) -> Self {
-//         match sign {
-//             Sign::NoSign => pb::Sign::NoSign,
-//             Sign::Plus => pb::Sign::Plus,
-//             Sign::Minus => pb::Sign::Minus,
-//         }
-//     }
-// }
-// impl From<pb::Sign> for Sign {
-//     fn from(sign: pb::Sign) -> Self {
-//         match sign {
-//             pb::Sign::NoSign => Sign::NoSign,
-//             pb::Sign::Plus => Sign::Plus,
-//             pb::Sign::Minus => Sign::Minus,
-//         }
-//     }
-// }
-// impl From<BigInt> for pb::BInt {
-//     fn from(value: BigInt) -> Self {
-//         let (sign, value) = value.to_bytes_be();
-//         BInt { sign: pb::Sign::from(sign).into(), value }
-//     }
-// }
-// impl From<pb::BInt> for BigInt {
-//     fn from(value: pb::BInt) -> Self {
-//         let pb::BInt { sign, value } = value;
-//         BigInt::from_bytes_be(pb::Sign::try_from(sign).unwrap().into(), &value)
-//     }
-// }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash)]
 pub struct CounterState {
@@ -94,7 +64,7 @@ impl Counter for CounterImpl {
         Ok(Response::new(CounterReply { value: incremented.to_i64().unwrap() }))
     }
     #[tracing::instrument(ret)]
-    async fn bincrement(&self, request: Request<BInt>) -> Result<Response<BInt>, Status> {
+    async fn bincrement(&self, request: Request<pb::BigInt>) -> Result<Response<pb::BigInt>, Status> {
         let bint = request.into_inner();
         let incremented = self.bigint_increment(bint.into())?;
         Ok(Response::new(incremented.into()))

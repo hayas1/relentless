@@ -6,7 +6,7 @@ import "google/protobuf/wrappers.proto";
 service Counter {
     rpc Incr(google.protobuf.Int64Value) returns (google.protobuf.Int64Value);
     rpc Increment (CounterRequest) returns (CounterReply);
-    rpc Bincrement (BInt) returns (BInt);
+    rpc Bincrement (BigInt) returns (BigInt);
 }
 
 message CounterRequest {
@@ -22,7 +22,7 @@ enum Sign {
     PLUS = 1;
     MINUS = -1;
 }
-message BInt {
+message BigInt {
     Sign sign = 1;
-    bytes value = 2;
+    bytes repr = 2;
 }
