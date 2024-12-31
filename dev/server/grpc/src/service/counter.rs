@@ -1,10 +1,10 @@
 use std::sync::{Arc, RwLock};
 
-use counter::{counter_server::Counter, CounterReply, CounterRequest};
 use num::BigInt;
+use pb::{counter_server::Counter, CounterReply, CounterRequest};
 use tonic::{Request, Response, Status};
 
-pub mod counter {
+pub mod pb {
     tonic::include_proto!("counter");
 }
 

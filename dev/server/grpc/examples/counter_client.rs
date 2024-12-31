@@ -1,7 +1,7 @@
-use counter::counter_client::CounterClient;
-use counter::CounterRequest;
+use pb::counter_client::CounterClient;
+use pb::CounterRequest;
 
-pub mod counter {
+pub mod pb {
     tonic::include_proto!("counter");
 }
 

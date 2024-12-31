@@ -16,5 +16,5 @@ pub fn app(state: AppState) -> Router<Identity> {
 pub fn router(state: AppState) -> Router<Identity> {
     Server::builder()
         .add_service(helloworld::hello_world::greeter_server::GreeterServer::new(helloworld::MyGreeter::default()))
-        .add_service(counter::counter::counter_server::CounterServer::new(counter::CounterImpl::default()))
+        .add_service(counter::pb::counter_server::CounterServer::new(counter::CounterImpl::default()))
 }
