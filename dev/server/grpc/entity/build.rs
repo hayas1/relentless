@@ -1,10 +1,10 @@
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let protos = std::fs::read_dir("proto/")?
+    let protos: Vec<_> = std::fs::read_dir("proto/")?
         .filter_map(|e| {
             let p = e.ok()?.path();
             (p.is_file() && matches!(p.extension()?.to_str()?, "proto")).then_some(p)
         })
-        .collect::<Vec<_>>();
+        .collect();
 
     tonic_build::configure()
         .build_server(true)
