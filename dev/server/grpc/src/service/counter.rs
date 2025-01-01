@@ -131,8 +131,6 @@ impl From<CounterError> for String {
 
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
-
     use pb::counter_server::Counter;
 
     use super::*;
@@ -155,7 +153,7 @@ mod tests {
     async fn test_counter_too_large_bigint() {
         let counter = CounterImpl::new(BigInt::from(0));
 
-        let large = BigInt::from_str("9999999999999999999999999999999").unwrap();
+        let large: BigInt = "9999999999999999999999999999999".parse().unwrap();
         assert_eq!(
             counter.bincrement(Request::new(large.clone().into())).await.unwrap().into_inner(),
             large.clone().into()
