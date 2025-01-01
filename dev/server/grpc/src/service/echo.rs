@@ -1,4 +1,6 @@
-use relentless_dev_server_grpc_entity::echo_pb::{echo_server::Echo, EchoAny, EchoAnyValue};
+use prost_types::{Any, Value};
+use relentless_dev_server_grpc_entity::echo_pb::echo_server::Echo;
+use tonic::{Request, Response, Status};
 
 #[derive(Debug, Default)]
 pub struct EchoImpl;
@@ -6,16 +8,13 @@ pub struct EchoImpl;
 #[tonic::async_trait]
 impl Echo for EchoImpl {
     #[tracing::instrument(ret)]
-    async fn echo(&self, request: tonic::Request<EchoAny>) -> Result<tonic::Response<EchoAny>, tonic::Status> {
-        let EchoAny { value } = request.into_inner();
-        Ok(tonic::Response::new(EchoAny { value }))
+    async fn echo(&self, request: Request<Any>) -> Result<Response<Any>, Status> {
+        let value = request.into_inner();
+        Ok(Response::new(value))
     }
     #[tracing::instrument(ret)]
-    async fn echo_value(
-        &self,
-        request: tonic::Request<EchoAnyValue>,
-    ) -> Result<tonic::Response<EchoAnyValue>, tonic::Status> {
-        let EchoAnyValue { value } = request.into_inner();
-        Ok(tonic::Response::new(EchoAnyValue { value }))
+    async fn echo_value(&self, request: Request<Value>) -> Result<Response<Value>, Status> {
+        let value = request.into_inner();
+        Ok(Response::new(value))
     }
 }
