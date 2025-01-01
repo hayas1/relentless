@@ -1,9 +1,43 @@
 use std::sync::{Arc, RwLock};
 
 use num::{BigInt, ToPrimitive};
-use relentless_dev_server_grpc_entity::counter_pb::{self, counter_server::Counter};
 use thiserror::Error;
 use tonic::{Request, Response, Status};
+
+pub mod pb {
+    tonic::include_proto!("counter");
+
+    impl From<num::bigint::Sign> for Sign {
+        fn from(sign: num::bigint::Sign) -> Self {
+            match sign {
+                num::bigint::Sign::NoSign => Sign::NoSign,
+                num::bigint::Sign::Plus => Sign::Plus,
+                num::bigint::Sign::Minus => Sign::Minus,
+            }
+        }
+    }
+    impl From<Sign> for num::bigint::Sign {
+        fn from(sign: Sign) -> Self {
+            match sign {
+                Sign::NoSign => num::bigint::Sign::NoSign,
+                Sign::Plus => num::bigint::Sign::Plus,
+                Sign::Minus => num::bigint::Sign::Minus,
+            }
+        }
+    }
+    impl From<num::BigInt> for BigInt {
+        fn from(value: num::BigInt) -> Self {
+            let (sign, repr) = value.to_bytes_be();
+            BigInt { sign: Sign::from(sign).into(), repr }
+        }
+    }
+    impl From<BigInt> for num::BigInt {
+        fn from(value: BigInt) -> Self {
+            let (sign, repr) = (value.sign(), value.repr);
+            num::BigInt::from_bytes_be(sign.into(), &repr)
+        }
+    }
+}
 
 #[derive(Debug, Default)]
 pub struct CounterImpl {
@@ -11,7 +45,7 @@ pub struct CounterImpl {
 }
 
 #[tonic::async_trait]
-impl Counter for CounterImpl {
+impl pb::counter_server::Counter for CounterImpl {
     #[tracing::instrument(ret)]
     async fn increment(&self, request: Request<i64>) -> Result<Response<i64>, Status> {
         let value = BigInt::from(request.into_inner());
@@ -19,7 +53,7 @@ impl Counter for CounterImpl {
         Ok(Response::new(Self::cast_bigint(incremented)?))
     }
     #[tracing::instrument(ret)]
-    async fn bincrement(&self, request: Request<counter_pb::BigInt>) -> Result<Response<counter_pb::BigInt>, Status> {
+    async fn bincrement(&self, request: Request<pb::BigInt>) -> Result<Response<pb::BigInt>, Status> {
         let bint = request.into_inner().into();
         let incremented = self.bigint_increment(bint)?;
         Ok(Response::new(incremented.into()))
@@ -31,7 +65,7 @@ impl Counter for CounterImpl {
         Ok(Response::new(Self::cast_bigint(decremented)?))
     }
     #[tracing::instrument(ret)]
-    async fn bdecrement(&self, request: Request<counter_pb::BigInt>) -> Result<Response<counter_pb::BigInt>, Status> {
+    async fn bdecrement(&self, request: Request<pb::BigInt>) -> Result<Response<pb::BigInt>, Status> {
         let bint = BigInt::from(request.into_inner());
         let decremented = self.bigint_increment(-bint)?;
         Ok(Response::new(decremented.into()))
@@ -43,7 +77,7 @@ impl Counter for CounterImpl {
         Ok(Response::new(Self::cast_bigint(shown)?))
     }
     #[tracing::instrument(ret)]
-    async fn bshow(&self, _: Request<()>) -> Result<Response<counter_pb::BigInt>, Status> {
+    async fn bshow(&self, _: Request<()>) -> Result<Response<pb::BigInt>, Status> {
         let shown = self.bigint_show()?;
         Ok(Response::new(shown.into()))
     }
@@ -53,7 +87,7 @@ impl Counter for CounterImpl {
         Ok(Response::new(Self::cast_bigint(reset)?))
     }
     #[tracing::instrument(ret)]
-    async fn breset(&self, _: Request<()>) -> Result<Response<counter_pb::BigInt>, Status> {
+    async fn breset(&self, _: Request<()>) -> Result<Response<pb::BigInt>, Status> {
         let reset = self.bigint_reset()?;
         Ok(Response::new(reset.into()))
     }
@@ -98,6 +132,8 @@ impl From<CounterError> for String {
 #[cfg(test)]
 mod tests {
     use std::str::FromStr;
+
+    use pb::counter_server::Counter;
 
     use super::*;
 

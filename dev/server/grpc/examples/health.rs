@@ -1,5 +1,4 @@
-use relentless_dev_server_grpc::service::counter::CounterImpl;
-use relentless_dev_server_grpc_entity::counter_pb::counter_server::CounterServer;
+use relentless_dev_server_grpc::service::counter::{pb::counter_server::CounterServer, CounterImpl};
 use tonic::Request;
 use tonic_health::pb::health_client::HealthClient;
 

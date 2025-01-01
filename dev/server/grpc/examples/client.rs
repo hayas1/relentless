@@ -1,4 +1,4 @@
-use relentless_dev_server_grpc_entity::helloworld_pb::{greeter_client::GreeterClient, HelloRequest};
+use relentless_dev_server_grpc::service::helloworld::pb::{greeter_client::GreeterClient, HelloRequest};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

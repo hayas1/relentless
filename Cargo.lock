@@ -1508,26 +1508,15 @@ dependencies = [
  "num",
  "prost",
  "prost-types",
- "relentless-dev-server-grpc-entity",
  "thiserror 2.0.9",
  "tokio",
  "tonic",
+ "tonic-build",
  "tonic-health",
  "tonic-reflection",
  "tower 0.5.2",
  "tracing",
  "tracing-subscriber",
-]
-
-[[package]]
-name = "relentless-dev-server-grpc-entity"
-version = "0.1.0"
-dependencies = [
- "num",
- "prost",
- "prost-types",
- "tonic",
- "tonic-build",
 ]
 
 [[package]]

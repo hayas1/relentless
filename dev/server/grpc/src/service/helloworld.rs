@@ -1,15 +1,18 @@
-use relentless_dev_server_grpc_entity::helloworld_pb::{greeter_server::Greeter, HelloReply, HelloRequest};
 use tonic::{Request, Response, Status};
+
+pub mod pb {
+    tonic::include_proto!("helloworld");
+}
 
 #[derive(Debug, Default)]
 pub struct MyGreeter {}
 
 #[tonic::async_trait]
-impl Greeter for MyGreeter {
-    async fn say_hello(&self, request: Request<HelloRequest>) -> Result<Response<HelloReply>, Status> {
+impl pb::greeter_server::Greeter for MyGreeter {
+    async fn say_hello(&self, request: Request<pb::HelloRequest>) -> Result<Response<pb::HelloReply>, Status> {
         println!("Got a request: {:?}", request);
 
-        let reply = HelloReply { message: format!("Hello {}!", request.into_inner().name) };
+        let reply = pb::HelloReply { message: format!("Hello {}!", request.into_inner().name) };
 
         Ok(Response::new(reply))
     }
