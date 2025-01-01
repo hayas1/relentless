@@ -28,11 +28,11 @@ use crate::{
 
 pub type PinResponseFuture<R> = Pin<Box<dyn Future<Output = R> + Send>>;
 
-pub fn app_with(env: Env) -> NormalizePath<Router<()>> {
+pub fn app(env: Env) -> NormalizePath<Router<()>> {
     let state = AppState { env, ..Default::default() };
-    app(state)
+    app_with(state)
 }
-pub fn app(state: AppState) -> NormalizePath<Router<()>> {
+pub fn app_with(state: AppState) -> NormalizePath<Router<()>> {
     NormalizePathLayer::trim_trailing_slash().layer(router(state))
 }
 pub fn router(state: AppState) -> Router<()> {

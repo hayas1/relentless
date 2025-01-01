@@ -11,10 +11,10 @@ use crate::env::Env;
 pub mod counter;
 pub mod helloworld;
 
-pub async fn app_with(env: Env) -> Router<Identity> {
-    app(env, 0.into()).await
+pub async fn app(env: Env) -> Router<Identity> {
+    app_with(env, 0.into()).await
 }
-pub async fn app(env: Env, initial_count: BigInt) -> Router<Identity> {
+pub async fn app_with(env: Env, initial_count: BigInt) -> Router<Identity> {
     let (mut health_reporter, health_service) = tonic_health::server::health_reporter();
     health_reporter.set_serving::<HealthServer<HealthService>>().await;
     health_reporter.set_serving::<GreeterServer<helloworld::MyGreeter>>().await;
