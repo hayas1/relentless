@@ -1,3 +1,5 @@
+pub const FILE_DESCRIPTOR_SET: &[u8] = tonic::include_file_descriptor_set!("file_descriptor");
+
 pub mod helloworld_pb {
     tonic::include_proto!("helloworld");
 }
