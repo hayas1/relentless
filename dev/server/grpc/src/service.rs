@@ -1,6 +1,5 @@
 use counter::pb::counter_server::CounterServer;
 use echo::pb::echo_server::EchoServer;
-use helloworld::pb::greeter_server::GreeterServer;
 use num::BigInt;
 use tonic::transport::{server::Router, Server};
 use tonic_health::{pb::health_server::HealthServer, server::HealthService};
@@ -10,7 +9,6 @@ use crate::env::Env;
 
 pub mod counter;
 pub mod echo;
-pub mod helloworld;
 
 pub const FILE_DESCRIPTOR_SET: &[u8] = tonic::include_file_descriptor_set!("file_descriptor");
 
@@ -20,7 +18,6 @@ pub async fn app(env: Env) -> Router<Identity> {
 pub async fn app_with(env: Env, initial_count: BigInt) -> Router<Identity> {
     let (mut health_reporter, health_service) = tonic_health::server::health_reporter();
     health_reporter.set_serving::<HealthServer<HealthService>>().await;
-    health_reporter.set_serving::<GreeterServer<helloworld::MyGreeter>>().await;
     health_reporter.set_serving::<CounterServer<counter::CounterImpl>>().await;
     health_reporter.set_serving::<EchoServer<echo::EchoImpl>>().await;
 
@@ -38,7 +35,6 @@ pub fn router(env: Env, initial_count: BigInt) -> Router<Identity> {
 
     Server::builder()
         .trace_fn(|_| tracing::info_span!(env!("CARGO_PKG_NAME")))
-        .add_service(GreeterServer::new(helloworld::MyGreeter::default()))
         .add_service(CounterServer::new(counter::CounterImpl::new(initial_count)))
         .add_service(EchoServer::new(echo::EchoImpl))
 }
