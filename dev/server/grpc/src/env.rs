@@ -9,7 +9,8 @@ impl Default for Env {
     }
 }
 impl Env {
-    pub fn environment(default: Self) -> Self {
+    pub fn environment() -> Self {
+        let default = Self::default();
         Self {
             listen: std::env::var("LISTEN").unwrap_or(default.listen),
             port: std::env::var("PORT").unwrap_or(default.port),
