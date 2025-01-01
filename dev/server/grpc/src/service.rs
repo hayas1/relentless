@@ -1,6 +1,7 @@
 use num::BigInt;
 use relentless_dev_server_grpc_entity::{
-    counter_pb::counter_server::CounterServer, helloworld_pb::greeter_server::GreeterServer,
+    counter_pb::counter_server::CounterServer, echo_pb::echo_server::EchoServer,
+    helloworld_pb::greeter_server::GreeterServer,
 };
 use tonic::transport::{server::Router, Server};
 use tonic_health::{pb::health_server::HealthServer, server::HealthService};
@@ -9,6 +10,7 @@ use tower::layer::util::Identity;
 use crate::env::Env;
 
 pub mod counter;
+pub mod echo;
 pub mod helloworld;
 
 pub async fn app(env: Env) -> Router<Identity> {
@@ -36,4 +38,5 @@ pub fn router(env: Env, initial_count: BigInt) -> Router<Identity> {
         .trace_fn(|_| tracing::info_span!(env!("CARGO_PKG_NAME")))
         .add_service(GreeterServer::new(helloworld::MyGreeter::default()))
         .add_service(CounterServer::new(counter::CounterImpl::new(initial_count)))
+        .add_service(EchoServer::new(echo::EchoImpl))
 }

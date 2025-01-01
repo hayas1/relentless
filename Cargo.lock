@@ -1507,6 +1507,7 @@ version = "0.1.0"
 dependencies = [
  "num",
  "prost",
+ "prost-types",
  "relentless-dev-server-grpc-entity",
  "thiserror 2.0.9",
  "tokio",
@@ -1524,6 +1525,7 @@ version = "0.1.0"
 dependencies = [
  "num",
  "prost",
+ "prost-types",
  "tonic",
  "tonic-build",
 ]

@@ -38,3 +38,7 @@ pub mod counter_pb {
         }
     }
 }
+
+pub mod echo_pb {
+    tonic::include_proto!("echo");
+}
