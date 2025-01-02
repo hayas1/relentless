@@ -3,9 +3,29 @@ package echo;
 
 import "google/protobuf/any.proto";
 import "google/protobuf/struct.proto";
+import "google/protobuf/empty.proto";
 
 service Echo {
     rpc Echo (google.protobuf.Any) returns (google.protobuf.Any);
     rpc EchoValue (google.protobuf.Value) returns (google.protobuf.Value);
+    rpc EchoMetadata (google.protobuf.Empty) returns (MetadataMap);
+}
+
+message MetadataMap {
+    repeated MapEntry entries = 1;
+}
+message MapEntry {
+     oneof entry {
+        AsciiEntry ascii = 1;
+        BinaryEntry binary = 2;
+    }
+}
+message AsciiEntry {
+    string key = 1;
+    string value = 2;
+}
+message BinaryEntry {
+    bytes key = 1;
+    bytes value = 2;
 }
 
