@@ -22,7 +22,11 @@ use crate::{
     implement::service_http::{evaluate::HttpResponse, factory::HttpRequest},
 };
 
-use super::{config::Config, helper::http_serde_priv, report::github_markdown::GithubMarkdownReport};
+use super::{
+    config::{Config, Configuration},
+    helper::{coalesce::Coalesce, http_serde_priv},
+    report::github_markdown::GithubMarkdownReport,
+};
 
 #[cfg(feature = "cli")]
 pub async fn execute() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sync>> {
@@ -190,15 +194,15 @@ impl Relentless {
         Ok(report)
     }
     /// TODO document
-    pub async fn assault_with<S, Req>(
+    pub async fn assault_with<Q, P, S, Req>(
         &self,
-        configs: Vec<Config<HttpRequest, HttpResponse>>,
+        configs: Vec<Config<Q, P>>,
         service: S,
-    ) -> crate::Result<Report<<HttpResponse as Evaluate<S::Response>>::Message, HttpRequest, HttpResponse>>
+    ) -> crate::Result<Report<P::Message, Q, P>>
     where
-        HttpRequest: RequestFactory<Req>,
-        <HttpRequest as RequestFactory<Req>>::Error: std::error::Error + Send + Sync + 'static,
-        HttpResponse: Evaluate<S::Response>,
+        Q: Configuration + Coalesce + RequestFactory<Req>,
+        Q::Error: std::error::Error + Send + Sync + 'static,
+        P: Configuration + Coalesce + Evaluate<S::Response>,
         S: Service<Req> + Clone + Send + 'static,
         S::Error: std::error::Error + Send + Sync + 'static,
         S::Future: Send + 'static,

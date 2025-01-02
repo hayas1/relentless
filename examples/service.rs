@@ -13,7 +13,7 @@ async fn main() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sync>> {
     };
     let (configs, _) = cmd.configs();
     let service = route::app_with(Default::default());
-    let report = cmd.assault_with::<_, Request<Body>>(configs, service).await?;
+    let report = cmd.assault_with::<_, _, _, Request<Body>>(configs, service).await?;
 
     cmd.report(&report)?;
     Ok(report.exit_code(&cmd))
