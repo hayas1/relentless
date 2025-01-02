@@ -15,7 +15,7 @@ message MetadataMap {
     repeated MapEntry entries = 1;
 }
 message MapEntry {
-     oneof entry {
+    oneof entry {
         AsciiEntry ascii = 1;
         BinaryEntry binary = 2;
     }
