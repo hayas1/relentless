@@ -33,6 +33,23 @@ pub mod pb {
             }
         }
     }
+
+    impl MetadataMap {
+        pub fn to_map(&self) -> std::collections::HashMap<String, String> {
+            self.entries
+                .iter()
+                .filter_map(|e| {
+                    Some(match e.entry.as_ref()? {
+                        map_entry::Entry::Ascii(ascii) => (ascii.key.to_string(), ascii.value.to_string()),
+                        map_entry::Entry::Binary(binary) => (
+                            String::from_utf8_lossy(&binary.key).to_string(),
+                            String::from_utf8_lossy(&binary.value).to_string(),
+                        ),
+                    })
+                })
+                .collect()
+        }
+    }
 }
 
 #[derive(Debug, Default)]
@@ -87,9 +104,9 @@ mod tests {
 
         let mut request = Request::new(());
         request.set_timeout(std::time::Duration::from_secs(1));
-        let response = echo.echo_metadata(request).await.unwrap();
+        let response = echo.echo_metadata(request).await.unwrap().into_inner();
         assert_eq!(
-            response.into_inner(),
+            response,
             pb::MetadataMap {
                 entries: vec![pb::MapEntry {
                     entry: Some(pb::map_entry::Entry::Ascii(pb::AsciiEntry {
@@ -98,6 +115,7 @@ mod tests {
                     }))
                 }]
             }
-        )
+        );
+        assert_eq!(response.to_map(), vec![("grpc-timeout".to_string(), "1000000u".to_string())].into_iter().collect());
     }
 }
