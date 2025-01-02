@@ -1,4 +1,5 @@
 use prost_types::{Any, Value};
+use thiserror::Error;
 use tonic::{Request, Response, Status};
 
 pub mod pb {
@@ -33,21 +34,23 @@ pub mod pb {
             }
         }
     }
-
-    impl MetadataMap {
-        pub fn to_map(&self) -> std::collections::HashMap<String, String> {
-            self.entries
-                .iter()
-                .filter_map(|e| {
-                    Some(match e.entry.as_ref()? {
-                        map_entry::Entry::Ascii(ascii) => (ascii.key.to_string(), ascii.value.to_string()),
-                        map_entry::Entry::Binary(binary) => (
-                            String::from_utf8_lossy(&binary.key).to_string(),
-                            String::from_utf8_lossy(&binary.value).to_string(),
-                        ),
-                    })
-                })
-                .collect()
+    impl TryFrom<MetadataMap> for tonic::metadata::MetadataMap {
+        type Error = super::EchoError;
+        fn try_from(map: MetadataMap) -> Result<Self, Self::Error> {
+            let mut metadata_map = tonic::metadata::MetadataMap::new();
+            for e in map.entries {
+                match e.entry.ok_or(super::EchoError::NoEntry)? {
+                    map_entry::Entry::Ascii(ascii) => metadata_map.append(
+                        ascii.key.parse::<tonic::metadata::MetadataKey<_>>()?,
+                        ascii.value.parse::<tonic::metadata::MetadataValue<_>>()?,
+                    ),
+                    map_entry::Entry::Binary(binary) => metadata_map.append_bin(
+                        tonic::metadata::MetadataKey::from_bytes(&binary.key)?,
+                        tonic::metadata::MetadataValue::from_bytes(&binary.value),
+                    ),
+                };
+            }
+            Ok(metadata_map)
         }
     }
 }
@@ -72,6 +75,16 @@ impl pb::echo_server::Echo for EchoImpl {
         let map = request.metadata();
         Ok(Response::new(pb::MetadataMap::from(map)))
     }
+}
+
+#[derive(Error, Debug)]
+pub enum EchoError {
+    #[error(transparent)]
+    MetadataKeyError(#[from] tonic::metadata::errors::InvalidMetadataKey),
+    #[error(transparent)]
+    MetadataValueError(#[from] tonic::metadata::errors::InvalidMetadataValue),
+    #[error("no entry in metadata")]
+    NoEntry,
 }
 
 #[cfg(test)]
@@ -116,6 +129,14 @@ mod tests {
                 }]
             }
         );
-        assert_eq!(response.to_map(), vec![("grpc-timeout".to_string(), "1000000u".to_string())].into_iter().collect());
+        let mut metadata_map = tonic::metadata::MetadataMap::new();
+        metadata_map.append(
+            tonic::metadata::MetadataKey::from_static("grpc-timeout"),
+            tonic::metadata::MetadataValue::from_static("1000000u"),
+        );
+        assert_eq!(
+            tonic::metadata::MetadataMap::try_from(response).unwrap().into_headers(),
+            metadata_map.into_headers()
+        );
     }
 }
