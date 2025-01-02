@@ -19,7 +19,10 @@ use crate::{
         worker::Control,
     },
     error::{InterfaceError, IntoResult},
-    implement::service_http::{evaluate::HttpResponse, factory::HttpRequest},
+    implement::{
+        service_grpc::{client::DefaultGrpcClient, evaluate::GrpcResponse, factory::GrpcRequest},
+        service_http::{evaluate::HttpResponse, factory::HttpRequest},
+    },
 };
 
 use super::{
@@ -161,9 +164,9 @@ impl Relentless {
     }
 
     /// TODO document
-    pub fn configs(&self) -> (Vec<Config<HttpRequest, HttpResponse>>, Vec<crate::Error>) {
+    pub fn configs<Q: Configuration, P: Configuration>(&self) -> (Vec<Config<Q, P>>, Vec<crate::Error>) {
         let Self { file, .. } = self;
-        let (ok, err): (Vec<_>, _) = file.iter().map(Config::read).partition(Result::is_ok);
+        let (ok, err): (Vec<_>, _) = file.iter().map(Config::<Q, P>::read).partition(Result::is_ok);
         let (configs, errors) =
             (ok.into_iter().map(Result::unwrap).collect(), err.into_iter().map(Result::unwrap_err).collect());
         (configs, errors)
@@ -191,6 +194,16 @@ impl Relentless {
         }
         let service = self.build_service(DefaultHttpClient::<reqwest::Body, reqwest::Body>::new().await?);
         let report = self.assault_with(configs, service).await?;
+        Ok(report)
+    }
+    pub async fn assault_grpc(&self) -> crate::Result<Report<(), GrpcRequest, GrpcResponse>> {
+        let (configs, cannot_read) = self.configs();
+        for err in cannot_read {
+            eprintln!("{}", err);
+        }
+        // let service = self.build_service(DefaultGrpcClient {});
+        let service = DefaultGrpcClient {};
+        let report = self.assault_with(configs, service).await.unwrap_or_else(|_| todo!());
         Ok(report)
     }
     /// TODO document
@@ -438,7 +451,7 @@ mod tests {
             report_format: ReportFormat::NullDevice,
             ..Default::default()
         };
-        let (configs, e) = cmd.configs();
+        let (configs, e) = cmd.configs::<HttpRequest, HttpResponse>();
         assert_eq!(configs.len(), glob::glob("tests/config/parse/valid_*.yaml").unwrap().filter(Result::is_ok).count());
 
         let mut buf = Vec::new();

@@ -1,0 +1,10 @@
+name: wip config of grpc
+destinations:
+  test-api: http://localhost:50051
+
+testcases:
+  - target: /counter.Counter/Increment
+    description: wip request
+    setting:
+      request:
+      response:

@@ -26,14 +26,19 @@ async fn test_example_yaml_config() {
 #[test]
 #[cfg(all(feature = "json", feature = "toml"))]
 fn test_same_basic_yaml_toml_config() {
+    use relentless::implement::service_http::{evaluate::HttpResponse, factory::HttpRequest};
+
     let yaml = glob::glob("tests/config/basic/*.yaml").unwrap().collect::<Result<Vec<_>, _>>().unwrap();
     let toml = glob::glob("tests/config/basic/*.toml").unwrap().collect::<Result<Vec<_>, _>>().unwrap();
     assert_eq!(yaml.len(), toml.len());
 
     let yam = Relentless { file: yaml, ..Default::default() };
     let tom = Relentless { file: toml, ..Default::default() };
-    assert_json_diff::assert_json_eq!(yam.configs().0, tom.configs().0);
-    assert_eq!(yam.configs().0, tom.configs().0);
+    assert_json_diff::assert_json_eq!(
+        yam.configs::<HttpRequest, HttpResponse>().0,
+        tom.configs::<HttpRequest, HttpResponse>().0,
+    );
+    assert_eq!(yam.configs::<HttpRequest, HttpResponse>().0, tom.configs::<HttpRequest, HttpResponse>().0);
 }
 
 #[tokio::test]
