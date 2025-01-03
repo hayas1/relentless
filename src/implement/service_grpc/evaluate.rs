@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -15,13 +17,14 @@ impl Coalesce for GrpcResponse {
     }
 }
 
-impl Evaluate<tonic::Response<Value>> for GrpcResponse {
+impl<T: Debug> Evaluate<tonic::Response<T>> for GrpcResponse {
     type Message = ();
     async fn evaluate(
         &self,
-        res: Destinations<RequestResult<tonic::Response<Value>>>,
+        res: Destinations<RequestResult<tonic::Response<T>>>,
         msg: &mut Messages<Self::Message>,
     ) -> bool {
+        dbg!(res);
         true
     }
 }

@@ -20,7 +20,7 @@ use tower::Service;
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash)]
 pub struct DefaultGrpcClient {}
 impl Service<http::Request<Value>> for DefaultGrpcClient {
-    type Response = tonic::Response<Value>;
+    type Response = tonic::Response<Bytes>;
     type Error = crate::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
@@ -36,11 +36,13 @@ impl Service<http::Request<Value>> for DefaultGrpcClient {
                 Channel::from_static("http://127.0.0.1:50051").connect().await.unwrap_or_else(|e| todo!("{}", e));
             let mut client = tonic::client::Grpc::new(channel);
 
-            let request = tonic::Request::new(request_body);
+            let request =
+                tonic::Request::new(Bytes::from(serde_json::to_vec(&request_body).unwrap_or_else(|_| todo!())));
             client.ready().await.unwrap_or_else(|e| todo!("{}", e));
 
             let response = client
-                .unary(request, path, JsonCodec(PhantomData::<(Value, Value)>))
+                // .unary(request, path, JsonCodec(PhantomData::<(Value, Value)>))
+                .unary(request, path, tonic::codec::ProstCodec::default())
                 .await
                 .unwrap_or_else(|e| todo!("{}", e));
 
