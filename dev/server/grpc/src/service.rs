@@ -3,19 +3,19 @@ use echo::pb::echo_server::EchoServer;
 use num::BigInt;
 use tonic::transport::{server::Router, Server};
 use tonic_health::{pb::health_server::HealthServer, server::HealthService};
-use tower::layer::util::Identity;
+use tower::layer::util::{Identity, Stack};
 
-use crate::env::Env;
+use crate::{env::Env, middleware::logging::LoggingLayer};
 
 pub mod counter;
 pub mod echo;
 
 pub const FILE_DESCRIPTOR_SET: &[u8] = tonic::include_file_descriptor_set!("file_descriptor");
 
-pub async fn app(env: Env) -> Router<Identity> {
+pub async fn app(env: Env) -> Router<Stack<LoggingLayer, Identity>> {
     app_with(env, 0.into()).await
 }
-pub async fn app_with(env: Env, initial_count: BigInt) -> Router<Identity> {
+pub async fn app_with(env: Env, initial_count: BigInt) -> Router<Stack<LoggingLayer, Identity>> {
     let (mut health_reporter, health_service) = tonic_health::server::health_reporter();
     health_reporter.set_serving::<HealthServer<HealthService>>().await;
     health_reporter.set_serving::<CounterServer<counter::CounterImpl>>().await;
@@ -28,13 +28,17 @@ pub async fn app_with(env: Env, initial_count: BigInt) -> Router<Identity> {
         .build_v1()
         .unwrap();
 
-    router(env, initial_count).add_service(health_service).add_service(reflection_service)
+    let mut builder = Server::builder().trace_fn(|_| tracing::info_span!(env!("CARGO_PKG_NAME"))).layer(LoggingLayer);
+    router(&mut builder, env, initial_count).add_service(health_service).add_service(reflection_service)
 }
-pub fn router(env: Env, initial_count: BigInt) -> Router<Identity> {
+pub fn router(
+    builder: &mut Server<Stack<LoggingLayer, Identity>>,
+    env: Env,
+    initial_count: BigInt,
+) -> Router<Stack<LoggingLayer, Identity>> {
     let _ = env;
 
-    Server::builder()
-        .trace_fn(|_| tracing::info_span!(env!("CARGO_PKG_NAME")))
+    builder
         .add_service(CounterServer::new(counter::CounterImpl::new(initial_count)))
         .add_service(EchoServer::new(echo::EchoImpl))
 }

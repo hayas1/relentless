@@ -17,7 +17,7 @@ async fn test_github_markdown_report_format() {
     };
     let (configs, _) = relentless.configs();
     let service = route::app_with(Default::default());
-    let report = relentless.assault_with::<_, Request<Body>>(configs, service).await.unwrap();
+    let report = relentless.assault_with::<_, _, _, Request<Body>>(configs, service).await.unwrap();
 
     let mut buf = Vec::new();
     relentless.report_with(&report, &mut buf).unwrap();
@@ -50,7 +50,7 @@ async fn test_github_markdown_measure() {
     };
     let (configs, _) = relentless.configs();
     let service = route::app_with(Default::default());
-    let report = relentless.assault_with::<_, Request<Body>>(configs, service).await.unwrap();
+    let report = relentless.assault_with::<_, _, _, Request<Body>>(configs, service).await.unwrap();
 
     let mut buf = Vec::new();
     relentless.report_with(&report, &mut buf).unwrap();

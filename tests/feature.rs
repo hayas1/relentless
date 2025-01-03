@@ -19,7 +19,7 @@ async fn test_repeat_config() {
     };
     let (configs, _) = relentless.configs();
     let service = route::app_with(Default::default());
-    let report = relentless.assault_with::<_, Request<Body>>(configs, service.clone()).await.unwrap();
+    let report = relentless.assault_with::<_, _, _, Request<Body>>(configs, service.clone()).await.unwrap();
 
     let mut buf = Vec::new();
     relentless.report_with(&report, &mut buf).unwrap();
@@ -47,7 +47,7 @@ async fn test_validate_config() {
         Relentless { file: vec!["tests/config/feature/validate.yaml".into()], no_color: true, ..Default::default() };
     let (configs, _) = relentless.configs();
     let service = route::app_with(Default::default());
-    let report = relentless.assault_with::<_, Request<Body>>(configs, service).await.unwrap();
+    let report = relentless.assault_with::<_, _, _, Request<Body>>(configs, service).await.unwrap();
 
     let mut buf = Vec::new();
     relentless.report_with(&report, &mut buf).unwrap();
@@ -67,7 +67,7 @@ async fn test_fail_validate_config() {
     };
     let (configs, _) = relentless.configs();
     let service = route::app_with(Default::default());
-    let report = relentless.assault_with::<_, Request<Body>>(configs, service).await.unwrap();
+    let report = relentless.assault_with::<_, _, _, Request<Body>>(configs, service).await.unwrap();
 
     let mut buf = Vec::new();
     relentless.report_with(&report, &mut buf).unwrap();
@@ -90,7 +90,7 @@ async fn test_allow_config() {
         Relentless { file: vec!["tests/config/feature/allow.yaml".into()], no_color: true, ..Default::default() };
     let (configs, _) = relentless.configs();
     let service = route::app_with(Default::default());
-    let report = relentless.assault_with::<_, Request<Body>>(configs, service).await.unwrap();
+    let report = relentless.assault_with::<_, _, _, Request<Body>>(configs, service).await.unwrap();
 
     let mut buf = Vec::new();
     relentless.report_with(&report, &mut buf).unwrap();
@@ -125,7 +125,7 @@ async fn test_allow_override_config() {
     };
     let (configs, _) = relentless.configs();
     let service = route::app_with(Default::default());
-    let report = relentless.assault_with::<_, Request<Body>>(configs, service).await.unwrap();
+    let report = relentless.assault_with::<_, _, _, Request<Body>>(configs, service).await.unwrap();
 
     let mut buf = Vec::new();
     relentless.report_with(&report, &mut buf).unwrap();
@@ -156,7 +156,7 @@ async fn test_json_diff_config() {
         Relentless { file: vec!["tests/config/feature/json_diff.yaml".into()], no_color: true, ..Default::default() };
     let (configs, _) = relentless.configs();
     let service = route::app_with(Default::default());
-    let report = relentless.assault_with::<_, Request<Body>>(configs, service).await.unwrap();
+    let report = relentless.assault_with::<_, _, _, Request<Body>>(configs, service).await.unwrap();
 
     let mut buf = Vec::new();
     relentless.report_with(&report, &mut buf).unwrap();
@@ -180,7 +180,7 @@ async fn test_headers_config() {
         Relentless { file: vec!["tests/config/feature/headers.yaml".into()], no_color: true, ..Default::default() };
     let (configs, _) = relentless.configs();
     let service = route::app_with(Default::default());
-    let report = relentless.assault_with::<_, Request<Body>>(configs, service).await.unwrap();
+    let report = relentless.assault_with::<_, _, _, Request<Body>>(configs, service).await.unwrap();
 
     let mut buf = Vec::new();
     relentless.report_with(&report, &mut buf).unwrap();
@@ -201,7 +201,7 @@ async fn test_header_from_env_config() {
     std::env::set_var("TOKEN", "VERY_SENSITIVE_TOKEN");
     let (configs, _) = relentless.configs();
     let service = route::app_with(Default::default());
-    let report = relentless.assault_with::<_, Request<Body>>(configs, service).await.unwrap();
+    let report = relentless.assault_with::<_, _, _, Request<Body>>(configs, service).await.unwrap();
 
     let mut buf = Vec::new();
     relentless.report_with(&report, &mut buf).unwrap();
@@ -221,7 +221,7 @@ async fn test_fail_headers_config() {
     };
     let (configs, _) = relentless.configs();
     let service = route::app_with(Default::default());
-    let report = relentless.assault_with::<_, Request<Body>>(configs, service).await.unwrap();
+    let report = relentless.assault_with::<_, _, _, Request<Body>>(configs, service).await.unwrap();
 
     let mut buf = Vec::new();
     relentless.report_with(&report, &mut buf).unwrap();
@@ -244,7 +244,7 @@ async fn test_body_config() {
         Relentless { file: vec!["tests/config/feature/body.yaml".into()], no_color: true, ..Default::default() };
     let (configs, _) = relentless.configs();
     let service = route::app_with(Default::default());
-    let report = relentless.assault_with::<_, Request<Body>>(configs, service).await.unwrap();
+    let report = relentless.assault_with::<_, _, _, Request<Body>>(configs, service).await.unwrap();
 
     let mut buf = Vec::new();
     relentless.report_with(&report, &mut buf).unwrap();
@@ -272,7 +272,7 @@ async fn test_timeout_config() {
         Relentless { file: vec!["tests/config/feature/timeout.yaml".into()], no_color: true, ..Default::default() };
     let (configs, _) = relentless.configs();
     let service = route::app_with(Default::default());
-    let report = relentless.assault_with::<_, Request<Body>>(configs, service).await.unwrap();
+    let report = relentless.assault_with::<_, _, _, Request<Body>>(configs, service).await.unwrap();
 
     let mut buf = Vec::new();
     relentless.report_with(&report, &mut buf).unwrap();
@@ -297,7 +297,7 @@ async fn test_template_config() {
         Relentless { file: vec!["tests/config/feature/template.yaml".into()], no_color: true, ..Default::default() };
     let (configs, _) = relentless.configs();
     let service = route::app_with(Default::default());
-    let report = relentless.assault_with::<_, Request<Body>>(configs, service).await.unwrap();
+    let report = relentless.assault_with::<_, _, _, Request<Body>>(configs, service).await.unwrap();
 
     let mut buf = Vec::new();
     relentless.report_with(&report, &mut buf).unwrap();
@@ -320,7 +320,7 @@ async fn test_async_config() {
         Relentless { file: vec!["tests/config/feature/async.yaml".into(); 5], no_color: true, ..Default::default() };
     let (configs, _) = relentless.configs();
     let service = route::app_with(Default::default());
-    let report = relentless.assault_with::<_, Request<Body>>(configs, service).await.unwrap();
+    let report = relentless.assault_with::<_, _, _, Request<Body>>(configs, service).await.unwrap();
 
     let mut buf = Vec::new();
     relentless.report_with(&report, &mut buf).unwrap();
@@ -371,7 +371,7 @@ async fn test_measure_config() {
     };
     let (configs, _) = relentless.configs();
     let service = route::app_with(Default::default());
-    let report = relentless.assault_with::<_, Request<Body>>(configs, service).await.unwrap();
+    let report = relentless.assault_with::<_, _, _, Request<Body>>(configs, service).await.unwrap();
 
     let mut buf = Vec::new();
     relentless.report_with(&report, &mut buf).unwrap();

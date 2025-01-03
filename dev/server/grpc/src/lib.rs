@@ -1,4 +1,5 @@
 pub mod env;
+pub mod middleware;
 pub mod service;
 
 pub async fn serve(env: env::Env) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
