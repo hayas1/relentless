@@ -30,6 +30,7 @@ jobs:
     - run: cargo fmt --check --manifest-path dev/server/http/Cargo.toml
     - run: cargo clippy --tests --manifest-path dev/server/http/Cargo.toml -- --deny warnings
 
+    - run: ./dev/server/grpc/scripts/setup.sh
     - run: cargo test --verbose --manifest-path dev/server/grpc/Cargo.toml
     - run: cargo fmt --check --manifest-path dev/server/grpc/Cargo.toml
     - run: cargo clippy --tests --manifest-path dev/server/grpc/Cargo.toml -- --deny warnings

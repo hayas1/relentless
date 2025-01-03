@@ -31,7 +31,7 @@ jobs:
     - name: Release test for develop http server
       run: cargo test --release --manifest-path dev/server/http/Cargo.toml
     - name: Release test for develop grpc server
-      run: cargo test --release --manifest-path dev/server/grpc/Cargo.toml
+      run: ./dev/server/grpc/scripts/setup.sh && cargo test --release --manifest-path dev/server/grpc/Cargo.toml
 
     - name: Release test
       run: cargo test --release
