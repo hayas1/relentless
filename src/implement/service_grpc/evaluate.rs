@@ -1,5 +1,6 @@
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 use crate::{
     assault::{destinations::Destinations, evaluate::Evaluate, messages::Messages, result::RequestResult},
@@ -14,11 +15,11 @@ impl Coalesce for GrpcResponse {
     }
 }
 
-impl Evaluate<http::Response<Bytes>> for GrpcResponse {
+impl Evaluate<tonic::Response<Value>> for GrpcResponse {
     type Message = ();
     async fn evaluate(
         &self,
-        res: Destinations<RequestResult<http::Response<Bytes>>>,
+        res: Destinations<RequestResult<tonic::Response<Value>>>,
         msg: &mut Messages<Self::Message>,
     ) -> bool {
         true

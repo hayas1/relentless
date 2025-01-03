@@ -1,17 +1,26 @@
 use std::{
+    convert::Infallible,
     future::Future,
+    marker::PhantomData,
     pin::Pin,
     task::{Context, Poll},
 };
 
-use bytes::{Bytes, BytesMut};
-use tokio::net::TcpStream;
+use bytes::{Buf, BufMut, Bytes, BytesMut};
+use http::Uri;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde_json::Value;
+use tonic::{
+    codec::{Codec, Decoder, Encoder, ProstCodec},
+    transport::Channel,
+    Status,
+};
 use tower::Service;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash)]
 pub struct DefaultGrpcClient {}
-impl Service<http::Request<Bytes>> for DefaultGrpcClient {
-    type Response = http::Response<Bytes>;
+impl Service<http::Request<Value>> for DefaultGrpcClient {
+    type Response = tonic::Response<Value>;
     type Error = crate::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
@@ -19,36 +28,74 @@ impl Service<http::Request<Bytes>> for DefaultGrpcClient {
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, req: http::Request<Bytes>) -> Self::Future {
+    fn call(&mut self, req: http::Request<Value>) -> Self::Future {
         let (parts, request_body) = req.into_parts();
-        Box::pin(async {
-            // let uri = "http://127.0.0.1:50051".parse::<http::Uri>()?;
-            let tcp = TcpStream::connect("127.0.0.1:50051").await.unwrap_or_else(|_| todo!());
-            let (client, connection) = h2::client::handshake(tcp).await.unwrap_or_else(|_| todo!());
-            tokio::spawn(async move {
-                connection.await.unwrap_or_else(|_| todo!());
-            });
+        let path = parts.uri.path_and_query().unwrap_or_else(|| todo!()).clone();
+        Box::pin(async move {
+            let channel =
+                Channel::from_static("http://127.0.0.1:50051").connect().await.unwrap_or_else(|e| todo!("{}", e));
+            let mut client = tonic::client::Grpc::new(channel);
 
-            let r = http::Request::<()>::from_parts(parts, ());
-            let (response, mut send) =
-                client.ready().await.unwrap_or_else(|_| todo!()).send_request(r, false).unwrap_or_else(|_| todo!());
+            let request = tonic::Request::new(request_body);
+            client.ready().await.unwrap_or_else(|e| todo!("{}", e));
 
-            send.send_data(request_body, false).unwrap_or_else(|e| todo!("{}", e));
-            let (head, mut recieve) = response.await.unwrap_or_else(|_| todo!()).into_parts();
-            let mut body = BytesMut::new();
-            let mut flow_control = recieve.flow_control().clone();
-            while let Some(chunk) = recieve.data().await {
-                dbg!(&chunk);
-                let chunk = chunk.unwrap_or_else(|e| todo!("{}", e));
-                body.extend(&chunk);
-                println!("RX: {:?}", chunk);
+            let response = client
+                .unary(request, path, JsonCodec(PhantomData::<(Value, Value)>))
+                .await
+                .unwrap_or_else(|e| todo!("{}", e));
 
-                let _ = flow_control.release_capacity(chunk.len());
-            }
-            send.send_data(Bytes::new(), true).unwrap_or_else(|e| todo!("{}", e));
-
-            println!("{}", String::from_utf8_lossy(&body));
-            Ok(http::Response::from_parts(head, body.freeze()))
+            Ok(response)
         })
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct JsonCodec<E, D>(PhantomData<(E, D)>);
+
+impl<E, D> Codec for JsonCodec<E, D>
+where
+    E: Serialize + Send + 'static,
+    D: DeserializeOwned + Send + 'static,
+{
+    type Encode = E;
+    type Decode = D;
+    type Encoder = JsonEncoder<E>;
+    type Decoder = JsonDecoder<D>;
+
+    fn encoder(&mut self) -> Self::Encoder {
+        JsonEncoder(PhantomData)
+    }
+
+    fn decoder(&mut self) -> Self::Decoder {
+        JsonDecoder(PhantomData)
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct JsonEncoder<E>(PhantomData<E>);
+
+impl<E: Serialize> Encoder for JsonEncoder<E> {
+    type Item = E;
+    type Error = Status;
+
+    fn encode(&mut self, item: Self::Item, dst: &mut tonic::codec::EncodeBuf<'_>) -> Result<(), Self::Error> {
+        serde_json::to_writer(dst.writer(), &item).map_err(|e| Status::internal(e.to_string()))
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct JsonDecoder<D>(PhantomData<D>);
+
+impl<D: DeserializeOwned> Decoder for JsonDecoder<D> {
+    type Item = D;
+    type Error = Status;
+
+    fn decode(&mut self, src: &mut tonic::codec::DecodeBuf<'_>) -> Result<Option<Self::Item>, Self::Error> {
+        if !src.has_remaining() {
+            return Ok(None);
+        }
+
+        let item = serde_json::from_reader(src.reader()).map_err(|e| Status::internal(e.to_string()))?;
+        Ok(Some(item))
     }
 }

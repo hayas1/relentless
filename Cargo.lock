@@ -1478,7 +1478,6 @@ dependencies = [
  "console",
  "futures",
  "glob",
- "h2",
  "hdrhistogram",
  "http",
  "http-body",
@@ -1500,6 +1499,7 @@ dependencies = [
  "thiserror 2.0.9",
  "tokio",
  "toml",
+ "tonic",
  "tower 0.5.2",
 ]
 
