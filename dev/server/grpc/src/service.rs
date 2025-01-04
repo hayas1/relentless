@@ -1,5 +1,6 @@
 use counter::pb::counter_server::CounterServer;
 use echo::pb::echo_server::EchoServer;
+use greeter::pb::greeter_server::GreeterServer;
 use num::BigInt;
 use tonic::transport::{server::Router, Server};
 use tonic_health::{pb::health_server::HealthServer, server::HealthService};
@@ -9,6 +10,7 @@ use crate::{env::Env, middleware::logging::LoggingLayer};
 
 pub mod counter;
 pub mod echo;
+pub mod greeter;
 
 pub const FILE_DESCRIPTOR_SET: &[u8] = tonic::include_file_descriptor_set!("file_descriptor");
 
@@ -39,6 +41,7 @@ pub fn router(
     let _ = env;
 
     builder
+        .add_service(GreeterServer::new(greeter::GreeterImpl))
         .add_service(CounterServer::new(counter::CounterImpl::new(initial_count)))
         .add_service(EchoServer::new(echo::EchoImpl))
 }
