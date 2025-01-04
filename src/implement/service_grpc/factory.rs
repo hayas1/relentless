@@ -1,7 +1,6 @@
-use bytes::Bytes;
+use prost_reflect::{DescriptorPool, DynamicMessage};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use tonic::GrpcMethod;
 
 use crate::{
     assault::factory::RequestFactory,
@@ -16,31 +15,26 @@ impl Coalesce for GrpcRequest {
     }
 }
 
-impl RequestFactory<http::Request<Value>> for GrpcRequest {
+impl RequestFactory<tonic::Request<DynamicMessage>> for GrpcRequest {
     type Error = crate::Error;
     fn produce(
         &self,
         destination: &http::Uri,
         target: &str,
         template: &Template,
-    ) -> Result<http::Request<Value>, Self::Error> {
-        // let mut buf = Vec::new();
-        // prost::encoding::string::encode(1, &"100".to_string(), &mut buf);
+    ) -> Result<tonic::Request<DynamicMessage>, Self::Error> {
+        let pool = DescriptorPool::decode(
+            include_bytes!(
+                "../../../target/debug/build/relentless-dev-server-grpc-966e593a5a4fc2ae/out/file_descriptor.bin"
+            )
+            .as_ref(),
+        )
+        .unwrap_or_else(|_| todo!());
 
-        let request = http::Request::builder()
-            // .uri(format!("{}{}", "http://localhost:50051", "/counter.Counter/Increment"))
-            // .uri(format!("{}{}", "http://localhost:50051", "/grpc.health.v1.Health/Check"))
-            .uri(format!("{}{}", "http://localhost:50051", "/echo.Echo/Echo"))
-            .method(http::Method::POST)
-            .header("content-type", "application/grpc")
-            .header("te", "trailers")
-            .body(json!({"service": "echo.Echo"}))
-            // .body(json!({"service": "counter.Counter"}))
-            // .body(json!(100))
-            .unwrap_or_else(|e| todo!("{}", e));
+        let message_descriptor = pool.get_message_by_name("greeter.HelloRequest").unwrap_or_else(|| todo!());
+        let mut hello_request = DynamicMessage::new(message_descriptor);
+        hello_request.set_field_by_name("name", prost_reflect::Value::String("Rust".to_string()));
 
-        let mut r = tonic::Request::new("100".to_string());
-        r.extensions_mut().insert(GrpcMethod::new("grpc.health.v1.Health", "Check"));
-        Ok(request)
+        Ok(tonic::Request::new(hello_request))
     }
 }

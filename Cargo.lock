@@ -1372,6 +1372,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "prost-reflect"
+version = "0.14.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "20ae544fca2892fd4b7e9ff26cba1090cedf1d4d95c2aded1af15d2f93f270b8"
+dependencies = [
+ "once_cell",
+ "prost",
+ "prost-types",
+]
+
+[[package]]
 name = "prost-types"
 version = "0.13.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1490,6 +1501,8 @@ dependencies = [
  "mime",
  "nom",
  "prost",
+ "prost-reflect",
+ "prost-types",
  "regex",
  "relentless-dev-server-http",
  "reqwest",

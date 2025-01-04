@@ -32,6 +32,8 @@ http-body-util = "0.1.2"
 mime = "0.3.17"
 bytes = "1.9.0"
 prost = "0.13.4"
+prost-types = "0.13.4"
+prost-reflect = "0.14.3"                                      # https://github.com/hyperium/tonic/issues/2028
 tonic = "0.12.3"
 
 thiserror = "2.0.9"
