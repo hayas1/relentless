@@ -199,14 +199,15 @@ where
 
         stream::iter(repeat.range())
             .map(move |_| async move {
-                destinations
-                    .iter()
-                    .map(|(name, destination)| {
+                stream::iter(destinations.iter())
+                    .map(|(name, destination)| async {
                         let default_empty = Template::new();
                         let template = template.get(name).unwrap_or(&default_empty);
-                        (name.to_string(), request.produce(destination, target, template))
+                        (name.to_string(), request.produce(destination, target, template).await)
                     })
+                    .buffer_unordered(destinations.len())
                     .collect()
+                    .await
             })
             .buffer_unordered(repeat.times())
     }

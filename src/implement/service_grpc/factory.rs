@@ -50,7 +50,7 @@ impl Coalesce for GrpcRequest {
 
 impl RequestFactory<tonic::Request<DynamicMessage>> for GrpcRequest {
     type Error = crate::Error;
-    fn produce(
+    async fn produce(
         &self,
         destination: &http::Uri,
         target: &str,
