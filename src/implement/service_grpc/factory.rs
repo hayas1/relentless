@@ -18,7 +18,7 @@ use crate::{
     },
 };
 
-use super::error::GrpcRequestError;
+use super::{client::DefaultGrpcRequest, error::GrpcRequestError};
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
@@ -48,18 +48,27 @@ impl Coalesce for GrpcRequest {
     }
 }
 
-impl RequestFactory<tonic::Request<DynamicMessage>> for GrpcRequest {
+impl RequestFactory<DefaultGrpcRequest> for GrpcRequest {
     type Error = crate::Error;
     async fn produce(
         &self,
         destination: &http::Uri,
         target: &str,
         template: &Template,
-    ) -> Result<tonic::Request<DynamicMessage>, Self::Error> {
+    ) -> Result<DefaultGrpcRequest, Self::Error> {
+        let uri = destination.clone();
         let pool = self.descriptor_pool()?;
         let (service, method) = Self::service_method(&pool, target)?;
         let (input, output) = (method.input(), method.output());
-        Ok(tonic::Request::new(self.message.as_ref().unwrap_or_else(|| todo!()).produce(input)))
+        let message = self.message.as_ref().unwrap_or_else(|| todo!()).produce(input);
+
+        Ok(DefaultGrpcRequest {
+            uri,
+            service,
+            method,
+            // codec: (),
+            message,
+        })
     }
 }
 impl GrpcRequest {

@@ -1,5 +1,6 @@
 use std::{
     future::Future,
+    net::SocketAddr,
     pin::Pin,
     task::{Context, Poll},
 };
@@ -7,7 +8,7 @@ use std::{
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use http::{uri::PathAndQuery, Uri};
 use prost::Message;
-use prost_reflect::{DescriptorPool, DynamicMessage};
+use prost_reflect::{DescriptorPool, DynamicMessage, MethodDescriptor, ServiceDescriptor};
 use tonic::{
     codec::{Codec, Decoder, Encoder, ProstCodec},
     transport::Channel,
@@ -15,9 +16,23 @@ use tonic::{
 };
 use tower::Service;
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct DefaultGrpcRequest {
+    pub uri: http::Uri,
+    pub service: ServiceDescriptor,
+    pub method: MethodDescriptor,
+    // pub codec: DynamicCodec,
+    pub message: DynamicMessage,
+}
+impl DefaultGrpcRequest {
+    pub fn path(&self) -> PathAndQuery {
+        format!("/{}/{}", self.service.full_name(), self.method.name()).parse().unwrap_or_else(|e| todo!("{}", e))
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash)]
 pub struct DefaultGrpcClient {}
-impl Service<tonic::Request<DynamicMessage>> for DefaultGrpcClient {
+impl Service<DefaultGrpcRequest> for DefaultGrpcClient {
     type Response = tonic::Response<DynamicMessage>;
     type Error = crate::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
@@ -26,17 +41,16 @@ impl Service<tonic::Request<DynamicMessage>> for DefaultGrpcClient {
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, req: tonic::Request<DynamicMessage>) -> Self::Future {
-        let path = PathAndQuery::from_static("/greeter.Greeter/SayHello");
+    fn call(&mut self, request: DefaultGrpcRequest) -> Self::Future {
+        let path = request.path();
         Box::pin(async move {
-            let channel =
-                Channel::from_static("http://127.0.0.1:50051").connect().await.unwrap_or_else(|e| todo!("{}", e));
+            let channel = Channel::builder(request.uri).connect().await.unwrap_or_else(|e| todo!("{}", e));
             let mut client = tonic::client::Grpc::new(channel);
 
             client.ready().await.unwrap_or_else(|e| todo!("{}", e));
 
             let response = client
-                .unary(req, path, DynamicCodec)
+                .unary(tonic::Request::new(request.message), path, DynamicCodec)
                 // .unary(req, path, tonic::codec::ProstCodec::default())
                 .await
                 .unwrap_or_else(|e| todo!("{}", e));
@@ -46,7 +60,7 @@ impl Service<tonic::Request<DynamicMessage>> for DefaultGrpcClient {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash)]
 pub struct DynamicCodec;
 
 impl Codec for DynamicCodec {
