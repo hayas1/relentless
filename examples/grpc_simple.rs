@@ -5,7 +5,7 @@ use std::process::ExitCode;
 async fn main() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sync>> {
     use relentless::interface::command::Relentless;
 
-    let cmd = Relentless { file: vec!["examples/config/wip_grpc.yaml".into()], ..Default::default() };
+    let cmd = Relentless { file: vec!["examples/wip/wip_grpc.yaml".into()], ..Default::default() };
 
     let report = cmd.assault_grpc().await?;
 
