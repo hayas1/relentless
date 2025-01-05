@@ -1,5 +1,6 @@
 use std::{
     future::Future,
+    marker::PhantomData,
     net::SocketAddr,
     pin::Pin,
     task::{Context, Poll},
@@ -8,7 +9,7 @@ use std::{
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use http::{uri::PathAndQuery, Uri};
 use prost::Message;
-use prost_reflect::{DescriptorPool, DynamicMessage, MethodDescriptor, ServiceDescriptor};
+use prost_reflect::{DescriptorPool, DynamicMessage, MessageDescriptor, MethodDescriptor, ServiceDescriptor};
 use tonic::{
     codec::{Codec, Decoder, Encoder, ProstCodec},
     transport::Channel,
@@ -17,14 +18,14 @@ use tonic::{
 use tower::Service;
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct DefaultGrpcRequest {
+pub struct DefaultGrpcRequest<E, D> {
     pub uri: http::Uri,
     pub service: ServiceDescriptor,
     pub method: MethodDescriptor,
-    // pub codec: DynamicCodec,
-    pub message: DynamicMessage,
+    pub codec: MethodCodec<E, D>,
+    pub message: E,
 }
-impl DefaultGrpcRequest {
+impl<E, D> DefaultGrpcRequest<E, D> {
     pub fn path(&self) -> PathAndQuery {
         format!("/{}/{}", self.service.full_name(), self.method.name()).parse().unwrap_or_else(|e| todo!("{}", e))
     }
@@ -32,8 +33,12 @@ impl DefaultGrpcRequest {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash)]
 pub struct DefaultGrpcClient {}
-impl Service<DefaultGrpcRequest> for DefaultGrpcClient {
-    type Response = tonic::Response<DynamicMessage>;
+impl<E: Send + Sync + 'static, D: Send + Sync + 'static> Service<DefaultGrpcRequest<E, D>> for DefaultGrpcClient
+where
+    E: Into<DynamicMessage>,
+    DynamicMessage: Into<D>,
+{
+    type Response = tonic::Response<D>;
     type Error = crate::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
@@ -41,7 +46,7 @@ impl Service<DefaultGrpcRequest> for DefaultGrpcClient {
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, request: DefaultGrpcRequest) -> Self::Future {
+    fn call(&mut self, request: DefaultGrpcRequest<E, D>) -> Self::Future {
         let path = request.path();
         Box::pin(async move {
             let channel = Channel::builder(request.uri).connect().await.unwrap_or_else(|e| todo!("{}", e));
@@ -50,8 +55,7 @@ impl Service<DefaultGrpcRequest> for DefaultGrpcClient {
             client.ready().await.unwrap_or_else(|e| todo!("{}", e));
 
             let response = client
-                .unary(tonic::Request::new(request.message), path, DynamicCodec)
-                // .unary(req, path, tonic::codec::ProstCodec::default())
+                .unary(tonic::Request::new(request.message), path, request.codec)
                 .await
                 .unwrap_or_else(|e| todo!("{}", e));
 
@@ -60,57 +64,67 @@ impl Service<DefaultGrpcRequest> for DefaultGrpcClient {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash)]
-pub struct DynamicCodec;
-
-impl Codec for DynamicCodec {
-    type Encode = DynamicMessage;
-    type Decode = DynamicMessage;
-    type Encoder = DynamicEncoder;
-    type Decoder = DynamicDecoder;
-
-    fn encoder(&mut self) -> Self::Encoder {
-        DynamicEncoder
-    }
-
-    fn decoder(&mut self) -> Self::Decoder {
-        DynamicDecoder
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MethodCodec<E, D> {
+    method: MethodDescriptor,
+    phantom: PhantomData<(E, D)>,
+}
+impl<E, D> MethodCodec<E, D> {
+    pub fn new(method: MethodDescriptor) -> Self {
+        Self { method, phantom: PhantomData }
     }
 }
 
-#[derive(Debug, Default)]
-pub struct DynamicEncoder;
-impl Encoder for DynamicEncoder {
-    type Item = DynamicMessage;
+impl<E: Send + 'static, D: Send + 'static> Codec for MethodCodec<E, D>
+where
+    E: Into<DynamicMessage>,
+    DynamicMessage: Into<D>,
+{
+    type Encode = E;
+    type Decode = D;
+    type Encoder = MethodEncoder<E>;
+    type Decoder = MethodDecoder<D>;
+
+    fn encoder(&mut self) -> Self::Encoder {
+        MethodEncoder(self.method.input(), PhantomData)
+    }
+
+    fn decoder(&mut self) -> Self::Decoder {
+        MethodDecoder(self.method.output(), PhantomData)
+    }
+}
+
+#[derive(Debug)]
+pub struct MethodEncoder<E>(MessageDescriptor, PhantomData<E>);
+impl<E> Encoder for MethodEncoder<E>
+where
+    E: Into<DynamicMessage>,
+{
+    type Item = E;
     type Error = Status;
 
     fn encode(&mut self, item: Self::Item, dst: &mut tonic::codec::EncodeBuf<'_>) -> Result<(), Self::Error> {
-        item.encode(dst).map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+        // TODO implement logic E -> DynamicMessage here ?
+        item.into().encode(dst).map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
         Ok(())
     }
 }
 
-#[derive(Debug, Default)]
-pub struct DynamicDecoder;
-impl Decoder for DynamicDecoder {
-    type Item = DynamicMessage;
+#[derive(Debug)]
+pub struct MethodDecoder<D>(MessageDescriptor, PhantomData<D>);
+impl<D> Decoder for MethodDecoder<D>
+where
+    DynamicMessage: Into<D>,
+{
+    type Item = D;
     type Error = Status;
 
     fn decode(&mut self, src: &mut tonic::codec::DecodeBuf<'_>) -> Result<Option<Self::Item>, Self::Error> {
         if !src.has_remaining() {
             return Ok(None);
         }
-        dbg!("// TODO schema info");
-        let pool = DescriptorPool::decode(
-            include_bytes!(
-                "../../../target/debug/build/relentless-dev-server-grpc-966e593a5a4fc2ae/out/file_descriptor.bin"
-            )
-            .as_ref(),
-        )
-        .unwrap();
-        let message_descriptor = pool.get_message_by_name("greeter.HelloResponse").unwrap_or_else(|| todo!());
-        let dynamic_message = DynamicMessage::decode(message_descriptor, src)
+        let dynamic_message = DynamicMessage::decode(self.0.clone(), src) // TODO `decode` requires ownership of MethodDescriptor
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
-        Ok(Some(dynamic_message))
+        Ok(Some(dynamic_message.into()))
     }
 }

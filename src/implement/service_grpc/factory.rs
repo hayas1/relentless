@@ -18,7 +18,10 @@ use crate::{
     },
 };
 
-use super::{client::DefaultGrpcRequest, error::GrpcRequestError};
+use super::{
+    client::{DefaultGrpcRequest, MethodCodec},
+    error::GrpcRequestError,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
@@ -48,27 +51,22 @@ impl Coalesce for GrpcRequest {
     }
 }
 
-impl RequestFactory<DefaultGrpcRequest> for GrpcRequest {
+impl RequestFactory<DefaultGrpcRequest<DynamicMessage, DynamicMessage>> for GrpcRequest {
     type Error = crate::Error;
     async fn produce(
         &self,
         destination: &http::Uri,
         target: &str,
         template: &Template,
-    ) -> Result<DefaultGrpcRequest, Self::Error> {
+    ) -> Result<DefaultGrpcRequest<DynamicMessage, DynamicMessage>, Self::Error> {
         let uri = destination.clone();
         let pool = self.descriptor_pool()?;
         let (service, method) = Self::service_method(&pool, target)?;
         let (input, output) = (method.input(), method.output());
         let message = self.message.as_ref().unwrap_or_else(|| todo!()).produce(input);
+        let codec = MethodCodec::new(method.clone()); // TODO remove clone
 
-        Ok(DefaultGrpcRequest {
-            uri,
-            service,
-            method,
-            // codec: (),
-            message,
-        })
+        Ok(DefaultGrpcRequest { uri, service, method, codec, message })
     }
 }
 impl GrpcRequest {
