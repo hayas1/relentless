@@ -8,8 +8,6 @@ testcases:
     setting:
       request:
         descriptor: ./target/debug/build/relentless-dev-server-grpc-966e593a5a4fc2ae/out/file_descriptor.bin
-        request-schema: greeter.HelloRequest
-        response-schema: greeter.HelloResponse
         message:
           json:
             name: Rust
