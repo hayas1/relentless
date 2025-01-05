@@ -28,7 +28,7 @@ use super::{
 pub struct GrpcRequest {
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
-    descriptor: Option<PathBuf>,
+    descriptor: Option<PathBuf>, // TODO compile `.proto` files with `protoc`
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
     message: Option<GrpcMessage>,
