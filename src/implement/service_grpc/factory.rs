@@ -71,10 +71,8 @@ impl RequestFactory<DefaultGrpcRequest<DynamicMessage, DynamicMessage>> for Grpc
 }
 impl GrpcRequest {
     pub fn service_method(pool: &DescriptorPool, target: &str) -> crate::Result<(ServiceDescriptor, MethodDescriptor)> {
-        // /greeter.Greeter/SayHello => ["","greeter.Greeter","SayHello"],
-        let &[_, svc, mtd] = &target.split('/').collect::<Vec<_>>()[..] else {
-            Err(GrpcRequestError::FailToParse(target.to_string())).box_err()?
-        };
+        let (svc, mtd) =
+            target.split_once('/').ok_or_else(|| GrpcRequestError::FailToParse(target.to_string())).box_err()?; // TODO only one '/' ?
         let service =
             pool.get_service_by_name(svc).ok_or_else(|| GrpcRequestError::NoService(target.to_string())).box_err()?;
         let method = service
