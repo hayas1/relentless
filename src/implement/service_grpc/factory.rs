@@ -121,7 +121,17 @@ impl GrpcMessage {
             serde_json::Value::Array(_) => todo!(),
             serde_json::Value::Object(_) => todo!(),
             serde_json::Value::String(s) => prost_reflect::Value::String(s.to_string()),
-            serde_json::Value::Number(_) => todo!(),
+            serde_json::Value::Number(n) => {
+                if let Some(u) = n.as_u64() {
+                    prost_reflect::Value::U64(u)
+                } else if let Some(i) = n.as_i64() {
+                    prost_reflect::Value::I64(i)
+                } else if let Some(f) = n.as_f64() {
+                    prost_reflect::Value::F64(f)
+                } else {
+                    unreachable!() // TODO how to use match ?
+                }
+            }
             serde_json::Value::Bool(_) => todo!(),
             serde_json::Value::Null => todo!(),
         }
