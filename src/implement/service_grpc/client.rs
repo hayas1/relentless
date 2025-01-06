@@ -10,6 +10,7 @@ use bytes::{Buf, BufMut, Bytes, BytesMut};
 use http::{uri::PathAndQuery, Uri};
 use prost::Message;
 use prost_reflect::{DescriptorPool, DynamicMessage, MessageDescriptor, MethodDescriptor, ServiceDescriptor};
+use serde::{de::DeserializeOwned, Deserialize, Deserializer, Serialize, Serializer};
 use tonic::{
     codec::{Codec, Decoder, Encoder, ProstCodec},
     transport::Channel,
@@ -34,12 +35,12 @@ impl<E, D> DefaultGrpcRequest<E, D> {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash)]
 pub struct DefaultGrpcClient {}
-impl<E: Send + Sync + 'static, D: Send + Sync + 'static> Service<DefaultGrpcRequest<E, D>> for DefaultGrpcClient
+impl<E, D> Service<DefaultGrpcRequest<E, D>> for DefaultGrpcClient
 where
-    E: Into<DynamicMessage>,
-    DynamicMessage: Into<D>,
+    E: for<'a> Deserializer<'a> + Send + Sync + 'static,
+    D: Serializer<Ok = serde_json::Value> + Send + 'static,
 {
-    type Response = tonic::Response<D>;
+    type Response = tonic::Response<D::Ok>;
     type Error = crate::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
@@ -76,13 +77,13 @@ impl<E, D> MethodCodec<E, D> {
     }
 }
 
-impl<E: Send + 'static, D: Send + 'static> Codec for MethodCodec<E, D>
+impl<E, D> Codec for MethodCodec<E, D>
 where
-    E: Into<DynamicMessage>,
-    DynamicMessage: Into<D>,
+    E: for<'a> Deserializer<'a> + Send + 'static,
+    D: Serializer<Ok = serde_json::Value> + Send + 'static,
 {
     type Encode = E;
-    type Decode = D;
+    type Decode = D::Ok;
     type Encoder = MethodEncoder<E>;
     type Decoder = MethodDecoder<D>;
 
@@ -99,14 +100,17 @@ where
 pub struct MethodEncoder<E>(MessageDescriptor, PhantomData<E>);
 impl<E> Encoder for MethodEncoder<E>
 where
-    E: Into<DynamicMessage>,
+    E: for<'a> Deserializer<'a>,
 {
     type Item = E;
     type Error = Status;
 
     fn encode(&mut self, item: Self::Item, dst: &mut tonic::codec::EncodeBuf<'_>) -> Result<(), Self::Error> {
-        // TODO implement logic E -> DynamicMessage here ?
-        item.into().encode(dst).map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+        let Self(descriptor, _phantom) = self;
+        DynamicMessage::deserialize(descriptor.clone(), item)
+            .unwrap_or_else(|_| todo!())
+            .encode(dst)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
         Ok(())
     }
 }
@@ -115,17 +119,19 @@ where
 pub struct MethodDecoder<D>(MessageDescriptor, PhantomData<D>);
 impl<D> Decoder for MethodDecoder<D>
 where
-    DynamicMessage: Into<D>,
+    D: Serializer<Ok = serde_json::Value>,
 {
-    type Item = D;
+    type Item = D::Ok;
     type Error = Status;
 
     fn decode(&mut self, src: &mut tonic::codec::DecodeBuf<'_>) -> Result<Option<Self::Item>, Self::Error> {
         if !src.has_remaining() {
             return Ok(None);
         }
-        let dynamic_message = DynamicMessage::decode(self.0.clone(), src) // TODO `decode` requires ownership of MethodDescriptor
+        let Self(descriptor, _phantom) = self;
+        let dynamic_message = DynamicMessage::decode(descriptor.clone(), src) // TODO `decode` requires ownership of MethodDescriptor
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
-        Ok(Some(dynamic_message.into()))
+        // TODO decoder should have Serializer instance ?
+        Ok(Some(dynamic_message.serialize(serde_json::value::Serializer).unwrap_or_else(|_| todo!())))
     }
 }

@@ -7,6 +7,7 @@ use std::{
 
 use bytes::{Bytes, BytesMut};
 use prost_reflect::{DescriptorPool, DynamicMessage, MessageDescriptor, MethodDescriptor, ServiceDescriptor};
+use prost_types::Value;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -51,14 +52,14 @@ impl Coalesce for GrpcRequest {
     }
 }
 
-impl RequestFactory<DefaultGrpcRequest<DynamicMessage, DynamicMessage>> for GrpcRequest {
+impl RequestFactory<DefaultGrpcRequest<serde_json::Value, serde_json::value::Serializer>> for GrpcRequest {
     type Error = crate::Error;
     async fn produce(
         &self,
         destination: &http::Uri,
         target: &str,
         template: &Template,
-    ) -> Result<DefaultGrpcRequest<DynamicMessage, DynamicMessage>, Self::Error> {
+    ) -> Result<DefaultGrpcRequest<serde_json::Value, serde_json::value::Serializer>, Self::Error> {
         let uri = destination.clone();
         let pool = self.descriptor_pool()?;
         let (service, method) = Self::service_method(&pool, target)?;
@@ -93,12 +94,14 @@ impl GrpcRequest {
 }
 
 impl GrpcMessage {
-    pub fn produce(&self, descriptor: MessageDescriptor) -> DynamicMessage {
+    // TODO!!!
+    pub fn produce(&self, descriptor: MessageDescriptor) -> serde_json::Value {
         match self {
             Self::Empty => todo!(),
             Self::Plaintext(_) => todo!(),
             #[cfg(feature = "json")]
-            Self::Json(v) => DynamicMessage::deserialize(descriptor, v).unwrap_or_else(|e| todo!("{}", e)),
+            // Self::Json(v) => DynamicMessage::deserialize(descriptor, v).unwrap_or_else(|e| todo!("{}", e)),
+            Self::Json(v) => v.clone(),
         }
     }
 }
