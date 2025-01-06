@@ -24,7 +24,7 @@ tokio = { version = "1.42.0", features = ["full"] }
 # tokio-stream = "0.1.17" # TODO map of tokio-stream may not collect as Vec<T>Item (it reduce Vec<Future>), so use futures
 futures = "0.3.31"
 tower = { version = "0.5.2", features = ["timeout", "util"] }
-reqwest = { version = "0.12.11", optional = true }
+reqwest = { version = "0.12.12", optional = true }
 http = "1.2.0"
 http-serde = "2.1.1"
 http-body = "1.0.1"
@@ -50,7 +50,7 @@ hdrhistogram = "7.5.4"
 
 [dev-dependencies]
 relentless-dev-server-http = { path = "dev/server/http" }
-axum = "0.7.9"
+axum = "0.8.1"
 glob = "0.3.2"
 httptest = "0.16.1"
 assert-json-diff = "2.0.2"
