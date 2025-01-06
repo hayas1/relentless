@@ -26,7 +26,8 @@ pub struct DefaultGrpcRequest<E, D> {
     pub message: E,
 }
 impl<E, D> DefaultGrpcRequest<E, D> {
-    pub fn path(&self) -> PathAndQuery {
+    pub fn format_method_path(&self) -> PathAndQuery {
+        // https://github.com/hyperium/tonic/blob/master/tonic-build/src/lib.rs#L212-L218
         format!("/{}/{}", self.service.full_name(), self.method.name()).parse().unwrap_or_else(|e| todo!("{}", e))
     }
 }
@@ -47,7 +48,7 @@ where
     }
 
     fn call(&mut self, request: DefaultGrpcRequest<E, D>) -> Self::Future {
-        let path = request.path();
+        let path = request.format_method_path();
         Box::pin(async move {
             let channel = Channel::builder(request.uri).connect().await.unwrap_or_else(|e| todo!("{}", e));
             let mut client = tonic::client::Grpc::new(channel);
