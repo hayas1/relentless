@@ -20,7 +20,7 @@ use tower::Service;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct DefaultGrpcRequest<D, S> {
-    pub uri: http::Uri,
+    pub destination: http::Uri,
     pub service: ServiceDescriptor,
     pub method: MethodDescriptor,
     pub codec: MethodCodec<D, S>,
@@ -50,7 +50,7 @@ where
     fn call(&mut self, request: DefaultGrpcRequest<D, serde_json::value::Serializer>) -> Self::Future {
         let path = request.format_method_path();
         Box::pin(async move {
-            let channel = Channel::builder(request.uri).connect().await.unwrap_or_else(|e| todo!("{}", e));
+            let channel = Channel::builder(request.destination).connect().await.unwrap_or_else(|e| todo!("{}", e));
             let mut client = tonic::client::Grpc::new(channel);
 
             client.ready().await.unwrap_or_else(|e| todo!("{}", e));

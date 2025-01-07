@@ -6,9 +6,15 @@ use std::{
 };
 
 use bytes::{Bytes, BytesMut};
+use futures::StreamExt;
 use prost_reflect::{DescriptorPool, DynamicMessage, MessageDescriptor, MethodDescriptor, ServiceDescriptor};
 use prost_types::Value;
 use serde::{Deserialize, Serialize};
+use tonic::transport::Channel;
+use tonic_reflection::pb::v1::{
+    server_reflection_client::ServerReflectionClient, server_reflection_request::MessageRequest,
+    server_reflection_response::MessageResponse, ServerReflectionRequest,
+};
 
 use crate::{
     assault::factory::RequestFactory,
@@ -60,13 +66,13 @@ impl RequestFactory<DefaultGrpcRequest<serde_json::Value, serde_json::value::Ser
         target: &str,
         template: &Template,
     ) -> Result<DefaultGrpcRequest<serde_json::Value, serde_json::value::Serializer>, Self::Error> {
-        let uri = destination.clone();
-        let pool = self.descriptor_pool()?;
+        let pool = self.descriptor_pool(destination).await?;
+        let destination = destination.clone();
         let (service, method) = Self::service_method(&pool, target)?;
         let message = self.message.as_ref().unwrap_or_else(|| todo!()).produce();
         let codec = MethodCodec::new(method.clone()); // TODO remove clone
 
-        Ok(DefaultGrpcRequest { uri, service, method, codec, message })
+        Ok(DefaultGrpcRequest { destination, service, method, codec, message })
     }
 }
 impl GrpcRequest {
@@ -82,13 +88,50 @@ impl GrpcRequest {
             .box_err()?;
         Ok((service, method))
     }
-    pub fn descriptor_pool(&self) -> crate::Result<DescriptorPool> {
+    pub async fn descriptor_pool(&self, destination: &http::Uri) -> crate::Result<DescriptorPool> {
+        if let Some(descriptor) = self.descriptor.as_ref() {
+            Self::descriptor_from_file(descriptor).await
+        } else {
+            Self::descriptor_from_reflection(destination).await
+        }
+    }
+
+    pub async fn descriptor_from_file(path: &PathBuf) -> crate::Result<DescriptorPool> {
         let mut descriptor_bytes = Vec::new();
-        File::open(self.descriptor.as_ref().unwrap_or_else(|| todo!("// TODO use reflection")))
-            .box_err()?
-            .read_to_end(&mut descriptor_bytes)
-            .box_err()?;
+        File::open(path).box_err()?.read_to_end(&mut descriptor_bytes).box_err()?;
+        println!("file: {:?}", descriptor_bytes);
         DescriptorPool::decode(Bytes::from(descriptor_bytes)).box_err()
+    }
+
+    pub async fn descriptor_from_reflection(destination: &http::Uri) -> crate::Result<DescriptorPool> {
+        let conn = Channel::builder(destination.clone()).connect().await.unwrap_or_else(|_| todo!());
+        let mut client = ServerReflectionClient::new(conn);
+        let host = destination.host().unwrap_or_else(|| todo!()).to_string();
+        let request_stream = futures::stream::once(async move {
+            ServerReflectionRequest {
+                host,
+                message_request: Some(MessageRequest::FileContainingSymbol("counter.Counter".into())),
+            }
+        });
+        let mut streaming =
+            client.server_reflection_info(request_stream).await.unwrap_or_else(|_| todo!()).into_inner();
+
+        while let Some(recv) = streaming.next().await {
+            match recv {
+                Ok(resp) => {
+                    let msg = resp.message_response.unwrap_or_else(|| todo!());
+                    match msg {
+                        MessageResponse::FileDescriptorResponse(resp) => {
+                            let c = resp.file_descriptor_proto.concat();
+                            return DescriptorPool::decode(Bytes::from(c)).box_err();
+                        }
+                        _ => todo!(),
+                    }
+                }
+                Err(e) => todo!("{}", e),
+            }
+        }
+        todo!()
     }
 }
 
