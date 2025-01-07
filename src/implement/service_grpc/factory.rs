@@ -63,8 +63,7 @@ impl RequestFactory<DefaultGrpcRequest<serde_json::Value, serde_json::value::Ser
         let uri = destination.clone();
         let pool = self.descriptor_pool()?;
         let (service, method) = Self::service_method(&pool, target)?;
-        let (input, output) = (method.input(), method.output());
-        let message = self.message.as_ref().unwrap_or_else(|| todo!()).produce(input);
+        let message = self.message.as_ref().unwrap_or_else(|| todo!()).produce();
         let codec = MethodCodec::new(method.clone()); // TODO remove clone
 
         Ok(DefaultGrpcRequest { uri, service, method, codec, message })
@@ -95,7 +94,7 @@ impl GrpcRequest {
 
 impl GrpcMessage {
     // TODO!!!
-    pub fn produce(&self, descriptor: MessageDescriptor) -> serde_json::Value {
+    pub fn produce(&self) -> serde_json::Value {
         match self {
             Self::Empty => todo!(),
             Self::Plaintext(_) => todo!(),
