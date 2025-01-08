@@ -7,16 +7,16 @@ testcases:
     description: wip request
     setting:
       request:
-        descriptor: ./target/debug/build/relentless-dev-server-grpc-966e593a5a4fc2ae/out/file_descriptor.bin
+        # descriptor: ./target/debug/build/relentless-dev-server-grpc-966e593a5a4fc2ae/out/file_descriptor.bin
         message:
           json:
             name: Rust
       response:
-  - target: counter.Counter/Increment
-    setting:
-      request:
-        descriptor: ./target/debug/build/relentless-dev-server-grpc-966e593a5a4fc2ae/out/file_descriptor.bin
-        message:
-          json:
-            100
-      response:
+  # - target: counter.Counter/Increment
+  #   setting:
+  #     request:
+  #       # descriptor: ./target/debug/build/relentless-dev-server-grpc-966e593a5a4fc2ae/out/file_descriptor.bin
+  #       message:
+  #         json:
+  #           100
+  #     response:

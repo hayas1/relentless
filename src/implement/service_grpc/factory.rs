@@ -9,7 +9,6 @@ use bytes::{Bytes, BytesMut};
 use futures::StreamExt;
 use http::uri::PathAndQuery;
 use prost_reflect::{DescriptorPool, DynamicMessage, MessageDescriptor, MethodDescriptor, ServiceDescriptor};
-use prost_types::Value;
 use serde::{Deserialize, Serialize};
 use tonic::transport::Channel;
 use tonic_reflection::pb::v1::{
@@ -104,73 +103,75 @@ impl GrpcRequest {
     }
 
     pub async fn descriptor_from_reflection(destination: &http::Uri) -> crate::Result<DescriptorPool> {
-        // let conn = Channel::builder(destination.clone()).connect().await.unwrap_or_else(|_| todo!());
-        // let mut client = ServerReflectionClient::new(conn);
-        // let host = destination.host().unwrap_or_else(|| todo!()).to_string();
-        // let request_stream = futures::stream::once(async move {
-        //     ServerReflectionRequest {
-        //         host,
-        //         message_request: Some(MessageRequest::FileContainingSymbol("counter.Counter".into())),
-        //     }
-        // });
-        // let mut streaming =
-        //     client.server_reflection_info(request_stream).await.unwrap_or_else(|_| todo!()).into_inner();
-
-        // while let Some(recv) = streaming.next().await {
-        //     match recv {
-        //         Ok(resp) => {
-        //             let msg = resp.message_response.unwrap_or_else(|| todo!());
-        //             match msg {
-        //                 MessageResponse::FileDescriptorResponse(resp) => {
-        //                     let c = resp.file_descriptor_proto.concat();
-        //                     return DescriptorPool::decode(Bytes::from(c)).box_err();
-        //                 }
-        //                 _ => todo!(),
-        //             }
-        //         }
-        //         Err(e) => todo!("{}", e),
-        //     }
-        // }
-        // todo!()
-        let channel = Channel::builder(destination.clone()).connect().await.unwrap_or_else(|e| todo!("{}", e));
-        let mut client = tonic::client::Grpc::new(channel);
-        client.ready().await.unwrap_or_else(|e| todo!("{}", e));
-
-        let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).unwrap_or_else(|e| todo!("{}", e));
-        let mut request = DynamicMessage::new(
-            pool.get_message_by_name("grpc.reflection.v1.ServerReflectionRequest").unwrap_or_else(|| unreachable!()),
-        );
-        request.set_field_by_name(
-            "host",
-            prost_reflect::Value::String(destination.host().unwrap_or_else(|| todo!()).to_string()),
-        );
-        request
-            .set_field_by_name("file_containing_symbol", prost_reflect::Value::String("counter.Counter".to_string()));
-
-        let mut streaming = client
-            .streaming(
-                tonic::Request::new(futures::stream::once(async move { request })),
-                PathAndQuery::from_static("/grpc.reflection.v1.ServerReflection/ServerReflectionInfo"),
-                dynamic_codec::DynamicReflectionCodec,
-            )
-            .await
-            .unwrap_or_else(|e| todo!("{}", e))
-            .into_inner();
+        let conn = Channel::builder(destination.clone()).connect().await.unwrap_or_else(|_| todo!());
+        let mut client = ServerReflectionClient::new(conn);
+        let host = destination.host().unwrap_or_else(|| todo!()).to_string();
+        let request_stream = futures::stream::once(async move {
+            ServerReflectionRequest {
+                host,
+                message_request: Some(MessageRequest::FileContainingSymbol("greeter.Greeter".into())),
+            }
+        });
+        let mut streaming =
+            client.server_reflection_info(request_stream).await.unwrap_or_else(|e| todo!("{}", e)).into_inner();
 
         while let Some(recv) = streaming.next().await {
             match recv {
-                Ok(mut response) => {
-                    let pool =
-                        response.get_field_by_name_mut("file_descriptor_proto").unwrap_or_else(|| unreachable!());
-                    dbg!(&pool);
-                    let ret = DescriptorPool::decode(pool.as_bytes_mut().unwrap_or_else(|| todo!()))
-                        .unwrap_or_else(|e| todo!("{}", e));
-                    return Ok(ret);
+                Ok(response) => {
+                    let msg = response.message_response.unwrap_or_else(|| todo!());
+                    match msg {
+                        MessageResponse::FileDescriptorResponse(descriptor) => {
+                            let greeter = [b"\n\xc1\x03".to_vec(), descriptor.file_descriptor_proto.concat()].concat();
+                            // let counter = [b"\n\xc8\x0b".to_vec(), descriptor.file_descriptor_proto.concat()].concat();
+                            // let c = descriptor.file_descriptor_proto.concat();
+                            return DescriptorPool::decode(Bytes::from(greeter)).box_err();
+                        }
+                        _ => todo!(),
+                    }
                 }
                 Err(e) => todo!("{}", e),
             }
         }
         unreachable!()
+        // let channel = Channel::builder(destination.clone()).connect().await.unwrap_or_else(|e| todo!("{}", e));
+        // let mut client = tonic::client::Grpc::new(channel);
+        // client.ready().await.unwrap_or_else(|e| todo!("{}", e));
+
+        // let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).unwrap_or_else(|e| todo!("{}", e));
+        // let mut request = DynamicMessage::new(
+        //     pool.get_message_by_name("grpc.reflection.v1.ServerReflectionRequest").unwrap_or_else(|| unreachable!()),
+        // );
+        // request.set_field_by_name(
+        //     "host",
+        //     prost_reflect::Value::String(destination.host().unwrap_or_else(|| todo!()).to_string()),
+        // );
+        // request
+        //     .set_field_by_name("file_containing_symbol", prost_reflect::Value::String("counter.Counter".to_string()));
+
+        // let mut streaming = client
+        //     .streaming(
+        //         tonic::Request::new(futures::stream::once(async move { request })),
+        //         PathAndQuery::from_static("/grpc.reflection.v1.ServerReflection/ServerReflectionInfo"),
+        //         dynamic_codec::DynamicReflectionCodec,
+        //     )
+        //     .await
+        //     .unwrap_or_else(|e| todo!("{}", e))
+        //     .into_inner();
+
+        // while let Some(recv) = streaming.next().await {
+        //     match recv {
+        //         Ok(mut response) => {
+        //             dbg!(&response);
+        //             let pool =
+        //                 response.get_field_by_name_mut("file_descriptor_proto").unwrap_or_else(|| unreachable!());
+        //             let ret = DescriptorPool::decode(pool.as_bytes_mut().unwrap_or_else(|| todo!()))
+        //                 .unwrap_or_else(|e| todo!("{}", e));
+        //             return Ok(ret);
+        //         }
+        //         Err(e) => todo!("{}", e),
+        //     }
+        // }
+        // unreachable!()
     }
 }
 
