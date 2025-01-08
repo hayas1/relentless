@@ -147,9 +147,9 @@ impl GrpcRequest {
         request
             .set_field_by_name("file_containing_symbol", prost_reflect::Value::String("counter.Counter".to_string()));
 
-        let response = client
-            .unary(
-                tonic::Request::new(request),
+        let mut streaming = client
+            .streaming(
+                tonic::Request::new(futures::stream::once(async move { request })),
                 PathAndQuery::from_static("/grpc.reflection.v1.ServerReflection/ServerReflectionInfo"),
                 dynamic_codec::DynamicReflectionCodec,
             )
@@ -157,13 +157,20 @@ impl GrpcRequest {
             .unwrap_or_else(|e| todo!("{}", e))
             .into_inner();
 
-        dbg!(&response);
-        let mut pool = (*response.get_field_by_name("file_descriptor_proto").unwrap_or_else(|| unreachable!())).clone();
-        dbg!(&pool);
-        let ret =
-            DescriptorPool::decode(pool.as_bytes_mut().unwrap_or_else(|| todo!())).unwrap_or_else(|e| todo!("{}", e));
-
-        Ok(ret)
+        while let Some(recv) = streaming.next().await {
+            match recv {
+                Ok(mut response) => {
+                    let pool =
+                        response.get_field_by_name_mut("file_descriptor_proto").unwrap_or_else(|| unreachable!());
+                    dbg!(&pool);
+                    let ret = DescriptorPool::decode(pool.as_bytes_mut().unwrap_or_else(|| todo!()))
+                        .unwrap_or_else(|e| todo!("{}", e));
+                    return Ok(ret);
+                }
+                Err(e) => todo!("{}", e),
+            }
+        }
+        unreachable!()
     }
 }
 
