@@ -1,5 +1,7 @@
 use thiserror::Error;
 
+use crate::error::IntoRelentlessError;
+
 #[derive(Error, Debug)]
 pub enum GrpcRequestError {
     #[error("cannot parse target {}", .0)]
@@ -9,3 +11,4 @@ pub enum GrpcRequestError {
     #[error("cannot find method {}", .0)]
     NoMethod(String),
 }
+impl IntoRelentlessError for GrpcRequestError {}

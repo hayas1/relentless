@@ -66,9 +66,10 @@ impl RequestFactory<DefaultGrpcRequest<serde_json::Value, serde_json::value::Ser
         target: &str,
         template: &Template,
     ) -> Result<DefaultGrpcRequest<serde_json::Value, serde_json::value::Serializer>, Self::Error> {
-        let pool = self.descriptor_pool(destination).await?;
+        let (svc, mtd) = target.split_once('/').ok_or_else(|| GrpcRequestError::FailToParse(target.to_string()))?; // TODO only one '/' ?
+        let pool = self.descriptor_pool(destination, (svc, mtd)).await?;
         let destination = destination.clone();
-        let (service, method) = Self::service_method(&pool, target)?;
+        let (service, method) = Self::service_method(&pool, (svc, mtd))?;
         let message = self.message.as_ref().unwrap_or_else(|| todo!()).produce();
         let codec = MethodCodec::new(method.clone()); // TODO remove clone
 
@@ -76,23 +77,24 @@ impl RequestFactory<DefaultGrpcRequest<serde_json::Value, serde_json::value::Ser
     }
 }
 impl GrpcRequest {
-    pub fn service_method(pool: &DescriptorPool, target: &str) -> crate::Result<(ServiceDescriptor, MethodDescriptor)> {
-        let (svc, mtd) =
-            target.split_once('/').ok_or_else(|| GrpcRequestError::FailToParse(target.to_string())).box_err()?; // TODO only one '/' ?
-        let service =
-            pool.get_service_by_name(svc).ok_or_else(|| GrpcRequestError::NoService(target.to_string())).box_err()?;
-        let method = service
-            .methods()
-            .find(|m| m.name() == mtd)
-            .ok_or_else(|| GrpcRequestError::NoMethod(target.to_string()))
-            .box_err()?;
+    pub fn service_method(
+        pool: &DescriptorPool,
+        (svc, mtd): (&str, &str),
+    ) -> crate::Result<(ServiceDescriptor, MethodDescriptor)> {
+        let service = pool.get_service_by_name(svc).ok_or_else(|| GrpcRequestError::NoService(svc.to_string()))?;
+        let method =
+            service.methods().find(|m| m.name() == mtd).ok_or_else(|| GrpcRequestError::NoMethod(mtd.to_string()))?;
         Ok((service, method))
     }
-    pub async fn descriptor_pool(&self, destination: &http::Uri) -> crate::Result<DescriptorPool> {
+    pub async fn descriptor_pool(
+        &self,
+        destination: &http::Uri,
+        (svc, mtd): (&str, &str),
+    ) -> crate::Result<DescriptorPool> {
         if let Some(descriptor) = self.descriptor.as_ref() {
             Self::descriptor_from_file(descriptor).await
         } else {
-            Self::descriptor_from_reflection(destination).await
+            Self::descriptor_from_reflection(destination, svc).await
         }
     }
 
@@ -102,15 +104,13 @@ impl GrpcRequest {
         DescriptorPool::decode(Bytes::from(descriptor_bytes)).box_err()
     }
 
-    pub async fn descriptor_from_reflection(destination: &http::Uri) -> crate::Result<DescriptorPool> {
+    pub async fn descriptor_from_reflection(destination: &http::Uri, svc: &str) -> crate::Result<DescriptorPool> {
         let conn = Channel::builder(destination.clone()).connect().await.unwrap_or_else(|_| todo!());
         let mut client = ServerReflectionClient::new(conn);
         let host = destination.host().unwrap_or_else(|| todo!()).to_string();
+        let service = svc.to_string();
         let request_stream = futures::stream::once(async move {
-            ServerReflectionRequest {
-                host,
-                message_request: Some(MessageRequest::FileContainingSymbol("greeter.Greeter".into())),
-            }
+            ServerReflectionRequest { host, message_request: Some(MessageRequest::FileContainingSymbol(service)) }
         });
         let mut streaming =
             client.server_reflection_info(request_stream).await.unwrap_or_else(|e| todo!("{}", e)).into_inner();
