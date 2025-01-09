@@ -10,5 +10,7 @@ pub enum GrpcRequestError {
     NoService(String),
     #[error("cannot find method {}", .0)]
     NoMethod(String),
+    #[error("unexpected reflection response")]
+    UnexpectedReflectionResponse,
 }
 impl IntoRelentlessError for GrpcRequestError {}

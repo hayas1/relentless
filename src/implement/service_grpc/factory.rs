@@ -1,19 +1,13 @@
-use std::{
-    collections::HashMap,
-    fs::File,
-    io::{BufReader, Read},
-    path::PathBuf,
-};
+use std::{fs::File, io::Read, path::PathBuf};
 
-use bytes::{Bytes, BytesMut};
-use futures::StreamExt;
-use http::uri::PathAndQuery;
-use prost_reflect::{DescriptorPool, DynamicMessage, MessageDescriptor, MethodDescriptor, ServiceDescriptor};
+use bytes::Bytes;
+use futures::{StreamExt, TryStreamExt};
+use prost_reflect::{DescriptorPool, MethodDescriptor, ServiceDescriptor};
 use serde::{Deserialize, Serialize};
 use tonic::transport::Channel;
 use tonic_reflection::pb::v1::{
     server_reflection_client::ServerReflectionClient, server_reflection_request::MessageRequest,
-    server_reflection_response::MessageResponse, ServerReflectionRequest, FILE_DESCRIPTOR_SET,
+    server_reflection_response::MessageResponse, ServerReflectionRequest,
 };
 
 use crate::{
@@ -79,22 +73,22 @@ impl RequestFactory<DefaultGrpcRequest<serde_json::Value, serde_json::value::Ser
 impl GrpcRequest {
     pub fn service_method(
         pool: &DescriptorPool,
-        (svc, mtd): (&str, &str),
+        (service, method): (&str, &str),
     ) -> crate::Result<(ServiceDescriptor, MethodDescriptor)> {
-        let service = pool.get_service_by_name(svc).ok_or_else(|| GrpcRequestError::NoService(svc.to_string()))?;
-        let method =
-            service.methods().find(|m| m.name() == mtd).ok_or_else(|| GrpcRequestError::NoMethod(mtd.to_string()))?;
-        Ok((service, method))
+        let svc = pool.get_service_by_name(service).ok_or_else(|| GrpcRequestError::NoService(service.to_string()))?;
+        let mtd =
+            svc.methods().find(|m| m.name() == method).ok_or_else(|| GrpcRequestError::NoMethod(method.to_string()))?;
+        Ok((svc, mtd))
     }
     pub async fn descriptor_pool(
         &self,
         destination: &http::Uri,
-        (svc, mtd): (&str, &str),
+        (service, _method): (&str, &str),
     ) -> crate::Result<DescriptorPool> {
         if let Some(descriptor) = self.descriptor.as_ref() {
             Self::descriptor_from_file(descriptor).await
         } else {
-            Self::descriptor_from_reflection(destination, svc).await
+            Self::descriptor_from_reflection(destination, service).await
         }
     }
 
@@ -105,6 +99,7 @@ impl GrpcRequest {
     }
 
     pub async fn descriptor_from_reflection(destination: &http::Uri, svc: &str) -> crate::Result<DescriptorPool> {
+        // TODO well known type, cache, etc...
         let conn = Channel::builder(destination.clone()).connect().await.box_err()?;
         let mut client = ServerReflectionClient::new(conn);
         let host = destination.host().unwrap_or_else(|| todo!()).to_string();
@@ -112,26 +107,21 @@ impl GrpcRequest {
         let request_stream = futures::stream::once(async move {
             ServerReflectionRequest { host, message_request: Some(MessageRequest::FileContainingSymbol(service)) }
         });
-        let mut streaming = client.server_reflection_info(request_stream).await.box_err()?.into_inner();
-        while let Some(recv) = streaming.next().await {
-            match recv {
-                Ok(response) => {
-                    let msg = response.message_response.unwrap_or_else(|| todo!());
-                    match msg {
-                        MessageResponse::FileDescriptorResponse(descriptor) => {
-                            let mut pool = DescriptorPool::new();
-                            for d in descriptor.file_descriptor_proto {
-                                pool.decode_file_descriptor_proto(&*d).box_err()?;
-                            }
-                            return Ok(pool);
-                        }
-                        _ => unreachable!(),
-                    }
+        let streaming = client.server_reflection_info(request_stream).await.box_err()?.into_inner();
+        let descriptors = streaming
+            .map(|recv| recv.box_err())
+            .try_fold(DescriptorPool::new(), |pool, recv| async move {
+                match recv.message_response.unwrap_or_else(|| todo!()) {
+                    MessageResponse::FileDescriptorResponse(descriptor) => descriptor
+                        .file_descriptor_proto
+                        .into_iter()
+                        .try_fold(pool, |mut p, d| p.decode_file_descriptor_proto(&*d).box_err().map(|()| p)),
+                    _ => Err(GrpcRequestError::UnexpectedReflectionResponse)?,
                 }
-                Err(e) => todo!("{}", e),
-            }
-        }
-        unreachable!()
+            })
+            .await
+            .box_err()?;
+        Ok(descriptors)
     }
 }
 
