@@ -121,10 +121,10 @@ impl GrpcRequest {
                     let msg = response.message_response.unwrap_or_else(|| todo!());
                     match msg {
                         MessageResponse::FileDescriptorResponse(descriptor) => {
-                            let greeter = [b"\n\xc1\x03".to_vec(), descriptor.file_descriptor_proto.concat()].concat();
+                            // let greeter = [b"\n\xc1\x03".to_vec(), descriptor.file_descriptor_proto.concat()].concat();
                             // let counter = [b"\n\xc8\x0b".to_vec(), descriptor.file_descriptor_proto.concat()].concat();
-                            // let c = descriptor.file_descriptor_proto.concat();
-                            return DescriptorPool::decode(Bytes::from(greeter)).box_err();
+                            let c = descriptor.file_descriptor_proto.concat();
+                            return DescriptorPool::decode(Bytes::from(c)).box_err();
                         }
                         _ => todo!(),
                     }
