@@ -1513,6 +1513,7 @@ dependencies = [
  "mime",
  "nom",
  "prost",
+ "prost-build",
  "prost-reflect",
  "prost-types",
  "regex",

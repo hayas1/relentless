@@ -1,4 +1,8 @@
-use std::{fs::File, io::Read, path::PathBuf};
+use std::{
+    fs::File,
+    io::Read,
+    path::{Path, PathBuf},
+};
 
 use bytes::Bytes;
 use futures::{StreamExt, TryStreamExt};
@@ -29,7 +33,10 @@ use super::{
 pub struct GrpcRequest {
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
-    descriptor: Option<PathBuf>, // TODO compile `.proto` files with `protoc`
+    descriptor: Option<PathBuf>,
+    #[serde(default, skip_serializing_if = "IsDefault::is_default")]
+    #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
+    proto: Option<(PathBuf, PathBuf)>, // TODO enum proto or descriptor (or reflection)
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
     message: Option<GrpcMessage>,
@@ -47,6 +54,7 @@ impl Coalesce for GrpcRequest {
     fn coalesce(self, other: &Self) -> Self {
         Self {
             descriptor: self.descriptor.or(other.descriptor.clone()),
+            proto: self.proto.or(other.proto.clone()),
             message: self.message.or(other.message.clone()),
         }
     }
@@ -85,11 +93,22 @@ impl GrpcRequest {
         destination: &http::Uri,
         (service, _method): (&str, &str),
     ) -> crate::Result<DescriptorPool> {
-        if let Some(descriptor) = self.descriptor.as_ref() {
-            Self::descriptor_from_file(descriptor).await
-        } else {
-            Self::descriptor_from_reflection(destination, service).await
-        }
+        let (proto, import_path) = self.proto.as_ref().unwrap_or_else(|| todo!());
+        Self::descriptor_from_protos(&[proto], &[import_path]).await
+
+        //     if let Some(descriptor) = self.descriptor.as_ref() {
+        //         Self::descriptor_from_file(descriptor).await
+        //     } else {
+        //         Self::descriptor_from_reflection(destination, service).await
+        //     }
+    }
+
+    pub async fn descriptor_from_protos<A: AsRef<Path>>(
+        protos: &[A],
+        import_path: &[A],
+    ) -> crate::Result<DescriptorPool> {
+        let fds = prost_build::Config::new().load_fds(protos, import_path).box_err()?;
+        DescriptorPool::from_file_descriptor_set(fds).box_err()
     }
 
     pub async fn descriptor_from_file(path: &PathBuf) -> crate::Result<DescriptorPool> {
