@@ -20,7 +20,9 @@ use crate::{
     },
     error::{InterfaceError, IntoResult},
     implement::{
-        service_grpc::{client::DefaultGrpcClient, evaluate::GrpcResponse, factory::GrpcRequest},
+        service_grpc::{
+            client::DefaultGrpcClient, error::GrpcEvaluateError, evaluate::GrpcResponse, factory::GrpcRequest,
+        },
         service_http::{evaluate::HttpResponse, factory::HttpRequest},
     },
 };
@@ -196,7 +198,7 @@ impl Relentless {
         let report = self.assault_with(configs, service).await?;
         Ok(report)
     }
-    pub async fn assault_grpc(&self) -> crate::Result<Report<(), GrpcRequest, GrpcResponse>> {
+    pub async fn assault_grpc(&self) -> crate::Result<Report<GrpcEvaluateError, GrpcRequest, GrpcResponse>> {
         let (configs, cannot_read) = self.configs();
         for err in cannot_read {
             eprintln!("{}", err);
@@ -225,17 +227,21 @@ impl Relentless {
         Ok(report)
     }
 
-    pub fn report<M: Display>(
-        &self,
-        report: &Report<M, HttpRequest, HttpResponse>,
-    ) -> Result<ExitCode, std::fmt::Error> {
+    pub fn report<M, Q, P>(&self, report: &Report<M, Q, P>) -> Result<ExitCode, std::fmt::Error>
+    where
+        M: Display,
+        Q: Configuration + Coalesce,
+        P: Configuration + Coalesce,
+    {
         self.report_with(report, std::io::stdout())
     }
-    pub fn report_with<M: Display, W: Write>(
-        &self,
-        report: &Report<M, HttpRequest, HttpResponse>,
-        mut write: W,
-    ) -> Result<ExitCode, std::fmt::Error> {
+    pub fn report_with<M, W, Q, P>(&self, report: &Report<M, Q, P>, mut write: W) -> Result<ExitCode, std::fmt::Error>
+    where
+        M: Display,
+        W: Write,
+        Q: Configuration + Coalesce,
+        P: Configuration + Coalesce,
+    {
         let Self { no_color, report_format, .. } = self;
         #[cfg(feature = "console-report")]
         console::set_colors_enabled(!no_color);

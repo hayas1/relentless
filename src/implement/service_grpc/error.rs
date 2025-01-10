@@ -1,6 +1,9 @@
 use thiserror::Error;
 
-use crate::error::IntoRelentlessError;
+use crate::{
+    assault::result::RequestError,
+    error::{IntoRelentlessError, JsonEvaluateError},
+};
 
 #[derive(Error, Debug)]
 pub enum GrpcRequestError {
@@ -14,3 +17,14 @@ pub enum GrpcRequestError {
     UnexpectedReflectionResponse,
 }
 impl IntoRelentlessError for GrpcRequestError {}
+
+#[derive(Error, Debug)]
+pub enum GrpcEvaluateError {
+    #[error(transparent)]
+    RequestError(#[from] RequestError),
+
+    #[cfg(feature = "json")]
+    #[error(transparent)]
+    JsonEvaluateError(#[from] JsonEvaluateError),
+}
+impl IntoRelentlessError for GrpcEvaluateError {}

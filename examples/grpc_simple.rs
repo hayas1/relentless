@@ -9,9 +9,8 @@ async fn main() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sync>> {
 
     let report = cmd.assault_grpc().await?;
 
-    // cmd.report(&report)?;
-    // Ok(report.exit_code(&cmd))
-    Ok(ExitCode::SUCCESS)
+    cmd.report(&report)?;
+    Ok(report.exit_code(&cmd))
 }
 
 #[cfg(not(all(feature = "yaml", feature = "json", feature = "console-report")))]
