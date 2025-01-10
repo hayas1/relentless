@@ -7,16 +7,22 @@ testcases:
     description: wip request
     setting:
       request:
-        # descriptor: ./target/debug/build/relentless-dev-server-grpc-966e593a5a4fc2ae/out/file_descriptor.bin
-        message:
+        descriptor: ./target/debug/build/relentless-dev-server-grpc-966e593a5a4fc2ae/out/file_descriptor.bin
+        message: 
           json:
             name: Rust
       response:
-  # - target: counter.Counter/Increment
-  #   setting:
-  #     request:
-  #       # descriptor: ./target/debug/build/relentless-dev-server-grpc-966e593a5a4fc2ae/out/file_descriptor.bin
-  #       message:
-  #         json:
-  #           100
-  #     response:
+  - target: counter.Counter/Increment
+    setting:
+      request:
+        descriptor: 
+          protos: [./dev/server/grpc/proto/counter.proto]
+          import_path: [./dev/server/grpc/proto]
+        message:
+          json:
+            100
+      response:
+  - target: echo.Echo/EchoMetadata
+    setting:
+      request:
+      response:

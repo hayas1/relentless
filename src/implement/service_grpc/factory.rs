@@ -33,13 +33,23 @@ use super::{
 pub struct GrpcRequest {
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
-    descriptor: Option<PathBuf>,
-    #[serde(default, skip_serializing_if = "IsDefault::is_default")]
-    #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
-    proto: Option<(PathBuf, PathBuf)>, // TODO enum proto or descriptor (or reflection)
+    descriptor: DescriptorFrom,
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
     message: Option<GrpcMessage>,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "kebab-case", untagged)]
+pub enum DescriptorFrom {
+    Protos {
+        #[serde(default, skip_serializing_if = "IsDefault::is_default")]
+        protos: Vec<PathBuf>,
+        #[serde(default, skip_serializing_if = "IsDefault::is_default")]
+        import_path: Vec<PathBuf>,
+    },
+    Bin(PathBuf),
+    #[default]
+    Reflection,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
@@ -53,9 +63,16 @@ pub enum GrpcMessage {
 impl Coalesce for GrpcRequest {
     fn coalesce(self, other: &Self) -> Self {
         Self {
-            descriptor: self.descriptor.or(other.descriptor.clone()),
-            proto: self.proto.or(other.proto.clone()),
+            descriptor: self.descriptor.coalesce(&other.descriptor),
             message: self.message.or(other.message.clone()),
+        }
+    }
+}
+impl Coalesce for DescriptorFrom {
+    fn coalesce(self, other: &Self) -> Self {
+        match self {
+            DescriptorFrom::Reflection => other.clone(),
+            _ => self,
         }
     }
 }
@@ -93,21 +110,19 @@ impl GrpcRequest {
         destination: &http::Uri,
         (service, _method): (&str, &str),
     ) -> crate::Result<DescriptorPool> {
-        let (proto, import_path) = self.proto.as_ref().unwrap_or_else(|| todo!());
-        Self::descriptor_from_protos(&[proto], &[import_path]).await
-
-        //     if let Some(descriptor) = self.descriptor.as_ref() {
-        //         Self::descriptor_from_file(descriptor).await
-        //     } else {
-        //         Self::descriptor_from_reflection(destination, service).await
-        //     }
+        match &self.descriptor {
+            DescriptorFrom::Protos { protos, import_path } => Self::descriptor_from_protos(protos, import_path).await,
+            DescriptorFrom::Bin(path) => Self::descriptor_from_file(path).await,
+            DescriptorFrom::Reflection => Self::descriptor_from_reflection(destination, service).await,
+        }
     }
 
     pub async fn descriptor_from_protos<A: AsRef<Path>>(
         protos: &[A],
         import_path: &[A],
     ) -> crate::Result<DescriptorPool> {
-        let fds = prost_build::Config::new().load_fds(protos, import_path).box_err()?;
+        let builder = &mut prost_build::Config::new();
+        let fds = builder.load_fds(protos, import_path).box_err()?;
         DescriptorPool::from_file_descriptor_set(fds).box_err()
     }
 
