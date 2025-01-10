@@ -70,9 +70,10 @@ impl Coalesce for GrpcRequest {
 }
 impl Coalesce for DescriptorFrom {
     fn coalesce(self, other: &Self) -> Self {
-        match self {
-            DescriptorFrom::Reflection => other.clone(),
-            _ => self,
+        if self.is_default() {
+            other.clone()
+        } else {
+            self
         }
     }
 }
