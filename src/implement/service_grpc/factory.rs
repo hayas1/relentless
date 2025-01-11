@@ -36,7 +36,7 @@ pub struct GrpcRequest {
     descriptor: DescriptorFrom,
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
-    message: Option<GrpcMessage>,
+    message: GrpcMessage,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case", untagged)]
@@ -62,13 +62,19 @@ pub enum GrpcMessage {
 }
 impl Coalesce for GrpcRequest {
     fn coalesce(self, other: &Self) -> Self {
-        Self {
-            descriptor: self.descriptor.coalesce(&other.descriptor),
-            message: self.message.or(other.message.clone()),
-        }
+        Self { descriptor: self.descriptor.coalesce(&other.descriptor), message: self.message.coalesce(&other.message) }
     }
 }
 impl Coalesce for DescriptorFrom {
+    fn coalesce(self, other: &Self) -> Self {
+        if self.is_default() {
+            other.clone()
+        } else {
+            self
+        }
+    }
+}
+impl Coalesce for GrpcMessage {
     fn coalesce(self, other: &Self) -> Self {
         if self.is_default() {
             other.clone()
@@ -90,7 +96,7 @@ impl RequestFactory<DefaultGrpcRequest<serde_json::Value, serde_json::value::Ser
         let pool = self.descriptor_pool(destination, (svc, mtd)).await?;
         let destination = destination.clone();
         let (service, method) = Self::service_method(&pool, (svc, mtd))?;
-        let message = self.message.as_ref().unwrap_or_else(|| todo!()).produce();
+        let message = self.message.produce();
         let codec = MethodCodec::new(method.clone()); // TODO remove clone
 
         Ok(DefaultGrpcRequest { destination, service, method, codec, message })
@@ -164,7 +170,7 @@ impl GrpcMessage {
     // TODO!!!
     pub fn produce(&self) -> serde_json::Value {
         match self {
-            Self::Empty => todo!(),
+            Self::Empty => serde_json::Value::Object(serde_json::Map::new()),
             Self::Plaintext(_) => todo!(),
             #[cfg(feature = "json")]
             // Self::Json(v) => DynamicMessage::deserialize(descriptor, v).unwrap_or_else(|e| todo!("{}", e)),
