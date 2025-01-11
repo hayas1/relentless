@@ -34,8 +34,15 @@ impl<D, S> DefaultGrpcRequest<D, S> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash)]
-pub struct DefaultGrpcClient {}
-impl<D> Service<DefaultGrpcRequest<D, serde_json::value::Serializer>> for DefaultGrpcClient
+pub struct DefaultGrpcClient<D> {
+    phantom: PhantomData<D>,
+}
+impl<D> DefaultGrpcClient<D> {
+    pub fn new() -> Self {
+        Self { phantom: PhantomData }
+    }
+}
+impl<D> Service<DefaultGrpcRequest<D, serde_json::value::Serializer>> for DefaultGrpcClient<D>
 where
     D: for<'a> Deserializer<'a> + Send + Sync + 'static,
 {
@@ -64,11 +71,15 @@ where
         })
     }
 }
-
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct MethodCodec<D, S> {
     method: MethodDescriptor,
     phantom: PhantomData<(D, S)>,
+}
+impl<D, S> Clone for MethodCodec<D, S> {
+    fn clone(&self) -> Self {
+        Self { method: self.method.clone(), phantom: PhantomData }
+    }
 }
 impl<D, S> MethodCodec<D, S> {
     pub fn new(method: MethodDescriptor) -> Self {

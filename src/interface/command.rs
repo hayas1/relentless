@@ -203,8 +203,7 @@ impl Relentless {
         for err in cannot_read {
             eprintln!("{}", err);
         }
-        // let service = self.build_service(DefaultGrpcClient {});
-        let service = DefaultGrpcClient {};
+        let service = self.build_service(DefaultGrpcClient::<serde_json::Value>::new());
         let report = self.assault_with(configs, service).await.unwrap_or_else(|_| todo!());
         Ok(report)
     }
