@@ -29,6 +29,15 @@ pub trait Recordable: Sized {
         self.record_raw(w).await
     }
 }
+#[allow(async_fn_in_trait)] // TODO #[warn(async_fn_in_trait)] by default
+pub trait CloneOwned: Sized {
+    type Error;
+    /// once consume body to record, and reconstruct to request/response
+    async fn clone_owned(self) -> Result<(Self, Self), Self::Error>;
+}
+pub trait RecordableRequest {
+    fn record_dir(&self) -> PathBuf;
+}
 
 impl<B> Recordable for http::Request<B>
 where
@@ -66,6 +75,26 @@ where
     }
 }
 
+impl<B> CloneOwned for http::Request<B>
+where
+    B: Body + From<Bytes>,
+    B::Error: std::error::Error + Send + Sync + 'static,
+{
+    type Error = crate::Error;
+    async fn clone_owned(self) -> Result<(Self, Self), Self::Error> {
+        let (req_parts, req_body) = self.into_parts();
+        let req_bytes = BodyExt::collect(req_body).await.map(Collected::to_bytes).box_err()?;
+        let req1 = http::Request::from_parts(req_parts.clone(), B::from(req_bytes.clone()));
+        let req2 = http::Request::from_parts(req_parts, B::from(req_bytes));
+        Ok((req1, req2))
+    }
+}
+impl<B> RecordableRequest for http::Request<B> {
+    fn record_dir(&self) -> PathBuf {
+        self.uri().to_string().into()
+    }
+}
+
 impl<B> Recordable for http::Response<B>
 where
     B: Body,
@@ -99,6 +128,21 @@ where
         }
 
         Ok(())
+    }
+}
+impl<B> CloneOwned for http::Response<B>
+where
+    B: Body + From<Bytes>,
+    B::Error: std::error::Error + Send + Sync + 'static,
+{
+    type Error = crate::Error;
+    async fn clone_owned(self) -> Result<(Self, Self), Self::Error> {
+        // once consume body to record, and reconstruct to response
+        let (res_parts, res_body) = self.into_parts();
+        let res_bytes = BodyExt::collect(res_body).await.map(Collected::to_bytes).box_err()?;
+        let res1 = http::Response::from_parts(res_parts.clone(), B::from(res_bytes.clone()));
+        let res2 = http::Response::from_parts(res_parts.clone(), B::from(res_bytes.clone()));
+        Ok((res1, res2))
     }
 }
 
