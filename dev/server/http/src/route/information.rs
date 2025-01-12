@@ -2,12 +2,13 @@ use std::collections::HashMap;
 
 use axum::{
     body::{to_bytes, Body, HttpBody},
-    extract::{Host, OriginalUri, Request},
+    extract::{OriginalUri, Request},
     http::{request::Parts, uri::Scheme, HeaderMap, Method, Uri, Version},
     response::Result,
     routing::any,
     Json, Router,
 };
+use axum_extra::extract::Host;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
