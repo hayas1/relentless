@@ -119,6 +119,7 @@ impl GrpcRequest {
         destination: &http::Uri,
         (service, _method): (&str, &str),
     ) -> crate::Result<DescriptorPool> {
+        // TODO cache
         match &self.descriptor {
             DescriptorFrom::Protos { protos, import_path } => Self::descriptor_from_protos(protos, import_path).await,
             DescriptorFrom::Bin(path) => Self::descriptor_from_file(path).await,
@@ -142,7 +143,6 @@ impl GrpcRequest {
     }
 
     pub async fn descriptor_from_reflection(destination: &http::Uri, svc: &str) -> crate::Result<DescriptorPool> {
-        // TODO cache
         let mut client = ServerReflectionClient::new(Channel::builder(destination.clone()).connect().await.box_err()?);
         let (host, service) = (destination.host().unwrap_or_else(|| todo!()).to_string(), svc.to_string());
         let request_stream = futures::stream::once({
