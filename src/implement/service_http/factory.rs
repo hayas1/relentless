@@ -93,7 +93,7 @@ where
     <HttpBody as BodyFactory<B>>::Error: std::error::Error + Send + Sync + 'static,
 {
     type Error = crate::Error;
-    fn produce(
+    async fn produce(
         &self,
         destination: &http::Uri,
         target: &str,
