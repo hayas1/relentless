@@ -5,7 +5,7 @@ pub struct Env {
 }
 impl Default for Env {
     fn default() -> Self {
-        Self { listen: "0.0.0.0".to_string(), port: "3000".to_string() }
+        Self { listen: "0.0.0.0".to_string(), port: "50051".to_string() }
     }
 }
 impl Env {
