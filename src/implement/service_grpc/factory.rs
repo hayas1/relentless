@@ -6,7 +6,9 @@ use std::{
 
 use bytes::Bytes;
 use futures::{StreamExt, TryStreamExt};
+use prost::Message;
 use prost_reflect::{DescriptorPool, MethodDescriptor, ServiceDescriptor};
+use prost_types::FileDescriptorProto;
 use serde::{Deserialize, Serialize};
 use tonic::transport::Channel;
 use tonic_reflection::pb::v1::{
@@ -92,10 +94,10 @@ impl RequestFactory<DefaultGrpcRequest<serde_json::Value, serde_json::value::Ser
         target: &str,
         template: &Template,
     ) -> Result<DefaultGrpcRequest<serde_json::Value, serde_json::value::Serializer>, Self::Error> {
-        let (svc, mtd) = target.split_once('/').ok_or_else(|| GrpcRequestError::FailToParse(target.to_string()))?; // TODO only one '/' ?
-        let pool = self.descriptor_pool(destination, (svc, mtd)).await?;
+        let (svc, mth) = target.split_once('/').ok_or_else(|| GrpcRequestError::FailToParse(target.to_string()))?; // TODO only one '/' ?
+        let pool = self.descriptor_pool(destination, (svc, mth)).await?;
         let destination = destination.clone();
-        let (service, method) = Self::service_method(&pool, (svc, mtd))?;
+        let (service, method) = Self::service_method(&pool, (svc, mth))?;
         let message = self.message.produce();
         let codec = MethodCodec::new(method.clone()); // TODO remove clone
 
@@ -108,9 +110,9 @@ impl GrpcRequest {
         (service, method): (&str, &str),
     ) -> crate::Result<(ServiceDescriptor, MethodDescriptor)> {
         let svc = pool.get_service_by_name(service).ok_or_else(|| GrpcRequestError::NoService(service.to_string()))?;
-        let mtd =
+        let mth =
             svc.methods().find(|m| m.name() == method).ok_or_else(|| GrpcRequestError::NoMethod(method.to_string()))?;
-        Ok((svc, mtd))
+        Ok((svc, mth))
     }
     pub async fn descriptor_pool(
         &self,
@@ -140,28 +142,57 @@ impl GrpcRequest {
     }
 
     pub async fn descriptor_from_reflection(destination: &http::Uri, svc: &str) -> crate::Result<DescriptorPool> {
-        // TODO well known type, cache, etc...
-        let conn = Channel::builder(destination.clone()).connect().await.box_err()?;
-        let mut client = ServerReflectionClient::new(conn);
-        let host = destination.host().unwrap_or_else(|| todo!()).to_string();
-        let service = svc.to_string();
+        let mut client = ServerReflectionClient::new(Channel::builder(destination.clone()).connect().await.box_err()?);
+        let (host, service) = (destination.host().unwrap_or_else(|| todo!()).to_string(), svc.to_string());
         let request_stream = futures::stream::once(async move {
             ServerReflectionRequest { host, message_request: Some(MessageRequest::FileContainingSymbol(service)) }
         });
         let streaming = client.server_reflection_info(request_stream).await.box_err()?.into_inner();
         let descriptors = streaming
-            .map(|recv| recv.box_err())
+            .map(|recv| async { recv.box_err() })
+            .buffer_unordered(16)
             .try_fold(DescriptorPool::new(), |pool, recv| async move {
                 match recv.message_response.unwrap_or_else(|| todo!()) {
-                    MessageResponse::FileDescriptorResponse(descriptor) => descriptor
-                        .file_descriptor_proto
-                        .into_iter()
-                        .try_fold(pool, |mut p, d| p.decode_file_descriptor_proto(&*d).box_err().map(|()| p)),
-                    _ => Err(GrpcRequestError::UnexpectedReflectionResponse)?,
-                }
+                    MessageResponse::FileDescriptorResponse(descriptor) => {
+                        Ok(futures::stream::iter(descriptor.file_descriptor_proto.into_iter())
+                            .map(|d| async { Ok(d) })
+                            .buffer_unordered(16)
+                            .try_fold(pool, |mut p, d| async move {
+                                let fd = FileDescriptorProto::decode(&*d).box_err()?;
+                                let mut dep_client = ServerReflectionClient::new(
+                                    Channel::builder(destination.clone()).connect().await.box_err()?,
+                                );
+                                let dep_stream = futures::stream::iter(fd.dependency.into_iter().map(|s| {
+                                    ServerReflectionRequest {
+                                        host: "localhost:50051".to_string(), // TODO
+                                        // host: host.clone(), // TODO
+                                        message_request: Some(MessageRequest::FileByFilename(s)),
+                                    }
+                                }));
+                                let dep_streaming =
+                                    dep_client.server_reflection_info(dep_stream).await.box_err()?.into_inner();
+                                dep_streaming
+                                    .map(|recv| async { recv.box_err() })
+                                    .buffer_unordered(16)
+                                    .try_fold(&mut p, |p, recv| async move {
+                                        match recv.message_response.unwrap_or_else(|| todo!()) {
+                                            MessageResponse::FileDescriptorResponse(descriptor) => {
+                                                descriptor.file_descriptor_proto.into_iter().try_fold(p, |p, d| {
+                                                    p.decode_file_descriptor_proto(&*d).box_err().map(|()| p)
+                                                })
+                                            }
+                                            _ => Err(GrpcRequestError::UnexpectedReflectionResponse.into()),
+                                        }
+                                    })
+                                    .await?;
+                                p.decode_file_descriptor_proto(&*d).box_err().map(|()| p)
+                            })
+                            .await)
+                    }
+                    _ => Err(GrpcRequestError::UnexpectedReflectionResponse),
+                }?
             })
-            .await
-            .box_err()?;
+            .await?;
         Ok(descriptors)
     }
 }
