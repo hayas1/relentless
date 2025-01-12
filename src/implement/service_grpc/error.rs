@@ -9,10 +9,14 @@ use crate::{
 pub enum GrpcRequestError {
     #[error("cannot parse target {}", .0)]
     FailToParse(String),
+    #[error("no host was specified {}", .0)]
+    NoHost(http::Uri),
     #[error("cannot find service {}", .0)]
     NoService(String),
     #[error("cannot find method {}", .0)]
     NoMethod(String),
+    #[error("got unexpected empty response")]
+    EmptyResponse,
     #[error("unexpected reflection response")]
     UnexpectedReflectionResponse,
 }

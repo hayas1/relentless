@@ -144,7 +144,10 @@ impl GrpcRequest {
 
     pub async fn descriptor_from_reflection(destination: &http::Uri, svc: &str) -> crate::Result<DescriptorPool> {
         let mut client = ServerReflectionClient::new(Channel::builder(destination.clone()).connect().await.box_err()?);
-        let (host, service) = (destination.host().unwrap_or_else(|| todo!()).to_string(), svc.to_string());
+        let (host, service) = (
+            destination.host().ok_or_else(|| GrpcRequestError::NoHost(destination.clone()))?.to_string(),
+            svc.to_string(),
+        );
         let request_stream = futures::stream::once({
             let host = host.clone();
             async move {
@@ -159,7 +162,7 @@ impl GrpcRequest {
                 let host = host.to_string();
                 async move {
                     let MessageResponse::FileDescriptorResponse(descriptor) =
-                        recv.message_response.unwrap_or_else(|| todo!())
+                        recv.message_response.ok_or_else(|| GrpcRequestError::EmptyResponse)?
                     else {
                         return Err(GrpcRequestError::UnexpectedReflectionResponse.into());
                     };
@@ -206,15 +209,16 @@ impl GrpcRequest {
                     .buffer_unordered(16)
                     .try_fold(&mut stack, |dfs, recv| async move {
                         let MessageResponse::FileDescriptorResponse(descriptor) =
-                            recv.message_response.unwrap_or_else(|| todo!())
+                            recv.message_response.ok_or_else(|| GrpcRequestError::EmptyResponse)?
                         else {
                             return Err(GrpcRequestError::UnexpectedReflectionResponse.into());
                         };
-                        let dep_protos = descriptor
+                        let dep_protos: crate::Result<Vec<_>> = descriptor
                             .file_descriptor_proto
                             .into_iter()
-                            .map(|d| FileDescriptorProto::decode(&*d).unwrap_or_else(|e| todo!("{}", e)));
-                        dfs.extend(dep_protos); // TODO dedup in advance?
+                            .map(|d| FileDescriptorProto::decode(&*d).box_err())
+                            .collect();
+                        dfs.extend(dep_protos?); // TODO dedup in advance?
                         Ok(dfs)
                     })
                     .await?;
@@ -225,13 +229,12 @@ impl GrpcRequest {
 }
 
 impl GrpcMessage {
-    // TODO!!!
+    // TODO type of grpc message
     pub fn produce(&self) -> serde_json::Value {
         match self {
             Self::Empty => serde_json::Value::Object(serde_json::Map::new()),
-            Self::Plaintext(_) => todo!(),
+            Self::Plaintext(_) => unimplemented!(),
             #[cfg(feature = "json")]
-            // Self::Json(v) => DynamicMessage::deserialize(descriptor, v).unwrap_or_else(|e| todo!("{}", e)),
             Self::Json(v) => v.clone(),
         }
     }

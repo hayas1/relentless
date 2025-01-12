@@ -204,7 +204,7 @@ impl Relentless {
             eprintln!("{}", err);
         }
         let service = self.build_service(DefaultGrpcClient::<serde_json::Value>::new());
-        let report = self.assault_with(configs, service).await.unwrap_or_else(|_| todo!());
+        let report = self.assault_with(configs, service).await?;
         Ok(report)
     }
     /// TODO document
