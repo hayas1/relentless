@@ -4,8 +4,8 @@ use http_body_util::{BodyExt, Collected};
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "json")]
-use crate::assault::evaluator::json::JsonEvaluator;
-use crate::{
+use relentless::assault::evaluator::json::JsonEvaluator;
+use relentless::{
     assault::{
         destinations::{AllOr, Destinations},
         evaluate::{Acceptable, Evaluate},
@@ -206,7 +206,7 @@ impl Acceptable<&Bytes> for HttpBody {
 mod tests {
     use std::time::{Instant, SystemTime};
 
-    use crate::assault::measure::metrics::MeasuredResponse;
+    use relentless::assault::measure::metrics::MeasuredResponse;
 
     use super::*;
 

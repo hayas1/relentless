@@ -1,8 +1,8 @@
 use thiserror::Error;
 
 #[cfg(feature = "json")]
-use crate::error::JsonEvaluateError;
-use crate::{assault::result::RequestError, error::PlaintextEvaluateError};
+use relentless::error::JsonEvaluateError;
+use relentless::{assault::result::RequestError, error::PlaintextEvaluateError};
 
 #[derive(Error, Debug)]
 pub enum HttpEvaluateError {

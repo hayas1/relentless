@@ -17,7 +17,7 @@ use tonic::{
 };
 use tower::Service;
 
-use crate::error::IntoResult;
+use relentless::error::IntoResult;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct DefaultGrpcRequest<D, S> {
@@ -51,7 +51,7 @@ where
     for<'a> <D as Deserializer<'a>>::Error: std::error::Error + Send + Sync + 'static,
 {
     type Response = tonic::Response<<serde_json::value::Serializer as Serializer>::Ok>;
-    type Error = crate::Error;
+    type Error = relentless::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {

@@ -5,12 +5,12 @@ use clap::{Parser, ValueEnum};
 use serde::{Deserialize, Serialize};
 use tower::{Service, ServiceBuilder};
 
-#[cfg(feature = "json")]
-use crate::implement::service_grpc::{
-    client::DefaultGrpcClient, error::GrpcEvaluateError, evaluate::GrpcResponse, factory::GrpcRequest,
-};
-#[cfg(feature = "default-http-client")]
-use crate::implement::service_http::client::DefaultHttpClient;
+// #[cfg(feature = "json")]
+// use crate::implement::service_grpc::{
+//     client::DefaultGrpcClient, error::GrpcEvaluateError, evaluate::GrpcResponse, factory::GrpcRequest,
+// };
+// #[cfg(feature = "default-http-client")]
+// use crate::implement::service_http::client::DefaultHttpClient;
 #[cfg(feature = "console-report")]
 use crate::interface::report::console::ConsoleReport;
 use crate::{
@@ -23,7 +23,7 @@ use crate::{
         worker::Control,
     },
     error::{InterfaceError, IntoResult},
-    implement::service_http::{evaluate::HttpResponse, factory::HttpRequest},
+    // implement::service_http::{evaluate::HttpResponse, factory::HttpRequest},
 };
 
 use super::{
@@ -32,19 +32,19 @@ use super::{
     report::github_markdown::GithubMarkdownReport,
 };
 
-#[cfg(feature = "cli")]
-pub async fn execute() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sync>> {
-    let cmd = Relentless::parse();
+// #[cfg(feature = "cli")]
+// pub async fn execute() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sync>> {
+//     let cmd = Relentless::parse();
 
-    let Relentless { rps, .. } = &cmd;
-    if rps.is_some() {
-        unimplemented!("`--rps` is not implemented yet");
-    }
+//     let Relentless { rps, .. } = &cmd;
+//     if rps.is_some() {
+//         unimplemented!("`--rps` is not implemented yet");
+//     }
 
-    let rep = cmd.assault().await?;
-    cmd.report(&rep)?;
-    Ok(cmd.exit_code(&rep))
-}
+//     let rep = cmd.assault().await?;
+//     cmd.report(&rep)?;
+//     Ok(cmd.exit_code(&rep))
+// }
 
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 #[cfg_attr(feature = "cli", derive(Parser))]
@@ -183,31 +183,31 @@ impl Relentless {
         ServiceBuilder::new().layer(RecordLayer::new(self.output_record.clone())).service(service)
     }
 
-    /// TODO document
-    #[cfg(all(feature = "default-http-client", feature = "cli"))]
-    pub async fn assault(
-        &self,
-    ) -> crate::Result<Report<crate::implement::service_http::error::HttpEvaluateError, HttpRequest, HttpResponse>>
-    {
-        let (configs, cannot_read) = self.configs();
-        for err in cannot_read {
-            eprintln!("{}", err);
-        }
-        let service = self.build_service(DefaultHttpClient::<reqwest::Body, reqwest::Body>::new().await?);
-        let report = self.assault_with(configs, service).await?;
-        Ok(report)
-    }
-    #[cfg(feature = "json")]
-    pub async fn assault_grpc(&self) -> crate::Result<Report<GrpcEvaluateError, GrpcRequest, GrpcResponse>> {
-        let (configs, cannot_read) = self.configs();
-        for err in cannot_read {
-            eprintln!("{}", err);
-        }
-        let service = self.build_service(DefaultGrpcClient::<serde_json::Value>::new());
-        let report = self.assault_with(configs, service).await?;
-        Ok(report)
-    }
-    /// TODO document
+    // /// TODO document
+    // #[cfg(all(feature = "default-http-client", feature = "cli"))]
+    // pub async fn assault(
+    //     &self,
+    // ) -> crate::Result<Report<crate::implement::service_http::error::HttpEvaluateError, HttpRequest, HttpResponse>>
+    // {
+    //     let (configs, cannot_read) = self.configs();
+    //     for err in cannot_read {
+    //         eprintln!("{}", err);
+    //     }
+    //     let service = self.build_service(DefaultHttpClient::<reqwest::Body, reqwest::Body>::new().await?);
+    //     let report = self.assault_with(configs, service).await?;
+    //     Ok(report)
+    // }
+    // #[cfg(feature = "json")]
+    // pub async fn assault_grpc(&self) -> crate::Result<Report<GrpcEvaluateError, GrpcRequest, GrpcResponse>> {
+    //     let (configs, cannot_read) = self.configs();
+    //     for err in cannot_read {
+    //         eprintln!("{}", err);
+    //     }
+    //     let service = self.build_service(DefaultGrpcClient::<serde_json::Value>::new());
+    //     let report = self.assault_with(configs, service).await?;
+    //     Ok(report)
+    // }
+    // /// TODO document
     pub async fn assault_with<Q, P, S, Req>(
         &self,
         configs: Vec<Config<Q, P>>,
@@ -258,15 +258,15 @@ impl Relentless {
         Ok(report.exit_code(self))
     }
 
-    pub fn pass<T>(&self, report: &Report<T, HttpRequest, HttpResponse>) -> bool {
-        report.pass()
-    }
-    pub fn allow<T>(&self, report: &Report<T, HttpRequest, HttpResponse>) -> bool {
-        report.allow(self.strict)
-    }
-    pub fn exit_code<T>(self, report: &Report<T, HttpRequest, HttpResponse>) -> ExitCode {
-        report.exit_code(&self)
-    }
+    // pub fn pass<T>(&self, report: &Report<T, HttpRequest, HttpResponse>) -> bool {
+    //     report.pass()
+    // }
+    // pub fn allow<T>(&self, report: &Report<T, HttpRequest, HttpResponse>) -> bool {
+    //     report.allow(self.strict)
+    // }
+    // pub fn exit_code<T>(self, report: &Report<T, HttpRequest, HttpResponse>) -> ExitCode {
+    //     report.exit_code(&self)
+    // }
 }
 
 #[cfg(feature = "cli")]
@@ -448,30 +448,30 @@ mod tests {
         }
     }
 
-    #[test]
-    #[cfg(all(feature = "yaml", feature = "json"))]
-    fn test_read_configs_filtered() {
-        let cmd = Relentless {
-            file: glob::glob("tests/config/parse/*.yaml").unwrap().collect::<Result<Vec<_>, _>>().unwrap(),
-            report_format: ReportFormat::NullDevice,
-            ..Default::default()
-        };
-        let (configs, e) = cmd.configs::<HttpRequest, HttpResponse>();
-        assert_eq!(configs.len(), glob::glob("tests/config/parse/valid_*.yaml").unwrap().filter(Result::is_ok).count());
+    // #[test]
+    // #[cfg(all(feature = "yaml", feature = "json"))]
+    // fn test_read_configs_filtered() {
+    //     let cmd = Relentless {
+    //         file: glob::glob("tests/config/parse/*.yaml").unwrap().collect::<Result<Vec<_>, _>>().unwrap(),
+    //         report_format: ReportFormat::NullDevice,
+    //         ..Default::default()
+    //     };
+    //     let (configs, e) = cmd.configs::<HttpRequest, HttpResponse>();
+    //     assert_eq!(configs.len(), glob::glob("tests/config/parse/valid_*.yaml").unwrap().filter(Result::is_ok).count());
 
-        let mut buf = Vec::new();
-        for err in e {
-            writeln!(buf, "{}", err).unwrap();
-        }
-        let warn = String::from_utf8_lossy(&buf);
-        assert!(warn.contains("tests/config/parse/invalid_simple_string.yaml"));
-        assert!(warn.contains("tests/config/parse/invalid_different_struct.yaml"));
-        assert!(warn.contains(
-            &[
-                r#"[tests/config/parse/invalid_simple_string.yaml] invalid type: string "simple string yaml", expected struct Config"#,
-                r#""#,
-            ]
-            .join("\n")
-        ));
-    }
+    //     let mut buf = Vec::new();
+    //     for err in e {
+    //         writeln!(buf, "{}", err).unwrap();
+    //     }
+    //     let warn = String::from_utf8_lossy(&buf);
+    //     assert!(warn.contains("tests/config/parse/invalid_simple_string.yaml"));
+    //     assert!(warn.contains("tests/config/parse/invalid_different_struct.yaml"));
+    //     assert!(warn.contains(
+    //         &[
+    //             r#"[tests/config/parse/invalid_simple_string.yaml] invalid type: string "simple string yaml", expected struct Config"#,
+    //             r#""#,
+    //         ]
+    //         .join("\n")
+    //     ));
+    // }
 }

@@ -1,0 +1,39 @@
+[package]
+name = "relentless-http"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+license-file.workspace = true
+
+[features]
+default = ["full"]
+full = ["relentless/full", "json", "yaml", "default-http-client"]
+
+json = ["relentless/json", "serde_json"]
+yaml = ["serde_yaml"]
+default-http-client = ["reqwest"]
+
+[dependencies]
+relentless = { path = "../.." }
+
+tokio = { version = "1.43.0", features = ["full"] }
+tower = { version = "0.5.2", features = ["timeout", "util"] }
+reqwest = { version = "0.12.12", optional = true }
+http = "1.2.0"
+http-serde = "2.1.1"
+http-body = "1.0.1"
+http-body-util = "0.1.2"
+mime = "0.3.17"
+
+bytes = "1.9.0"
+thiserror = "2.0.11"
+regex = "1.11.1"
+serde = { version = "1.0.217", features = ["derive"] }
+serde_json = { version = "1.0.135", optional = true }
+serde_yaml = { version = "0.9.34", optional = true }
+
+[dev-dependencies]
+tokio = { version = "1.43.0", features = ["full"] }
+axum = "0.8.1"
+httptest = "0.16.1"

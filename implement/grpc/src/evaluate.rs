@@ -4,7 +4,7 @@ use http::Extensions;
 use serde::{Deserialize, Serialize};
 use tonic::metadata::MetadataMap;
 
-use crate::{
+use relentless::{
     assault::{
         destinations::Destinations,
         evaluate::{Acceptable, Evaluate},
@@ -52,7 +52,6 @@ pub enum GrpcMessage {
     #[default]
     AnyOrEqual,
     Plaintext(PlaintextEvaluator),
-    #[cfg(feature = "json")]
     Json(JsonEvaluator),
 }
 impl Coalesce for GrpcResponse {
@@ -149,7 +148,6 @@ impl Acceptable<&serde_json::Value> for GrpcMessage {
         match self {
             GrpcMessage::AnyOrEqual => Self::assault_or_compare(values, |_| true),
             GrpcMessage::Plaintext(_plaintext) => unimplemented!(),
-            #[cfg(feature = "json")]
             GrpcMessage::Json(json) => Self::sub_accept(json, values, msg, GrpcEvaluateError::JsonEvaluateError),
         }
     }

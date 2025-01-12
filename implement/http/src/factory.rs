@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "json")]
 use serde_json::Value;
 
-use crate::{
+use relentless::{
     assault::factory::RequestFactory,
     error::IntoResult,
     interface::{
@@ -44,7 +44,7 @@ pub enum HttpBody {
     Json(Value),
 }
 impl HttpBody {
-    pub fn body_with_headers<ReqB>(&self, template: &Template) -> crate::Result<(ReqB, HeaderMap)>
+    pub fn body_with_headers<ReqB>(&self, template: &Template) -> relentless::Result<(ReqB, HeaderMap)>
     where
         ReqB: Body,
         Self: BodyFactory<ReqB>,
@@ -92,7 +92,7 @@ where
     HttpBody: BodyFactory<B>,
     <HttpBody as BodyFactory<B>>::Error: std::error::Error + Send + Sync + 'static,
 {
-    type Error = crate::Error;
+    type Error = relentless::Error;
     async fn produce(
         &self,
         destination: &http::Uri,
@@ -141,7 +141,7 @@ impl<B> BodyFactory<B> for HttpBody
 where
     B: Body + From<Bytes> + Default,
 {
-    type Error = crate::Error;
+    type Error = relentless::Error;
     fn produce(&self, template: &Template) -> Result<B, Self::Error> {
         match self {
             HttpBody::Empty => Ok(Default::default()),

@@ -7,7 +7,7 @@ use std::{
 
 use tower::Service;
 
-use crate::error::IntoResult;
+use relentless::error::IntoResult;
 
 pub const APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),);
 
@@ -24,7 +24,7 @@ impl<ReqB, ResB> Clone for DefaultHttpClient<ReqB, ResB> {
     }
 }
 impl<ReqB, ResB> DefaultHttpClient<ReqB, ResB> {
-    pub async fn new() -> crate::Result<Self> {
+    pub async fn new() -> relentless::Result<Self> {
         // TODO use hyper ? continue to use reqwest's rich client?
         let client = reqwest::Client::builder().user_agent(APP_USER_AGENT).build().box_err()?;
         Ok(Self { client, phantom: PhantomData })

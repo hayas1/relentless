@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use crate::{
+use relentless::{
     assault::result::RequestError,
     error::{IntoRelentlessError, JsonEvaluateError},
 };
@@ -32,7 +32,6 @@ pub enum GrpcEvaluateError {
     #[error("extension is not acceptable")]
     UnacceptableExtensions,
 
-    #[cfg(feature = "json")]
     #[error(transparent)]
     JsonEvaluateError(#[from] JsonEvaluateError),
 }

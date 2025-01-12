@@ -1,0 +1,37 @@
+[package]
+name = "relentless-grpc"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+license-file.workspace = true
+
+[features]
+default = ["full"]
+full = ["relentless/full", "yaml"]
+
+yaml = ["serde_yaml"]
+
+[dependencies]
+relentless = { path = "../..", features = ["json"] }
+
+tower = { version = "0.5.2", features = ["timeout", "util"] }
+http = "1.2.0"
+prost = "0.13.4"
+prost-types = "0.13.4"
+prost-build = "0.13.4"
+prost-reflect = { version = "0.14.3", features = [
+    "serde",
+] } # https://github.com/hyperium/tonic/issues/2028
+tonic = "0.12.3"
+tonic-reflection = "0.12.3"
+
+bytes = "1.9.0"
+futures = "0.3.31"
+thiserror = "2.0.11"
+serde = { version = "1.0.217", features = ["derive"] }
+serde_json = "1.0.135"
+serde_yaml = { version = "0.9.34", optional = true }
+
+[dev-dependencies]
+tokio = { version = "1.43.0", features = ["full"] }

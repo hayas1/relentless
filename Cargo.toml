@@ -17,13 +17,12 @@ license-file.workspace = true
 
 [features]
 default = ["full"]
-full = ["json", "yaml", "toml", "cli", "default-http-client"]
+full = ["json", "yaml", "toml", "cli"]
 
 json = ["serde_json", "json-patch", "jsonptr"]
 yaml = ["serde_yaml"]
-cli = ["clap", "default-http-client", "console-report"]
+cli = ["clap", "console-report"]
 console-report = ["console"]
-default-http-client = ["reqwest"]
 
 
 [dependencies]
@@ -31,21 +30,9 @@ tokio = { version = "1.43.0", features = ["full"] }
 # tokio-stream = "0.1.17" # TODO map of tokio-stream may not collect as Vec<T>Item (it reduce Vec<Future>), so use futures
 futures = "0.3.31"
 tower = { version = "0.5.2", features = ["timeout", "util"] }
-reqwest = { version = "0.12.12", optional = true }
 http = "1.2.0"
 http-serde = "2.1.1"
-http-body = "1.0.1"
-http-body-util = "0.1.2"
-mime = "0.3.17"
 bytes = "1.9.0"
-prost = "0.13.4"
-prost-types = "0.13.4"
-prost-build = "0.13.4"
-prost-reflect = { version = "0.14.3", features = [
-    "serde",
-] } # https://github.com/hyperium/tonic/issues/2028
-tonic = "0.12.3"
-tonic-reflection = "0.12.3"
 
 thiserror = "2.0.11"
 regex = "1.11.1"
@@ -68,12 +55,18 @@ relentless-dev-server-http = { path = "dev/server/http" }
 axum = "0.8.1"
 glob = "0.3.2"
 httptest = "0.16.1"
+http-body-util = "0.1.2"
 assert-json-diff = "2.0.2"
 serde_json = "1.0.135"
 indoc = "2.0.5"
 
 [workspace]
-members = ["dev/server/grpc", "dev/server/http"]
+members = [
+    "implement/grpc",
+    "implement/http",
+    "dev/server/grpc",
+    "dev/server/http",
+]
 
 [badges]
 github = { repository = "hayas1/relentless", workflow = "Master" }

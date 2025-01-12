@@ -3,7 +3,8 @@ use std::process::ExitCode;
 #[cfg(feature = "cli")]
 #[tokio::main]
 pub async fn main() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sync>> {
-    relentless::interface::command::execute().await
+    // relentless::interface::command::execute().await
+    todo!()
 }
 
 #[cfg(not(feature = "cli"))]

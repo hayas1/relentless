@@ -16,7 +16,7 @@ use tonic_reflection::pb::v1::{
     server_reflection_response::MessageResponse, ServerReflectionRequest,
 };
 
-use crate::{
+use relentless::{
     assault::factory::RequestFactory,
     error::IntoResult,
     interface::{
@@ -59,7 +59,6 @@ pub enum GrpcMessage {
     #[default]
     Empty,
     Plaintext(String),
-    #[cfg(feature = "json")]
     Json(serde_json::Value),
 }
 impl Coalesce for GrpcRequest {
@@ -87,7 +86,7 @@ impl Coalesce for GrpcMessage {
 }
 
 impl RequestFactory<DefaultGrpcRequest<serde_json::Value, serde_json::value::Serializer>> for GrpcRequest {
-    type Error = crate::Error;
+    type Error = relentless::Error;
     async fn produce(
         &self,
         destination: &http::Uri,
@@ -108,7 +107,7 @@ impl GrpcRequest {
     pub fn service_method(
         pool: &DescriptorPool,
         (service, method): (&str, &str),
-    ) -> crate::Result<(ServiceDescriptor, MethodDescriptor)> {
+    ) -> relentless::Result<(ServiceDescriptor, MethodDescriptor)> {
         let svc = pool.get_service_by_name(service).ok_or_else(|| GrpcRequestError::NoService(service.to_string()))?;
         let mth =
             svc.methods().find(|m| m.name() == method).ok_or_else(|| GrpcRequestError::NoMethod(method.to_string()))?;
@@ -118,7 +117,7 @@ impl GrpcRequest {
         &self,
         destination: &http::Uri,
         (service, _method): (&str, &str),
-    ) -> crate::Result<DescriptorPool> {
+    ) -> relentless::Result<DescriptorPool> {
         // TODO cache
         match &self.descriptor {
             DescriptorFrom::Protos { protos, import_path } => Self::descriptor_from_protos(protos, import_path).await,
@@ -130,19 +129,19 @@ impl GrpcRequest {
     pub async fn descriptor_from_protos<A: AsRef<Path>>(
         protos: &[A],
         import_path: &[A],
-    ) -> crate::Result<DescriptorPool> {
+    ) -> relentless::Result<DescriptorPool> {
         let builder = &mut prost_build::Config::new();
         let fds = builder.load_fds(protos, import_path).box_err()?;
         DescriptorPool::from_file_descriptor_set(fds).box_err()
     }
 
-    pub async fn descriptor_from_file(path: &PathBuf) -> crate::Result<DescriptorPool> {
+    pub async fn descriptor_from_file(path: &PathBuf) -> relentless::Result<DescriptorPool> {
         let mut descriptor_bytes = Vec::new();
         File::open(path).box_err()?.read_to_end(&mut descriptor_bytes).box_err()?;
         DescriptorPool::decode(Bytes::from(descriptor_bytes)).box_err()
     }
 
-    pub async fn descriptor_from_reflection(destination: &http::Uri, svc: &str) -> crate::Result<DescriptorPool> {
+    pub async fn descriptor_from_reflection(destination: &http::Uri, svc: &str) -> relentless::Result<DescriptorPool> {
         let mut client = ServerReflectionClient::new(Channel::builder(destination.clone()).connect().await.box_err()?);
         let (host, service) = (
             destination.host().ok_or_else(|| GrpcRequestError::NoHost(destination.clone()))?.to_string(),
@@ -189,7 +188,7 @@ impl GrpcRequest {
         host: &str,
         pool: &mut DescriptorPool,
         fd: FileDescriptorProto,
-    ) -> crate::Result<()> {
+    ) -> relentless::Result<()> {
         let mut stack = vec![fd]; // TODO use stream as stack ?
         let mut client = ServerReflectionClient::new(Channel::builder(destination.clone()).connect().await.box_err()?);
         while let Some(proto) = stack.pop() {
@@ -213,7 +212,7 @@ impl GrpcRequest {
                         else {
                             return Err(GrpcRequestError::UnexpectedReflectionResponse.into());
                         };
-                        let dep_protos: crate::Result<Vec<_>> = descriptor
+                        let dep_protos: relentless::Result<Vec<_>> = descriptor
                             .file_descriptor_proto
                             .into_iter()
                             .map(|d| FileDescriptorProto::decode(&*d).box_err())
@@ -234,7 +233,6 @@ impl GrpcMessage {
         match self {
             Self::Empty => serde_json::Value::Object(serde_json::Map::new()),
             Self::Plaintext(_) => unimplemented!(),
-            #[cfg(feature = "json")]
             Self::Json(v) => v.clone(),
         }
     }
