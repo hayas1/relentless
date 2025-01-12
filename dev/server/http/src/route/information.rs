@@ -144,7 +144,7 @@ mod tests {
             req,
             StatusCode::OK,
             InformationResponse {
-                hostname: "localhost".to_string(),
+                hostname: "localhost:3000".to_string(),
                 // BUG? in test, include scheme and authority, but server response include only path and query
                 uri: Uri::from_static("http://localhost:3000/information"),
                 path: "/information".to_string(),
@@ -167,7 +167,7 @@ mod tests {
             req,
             StatusCode::OK,
             InformationResponse {
-                hostname: "localhost".to_string(),
+                hostname: "localhost:3000".to_string(),
                 uri: Uri::from_static("http://localhost:3000/information/path/to/query?q=test&k=1&k=2&k=3"),
                 path: "/information/path/to/query".to_string(),
                 query: json!({ "q": "test", "k": ["1", "2", "3"] }).as_object().unwrap().clone(),
@@ -193,7 +193,7 @@ mod tests {
             StatusCode::OK,
             InformationResponse {
                 scheme: None,
-                hostname: "localhost".to_string(),
+                hostname: "localhost:3000".to_string(),
                 method: Method::POST,
                 uri: Uri::from_static("http://localhost:3000/information/post/qs/to?type=txt"),
                 path: "/information/post/qs/to".to_string(),
@@ -220,7 +220,7 @@ mod tests {
             StatusCode::OK,
             InformationResponse {
                 scheme: None,
-                hostname: "localhost".to_string(),
+                hostname: "localhost:3000".to_string(),
                 method: Method::POST,
                 uri: Uri::from_static("http://localhost:3000/information/post/json/to"),
                 path: "/information/post/json/to".to_string(),
