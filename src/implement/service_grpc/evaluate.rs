@@ -148,7 +148,7 @@ impl Acceptable<&serde_json::Value> for GrpcMessage {
     type Message = GrpcEvaluateError;
     fn accept(&self, values: &Destinations<&serde_json::Value>, msg: &mut Messages<Self::Message>) -> bool {
         match self {
-            GrpcMessage::AnyOrEqual => true,
+            GrpcMessage::AnyOrEqual => Self::assault_or_compare(values, |_| true),
             GrpcMessage::Plaintext(plaintext) => todo!(),
             #[cfg(feature = "json")]
             GrpcMessage::Json(json) => Self::sub_accept(json, values, msg, GrpcEvaluateError::JsonEvaluateError),

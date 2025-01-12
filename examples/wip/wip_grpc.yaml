@@ -7,6 +7,7 @@ testcases:
   - target: greeter.Greeter/SayHello
     description: wip request
     setting:
+      allow: true
       template:
         name:
           test-ap1: server1
@@ -17,6 +18,8 @@ testcases:
           json:
             name: ${name}
       response:
+        message:
+          json:
   - target: counter.Counter/Increment
     setting:
       request:
@@ -27,11 +30,9 @@ testcases:
           json:
             100
       response:
+        message:
+          json:
   - target: echo.Echo/EchoMetadata
     setting:
       request:
-        # descriptor: ./target/debug/build/relentless-dev-server-grpc-966e593a5a4fc2ae/out/file_descriptor.bin
-        # descriptor: 
-        #   protos: [./dev/server/grpc/proto/echo.proto]
-        #   import_path: [./dev/server/grpc/proto]
       response:
