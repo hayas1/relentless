@@ -1,6 +1,5 @@
 use std::fmt::Debug;
 
-use bytes::Bytes;
 use http::Extensions;
 use serde::{Deserialize, Serialize};
 use tonic::metadata::MetadataMap;
@@ -149,7 +148,7 @@ impl Acceptable<&serde_json::Value> for GrpcMessage {
     fn accept(&self, values: &Destinations<&serde_json::Value>, msg: &mut Messages<Self::Message>) -> bool {
         match self {
             GrpcMessage::AnyOrEqual => Self::assault_or_compare(values, |_| true),
-            GrpcMessage::Plaintext(plaintext) => todo!(),
+            GrpcMessage::Plaintext(_plaintext) => unimplemented!(),
             #[cfg(feature = "json")]
             GrpcMessage::Json(json) => Self::sub_accept(json, values, msg, GrpcEvaluateError::JsonEvaluateError),
         }
@@ -172,7 +171,7 @@ impl Acceptable<http::HeaderMap> for GrpcMetadataMap {
 
 impl Acceptable<&Extensions> for GrpcExtensions {
     type Message = GrpcEvaluateError;
-    fn accept(&self, extensions: &Destinations<&Extensions>, msg: &mut Messages<Self::Message>) -> bool {
+    fn accept(&self, _extensions: &Destinations<&Extensions>, msg: &mut Messages<Self::Message>) -> bool {
         let acceptable = match self {
             GrpcExtensions::AnyOrEqual => true, // TODO Self::assault_or_compare(extensions, |_| true),
             GrpcExtensions::Ignore => true,
