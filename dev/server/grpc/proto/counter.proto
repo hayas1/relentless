@@ -5,23 +5,23 @@ import "google/protobuf/wrappers.proto";
 import "google/protobuf/empty.proto";
 
 service Counter {
-    rpc Increment(google.protobuf.Int64Value) returns (google.protobuf.Int64Value);
-    rpc Bincrement (BigInt) returns (BigInt);
-    rpc Decrement(google.protobuf.Int64Value) returns (google.protobuf.Int64Value);
-    rpc Bdecrement (BigInt) returns (BigInt);
+  rpc Increment(google.protobuf.Int64Value) returns (google.protobuf.Int64Value);
+  rpc Bincrement(BigInt) returns (BigInt);
+  rpc Decrement(google.protobuf.Int64Value) returns (google.protobuf.Int64Value);
+  rpc Bdecrement(BigInt) returns (BigInt);
 
-    rpc Show(google.protobuf.Empty) returns (google.protobuf.Int64Value);
-    rpc Bshow(google.protobuf.Empty) returns (BigInt);
-    rpc Reset(google.protobuf.Empty) returns (google.protobuf.Int64Value);
-    rpc Breset(google.protobuf.Empty) returns (BigInt);
+  rpc Show(google.protobuf.Empty) returns (google.protobuf.Int64Value);
+  rpc Bshow(google.protobuf.Empty) returns (BigInt);
+  rpc Reset(google.protobuf.Empty) returns (google.protobuf.Int64Value);
+  rpc Breset(google.protobuf.Empty) returns (BigInt);
 }
 
 enum Sign {
-    NoSign = 0;
-    PLUS = 1;
-    MINUS = -1;
+  NoSign = 0;
+  PLUS   = 1;
+  MINUS  = -1;
 }
 message BigInt {
-    Sign sign = 1;
-    bytes repr = 2;
+  Sign  sign = 1;
+  bytes repr = 2;
 }

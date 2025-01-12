@@ -5,6 +5,10 @@ use clap::{Parser, ValueEnum};
 use serde::{Deserialize, Serialize};
 use tower::{Service, ServiceBuilder};
 
+#[cfg(feature = "json")]
+use crate::implement::service_grpc::{
+    client::DefaultGrpcClient, error::GrpcEvaluateError, evaluate::GrpcResponse, factory::GrpcRequest,
+};
 #[cfg(feature = "default-http-client")]
 use crate::implement::service_http::client::DefaultHttpClient;
 #[cfg(feature = "console-report")]
@@ -22,7 +26,11 @@ use crate::{
     implement::service_http::{evaluate::HttpResponse, factory::HttpRequest},
 };
 
-use super::{config::Config, helper::http_serde_priv, report::github_markdown::GithubMarkdownReport};
+use super::{
+    config::{Config, Configuration},
+    helper::{coalesce::Coalesce, http_serde_priv},
+    report::github_markdown::GithubMarkdownReport,
+};
 
 #[cfg(feature = "cli")]
 pub async fn execute() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sync>> {
@@ -157,9 +165,9 @@ impl Relentless {
     }
 
     /// TODO document
-    pub fn configs(&self) -> (Vec<Config<HttpRequest, HttpResponse>>, Vec<crate::Error>) {
+    pub fn configs<Q: Configuration, P: Configuration>(&self) -> (Vec<Config<Q, P>>, Vec<crate::Error>) {
         let Self { file, .. } = self;
-        let (ok, err): (Vec<_>, _) = file.iter().map(Config::read).partition(Result::is_ok);
+        let (ok, err): (Vec<_>, _) = file.iter().map(Config::<Q, P>::read).partition(Result::is_ok);
         let (configs, errors) =
             (ok.into_iter().map(Result::unwrap).collect(), err.into_iter().map(Result::unwrap_err).collect());
         (configs, errors)
@@ -189,16 +197,26 @@ impl Relentless {
         let report = self.assault_with(configs, service).await?;
         Ok(report)
     }
+    #[cfg(feature = "json")]
+    pub async fn assault_grpc(&self) -> crate::Result<Report<GrpcEvaluateError, GrpcRequest, GrpcResponse>> {
+        let (configs, cannot_read) = self.configs();
+        for err in cannot_read {
+            eprintln!("{}", err);
+        }
+        let service = self.build_service(DefaultGrpcClient::<serde_json::Value>::new());
+        let report = self.assault_with(configs, service).await?;
+        Ok(report)
+    }
     /// TODO document
-    pub async fn assault_with<S, Req>(
+    pub async fn assault_with<Q, P, S, Req>(
         &self,
-        configs: Vec<Config<HttpRequest, HttpResponse>>,
+        configs: Vec<Config<Q, P>>,
         service: S,
-    ) -> crate::Result<Report<<HttpResponse as Evaluate<S::Response>>::Message, HttpRequest, HttpResponse>>
+    ) -> crate::Result<Report<P::Message, Q, P>>
     where
-        HttpRequest: RequestFactory<Req>,
-        <HttpRequest as RequestFactory<Req>>::Error: std::error::Error + Send + Sync + 'static,
-        HttpResponse: Evaluate<S::Response>,
+        Q: Configuration + Coalesce + RequestFactory<Req>,
+        Q::Error: std::error::Error + Send + Sync + 'static,
+        P: Configuration + Coalesce + Evaluate<S::Response>,
         S: Service<Req> + Clone + Send + 'static,
         S::Error: std::error::Error + Send + Sync + 'static,
         S::Future: Send + 'static,
@@ -208,17 +226,21 @@ impl Relentless {
         Ok(report)
     }
 
-    pub fn report<M: Display>(
-        &self,
-        report: &Report<M, HttpRequest, HttpResponse>,
-    ) -> Result<ExitCode, std::fmt::Error> {
+    pub fn report<M, Q, P>(&self, report: &Report<M, Q, P>) -> Result<ExitCode, std::fmt::Error>
+    where
+        M: Display,
+        Q: Configuration + Coalesce,
+        P: Configuration + Coalesce,
+    {
         self.report_with(report, std::io::stdout())
     }
-    pub fn report_with<M: Display, W: Write>(
-        &self,
-        report: &Report<M, HttpRequest, HttpResponse>,
-        mut write: W,
-    ) -> Result<ExitCode, std::fmt::Error> {
+    pub fn report_with<M, W, Q, P>(&self, report: &Report<M, Q, P>, mut write: W) -> Result<ExitCode, std::fmt::Error>
+    where
+        M: Display,
+        W: Write,
+        Q: Configuration + Coalesce,
+        P: Configuration + Coalesce,
+    {
         let Self { no_color, report_format, .. } = self;
         #[cfg(feature = "console-report")]
         console::set_colors_enabled(!no_color);
@@ -434,7 +456,7 @@ mod tests {
             report_format: ReportFormat::NullDevice,
             ..Default::default()
         };
-        let (configs, e) = cmd.configs();
+        let (configs, e) = cmd.configs::<HttpRequest, HttpResponse>();
         assert_eq!(configs.len(), glob::glob("tests/config/parse/valid_*.yaml").unwrap().filter(Result::is_ok).count());
 
         let mut buf = Vec::new();

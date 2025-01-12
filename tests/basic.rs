@@ -17,7 +17,7 @@ async fn test_example_yaml_config() {
     };
     let (configs, _) = relentless.configs();
     let service = route::app_with(Default::default());
-    let report = relentless.assault_with::<_, http::Request<Body>>(configs, service).await.unwrap();
+    let report = relentless.assault_with::<_, _, _, http::Request<Body>>(configs, service).await.unwrap();
 
     assert_eq!(relentless.file.len(), report.sub_reportable().unwrap().len());
     assert!(relentless.allow(&report));
@@ -26,14 +26,19 @@ async fn test_example_yaml_config() {
 #[test]
 #[cfg(all(feature = "json", feature = "toml"))]
 fn test_same_basic_yaml_toml_config() {
+    use relentless::implement::service_http::{evaluate::HttpResponse, factory::HttpRequest};
+
     let yaml = glob::glob("tests/config/basic/*.yaml").unwrap().collect::<Result<Vec<_>, _>>().unwrap();
     let toml = glob::glob("tests/config/basic/*.toml").unwrap().collect::<Result<Vec<_>, _>>().unwrap();
     assert_eq!(yaml.len(), toml.len());
 
     let yam = Relentless { file: yaml, ..Default::default() };
     let tom = Relentless { file: toml, ..Default::default() };
-    assert_json_diff::assert_json_eq!(yam.configs().0, tom.configs().0);
-    assert_eq!(yam.configs().0, tom.configs().0);
+    assert_json_diff::assert_json_eq!(
+        yam.configs::<HttpRequest, HttpResponse>().0,
+        tom.configs::<HttpRequest, HttpResponse>().0,
+    );
+    assert_eq!(yam.configs::<HttpRequest, HttpResponse>().0, tom.configs::<HttpRequest, HttpResponse>().0);
 }
 
 #[tokio::test]
@@ -52,7 +57,7 @@ async fn test_basic_yaml_config() {
             .into_iter()
             .collect(),
     );
-    let report = relentless.assault_with::<_, http::Request<Body>>(configs, service).await.unwrap();
+    let report = relentless.assault_with::<_, _, _, http::Request<Body>>(configs, service).await.unwrap();
 
     assert_eq!(relentless.file.len(), report.sub_reportable().unwrap().len());
     assert!(relentless.allow(&report));
@@ -74,7 +79,7 @@ async fn test_basic_toml_config() {
             .into_iter()
             .collect(),
     );
-    let report = relentless.assault_with::<_, http::Request<Body>>(configs, service).await.unwrap();
+    let report = relentless.assault_with::<_, _, _, http::Request<Body>>(configs, service).await.unwrap();
 
     relentless.report(&report).unwrap();
     assert_eq!(relentless.file.len(), report.sub_reportable().unwrap().len());

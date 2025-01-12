@@ -26,21 +26,22 @@ jobs:
           ${{ steps.cargo-home.outputs.path }}
         key: cargo-${{ hashFiles('**/Cargo.toml') }}
 
-    - run: cargo test --verbose --manifest-path dev/server/http/Cargo.toml
+    - run: cargo test --manifest-path dev/server/http/Cargo.toml
     - run: cargo fmt --check --manifest-path dev/server/http/Cargo.toml
     - run: cargo clippy --tests --manifest-path dev/server/http/Cargo.toml -- --deny warnings
 
     - run: ./dev/server/grpc/scripts/setup.sh
-    - run: cargo test --verbose --manifest-path dev/server/grpc/Cargo.toml
+    - run: cargo test --manifest-path dev/server/grpc/Cargo.toml
     - run: cargo fmt --check --manifest-path dev/server/grpc/Cargo.toml
     - run: cargo clippy --tests --manifest-path dev/server/grpc/Cargo.toml -- --deny warnings
+    - run: clang-format ./dev/server/grpc/proto/*.proto --dry-run --Werror
 
-    - run: cargo test --verbose
-    - run: cargo test --verbose --no-default-features
-    - run: cargo test --verbose --no-default-features --features=json
-    - run: cargo test --verbose --no-default-features --features=yaml
-    - run: cargo test --verbose --no-default-features --features=json --features=yaml
-    - run: cargo test --verbose --no-default-features --features=json --features=yaml --features=cli
+    - run: cargo test
+    - run: cargo test --no-default-features
+    - run: cargo test --no-default-features --features=json
+    - run: cargo test --no-default-features --features=yaml
+    - run: cargo test --no-default-features --features=json --features=yaml
+    - run: cargo test --no-default-features --features=json --features=yaml --features=cli
     - run: cargo fmt --check
     - run: RUSTDOCFLAGS="-D warnings" cargo doc --no-deps
     - run: cargo clippy --tests -- --deny warnings
