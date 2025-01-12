@@ -1,22 +1,23 @@
 use std::{
     future::Future,
     marker::PhantomData,
-    net::SocketAddr,
     pin::Pin,
     task::{Context, Poll},
 };
 
-use bytes::{Buf, BufMut, Bytes, BytesMut};
-use http::{uri::PathAndQuery, Uri};
+use bytes::Buf;
+use http::uri::PathAndQuery;
 use prost::Message;
-use prost_reflect::{DescriptorPool, DynamicMessage, MessageDescriptor, MethodDescriptor, ServiceDescriptor};
-use serde::{de::DeserializeOwned, Deserialize, Deserializer, Serialize, Serializer};
+use prost_reflect::{DynamicMessage, MessageDescriptor, MethodDescriptor, ServiceDescriptor};
+use serde::{Deserializer, Serialize, Serializer};
 use tonic::{
-    codec::{Codec, Decoder, Encoder, ProstCodec},
+    codec::{Codec, Decoder, Encoder},
     transport::Channel,
     Status,
 };
 use tower::Service;
+
+use crate::error::IntoResult;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct DefaultGrpcRequest<D, S> {
@@ -29,7 +30,9 @@ pub struct DefaultGrpcRequest<D, S> {
 impl<D, S> DefaultGrpcRequest<D, S> {
     pub fn format_method_path(&self) -> PathAndQuery {
         // https://github.com/hyperium/tonic/blob/master/tonic-build/src/lib.rs#L212-L218
-        format!("/{}/{}", self.service.full_name(), self.method.name()).parse().unwrap_or_else(|e| todo!("{}", e))
+        format!("/{}/{}", self.service.full_name(), self.method.name())
+            .parse()
+            .unwrap_or_else(|e| unreachable!("{}", e))
     }
 }
 
@@ -45,6 +48,7 @@ impl<D> DefaultGrpcClient<D> {
 impl<D> Service<DefaultGrpcRequest<D, serde_json::value::Serializer>> for DefaultGrpcClient<D>
 where
     D: for<'a> Deserializer<'a> + Send + Sync + 'static,
+    for<'a> <D as Deserializer<'a>>::Error: std::error::Error + Send + Sync + 'static,
 {
     type Response = tonic::Response<<serde_json::value::Serializer as Serializer>::Ok>;
     type Error = crate::Error;
@@ -57,17 +61,9 @@ where
     fn call(&mut self, request: DefaultGrpcRequest<D, serde_json::value::Serializer>) -> Self::Future {
         let path = request.format_method_path();
         Box::pin(async move {
-            let channel = Channel::builder(request.destination).connect().await.unwrap_or_else(|e| todo!("{}", e));
-            let mut client = tonic::client::Grpc::new(channel);
-
-            client.ready().await.unwrap_or_else(|e| todo!("{}", e));
-
-            let response = client
-                .unary(tonic::Request::new(request.message), path, request.codec)
-                .await
-                .unwrap_or_else(|e| todo!("{}", e));
-
-            Ok(response)
+            let mut client = tonic::client::Grpc::new(Channel::builder(request.destination).connect().await.box_err()?);
+            client.ready().await.box_err()?;
+            client.unary(tonic::Request::new(request.message), path, request.codec).await.box_err()
         })
     }
 }
@@ -90,6 +86,7 @@ impl<D, S> MethodCodec<D, S> {
 impl<D, S> Codec for MethodCodec<D, S>
 where
     D: for<'a> Deserializer<'a> + Send + 'static,
+    for<'a> <D as Deserializer<'a>>::Error: std::error::Error + Send + Sync + 'static,
 {
     type Encode = D;
     type Decode = <serde_json::value::Serializer as Serializer>::Ok;
@@ -110,6 +107,7 @@ pub struct MethodEncoder<D>(MessageDescriptor, PhantomData<D>);
 impl<D> Encoder for MethodEncoder<D>
 where
     D: for<'a> Deserializer<'a>,
+    for<'a> <D as Deserializer<'a>>::Error: std::error::Error + Send + Sync + 'static,
 {
     type Item = D;
     type Error = Status;
@@ -117,7 +115,7 @@ where
     fn encode(&mut self, item: Self::Item, dst: &mut tonic::codec::EncodeBuf<'_>) -> Result<(), Self::Error> {
         let Self(descriptor, _phantom) = self;
         DynamicMessage::deserialize(descriptor.clone(), item)
-            .unwrap_or_else(|_| todo!())
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?
             .encode(dst)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
         Ok(())
@@ -141,6 +139,10 @@ impl Decoder for MethodDecoder<serde_json::value::Serializer>
         let Self(descriptor, _phantom) = self;
         let dynamic_message = DynamicMessage::decode(descriptor.clone(), src) // TODO `decode` requires ownership of MethodDescriptor
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
-        Ok(Some(dynamic_message.serialize(serde_json::value::Serializer).unwrap_or_else(|_| todo!())))
+        Ok(Some(
+            dynamic_message
+                .serialize(serde_json::value::Serializer)
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?,
+        ))
     }
 }
