@@ -5,6 +5,10 @@ use clap::{Parser, ValueEnum};
 use serde::{Deserialize, Serialize};
 use tower::{Service, ServiceBuilder};
 
+#[cfg(feature = "json")]
+use crate::implement::service_grpc::{
+    client::DefaultGrpcClient, error::GrpcEvaluateError, evaluate::GrpcResponse, factory::GrpcRequest,
+};
 #[cfg(feature = "default-http-client")]
 use crate::implement::service_http::client::DefaultHttpClient;
 #[cfg(feature = "console-report")]
@@ -19,12 +23,7 @@ use crate::{
         worker::Control,
     },
     error::{InterfaceError, IntoResult},
-    implement::{
-        service_grpc::{
-            client::DefaultGrpcClient, error::GrpcEvaluateError, evaluate::GrpcResponse, factory::GrpcRequest,
-        },
-        service_http::{evaluate::HttpResponse, factory::HttpRequest},
-    },
+    implement::service_http::{evaluate::HttpResponse, factory::HttpRequest},
 };
 
 use super::{
@@ -198,6 +197,7 @@ impl Relentless {
         let report = self.assault_with(configs, service).await?;
         Ok(report)
     }
+    #[cfg(feature = "json")]
     pub async fn assault_grpc(&self) -> crate::Result<Report<GrpcEvaluateError, GrpcRequest, GrpcResponse>> {
         let (configs, cannot_read) = self.configs();
         for err in cannot_read {

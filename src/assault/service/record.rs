@@ -17,7 +17,9 @@ use http_body_util::{BodyExt, Collected};
 use serde::{de::DeserializeOwned, Deserialize};
 use tower::{Layer, Service};
 
-use crate::{error::IntoResult, implement::service_grpc::client::DefaultGrpcRequest};
+use crate::error::IntoResult;
+#[cfg(feature = "json")]
+use crate::implement::service_grpc::client::DefaultGrpcRequest;
 
 pub trait Recordable: Sized + Send {
     type Error;
@@ -41,227 +43,238 @@ pub trait RecordableRequest {
     fn record_dir(&self) -> PathBuf;
 }
 
-impl<B> Recordable for http::Request<B>
-where
-    B: Body + Send,
-    B::Data: Send,
-{
-    type Error = std::io::Error;
-    fn extension(&self) -> &'static str {
-        if let Some(content_type) = self.headers().get(CONTENT_TYPE) {
-            if content_type == mime::APPLICATION_JSON.as_ref() {
-                "json"
+pub mod http_record {
+    use super::*;
+
+    impl<B> Recordable for http::Request<B>
+    where
+        B: Body + Send,
+        B::Data: Send,
+    {
+        type Error = std::io::Error;
+        fn extension(&self) -> &'static str {
+            if let Some(content_type) = self.headers().get(CONTENT_TYPE) {
+                if content_type == mime::APPLICATION_JSON.as_ref() {
+                    "json"
+                } else {
+                    "txt"
+                }
             } else {
                 "txt"
             }
-        } else {
-            "txt"
+        }
+        async fn record<W: std::io::Write>(self, w: &mut W) -> Result<(), Self::Error> {
+            let body = BodyExt::collect(self.into_body()).await.map(Collected::to_bytes).unwrap_or_default();
+            write!(w, "{}", String::from_utf8_lossy(&body))
+        }
+        async fn record_raw<W: std::io::Write>(self, w: &mut W) -> Result<(), Self::Error> {
+            let (http::request::Parts { method, uri, version, headers, .. }, body) = self.into_parts();
+
+            writeln!(w, "{} {} {:?}", method, uri, version)?;
+            for (header, value) in headers.iter() {
+                writeln!(w, "{}: {:?}", header, value)?;
+            }
+            writeln!(w)?;
+            if let Ok(b) = BodyExt::collect(body).await.map(Collected::to_bytes) {
+                write!(w, "{}", String::from_utf8_lossy(&b))?;
+            }
+
+            Ok(())
         }
     }
-    async fn record<W: std::io::Write>(self, w: &mut W) -> Result<(), Self::Error> {
-        let body = BodyExt::collect(self.into_body()).await.map(Collected::to_bytes).unwrap_or_default();
-        write!(w, "{}", String::from_utf8_lossy(&body))
-    }
-    async fn record_raw<W: std::io::Write>(self, w: &mut W) -> Result<(), Self::Error> {
-        let (http::request::Parts { method, uri, version, headers, .. }, body) = self.into_parts();
 
-        writeln!(w, "{} {} {:?}", method, uri, version)?;
-        for (header, value) in headers.iter() {
-            writeln!(w, "{}: {:?}", header, value)?;
+    impl<B> CloneCollected for http::Request<B>
+    where
+        B: Body + From<Bytes> + Send,
+        B::Data: Send,
+    {
+        type CollectError = B::Error;
+        async fn clone_collected(self) -> Result<(Self, Self), Self::CollectError> {
+            let (req_parts, req_body) = self.into_parts();
+            let req_bytes = BodyExt::collect(req_body).await.map(Collected::to_bytes)?;
+            let req1 = http::Request::from_parts(req_parts.clone(), B::from(req_bytes.clone()));
+            let req2 = http::Request::from_parts(req_parts, B::from(req_bytes));
+            Ok((req1, req2))
         }
-        writeln!(w)?;
-        if let Ok(b) = BodyExt::collect(body).await.map(Collected::to_bytes) {
-            write!(w, "{}", String::from_utf8_lossy(&b))?;
+    }
+    impl<B> RecordableRequest for http::Request<B> {
+        fn record_dir(&self) -> PathBuf {
+            self.uri().to_string().into()
         }
-
-        Ok(())
     }
-}
 
-impl<B> CloneCollected for http::Request<B>
-where
-    B: Body + From<Bytes> + Send,
-    B::Data: Send,
-{
-    type CollectError = B::Error;
-    async fn clone_collected(self) -> Result<(Self, Self), Self::CollectError> {
-        let (req_parts, req_body) = self.into_parts();
-        let req_bytes = BodyExt::collect(req_body).await.map(Collected::to_bytes)?;
-        let req1 = http::Request::from_parts(req_parts.clone(), B::from(req_bytes.clone()));
-        let req2 = http::Request::from_parts(req_parts, B::from(req_bytes));
-        Ok((req1, req2))
-    }
-}
-impl<B> RecordableRequest for http::Request<B> {
-    fn record_dir(&self) -> PathBuf {
-        self.uri().to_string().into()
-    }
-}
-
-impl<B> Recordable for http::Response<B>
-where
-    B: Body + Send,
-    B::Data: Send,
-{
-    type Error = std::io::Error;
-    fn extension(&self) -> &'static str {
-        if let Some(content_type) = self.headers().get(CONTENT_TYPE) {
-            if content_type == mime::APPLICATION_JSON.as_ref() {
-                "json"
+    impl<B> Recordable for http::Response<B>
+    where
+        B: Body + Send,
+        B::Data: Send,
+    {
+        type Error = std::io::Error;
+        fn extension(&self) -> &'static str {
+            if let Some(content_type) = self.headers().get(CONTENT_TYPE) {
+                if content_type == mime::APPLICATION_JSON.as_ref() {
+                    "json"
+                } else {
+                    "txt"
+                }
             } else {
                 "txt"
             }
-        } else {
-            "txt"
         }
-    }
-    async fn record<W: std::io::Write>(self, w: &mut W) -> Result<(), Self::Error> {
-        let body = BodyExt::collect(self.into_body()).await.map(Collected::to_bytes).unwrap_or_default();
-        write!(w, "{}", String::from_utf8_lossy(&body))
-    }
-    async fn record_raw<W: std::io::Write>(self, w: &mut W) -> Result<(), Self::Error> {
-        let (http::response::Parts { version, status, headers, .. }, body) = self.into_parts();
+        async fn record<W: std::io::Write>(self, w: &mut W) -> Result<(), Self::Error> {
+            let body = BodyExt::collect(self.into_body()).await.map(Collected::to_bytes).unwrap_or_default();
+            write!(w, "{}", String::from_utf8_lossy(&body))
+        }
+        async fn record_raw<W: std::io::Write>(self, w: &mut W) -> Result<(), Self::Error> {
+            let (http::response::Parts { version, status, headers, .. }, body) = self.into_parts();
 
-        writeln!(w, "{:?} {}", version, status)?;
-        for (header, value) in headers.iter() {
-            writeln!(w, "{}: {:?}", header, value)?;
-        }
-        writeln!(w)?;
-        if let Ok(b) = BodyExt::collect(body).await.map(Collected::to_bytes) {
-            write!(w, "{}", String::from_utf8_lossy(&b))?;
-        }
+            writeln!(w, "{:?} {}", version, status)?;
+            for (header, value) in headers.iter() {
+                writeln!(w, "{}: {:?}", header, value)?;
+            }
+            writeln!(w)?;
+            if let Ok(b) = BodyExt::collect(body).await.map(Collected::to_bytes) {
+                write!(w, "{}", String::from_utf8_lossy(&b))?;
+            }
 
-        Ok(())
+            Ok(())
+        }
     }
-}
-impl<B> CloneCollected for http::Response<B>
-where
-    B: Body + From<Bytes> + Send,
-    B::Data: Send,
-{
-    type CollectError = B::Error;
-    async fn clone_collected(self) -> Result<(Self, Self), Self::CollectError> {
-        // once consume body to record, and reconstruct to response
-        let (res_parts, res_body) = self.into_parts();
-        let res_bytes = BodyExt::collect(res_body).await.map(Collected::to_bytes)?;
-        let res1 = http::Response::from_parts(res_parts.clone(), B::from(res_bytes.clone()));
-        let res2 = http::Response::from_parts(res_parts, B::from(res_bytes));
-        Ok((res1, res2))
+    impl<B> CloneCollected for http::Response<B>
+    where
+        B: Body + From<Bytes> + Send,
+        B::Data: Send,
+    {
+        type CollectError = B::Error;
+        async fn clone_collected(self) -> Result<(Self, Self), Self::CollectError> {
+            // once consume body to record, and reconstruct to response
+            let (res_parts, res_body) = self.into_parts();
+            let res_bytes = BodyExt::collect(res_body).await.map(Collected::to_bytes)?;
+            let res1 = http::Response::from_parts(res_parts.clone(), B::from(res_bytes.clone()));
+            let res2 = http::Response::from_parts(res_parts, B::from(res_bytes));
+            Ok((res1, res2))
+        }
     }
 }
 
-impl<De, Se> Recordable for DefaultGrpcRequest<De, Se>
-where
-    De: for<'a> serde::Deserializer<'a> + Send + Sync + 'static,
-    for<'a> <De as serde::Deserializer<'a>>::Error: std::error::Error + Send + Sync + 'static,
-    Se: Send,
-{
-    type Error = std::io::Error;
-    fn extension(&self) -> &'static str {
-        "json"
-    }
-    async fn record<W: std::io::Write>(self, w: &mut W) -> Result<(), Self::Error> {
-        let value = serde_json::Value::deserialize(self.message)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
-        write!(w, "{}", serde_json::to_string_pretty(&value).unwrap())
-    }
-    async fn record_raw<W: std::io::Write + Send>(self, w: &mut W) -> Result<(), Self::Error> {
-        let uri = self.destination;
-        let (metadata, extension, message) = tonic::Request::new(self.message).into_parts();
-        let mut http_request_builder = http::Request::builder().method(Method::POST).uri(uri).extension(extension);
-        if let Some(headers) = http_request_builder.headers_mut() {
-            *headers = metadata.into_headers();
-        }
-        let body = Bytes::from(
-            serde_json::to_vec(
-                &serde_json::Value::deserialize(message)
-                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?,
-            )
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?,
-        );
-        let http_request = http_request_builder
-            .body(http_body_util::Full::new(body))
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+#[cfg(feature = "json")]
+pub mod grpc_record {
+    use super::*;
 
-        http_request.record_raw(w).await
-    }
-}
-impl<De, Se> CloneCollected for DefaultGrpcRequest<De, Se>
-where
-    De: for<'a> serde::Deserializer<'a> + DeserializeOwned + Send + Sync + 'static,
-    for<'a> <De as serde::Deserializer<'a>>::Error: std::error::Error + Send + Sync + 'static,
-    Se: Send,
-{
-    type CollectError = std::io::Error;
-    async fn clone_collected(self) -> Result<(Self, Self), Self::CollectError> {
-        let Self { destination, service, method, codec, message } = self;
-        let value = serde_json::Value::deserialize(message)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
-        let m1 = serde_json::from_value(value.clone())
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
-        let m2 = serde_json::from_value(value).map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
-        Ok((
-            Self {
-                destination: destination.clone(),
-                service: service.clone(),
-                method: method.clone(),
-                codec: codec.clone(),
-                message: m1,
-            },
-            Self { destination, service, method, codec, message: m2 },
-        ))
-    }
-}
-impl<De, Se> RecordableRequest for DefaultGrpcRequest<De, Se> {
-    fn record_dir(&self) -> PathBuf {
-        http::uri::Builder::from(self.destination.clone())
-            .path_and_query(self.format_method_path())
-            .build()
-            .unwrap_or_else(|e| unreachable!("{}", e))
-            .to_string()
-            .into()
-    }
-}
-impl Recordable for tonic::Response<<serde_json::value::Serializer as serde::Serializer>::Ok> {
-    type Error = std::io::Error;
-    fn extension(&self) -> &'static str {
-        "json"
-    }
-    async fn record<W: std::io::Write>(self, w: &mut W) -> Result<(), Self::Error> {
-        let value = serde_json::Value::deserialize(self.into_inner())
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
-        write!(w, "{}", serde_json::to_string_pretty(&value).unwrap())
-    }
-    async fn record_raw<W: std::io::Write + Send>(self, w: &mut W) -> Result<(), Self::Error> {
-        let (metadata, message, extension) = self.into_parts();
-        let mut http_response_builder = http::Response::builder().extension(extension);
-        if let Some(headers) = http_response_builder.headers_mut() {
-            *headers = metadata.into_headers();
+    impl<De, Se> Recordable for DefaultGrpcRequest<De, Se>
+    where
+        De: for<'a> serde::Deserializer<'a> + Send + Sync + 'static,
+        for<'a> <De as serde::Deserializer<'a>>::Error: std::error::Error + Send + Sync + 'static,
+        Se: Send,
+    {
+        type Error = std::io::Error;
+        fn extension(&self) -> &'static str {
+            "json"
         }
-        let body = Bytes::from(
-            serde_json::to_vec(
-                &serde_json::Value::deserialize(message)
-                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?,
-            )
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?,
-        );
-        let http_response = http_response_builder
-            .body(http_body_util::Full::new(body))
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+        async fn record<W: std::io::Write>(self, w: &mut W) -> Result<(), Self::Error> {
+            let value = serde_json::Value::deserialize(self.message)
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+            write!(w, "{}", serde_json::to_string_pretty(&value).unwrap())
+        }
+        async fn record_raw<W: std::io::Write + Send>(self, w: &mut W) -> Result<(), Self::Error> {
+            let uri = self.destination;
+            let (metadata, extension, message) = tonic::Request::new(self.message).into_parts();
+            let mut http_request_builder = http::Request::builder().method(Method::POST).uri(uri).extension(extension);
+            if let Some(headers) = http_request_builder.headers_mut() {
+                *headers = metadata.into_headers();
+            }
+            let body = Bytes::from(
+                serde_json::to_vec(
+                    &serde_json::Value::deserialize(message)
+                        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?,
+                )
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?,
+            );
+            let http_request = http_request_builder
+                .body(http_body_util::Full::new(body))
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
 
-        http_response.record_raw(w).await
+            http_request.record_raw(w).await
+        }
     }
-}
-impl CloneCollected for tonic::Response<<serde_json::value::Serializer as serde::Serializer>::Ok> {
-    type CollectError = std::io::Error;
-    async fn clone_collected(self) -> Result<(Self, Self), Self::CollectError> {
-        let (metadata, message, extension) = self.into_parts();
-        let value = serde_json::Value::deserialize(message)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
-        let m1 = serde_json::from_value(value.clone())
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
-        let m2 = serde_json::from_value(value).map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
-        Ok((Self::from_parts(metadata.clone(), m1, extension.clone()), Self::from_parts(metadata, m2, extension)))
+    impl<De, Se> CloneCollected for DefaultGrpcRequest<De, Se>
+    where
+        De: for<'a> serde::Deserializer<'a> + DeserializeOwned + Send + Sync + 'static,
+        for<'a> <De as serde::Deserializer<'a>>::Error: std::error::Error + Send + Sync + 'static,
+        Se: Send,
+    {
+        type CollectError = std::io::Error;
+        async fn clone_collected(self) -> Result<(Self, Self), Self::CollectError> {
+            let Self { destination, service, method, codec, message } = self;
+            let value = serde_json::Value::deserialize(message)
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+            let m1 = serde_json::from_value(value.clone())
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+            let m2 =
+                serde_json::from_value(value).map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+            Ok((
+                Self {
+                    destination: destination.clone(),
+                    service: service.clone(),
+                    method: method.clone(),
+                    codec: codec.clone(),
+                    message: m1,
+                },
+                Self { destination, service, method, codec, message: m2 },
+            ))
+        }
+    }
+    impl<De, Se> RecordableRequest for DefaultGrpcRequest<De, Se> {
+        fn record_dir(&self) -> PathBuf {
+            http::uri::Builder::from(self.destination.clone())
+                .path_and_query(self.format_method_path())
+                .build()
+                .unwrap_or_else(|e| unreachable!("{}", e))
+                .to_string()
+                .into()
+        }
+    }
+    impl Recordable for tonic::Response<<serde_json::value::Serializer as serde::Serializer>::Ok> {
+        type Error = std::io::Error;
+        fn extension(&self) -> &'static str {
+            "json"
+        }
+        async fn record<W: std::io::Write>(self, w: &mut W) -> Result<(), Self::Error> {
+            let value = serde_json::Value::deserialize(self.into_inner())
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+            write!(w, "{}", serde_json::to_string_pretty(&value).unwrap())
+        }
+        async fn record_raw<W: std::io::Write + Send>(self, w: &mut W) -> Result<(), Self::Error> {
+            let (metadata, message, extension) = self.into_parts();
+            let mut http_response_builder = http::Response::builder().extension(extension);
+            if let Some(headers) = http_response_builder.headers_mut() {
+                *headers = metadata.into_headers();
+            }
+            let body = Bytes::from(
+                serde_json::to_vec(
+                    &serde_json::Value::deserialize(message)
+                        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?,
+                )
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?,
+            );
+            let http_response = http_response_builder
+                .body(http_body_util::Full::new(body))
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+
+            http_response.record_raw(w).await
+        }
+    }
+    impl CloneCollected for tonic::Response<<serde_json::value::Serializer as serde::Serializer>::Ok> {
+        type CollectError = std::io::Error;
+        async fn clone_collected(self) -> Result<(Self, Self), Self::CollectError> {
+            let (metadata, message, extension) = self.into_parts();
+            let value = serde_json::Value::deserialize(message)
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+            let m1 = serde_json::from_value(value.clone())
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+            let m2 =
+                serde_json::from_value(value).map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+            Ok((Self::from_parts(metadata.clone(), m1, extension.clone()), Self::from_parts(metadata, m2, extension)))
+        }
     }
 }
 
