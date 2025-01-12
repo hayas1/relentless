@@ -23,14 +23,14 @@ use super::error::GrpcEvaluateError;
 pub struct GrpcResponse {
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
-    pub header: GrpcHeaders,
+    pub metadata_map: GrpcMetadataMap,
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
     pub message: GrpcMessage,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
-pub enum GrpcHeaders {
+pub enum GrpcMetadataMap {
     #[default]
     AnyOrEqual,
     // Expect(AllOr<tonic::metadata::MetadataMap>), // TODO
@@ -47,10 +47,13 @@ pub enum GrpcMessage {
 }
 impl Coalesce for GrpcResponse {
     fn coalesce(self, other: &Self) -> Self {
-        Self { header: self.header.coalesce(&other.header), message: self.message.coalesce(&other.message) }
+        Self {
+            metadata_map: self.metadata_map.coalesce(&other.metadata_map),
+            message: self.message.coalesce(&other.message),
+        }
     }
 }
-impl Coalesce for GrpcHeaders {
+impl Coalesce for GrpcMetadataMap {
     fn coalesce(self, other: &Self) -> Self {
         if self.is_default() {
             other.clone()
@@ -97,11 +100,11 @@ impl Acceptable<(MetadataMap, serde_json::Value, Extensions)> for GrpcResponse {
         let (mut metadata, mut message, mut extension) =
             (Destinations::new(), Destinations::new(), Destinations::new());
         for (name, (d, m, e)) in parts {
-            metadata.insert(name.clone(), d);
+            metadata.insert(name.clone(), d.clone().into_headers());
             message.insert(name.clone(), m);
             extension.insert(name.clone(), e);
         }
-        true && self.message.accept(&message, msg) && true
+        self.metadata_map.accept(&metadata, msg) && self.message.accept(&message, msg) && true
     }
 }
 
@@ -135,5 +138,19 @@ impl Acceptable<&serde_json::Value> for GrpcMessage {
                 Self::sub_accept(json, &dst_ref, msg, GrpcEvaluateError::JsonEvaluateError)
             }
         }
+    }
+}
+
+impl Acceptable<http::HeaderMap> for GrpcMetadataMap {
+    type Message = GrpcEvaluateError;
+    fn accept(&self, maps: &Destinations<http::HeaderMap>, msg: &mut Messages<Self::Message>) -> bool {
+        let acceptable = match self {
+            GrpcMetadataMap::AnyOrEqual => Self::assault_or_compare(maps, |_| true),
+            GrpcMetadataMap::Ignore => true,
+        };
+        if !acceptable {
+            msg.push_err(GrpcEvaluateError::UnacceptableMetadataMap);
+        }
+        acceptable
     }
 }

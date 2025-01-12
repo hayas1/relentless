@@ -23,6 +23,11 @@ pub enum GrpcEvaluateError {
     #[error(transparent)]
     RequestError(#[from] RequestError),
 
+    #[error("metadata map is not acceptable")]
+    UnacceptableMetadataMap,
+    #[error("extension is not acceptable")]
+    UnacceptableExtension,
+
     #[cfg(feature = "json")]
     #[error(transparent)]
     JsonEvaluateError(#[from] JsonEvaluateError),
