@@ -168,7 +168,7 @@ impl GrpcRequest {
                     };
                     futures::stream::iter(descriptor.file_descriptor_proto.into_iter())
                         .map(|d| async { Ok(d) })
-                        .buffer_unordered(1)
+                        .buffer_unordered(16)
                         .try_fold(&mut pool, move |p, d| {
                             let host = host.clone();
                             async move {
