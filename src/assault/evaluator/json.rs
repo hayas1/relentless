@@ -26,30 +26,49 @@ pub struct JsonEvaluator {
 impl Acceptable<&Bytes> for JsonEvaluator {
     type Message = JsonEvaluateError;
     fn accept(&self, bytes: &Destinations<&Bytes>, msg: &mut Messages<Self::Message>) -> bool {
-        self.accept_json(bytes, msg)
+        let Some(mut values) = msg.push_if_err(Self::to_values(bytes)) else {
+            return false;
+        };
+        self.accept_json(&mut values, msg)
+    }
+}
+impl Acceptable<&Value> for JsonEvaluator {
+    type Message = JsonEvaluateError;
+    fn accept(&self, values: &Destinations<&Value>, msg: &mut Messages<Self::Message>) -> bool {
+        self.accept_json(&mut values.iter().map(|(k, &v)| (k, v.clone())).collect(), msg)
     }
 }
 impl JsonEvaluator {
-    pub fn accept_json(&self, bytes: &Destinations<&Bytes>, msg: &mut Messages<JsonEvaluateError>) -> bool {
-        let Some(patched) = msg.push_if_err(self.patched(bytes)) else {
-            return false;
-        };
-        let values: Vec<_> = patched.into_values().collect();
-
-        values.windows(2).all(|w| self.json_compare((&w[0], &w[1]), msg))
-    }
-
-    pub fn patched(&self, bytes: &Destinations<&Bytes>) -> Result<Destinations<Value>, JsonEvaluateError> {
+    pub fn to_values(bytes: &Destinations<&Bytes>) -> Result<Destinations<Value>, JsonEvaluateError> {
         bytes
             .iter()
             .map(|(name, b)| {
-                let mut value = serde_json::from_slice(b).map_err(JsonEvaluateError::FailToParseJson)?;
-                if let Err(e) = self.patch(name, &mut value) {
-                    if self.patch_fail.is_none() && bytes.len() == 1 || self.patch_fail > Some(Severity::Warn) {
+                let value = serde_json::from_slice(b).map_err(JsonEvaluateError::FailToParseJson)?;
+                Ok((name.clone(), value))
+            })
+            .collect()
+    }
+    pub fn accept_json(&self, values: &mut Destinations<Value>, msg: &mut Messages<JsonEvaluateError>) -> bool {
+        let Some(patched) = msg.push_if_err(self.patched(values)) else {
+            return false;
+        };
+        let values: Vec<_> = patched.values().collect();
+        values.windows(2).all(|w| self.json_compare((w[0], w[1]), msg))
+    }
+    pub fn patched<'a>(
+        &'a self,
+        values: &'a mut Destinations<Value>,
+    ) -> Result<Destinations<&'a mut Value>, JsonEvaluateError> {
+        let is_assault = values.len() == 1;
+        values
+            .iter_mut()
+            .map(|(name, v)| {
+                if let Err(e) = self.patch(name, v) {
+                    if self.patch_fail.is_none() && is_assault || self.patch_fail > Some(Severity::Warn) {
                         Err(JsonEvaluateError::FailToPatchJson(e))?;
                     }
                 }
-                Ok((name.clone(), value))
+                Ok((name.clone(), v))
             })
             .collect()
     }

@@ -146,20 +146,12 @@ impl GrpcResponse {
 
 impl Acceptable<&serde_json::Value> for GrpcMessage {
     type Message = GrpcEvaluateError;
-    fn accept(&self, parts: &Destinations<&serde_json::Value>, msg: &mut Messages<Self::Message>) -> bool {
+    fn accept(&self, values: &Destinations<&serde_json::Value>, msg: &mut Messages<Self::Message>) -> bool {
         match self {
             GrpcMessage::AnyOrEqual => true,
             GrpcMessage::Plaintext(plaintext) => todo!(),
             #[cfg(feature = "json")]
-            GrpcMessage::Json(json) => {
-                let dst: Destinations<_> = parts
-                    .iter()
-                    .map(|(d, v)| (d, Bytes::from(serde_json::to_vec(v).unwrap_or_else(|_| todo!()))))
-                    .collect();
-                let dst_ref = dst.iter().collect();
-                // TODO Value -> Bytes -> Value conversion occurs here
-                Self::sub_accept(json, &dst_ref, msg, GrpcEvaluateError::JsonEvaluateError)
-            }
+            GrpcMessage::Json(json) => Self::sub_accept(json, values, msg, GrpcEvaluateError::JsonEvaluateError),
         }
     }
 }
