@@ -10,7 +10,7 @@ tonic = "0.12.3"
 tonic-health = "0.12.3"
 tonic-reflection = "0.12.3"
 tower = "0.5.2"
-tokio = { version = "1.42.0", features = [
+tokio = { version = "1.43.0", features = [
     "macros",
     "rt-multi-thread",
     "signal",
@@ -19,7 +19,7 @@ tracing = "0.1.41"
 tracing-subscriber = "0.3.19"
 
 num = "0.4.3"
-thiserror = "2.0.9"
+thiserror = "2.0.11"
 
 [build-dependencies]
 tonic-build = "0.12.3"
