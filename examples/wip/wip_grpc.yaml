@@ -13,7 +13,6 @@ testcases:
           test-ap1: server1
           test-ap2: server2
       request:
-        descriptor: ./target/debug/build/relentless-dev-server-grpc-966e593a5a4fc2ae/out/file_descriptor.bin
         message: 
           json:
             name: ${name}
