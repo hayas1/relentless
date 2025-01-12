@@ -34,6 +34,7 @@ jobs:
     - run: cargo test --verbose --manifest-path dev/server/grpc/Cargo.toml
     - run: cargo fmt --check --manifest-path dev/server/grpc/Cargo.toml
     - run: cargo clippy --tests --manifest-path dev/server/grpc/Cargo.toml -- --deny warnings
+    - run: clang-format ./dev/server/grpc/proto/*.proto --dry-run --Werror
 
     - run: cargo test --verbose
     - run: cargo test --verbose --no-default-features
