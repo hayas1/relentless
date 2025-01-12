@@ -26,6 +26,9 @@ pub struct GrpcResponse {
     pub metadata_map: GrpcMetadataMap,
     #[serde(default, skip_serializing_if = "IsDefault::is_default")]
     #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
+    pub extensions: GrpcExtensions,
+    #[serde(default, skip_serializing_if = "IsDefault::is_default")]
+    #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
     pub message: GrpcMessage,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -34,6 +37,14 @@ pub enum GrpcMetadataMap {
     #[default]
     AnyOrEqual,
     // Expect(AllOr<tonic::metadata::MetadataMap>), // TODO
+    Ignore,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
+pub enum GrpcExtensions {
+    #[default]
+    AnyOrEqual,
+    // Expect(AllOr<http_serde_priv::Extensions>), // TODO
     Ignore,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -49,6 +60,7 @@ impl Coalesce for GrpcResponse {
     fn coalesce(self, other: &Self) -> Self {
         Self {
             metadata_map: self.metadata_map.coalesce(&other.metadata_map),
+            extensions: self.extensions.coalesce(&other.extensions),
             message: self.message.coalesce(&other.message),
         }
     }
@@ -63,6 +75,15 @@ impl Coalesce for GrpcMetadataMap {
     }
 }
 impl Coalesce for GrpcMessage {
+    fn coalesce(self, other: &Self) -> Self {
+        if self.is_default() {
+            other.clone()
+        } else {
+            self
+        }
+    }
+}
+impl Coalesce for GrpcExtensions {
     fn coalesce(self, other: &Self) -> Self {
         if self.is_default() {
             other.clone()
@@ -97,14 +118,16 @@ impl Acceptable<(MetadataMap, serde_json::Value, Extensions)> for GrpcResponse {
         parts: &Destinations<(MetadataMap, serde_json::Value, Extensions)>,
         msg: &mut Messages<Self::Message>,
     ) -> bool {
-        let (mut metadata, mut message, mut extension) =
+        let (mut metadata, mut message, mut extensions) =
             (Destinations::new(), Destinations::new(), Destinations::new());
         for (name, (d, m, e)) in parts {
             metadata.insert(name.clone(), d.clone().into_headers());
             message.insert(name.clone(), m);
-            extension.insert(name.clone(), e);
+            extensions.insert(name.clone(), e);
         }
-        self.metadata_map.accept(&metadata, msg) && self.message.accept(&message, msg) && true
+        self.metadata_map.accept(&metadata, msg)
+            && self.message.accept(&message, msg)
+            && self.extensions.accept(&extensions, msg)
     }
 }
 
@@ -150,6 +173,20 @@ impl Acceptable<http::HeaderMap> for GrpcMetadataMap {
         };
         if !acceptable {
             msg.push_err(GrpcEvaluateError::UnacceptableMetadataMap);
+        }
+        acceptable
+    }
+}
+
+impl Acceptable<&Extensions> for GrpcExtensions {
+    type Message = GrpcEvaluateError;
+    fn accept(&self, extensions: &Destinations<&Extensions>, msg: &mut Messages<Self::Message>) -> bool {
+        let acceptable = match self {
+            GrpcExtensions::AnyOrEqual => true, // TODO Self::assault_or_compare(extensions, |_| true),
+            GrpcExtensions::Ignore => true,
+        };
+        if !acceptable {
+            msg.push_err(GrpcEvaluateError::UnacceptableExtensions);
         }
         acceptable
     }
