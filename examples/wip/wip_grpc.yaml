@@ -1,16 +1,21 @@
 name: wip config of grpc
 destinations:
-  test-api: http://localhost:50051
+  test-ap1: http://localhost:50051
+  test-ap2: http://localhost:50050
 
 testcases:
   - target: greeter.Greeter/SayHello
     description: wip request
     setting:
+      template:
+        name:
+          test-ap1: server1
+          test-ap2: server2
       request:
         descriptor: ./target/debug/build/relentless-dev-server-grpc-966e593a5a4fc2ae/out/file_descriptor.bin
         message: 
           json:
-            name: Rust
+            name: ${name}
       response:
   - target: counter.Counter/Increment
     setting:
@@ -25,4 +30,8 @@ testcases:
   - target: echo.Echo/EchoMetadata
     setting:
       request:
+        # descriptor: ./target/debug/build/relentless-dev-server-grpc-966e593a5a4fc2ae/out/file_descriptor.bin
+        # descriptor: 
+        #   protos: [./dev/server/grpc/proto/echo.proto]
+        #   import_path: [./dev/server/grpc/proto]
       response:
