@@ -1,5 +1,4 @@
-[package]
-name = "relentless"
+[workspace.package]
 version = "0.1.6"
 description = "Relentless HTTP load testing / comparison testing tool"
 authors = ["hayas1 <h4ystack@gmail.com>"]
@@ -7,6 +6,14 @@ edition = "2021"
 repository = "https://github.com/hayas1/relentless"
 license-file = "LICENSE"
 readme = "README.md"
+
+[package]
+name = "relentless"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+license-file.workspace = true
 
 [features]
 default = ["full"]
