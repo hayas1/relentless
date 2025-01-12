@@ -25,7 +25,7 @@ pub fn route_information() -> Router<AppState> {
     Router::new()
         // .route("/", any(information))
         .route("/", any(information))
-        .route("/*path", any(information))
+        .route("/{*path}", any(information))
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]

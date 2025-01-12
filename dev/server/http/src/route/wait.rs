@@ -10,11 +10,11 @@ use super::PinResponseFuture;
 
 pub fn route_wait() -> Router<AppState> {
     Router::new()
-        .route("/:duration", get(DurationUnit::default().handler()))
-        .route("/:duration/s", get(DurationUnit::Seconds.handler()))
-        .route("/:duration/ms", get(DurationUnit::Milliseconds.handler()))
-        .route("/:duration/us", get(DurationUnit::Microseconds.handler()))
-        .route("/:duration/ns", get(DurationUnit::Nanoseconds.handler()))
+        .route("/{duration}", get(DurationUnit::default().handler()))
+        .route("/{duration}/s", get(DurationUnit::Seconds.handler()))
+        .route("/{duration}/ms", get(DurationUnit::Milliseconds.handler()))
+        .route("/{duration}/us", get(DurationUnit::Microseconds.handler()))
+        .route("/{duration}/ns", get(DurationUnit::Nanoseconds.handler()))
     // .fallback() // TODO
 }
 
