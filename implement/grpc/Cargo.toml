@@ -11,7 +11,7 @@ default = ["full"]
 full = ["relentless/full", "yaml", "cli"]
 
 yaml = ["relentless/yaml", "serde_yaml"]
-cli = ["relentless/cli", "clap"]
+cli = ["relentless/cli"]
 
 [dependencies]
 relentless = { path = "../..", features = ["json"] }
@@ -34,6 +34,5 @@ thiserror = "2.0.11"
 serde = { version = "1.0.217", features = ["derive"] }
 serde_json = "1.0.135"
 serde_yaml = { version = "0.9.34", optional = true }
-clap = { version = "4.5.26", features = ["derive"], optional = true }
 
 [dev-dependencies]

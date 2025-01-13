@@ -1,16 +1,10 @@
-use std::{fmt::Display, future::Future, io::Write, path::PathBuf, process::ExitCode};
+use std::{fmt::Display, io::Write, path::PathBuf, process::ExitCode};
 
 #[cfg(feature = "cli")]
 use clap::{Parser, ValueEnum};
 use serde::{Deserialize, Serialize};
 use tower::{Service, ServiceBuilder};
 
-// #[cfg(feature = "json")]
-// use crate::implement::service_grpc::{
-//     client::DefaultGrpcClient, error::GrpcEvaluateError, evaluate::GrpcResponse, factory::GrpcRequest,
-// };
-// #[cfg(feature = "default-http-client")]
-// use crate::implement::service_http::client::DefaultHttpClient;
 #[cfg(feature = "console-report")]
 use crate::interface::report::console::ConsoleReport;
 use crate::{
@@ -23,7 +17,6 @@ use crate::{
         worker::Control,
     },
     error::{InterfaceError, IntoResult},
-    // implement::service_http::{evaluate::HttpResponse, factory::HttpRequest},
 };
 
 use super::{
@@ -31,20 +24,6 @@ use super::{
     helper::{coalesce::Coalesce, http_serde_priv},
     report::github_markdown::GithubMarkdownReport,
 };
-
-// #[cfg(feature = "cli")]
-// pub async fn execute() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sync>> {
-//     let cmd = Relentless::parse();
-
-//     let Relentless { rps, .. } = &cmd;
-//     if rps.is_some() {
-//         unimplemented!("`--rps` is not implemented yet");
-//     }
-
-//     let rep = cmd.assault().await?;
-//     cmd.report(&rep)?;
-//     Ok(cmd.exit_code(&rep))
-// }
 
 #[allow(async_fn_in_trait)] // TODO #[warn(async_fn_in_trait)] by default
 pub trait Assault<Req, Res> {
@@ -73,6 +52,16 @@ pub trait Assault<Req, Res> {
 
         let report = self.assault_with(configs, service).await?;
         self.report_with(&report, std::io::stdout()).box_err()
+    }
+
+    /// TODO document
+    // TODO return type should be `impl Service<Req>` ?
+    fn build_service<S>(&self, service: S) -> RecordService<S>
+    where
+        S: Service<Req>,
+    {
+        // TODO use option_layer ?
+        ServiceBuilder::new().layer(RecordLayer::new(self.command().output_record.clone())).service(service)
     }
     async fn assault_with<S>(
         &self,
@@ -223,6 +212,15 @@ pub enum WorkerKind {
 }
 
 impl Relentless {
+    #[cfg(feature = "cli")]
+    pub fn parse_cli() -> Self {
+        Self::parse()
+    }
+    #[cfg(feature = "cli")]
+    pub fn try_parse_cli() -> crate::Result<Self> {
+        Self::try_parse().box_err()
+    }
+
     pub fn destinations(&self) -> crate::Result<Destinations<http_serde_priv::Uri>> {
         let Self { destination, .. } = self;
         destination
@@ -272,16 +270,6 @@ impl Relentless {
         (configs, errors)
     }
 
-    /// TODO document
-    // TODO return type should be `impl Service<Req>` ?
-    pub fn build_service<S, Req>(&self, service: S) -> RecordService<S>
-    where
-        S: Service<Req>,
-    {
-        // TODO use option_layer ?
-        ServiceBuilder::new().layer(RecordLayer::new(self.output_record.clone())).service(service)
-    }
-
     // /// TODO document
     // #[cfg(all(feature = "default-http-client", feature = "cli"))]
     // pub async fn assault(
@@ -307,64 +295,54 @@ impl Relentless {
     //     Ok(report)
     // }
     // /// TODO document
-    pub async fn assault_with<Q, P, S, Req>(
-        &self,
-        configs: Vec<Config<Q, P>>,
-        service: S,
-    ) -> crate::Result<Report<P::Message, Q, P>>
-    where
-        Q: Configuration + Coalesce + RequestFactory<Req>,
-        Q::Error: std::error::Error + Send + Sync + 'static,
-        P: Configuration + Coalesce + Evaluate<S::Response>,
-        S: Service<Req> + Clone + Send + 'static,
-        S::Error: std::error::Error + Send + Sync + 'static,
-        S::Future: Send + 'static,
-    {
-        let control = Control::new(service);
-        let report = control.assault(self, configs).await?;
-        Ok(report)
-    }
-
-    pub fn report<M, Q, P>(&self, report: &Report<M, Q, P>) -> Result<ExitCode, std::fmt::Error>
-    where
-        M: Display,
-        Q: Configuration + Coalesce,
-        P: Configuration + Coalesce,
-    {
-        self.report_with(report, std::io::stdout())
-    }
-    pub fn report_with<M, W, Q, P>(&self, report: &Report<M, Q, P>, mut write: W) -> Result<ExitCode, std::fmt::Error>
-    where
-        M: Display,
-        W: Write,
-        Q: Configuration + Coalesce,
-        P: Configuration + Coalesce,
-    {
-        let Self { no_color, report_format, .. } = self;
-        #[cfg(feature = "console-report")]
-        console::set_colors_enabled(!no_color);
-
-        match (report.skip_report(self), report_format) {
-            (false, ReportFormat::NullDevice) => (),
-            #[cfg(feature = "console-report")]
-            (false, ReportFormat::Console) => report.console_report(self, &mut ReportWriter::new(0, &mut write))?,
-            (false, ReportFormat::GithubMarkdown) => {
-                report.github_markdown_report(self, &mut ReportWriter::new(0, &mut write))?
-            }
-            _ => (),
-        };
-
-        Ok(report.exit_code(self))
-    }
-
-    // pub fn pass<T>(&self, report: &Report<T, HttpRequest, HttpResponse>) -> bool {
-    //     report.pass()
+    // pub async fn assault_with<Q, P, S, Req>(
+    //     &self,
+    //     configs: Vec<Config<Q, P>>,
+    //     service: S,
+    // ) -> crate::Result<Report<P::Message, Q, P>>
+    // where
+    //     Q: Configuration + Coalesce + RequestFactory<Req>,
+    //     Q::Error: std::error::Error + Send + Sync + 'static,
+    //     P: Configuration + Coalesce + Evaluate<S::Response>,
+    //     S: Service<Req> + Clone + Send + 'static,
+    //     S::Error: std::error::Error + Send + Sync + 'static,
+    //     S::Future: Send + 'static,
+    // {
+    //     let control = Control::new(service);
+    //     let report = control.assault(self, configs).await?;
+    //     Ok(report)
     // }
-    // pub fn allow<T>(&self, report: &Report<T, HttpRequest, HttpResponse>) -> bool {
-    //     report.allow(self.strict)
+
+    // pub fn report<M, Q, P>(&self, report: &Report<M, Q, P>) -> Result<ExitCode, std::fmt::Error>
+    // where
+    //     M: Display,
+    //     Q: Configuration + Coalesce,
+    //     P: Configuration + Coalesce,
+    // {
+    //     self.report_with(report, std::io::stdout())
     // }
-    // pub fn exit_code<T>(self, report: &Report<T, HttpRequest, HttpResponse>) -> ExitCode {
-    //     report.exit_code(&self)
+    // pub fn report_with<M, W, Q, P>(&self, report: &Report<M, Q, P>, mut write: W) -> Result<ExitCode, std::fmt::Error>
+    // where
+    //     M: Display,
+    //     W: Write,
+    //     Q: Configuration + Coalesce,
+    //     P: Configuration + Coalesce,
+    // {
+    //     let Self { no_color, report_format, .. } = self;
+    //     #[cfg(feature = "console-report")]
+    //     console::set_colors_enabled(!no_color);
+
+    //     match (report.skip_report(self), report_format) {
+    //         (false, ReportFormat::NullDevice) => (),
+    //         #[cfg(feature = "console-report")]
+    //         (false, ReportFormat::Console) => report.console_report(self, &mut ReportWriter::new(0, &mut write))?,
+    //         (false, ReportFormat::GithubMarkdown) => {
+    //             report.github_markdown_report(self, &mut ReportWriter::new(0, &mut write))?
+    //         }
+    //         _ => (),
+    //     };
+
+    //     Ok(report.exit_code(self))
     // }
 }
 

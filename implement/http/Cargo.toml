@@ -13,7 +13,7 @@ full = ["relentless/full", "json", "yaml", "default-http-client", "cli"]
 json = ["relentless/json", "serde_json"]
 yaml = ["serde_yaml"]
 default-http-client = ["reqwest"]
-cli = ["relentless/cli", "clap"]
+cli = ["relentless/cli"]
 
 [dependencies]
 relentless = { path = "../.." }
@@ -33,7 +33,6 @@ regex = "1.11.1"
 serde = { version = "1.0.217", features = ["derive"] }
 serde_json = { version = "1.0.135", optional = true }
 serde_yaml = { version = "0.9.34", optional = true }
-clap = { version = "4.5.26", features = ["derive"], optional = true }
 
 [dev-dependencies]
 axum = "0.8.1"
