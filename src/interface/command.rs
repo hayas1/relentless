@@ -143,7 +143,7 @@ pub struct Relentless {
     pub file: Vec<PathBuf>,
 
     /// override destinations
-    #[cfg_attr(feature = "cli", arg(short, long, num_args=0.., value_parser = parse_key_value::<String, String>, number_of_values=1))]
+    #[cfg_attr(feature = "cli", arg(short, long, num_args=0.., value_parser = Self::parse_key_value::<String, String>, number_of_values=1))]
     pub destination: Vec<(String, String)>, // TODO HashMap<String, Uri>, but clap won't parse HashMap
 
     /// allow invalid testcases
@@ -220,13 +220,21 @@ impl Relentless {
     pub fn try_parse_cli() -> crate::Result<Self> {
         Self::try_parse().box_err()
     }
+    #[cfg(feature = "cli")]
+    pub fn parse_key_value<T, U>(s: &str) -> crate::Result<(T, U)>
+    where
+        T: std::str::FromStr,
+        T::Err: std::error::Error + Send + Sync + 'static,
+        U: std::str::FromStr,
+        U::Err: std::error::Error + Send + Sync + 'static,
+    {
+        let (name, destination) = s.split_once('=').ok_or_else(|| InterfaceError::KeyValueFormat(s.to_string()))?;
+        Ok((name.parse().box_err()?, destination.parse().box_err()?))
+    }
 
     pub fn destinations(&self) -> crate::Result<Destinations<http_serde_priv::Uri>> {
         let Self { destination, .. } = self;
-        destination
-            .iter()
-            .map(|(k, v)| Ok((k.to_string(), http_serde_priv::Uri(v.parse().box_err()?))))
-            .collect::<Result<Destinations<_>, _>>()
+        destination.iter().map(|(k, v)| Ok((k.to_string(), http_serde_priv::Uri(v.parse().box_err()?)))).collect()
     }
 
     pub fn sequential_set(&self) -> Vec<WorkerKind> {
@@ -344,18 +352,6 @@ impl Relentless {
 
     //     Ok(report.exit_code(self))
     // }
-}
-
-#[cfg(feature = "cli")]
-pub fn parse_key_value<T, U>(s: &str) -> crate::Result<(T, U)>
-where
-    T: std::str::FromStr,
-    T::Err: std::error::Error + Send + Sync + 'static,
-    U: std::str::FromStr,
-    U::Err: std::error::Error + Send + Sync + 'static,
-{
-    let (name, destination) = s.split_once('=').ok_or_else(|| InterfaceError::KeyValueFormat(s.to_string()))?;
-    Ok((name.parse().box_err()?, destination.parse().box_err()?))
 }
 
 #[cfg(test)]
