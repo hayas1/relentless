@@ -8,16 +8,18 @@ license-file.workspace = true
 
 [features]
 default = ["full"]
-full = ["relentless/full", "yaml", "cli"]
+full = ["relentless/full", "yaml", "toml", "cli"]
 
 yaml = ["relentless/yaml", "serde_yaml"]
-cli = ["relentless/cli"]
+toml = ["relentless/toml"]
+cli = ["relentless/cli", "console-report"]
+console-report = ["relentless/console-report"]
 
 [dependencies]
 relentless = { path = "../..", features = ["json"] }
 
+tower = "0.5.2"
 tokio = { version = "1.43.0", features = ["full"] }
-tower = { version = "0.5.2", features = ["timeout", "util"] }
 http = "1.2.0"
 prost = "0.13.4"
 prost-types = "0.13.4"

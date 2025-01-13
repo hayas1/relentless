@@ -8,28 +8,29 @@ license-file.workspace = true
 
 [features]
 default = ["full"]
-full = ["relentless/full", "json", "yaml", "default-http-client", "cli"]
+full = ["relentless/full", "json", "yaml", "toml", "default-http-client", "cli"]
 
 json = ["relentless/json", "serde_json"]
 yaml = ["serde_yaml"]
+toml = ["relentless/toml"]
 default-http-client = ["reqwest"]
-cli = ["relentless/cli"]
+cli = ["relentless/cli", "console-report"]
+console-report = ["relentless/console-report"]
 
 [dependencies]
 relentless = { path = "../.." }
 
+tower = "0.5.2"
 tokio = { version = "1.43.0", features = ["full"] }
-tower = { version = "0.5.2", features = ["timeout", "util"] }
-reqwest = { version = "0.12.12", optional = true }
 http = "1.2.0"
 http-serde = "2.1.1"
 http-body = "1.0.1"
 http-body-util = "0.1.2"
 mime = "0.3.17"
+reqwest = { version = "0.12.12", optional = true }
 
 bytes = "1.9.0"
 thiserror = "2.0.11"
-regex = "1.11.1"
 serde = { version = "1.0.217", features = ["derive"] }
 serde_json = { version = "1.0.135", optional = true }
 serde_yaml = { version = "0.9.34", optional = true }
