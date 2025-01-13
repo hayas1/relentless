@@ -8,13 +8,15 @@ license-file.workspace = true
 
 [features]
 default = ["full"]
-full = ["relentless/full", "yaml"]
+full = ["relentless/full", "yaml", "cli"]
 
-yaml = ["serde_yaml"]
+yaml = ["relentless/yaml", "serde_yaml"]
+cli = ["relentless/cli", "clap"]
 
 [dependencies]
 relentless = { path = "../..", features = ["json"] }
 
+tokio = { version = "1.43.0", features = ["full"] }
 tower = { version = "0.5.2", features = ["timeout", "util"] }
 http = "1.2.0"
 prost = "0.13.4"
@@ -32,6 +34,6 @@ thiserror = "2.0.11"
 serde = { version = "1.0.217", features = ["derive"] }
 serde_json = "1.0.135"
 serde_yaml = { version = "0.9.34", optional = true }
+clap = { version = "4.5.26", features = ["derive"], optional = true }
 
 [dev-dependencies]
-tokio = { version = "1.43.0", features = ["full"] }

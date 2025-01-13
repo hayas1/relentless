@@ -1,4 +1,4 @@
-use std::{fmt::Display, io::Write, path::PathBuf, process::ExitCode};
+use std::{fmt::Display, future::Future, io::Write, path::PathBuf, process::ExitCode};
 
 #[cfg(feature = "cli")]
 use clap::{Parser, ValueEnum};
@@ -45,6 +45,105 @@ use super::{
 //     cmd.report(&rep)?;
 //     Ok(cmd.exit_code(&rep))
 // }
+
+#[allow(async_fn_in_trait)] // TODO #[warn(async_fn_in_trait)] by default
+pub trait Assault<Req, Res> {
+    type Request: Configuration + Coalesce + RequestFactory<Req>;
+    type Response: Configuration + Coalesce + Evaluate<Res>;
+
+    fn command(&self) -> &Relentless;
+
+    #[cfg(feature = "cli")]
+    async fn execute<S>(&self, service: S) -> crate::Result<ExitCode>
+    where
+        <Self::Request as RequestFactory<Req>>::Error: std::error::Error + Send + Sync + 'static,
+        <Self::Response as Evaluate<Res>>::Message: Display,
+        S: Service<Req, Response = Res> + Clone + Send + 'static,
+        S::Error: std::error::Error + Send + Sync + 'static,
+        S::Future: Send + 'static,
+    {
+        let cmd = self.command();
+        let Relentless { rps, .. } = &cmd;
+        if rps.is_some() {
+            unimplemented!("`--rps` is not implemented yet");
+        }
+
+        let (configs, cannot_read) = cmd.configs();
+        cannot_read.into_iter().for_each(|err| eprintln!("{}", err));
+
+        let report = self.assault_with(configs, service).await?;
+        self.report_with(&report, std::io::stdout()).box_err()
+    }
+    async fn assault_with<S>(
+        &self,
+        configs: Vec<Config<Self::Request, Self::Response>>,
+        service: S,
+    ) -> crate::Result<Report<<Self::Response as Evaluate<Res>>::Message, Self::Request, Self::Response>>
+    where
+        <Self::Request as RequestFactory<Req>>::Error: std::error::Error + Send + Sync + 'static,
+        S: Service<Req, Response = Res> + Clone + Send + 'static,
+        S::Error: std::error::Error + Send + Sync + 'static,
+        S::Future: Send + 'static,
+    {
+        let cmd = self.command();
+        // let service = cmd.build_service(service); // TODO record
+        let control = Control::new(service);
+        let report = control.assault(cmd, configs).await?;
+        Ok(report)
+    }
+
+    // fn report(
+    //     &self,
+    //     report: &Report<<Self::Response as Evaluate<Res>>::Message, Self::Request, Self::Response>,
+    // ) -> Result<ExitCode, std::fmt::Error>
+    // where
+    //     <Self::Response as Evaluate<Res>>::Message: Display,
+    // {
+    //     self.report_with(report, std::io::stdout())
+    // }
+    fn report_with<W>(
+        &self,
+        report: &Report<<Self::Response as Evaluate<Res>>::Message, Self::Request, Self::Response>,
+        mut write: W,
+    ) -> Result<ExitCode, std::fmt::Error>
+    where
+        <Self::Response as Evaluate<Res>>::Message: Display,
+        W: Write,
+    {
+        let cmd = self.command();
+        let Relentless { no_color, report_format, .. } = cmd;
+        #[cfg(feature = "console-report")]
+        console::set_colors_enabled(!no_color);
+
+        match (report.skip_report(cmd), report_format) {
+            (false, ReportFormat::NullDevice) => (),
+            #[cfg(feature = "console-report")]
+            (false, ReportFormat::Console) => report.console_report(cmd, &mut ReportWriter::new(0, &mut write))?,
+            (false, ReportFormat::GithubMarkdown) => {
+                report.github_markdown_report(cmd, &mut ReportWriter::new(0, &mut write))?
+            }
+            _ => (),
+        };
+
+        Ok(report.exit_code(cmd))
+    }
+
+    fn pass(&self, report: &Report<<Self::Response as Evaluate<Res>>::Message, Self::Request, Self::Response>) -> bool {
+        report.pass()
+    }
+    fn allow(
+        &self,
+        report: &Report<<Self::Response as Evaluate<Res>>::Message, Self::Request, Self::Response>,
+    ) -> bool {
+        report.allow(self.command().strict)
+    }
+    fn exit_code(
+        &self,
+        report: &Report<<Self::Response as Evaluate<Res>>::Message, Self::Request, Self::Response>,
+    ) -> ExitCode {
+        report.exit_code(self.command())
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 #[cfg_attr(feature = "cli", derive(Parser))]

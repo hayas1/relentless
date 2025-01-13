@@ -1640,6 +1640,7 @@ name = "relentless-grpc"
 version = "0.1.6"
 dependencies = [
  "bytes",
+ "clap",
  "futures",
  "http",
  "prost",
@@ -1663,6 +1664,7 @@ version = "0.1.6"
 dependencies = [
  "axum 0.8.1",
  "bytes",
+ "clap",
  "http",
  "http-body",
  "http-body-util",
