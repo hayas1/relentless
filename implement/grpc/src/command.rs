@@ -5,7 +5,7 @@ use crate::{client::DefaultGrpcRequest, evaluate::GrpcResponse, factory::GrpcReq
 
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct GrpcAssault {
-    pub relentless: Relentless,
+    relentless: Relentless,
 }
 impl Assault<DefaultGrpcRequest<serde_json::Value, serde_json::value::Serializer>, tonic::Response<serde_json::Value>>
     for GrpcAssault
@@ -14,5 +14,11 @@ impl Assault<DefaultGrpcRequest<serde_json::Value, serde_json::value::Serializer
     type Response = GrpcResponse;
     fn command(&self) -> &Relentless {
         &self.relentless
+    }
+}
+
+impl GrpcAssault {
+    pub fn new(relentless: Relentless) -> Self {
+        Self { relentless }
     }
 }

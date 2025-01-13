@@ -6,7 +6,7 @@ pub async fn main() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sync>
     use relentless::interface::command::{Assault, Relentless};
     use relentless_http::{client::DefaultHttpClient, command::HttpAssault};
 
-    let assault = HttpAssault { relentless: Relentless::parse_cli() };
+    let assault = HttpAssault::new(Relentless::parse_cli());
     let client = DefaultHttpClient::<reqwest::Body, reqwest::Body>::new().await?;
     Ok(assault.execute(client).await?)
 }

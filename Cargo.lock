@@ -1661,8 +1661,10 @@ dependencies = [
 name = "relentless-http"
 version = "0.1.6"
 dependencies = [
+ "assert-json-diff",
  "axum 0.8.1",
  "bytes",
+ "glob",
  "http",
  "http-body",
  "http-body-util",
@@ -1670,6 +1672,7 @@ dependencies = [
  "httptest",
  "mime",
  "relentless",
+ "relentless-dev-server-http",
  "reqwest",
  "serde",
  "serde_json",

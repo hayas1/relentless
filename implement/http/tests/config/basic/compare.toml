@@ -1,0 +1,42 @@
+name = "example config of basic compare test"
+
+[destinations]
+actual = "http://localhost:3000"
+expect = "http://localhost:3000"
+
+[setting]
+response = { header = "ignore" }
+
+[[testcases]]
+target = "/"
+
+[[testcases]]
+target = "/health"
+
+[[testcases]]
+target = "/healthz"
+
+[[testcases]]
+target = "/health/rich"
+
+[[testcases]]
+target = "/counter/increment"
+setting.repeat = 10
+setting.allow = true
+
+[[testcases]]
+target = "/counter/increment/10"
+setting.repeat = 10
+setting.allow = true
+
+[[testcases]]
+target = "/counter/decrement"
+setting.repeat = 10
+setting.allow = true
+
+[[testcases]]
+target = "/counter/decrement/10"
+setting.repeat = 10
+
+[[testcases]]
+target = "/wait/100/ms"

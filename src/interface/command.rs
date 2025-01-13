@@ -41,17 +41,26 @@ pub trait Assault<Req, Res> {
         S::Error: std::error::Error + Send + Sync + 'static,
         S::Future: Send + 'static,
     {
-        let cmd = self.command();
-        let Relentless { rps, .. } = &cmd;
+        let Relentless { rps, .. } = self.command();
         if rps.is_some() {
             unimplemented!("`--rps` is not implemented yet");
         }
 
-        let (configs, cannot_read) = cmd.configs();
-        cannot_read.into_iter().for_each(|err| eprintln!("{}", err));
+        let (configs, errors) = self.configs();
+        errors.into_iter().for_each(|err| eprintln!("{}", err));
 
         let report = self.assault_with(configs, service).await?;
         self.report_with(&report, std::io::stdout()).box_err()
+    }
+
+    /// TODO document
+    #[allow(clippy::type_complexity)] // TODO default: #[warn(clippy::type_complexity)]
+    fn configs(&self) -> (Vec<Config<Self::Request, Self::Response>>, Vec<crate::Error>) {
+        let Relentless { file, .. } = self.command();
+        let (ok, err): (Vec<_>, _) = file.iter().map(Config::read).partition(Result::is_ok);
+        let (configs, errors) =
+            (ok.into_iter().map(Result::unwrap).collect(), err.into_iter().map(Result::unwrap_err).collect());
+        (configs, errors)
     }
 
     /// TODO document
@@ -269,14 +278,14 @@ impl Relentless {
         self.percentile_set().iter().map(|p| p / 100.).collect()
     }
 
-    /// TODO document
-    pub fn configs<Q: Configuration, P: Configuration>(&self) -> (Vec<Config<Q, P>>, Vec<crate::Error>) {
-        let Self { file, .. } = self;
-        let (ok, err): (Vec<_>, _) = file.iter().map(Config::<Q, P>::read).partition(Result::is_ok);
-        let (configs, errors) =
-            (ok.into_iter().map(Result::unwrap).collect(), err.into_iter().map(Result::unwrap_err).collect());
-        (configs, errors)
-    }
+    // /// TODO document
+    // pub fn configs<Q: Configuration, P: Configuration>(&self) -> (Vec<Config<Q, P>>, Vec<crate::Error>) {
+    //     let Self { file, .. } = self;
+    //     let (ok, err): (Vec<_>, _) = file.iter().map(Config::<Q, P>::read).partition(Result::is_ok);
+    //     let (configs, errors) =
+    //         (ok.into_iter().map(Result::unwrap).collect(), err.into_iter().map(Result::unwrap_err).collect());
+    //     (configs, errors)
+    // }
 
     // /// TODO document
     // #[cfg(all(feature = "default-http-client", feature = "cli"))]

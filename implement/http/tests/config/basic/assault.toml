@@ -1,0 +1,27 @@
+name = "example config of basic assault test"
+
+[destinations]
+test-api = "http://localhost:3000"
+
+[setting]
+repeat = 10
+response = { header = "ignore" }
+
+[[testcases]]
+target = "/"
+description = "request to root"
+setting.repeat = 100
+
+[[testcases]]
+target = "/health"
+
+[[testcases]]
+target = "/healthz"
+
+[[testcases]]
+target = "/health/rich"
+
+[[testcases]]
+target = "/health/disabled"
+description = "this endpoint will respond with 503 service unavailable"
+setting = { request = { method = "GET" }, repeat = 1, allow = true }
