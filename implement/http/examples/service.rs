@@ -9,7 +9,10 @@ async fn main() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sync>> {
     use relentless_http::command::HttpAssault;
 
     let assault = HttpAssault::<Body, Body>::new(Relentless {
-        file: vec!["examples/config/assault.yaml".into(), "examples/config/compare.yaml".into()],
+        file: vec![
+            concat!(env!("CARGO_MANIFEST_DIR"), "/examples/config/assault.yaml").into(),
+            concat!(env!("CARGO_MANIFEST_DIR"), "/examples/config/compare.yaml").into(),
+        ],
         ..Default::default()
     });
     let (configs, errors) = assault.configs();

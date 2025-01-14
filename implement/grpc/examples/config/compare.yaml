@@ -21,10 +21,11 @@ testcases:
           json:
   - target: counter.Counter/Increment
     setting:
+      allow: true # count will be different for each request
       request:
         descriptor: 
-          protos: [./dev/server/grpc/proto/counter.proto]
-          import_path: [./dev/server/grpc/proto]
+          protos: [dev/server/grpc/proto/counter.proto]
+          import_path: [dev/server/grpc/proto]
         message:
           json:
             100
