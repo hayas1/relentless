@@ -1,23 +1,24 @@
 #![cfg(all(feature = "json", feature = "yaml"))]
 use std::vec;
 
-use axum::{body::Body, http::Request};
+use axum::body::Body;
 use relentless::interface::{
-    command::{Relentless, ReportFormat, WorkerKind},
+    command::{Assault, Relentless, ReportFormat, WorkerKind},
     report::github_markdown::CaseGithubMarkdownReport,
 };
 use relentless_dev_server_http::route;
+use relentless_http::command::HttpAssault;
 
 #[tokio::test]
 async fn test_github_markdown_report_format() {
-    let relentless = Relentless {
+    let relentless = HttpAssault::<Body, Body>::new(Relentless {
         file: vec!["tests/config/feature/allow.yaml".into()],
         report_format: ReportFormat::GithubMarkdown,
         ..Default::default()
-    };
+    });
     let (configs, _) = relentless.configs();
     let service = route::app_with(Default::default());
-    let report = relentless.assault_with::<_, _, _, Request<Body>>(configs, service).await.unwrap();
+    let report = relentless.assault_with(configs, service).await.unwrap();
 
     let mut buf = Vec::new();
     relentless.report_with(&report, &mut buf).unwrap();
@@ -41,16 +42,16 @@ async fn test_github_markdown_report_format() {
 
 #[tokio::test]
 async fn test_github_markdown_measure() {
-    let relentless = Relentless {
+    let relentless = HttpAssault::<Body, Body>::new(Relentless {
         file: vec!["tests/config/feature/measure.yaml".into()],
         report_format: ReportFormat::GithubMarkdown,
         measure: Some(vec![WorkerKind::Configs]),
         percentile: Some(vec![50., 99.]),
         ..Default::default()
-    };
+    });
     let (configs, _) = relentless.configs();
     let service = route::app_with(Default::default());
-    let report = relentless.assault_with::<_, _, _, Request<Body>>(configs, service).await.unwrap();
+    let report = relentless.assault_with(configs, service).await.unwrap();
 
     let mut buf = Vec::new();
     relentless.report_with(&report, &mut buf).unwrap();
