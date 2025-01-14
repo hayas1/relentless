@@ -1,7 +1,6 @@
-name: wip config of grpc
+name: basic grpc assault test
 destinations:
-  test-ap1: http://localhost:50051
-  test-ap2: http://localhost:50050
+  test-api: http://localhost:50051
 
 testcases:
   - target: greeter.Greeter/SayHello

@@ -1,4 +1,4 @@
-name: basic comparison test
+name: basic http comparison test
 destinations:
   actual: http://localhost:3000
   expect: http://localhost:3000
