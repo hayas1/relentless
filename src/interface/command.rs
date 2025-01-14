@@ -50,7 +50,9 @@ pub trait Assault<Req, Res> {
         errors.into_iter().for_each(|err| eprintln!("{}", err));
 
         let report = self.assault_with(configs, service).await?;
-        self.report_with(&report, std::io::stdout()).box_err()
+        self.report_with(&report, std::io::stdout()).box_err()?;
+
+        Ok(self.exit_code(&report))
     }
 
     /// TODO document
@@ -103,7 +105,7 @@ pub trait Assault<Req, Res> {
         &self,
         report: &Report<<Self::Response as Evaluate<Res>>::Message, Self::Request, Self::Response>,
         mut write: W,
-    ) -> Result<ExitCode, std::fmt::Error>
+    ) -> Result<bool, std::fmt::Error>
     where
         <Self::Response as Evaluate<Res>>::Message: Display,
         W: Write,
@@ -123,7 +125,7 @@ pub trait Assault<Req, Res> {
             _ => (),
         };
 
-        Ok(report.exit_code(cmd))
+        Ok(report.allow(cmd.strict))
     }
 
     fn pass(&self, report: &Report<<Self::Response as Evaluate<Res>>::Message, Self::Request, Self::Response>) -> bool {
