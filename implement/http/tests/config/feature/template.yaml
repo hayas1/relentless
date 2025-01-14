@@ -1,0 +1,68 @@
+name: test config for template
+destinations:
+  server1: http://localhost:3000
+  server2: http://localhost:3001
+
+
+testcases:
+  - target: /echo/path/${var}
+    setting:
+      template:
+        var:
+          server1: server1
+          server2: server2
+      allow: true
+  - target: /echo/body
+    setting:
+      template:
+        var:
+          server1: server1
+          server2: server2
+      request:
+        method: POST
+        body:
+          plaintext: hello ${var}
+      response:
+        body:
+          plaintext:
+            regex:
+              server1: ^hello server1$
+              server2: ^hello server2$
+  - target: /echo/body
+    setting:
+      template:
+        server:
+          server1: server1
+          server2: server2
+      request:
+        method: POST
+        body:
+          json:
+            server: ${server}
+      response:
+        body:
+          json:
+            patch:
+              server1:
+                - {op: test, path: "/server", value: "server1"}
+                - {op: replace, path: "/server", value: "server"}
+              server2:
+                - {op: test, path: "/server", value: "server2"}
+                - {op: replace, path: "/server", value: "server"}
+            patch-fail: deny
+  - target: /echo/headers
+    setting:
+      template:
+        token:
+          server1: VERY_SENSITIVE_TOKEN
+          server2: VERY_SENSITIVE_TOKEN
+      request:
+        headers:
+          Authorization: Bearer ${token}
+      response:
+        body:
+          json:
+            patch:
+            - {op: test, path: "/0/authorization", value: "Bearer VERY_SENSITIVE_TOKEN"}
+            patch-fail: deny
+

@@ -1,0 +1,48 @@
+name: test config for body
+destinations:
+  test-api: http://localhost:3000
+
+testcases:
+  - target: /echo/body
+    setting:
+      request:
+        method: POST
+        body:
+          plaintext: hello world
+      response:
+        body:
+          plaintext:
+            regex: hello world
+  - target: /echo/json
+    setting:
+      request:
+        method: POST
+        body:
+          json:
+            foo: hoge
+            bar: fuga
+            baz: piyo
+      response:
+        body:
+          json:
+            patch:
+              - op: test
+                path: ""
+                value:
+                  foo: hoge
+                  bar: fuga
+                  baz: piyo
+  - target: /echo/json
+    description: json without Content-Type will return 415 Unsupported Media Type
+    setting:
+      request:
+        no-additional-headers: true
+        method: POST
+        body:
+          json:
+            foo: hoge
+            bar: fuga
+            baz: piyo
+      response:
+        status:
+          expect: 415
