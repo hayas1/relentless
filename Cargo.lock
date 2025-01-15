@@ -1670,6 +1670,7 @@ dependencies = [
  "http-body-util",
  "http-serde",
  "httptest",
+ "indoc",
  "mime",
  "relentless",
  "relentless-dev-server-http",

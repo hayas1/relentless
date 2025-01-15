@@ -1,22 +1,23 @@
 #![cfg(all(feature = "json", feature = "yaml"))]
-use axum::{body::Body, http::Request};
-use relentless::interface::command::Relentless;
+use axum::body::Body;
+use relentless::interface::command::{Assault, Relentless};
 use relentless_dev_server_http::route;
+use relentless_http::command::HttpAssault;
 
 #[tokio::test]
 async fn test_record_config() {
-    let relentless = Relentless {
+    let assault = HttpAssault::<Body, Body>::new(Relentless {
         file: vec!["tests/config/record/config.yaml".into()],
         no_color: true,
         output_record: Some("tests/record_test_directory".into()),
         ..Default::default()
-    };
-    let (configs, _) = relentless.configs();
+    });
+    let (configs, _) = assault.configs();
     let service = route::app_with(Default::default());
-    let record_service = relentless.build_service::<_, Request<Body>>(service);
-    let report = relentless.assault_with::<_, _, _, Request<Body>>(configs, record_service).await.unwrap();
-    assert!(relentless.pass(&report));
-    assert!(relentless.allow(&report));
+    let record_service = assault.build_service(service);
+    let report = assault.assault_with(configs, record_service).await.unwrap();
+    assert!(assault.pass(&report));
+    assert!(assault.allow(&report));
 
     let gitignore_path = "tests/record_test_directory/.gitignore";
     let gitignore_content = std::fs::read_to_string(gitignore_path).unwrap();
