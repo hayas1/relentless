@@ -137,34 +137,3 @@ where
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    // use bytes::Bytes;
-    // use http::Method;
-
-    // use super::*;
-
-    // #[tokio::test]
-    // async fn test_empty_body_request() {
-    //     let request = http::Request::builder()
-    //         .method(Method::GET)
-    //         .uri("http://localhost:3000")
-    //         .body(http_body_util::Empty::<Bytes>::new())
-    //         .unwrap();
-
-    //     let mut buf = Vec::new();
-    //     request.record_raw(&mut buf).await.unwrap();
-    //     assert_eq!(buf, b"GET http://localhost:3000/ HTTP/1.1\n\n");
-    // }
-
-    // #[tokio::test]
-    // async fn test_empty_body_response() {
-    //     let response =
-    //         http::Response::builder().status(http::StatusCode::OK).body(http_body_util::Empty::<Bytes>::new()).unwrap();
-
-    //     let mut buf = Vec::new();
-    //     response.record_raw(&mut buf).await.unwrap();
-    //     assert_eq!(buf, b"HTTP/1.1 200 OK\n\n");
-    // }
-}
