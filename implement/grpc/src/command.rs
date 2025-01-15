@@ -1,7 +1,7 @@
 use relentless::interface::command::{Assault, Relentless};
 use serde::{Deserialize, Serialize};
 
-use crate::{client::DefaultGrpcRequest, evaluate::GrpcResponse, factory::GrpcRequest};
+use crate::{client::DefaultGrpcRequest, evaluate::GrpcResponse, factory::GrpcRequest, record::GrpcIoRecorder};
 
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct GrpcAssault {
@@ -12,12 +12,14 @@ impl Assault<DefaultGrpcRequest<serde_json::Value, serde_json::value::Serializer
 {
     type Request = GrpcRequest;
     type Response = GrpcResponse;
-    type Recorder = (); // TODO
+    type Recorder = GrpcIoRecorder;
 
     fn command(&self) -> &Relentless {
         &self.relentless
     }
-    fn recorder(&self) -> Self::Recorder {}
+    fn recorder(&self) -> Self::Recorder {
+        GrpcIoRecorder
+    }
 }
 
 impl GrpcAssault {

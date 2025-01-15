@@ -10,8 +10,8 @@ testcases:
       allow: true
       template:
         name:
-          test-ap1: server1
-          test-ap2: server2
+          actual: server1
+          expect: server2
       request:
         message: 
           json:

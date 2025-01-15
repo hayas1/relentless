@@ -7,14 +7,10 @@ testcases:
     description: wip request
     setting:
       allow: true
-      template:
-        name:
-          test-ap1: server1
-          test-ap2: server2
       request:
         message: 
           json:
-            name: ${name}
+            name: Rust
       response:
         message:
           json:
