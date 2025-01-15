@@ -5,7 +5,7 @@ use http_body::Body;
 use relentless::interface::command::{Assault, Relentless};
 use serde::{Deserialize, Serialize};
 
-use crate::{evaluate::HttpResponse, factory::HttpRequest};
+use crate::{evaluate::HttpResponse, factory::HttpRequest, record::HttpIoRecorder};
 
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct HttpAssault<ReqB, ResB> {
@@ -20,8 +20,13 @@ where
 {
     type Request = HttpRequest;
     type Response = HttpResponse;
+    type Recorder = HttpIoRecorder;
+
     fn command(&self) -> &Relentless {
         &self.relentless
+    }
+    fn recorder(&self) -> Self::Recorder {
+        HttpIoRecorder
     }
 }
 

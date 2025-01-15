@@ -8,7 +8,8 @@ pub async fn main() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sync>
 
     let assault = HttpAssault::new(Relentless::parse_cli());
     let client = DefaultHttpClient::<reqwest::Body, reqwest::Body>::new().await?;
-    Ok(assault.execute(client).await?)
+    let record = assault.build_service(client);
+    Ok(assault.execute(record).await?)
 }
 
 #[cfg(not(feature = "cli"))]

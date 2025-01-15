@@ -10,69 +10,72 @@ use std::{
     task::{Context, Poll},
 };
 
-use bytes::Bytes;
-use http::{header::CONTENT_TYPE, Method};
-// use http_body::Body;
-// use http_body_util::{BodyExt, Collected};
-use serde::{de::DeserializeOwned, Deserialize};
 use tower::{Layer, Service};
 
 use crate::error::IntoResult;
-// #[cfg(feature = "json")]
-// use crate::implement::service_grpc::client::DefaultGrpcRequest;
 
-pub trait Recordable: Sized + Send {
+pub trait IoRecord<R> {
     type Error;
+    fn extension(&self, r: &R) -> &'static str;
+    fn record<W: std::io::Write + Send>(&self, w: &mut W, r: R)
+        -> impl Future<Output = Result<(), Self::Error>> + Send;
     fn record_raw<W: std::io::Write + Send>(
-        self,
+        &self,
         w: &mut W,
-    ) -> impl std::future::Future<Output = Result<(), Self::Error>> + Send;
-    fn extension(&self) -> &'static str {
-        "txt"
-    }
-    fn record<W: std::io::Write + Send>(self, w: &mut W) -> impl Future<Output = Result<(), Self::Error>> + Send {
-        async { self.record_raw(w).await }
-    }
+        r: R,
+    ) -> impl Future<Output = Result<(), Self::Error>> + Send;
 }
-pub trait CloneCollected: Sized {
-    type CollectError;
-    /// once consume body to record, and reconstruct to request/response
-    fn clone_collected(self) -> impl Future<Output = Result<(Self, Self), Self::CollectError>> + Send;
+pub trait CollectClone<R> {
+    type Error;
+    fn collect_clone(&self, r: R) -> impl Future<Output = Result<(R, R), Self::Error>> + Send;
 }
-pub trait RecordableRequest {
-    fn record_dir(&self) -> PathBuf;
+pub trait RequestIoRecord<R> {
+    fn record_dir(&self, r: &R) -> PathBuf;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Hash)]
-pub struct RecordLayer {
+pub struct RecordLayer<R> {
     path: Option<PathBuf>,
+    recorder: R,
 }
-impl RecordLayer {
-    pub fn new(path: Option<PathBuf>) -> Self {
-        Self { path }
+impl<R> RecordLayer<R> {
+    pub fn new(path: Option<PathBuf>, recorder: R) -> Self {
+        Self { path, recorder }
     }
 }
-impl<S> Layer<S> for RecordLayer {
-    type Service = RecordService<S>;
+impl<S, R> Layer<S> for RecordLayer<R>
+where
+    R: Clone,
+{
+    type Service = RecordService<S, R>;
     fn layer(&self, inner: S) -> Self::Service {
-        let path = self.path.clone();
-        RecordService { path, inner }
+        let Self { path, recorder } = self.clone();
+        RecordService { path, recorder, inner }
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Hash)]
-pub struct RecordService<S> {
+pub struct RecordService<S, R> {
     path: Option<PathBuf>,
+    recorder: R,
     inner: S,
 }
-impl<S, Req, Res> Service<Req> for RecordService<S>
+impl<S, R, Req, Res> Service<Req> for RecordService<S, R>
 where
-    Req: Recordable + CloneCollected + RecordableRequest + Send + 'static,
-    Req::Error: std::error::Error + Send + Sync + 'static,
-    Req::CollectError: std::error::Error + Send + Sync + 'static,
-    Res: Recordable + CloneCollected + Send,
-    Res::Error: std::error::Error + Send + Sync + 'static,
-    Res::CollectError: std::error::Error + Send + Sync + 'static,
+    R: IoRecord<Req>
+        + CollectClone<Req>
+        + RequestIoRecord<Req>
+        + IoRecord<Res>
+        + CollectClone<Res>
+        + Clone
+        + Send
+        + 'static,
+    <R as IoRecord<Req>>::Error: std::error::Error + Send + Sync + 'static,
+    <R as CollectClone<Req>>::Error: std::error::Error + Send + Sync + 'static,
+    <R as IoRecord<Res>>::Error: std::error::Error + Send + Sync + 'static,
+    <R as CollectClone<Res>>::Error: std::error::Error + Send + Sync + 'static,
+    Req: Send + 'static,
+    Res: Send + 'static,
     S: Service<Req, Response = Res> + Clone + Send + 'static,
     S::Future: Send + 'static,
     S::Error: std::error::Error + Send + Sync + 'static,
@@ -90,7 +93,7 @@ where
             // TODO path will be uri ... (if implement template, it will not be in path)
             // TODO timestamp or repeated number
             // TODO join path (absolute) https://github.com/rust-lang/rust/issues/16507
-            let dir = p?.join(request.record_dir());
+            let dir = p?.join(self.recorder.record_dir(&request));
             std::fs::create_dir_all(&dir).ok()?;
             writeln!(File::create(p?.join(".gitignore")).ok()?, "*").ok()?; // TODO hardcode...
             Some(((dir.join("raw_request"), dir.join("request")), (dir.join("raw_response"), dir.join("response"))))
@@ -98,30 +101,31 @@ where
 
         if let Some(((path_raw_req, path_req), (path_raw_res, path_res))) = paths {
             let mut cloned_inner = self.inner.clone();
+            let recorder = self.recorder.clone();
             Box::pin(async move {
-                let (request, recordable_raw_req) = request.clone_collected().await.box_err()?;
-                recordable_raw_req
-                    .record_raw(&mut File::create(path_raw_req.with_extension("txt")).box_err()?)
+                let (request, recordable_raw_req) = recorder.collect_clone(request).await.box_err()?;
+                recorder
+                    .record_raw(&mut File::create(path_raw_req.with_extension("txt")).box_err()?, recordable_raw_req)
                     .await
                     .box_err()?;
-                let (request, recordable_req) = request.clone_collected().await.box_err()?;
-                let req_record_extension = recordable_req.extension();
-                recordable_req
-                    .record(&mut File::create(path_req.with_extension(req_record_extension)).box_err()?)
+                let (request, recordable_req) = recorder.collect_clone(request).await.box_err()?;
+                let req_record_extension = recorder.extension(&recordable_req);
+                recorder
+                    .record(&mut File::create(path_req.with_extension(req_record_extension)).box_err()?, recordable_req)
                     .await
                     .box_err()?;
 
                 let response = cloned_inner.call(request).await.box_err()?;
 
-                let (response, recordable_raw_res) = response.clone_collected().await.box_err()?;
-                recordable_raw_res
-                    .record_raw(&mut File::create(path_raw_res.with_extension("txt")).box_err()?)
+                let (response, recordable_raw_res) = recorder.collect_clone(response).await.box_err()?;
+                recorder
+                    .record_raw(&mut File::create(path_raw_res.with_extension("txt")).box_err()?, recordable_raw_res)
                     .await
                     .box_err()?;
-                let (response, recordable_res) = response.clone_collected().await.box_err()?;
-                let res_record_extension = recordable_res.extension();
-                recordable_res
-                    .record(&mut File::create(path_res.with_extension(res_record_extension)).box_err()?)
+                let (response, recordable_res) = recorder.collect_clone(response).await.box_err()?;
+                let res_record_extension = recorder.extension(&recordable_res);
+                recorder
+                    .record(&mut File::create(path_res.with_extension(res_record_extension)).box_err()?, recordable_res)
                     .await
                     .box_err()?;
 

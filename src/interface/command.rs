@@ -13,7 +13,7 @@ use crate::{
         evaluate::Evaluate,
         factory::RequestFactory,
         reportable::{Report, ReportWriter, Reportable},
-        service::record::{RecordLayer, RecordService},
+        service::record::{CollectClone, IoRecord, RecordLayer, RecordService, RequestIoRecord},
         worker::Control,
     },
     error::{InterfaceError, IntoResult},
@@ -29,8 +29,10 @@ use super::{
 pub trait Assault<Req, Res> {
     type Request: Configuration + Coalesce + RequestFactory<Req>;
     type Response: Configuration + Coalesce + Evaluate<Res>;
+    type Recorder;
 
     fn command(&self) -> &Relentless;
+    fn recorder(&self) -> Self::Recorder;
 
     #[cfg(feature = "cli")]
     async fn execute<S>(&self, service: S) -> crate::Result<ExitCode>
@@ -67,12 +69,22 @@ pub trait Assault<Req, Res> {
 
     /// TODO document
     // TODO return type should be `impl Service<Req>` ?
-    fn build_service<S>(&self, service: S) -> RecordService<S>
+    fn build_service<S>(&self, service: S) -> RecordService<S, Self::Recorder>
     where
+        Self::Recorder: IoRecord<Req>
+            + CollectClone<Req>
+            + RequestIoRecord<Req>
+            + IoRecord<Res>
+            + CollectClone<Res>
+            + Clone
+            + Send
+            + 'static,
         S: Service<Req>,
     {
         // TODO use option_layer ?
-        ServiceBuilder::new().layer(RecordLayer::new(self.command().output_record.clone())).service(service)
+        ServiceBuilder::new()
+            .layer(RecordLayer::new(self.command().output_record.clone(), self.recorder()))
+            .service(service)
     }
     async fn assault_with<S>(
         &self,
@@ -86,7 +98,6 @@ pub trait Assault<Req, Res> {
         S::Future: Send + 'static,
     {
         let cmd = self.command();
-        // let service = cmd.build_service(service); // TODO record
         let control = Control::new(service);
         let report = control.assault(cmd, configs).await?;
         Ok(report)

@@ -12,9 +12,12 @@ impl Assault<DefaultGrpcRequest<serde_json::Value, serde_json::value::Serializer
 {
     type Request = GrpcRequest;
     type Response = GrpcResponse;
+    type Recorder = (); // TODO
+
     fn command(&self) -> &Relentless {
         &self.relentless
     }
+    fn recorder(&self) -> Self::Recorder {}
 }
 
 impl GrpcAssault {
