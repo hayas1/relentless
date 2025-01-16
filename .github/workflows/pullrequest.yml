@@ -77,8 +77,8 @@ jobs:
       run: |
         set -euo pipefail
         {
-          cargo run --features cli -- \
-            -f examples/config/assault.yaml examples/config/compare.yaml -d actual=http://localhost:3000 \
+          cargo run --manifest-path implement/http/Cargo.toml --features cli -- \
+            -f implement/http/examples/config/assault.yaml implement/http/examples/config/compare.yaml -d actual=http://localhost:3000 \
             -s testcases repeats -r github-markdown \
             --no-color --ng-only
         } >> target/report.txt
