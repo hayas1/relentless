@@ -86,7 +86,7 @@ jobs:
       run: |
         set -euo pipefail
         {
-          cargo run --features cli -- \
+          cargo run --manifest-path implement/http/Cargo.toml --features cli -- \
             -f tests/config/basic/*.yaml -d actual=http://localhost:3001 \
             -s testcases repeats -r github-markdown \
             --no-color --ng-only
