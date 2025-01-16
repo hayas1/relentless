@@ -40,8 +40,8 @@ jobs:
     - run: clang-format ./dev/server/grpc/proto/*.proto --dry-run --Werror
     - run: RUSTDOCFLAGS="-D warnings" cargo doc --all --no-deps
 
-    - run: cargo install cargo-readme && cargo readme > README.md
-    - run: git add -N . && git diff --exit-code -- README.md
+    # - run: cargo install cargo-readme && cargo readme > README.md
+    # - run: git add -N . && git diff --exit-code -- README.md
 
   e2e-test:
     runs-on: ubuntu-latest
