@@ -28,23 +28,21 @@ jobs:
           ${{ steps.cargo-home.outputs.path }}
         key: cargo-${{ hashFiles('**/Cargo.toml') }}
 
-    - name: Release test for develop http server
-      run: cargo test --release --manifest-path dev/server/http/Cargo.toml
-    - name: Release test for develop grpc server
-      run: ./dev/server/grpc/scripts/setup.sh && cargo test --release --manifest-path dev/server/grpc/Cargo.toml
+    - name: Setup grpc for tests
+      run: ./dev/server/grpc/scripts/setup.sh
 
     - name: Release test
-      run: cargo test --release
+      run: cargo test --all --release
     - name: Release test without cli feature
-      run: cargo test --release --no-default-features --features=json --features=yaml
+      run: cargo test --all --release --no-default-features --features=json --features=yaml
     - name: Release test with cli feature
-      run: cargo test --release --no-default-features --features=json --features=yaml --features=cli
+      run: cargo test --all --release --no-default-features --features=json --features=yaml --features=cli
     - name: Run doc
-      run: cargo doc --no-deps
+      run: cargo doc --all --no-deps
     - name: Coverage
       run: >
         cargo install cargo-tarpaulin &&
-          cargo tarpaulin --output-dir target/doc --manifest-path Cargo.toml --out Html
+          cargo tarpaulin --output-dir target/doc/relentless --manifest-path Cargo.toml --out Html
     - name: Remove 600 permission files
       run: find target/doc -perm 600 | xargs rm -rf
     - name: Upload artifact
@@ -105,12 +103,22 @@ jobs:
         tag_name: ${{ needs.build.outputs.expected-git-tag }}
         release_name: ${{ needs.build.outputs.expected-git-tag }}
         draft: true
+
     - name: Upload Release Asset
       uses: actions/upload-release-asset@v1 # archived
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create-release.outputs.upload_url }}
-        asset_path: ./target/release/relentless
-        asset_name: relentless
+        asset_path: ./target/release/relentless-http
+        asset_name: relentless-http
+        asset_content_type: application/octet-stream
+    - name: Upload Release Asset
+      uses: actions/upload-release-asset@v1 # archived
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create-release.outputs.upload_url }}
+        asset_path: ./target/release/relentless-grpc
+        asset_name: relentless-grpc
         asset_content_type: application/octet-stream
