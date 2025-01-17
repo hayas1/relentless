@@ -1,3 +1,8 @@
+//! Relentless HTTP comparison testing tool
+//!
+//! # Usage
+//! TODO: see [relentless]
+
 #[cfg(feature = "default-http-client")]
 pub mod client;
 pub mod command;

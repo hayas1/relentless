@@ -1,6 +1,6 @@
 [workspace.package]
 version = "0.1.6"
-description = "Relentless HTTP load testing / comparison testing tool"
+description = "Relentless HTTP / GRPC comparison testing tool"
 authors = ["hayas1 <h4ystack@gmail.com>"]
 edition = "2021"
 repository = "https://github.com/hayas1/relentless"
