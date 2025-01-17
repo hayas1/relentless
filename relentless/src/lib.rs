@@ -23,7 +23,7 @@
 //! ```
 //!
 //! ### Run API for testing
-//! If you have no API for testing, you can use `relentless-dev-server-http`
+//! Optional: there is no API for testing, `relentless-dev-server-http` is provided.
 //! ```sh
 //! cargo install --git https://github.com/hayas1/relentless relentless-dev-server-http
 //! relentless-dev-server-http
