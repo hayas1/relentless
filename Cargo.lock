@@ -1576,36 +1576,27 @@ dependencies = [
  "glob",
  "hdrhistogram",
  "http",
- "http-body",
  "http-body-util",
  "http-serde",
  "httptest",
  "indoc",
  "json-patch",
  "jsonptr",
- "mime",
  "nom",
- "prost",
- "prost-build",
- "prost-reflect",
- "prost-types",
  "regex",
  "relentless-dev-server-http",
- "reqwest",
  "serde",
  "serde_json",
  "serde_yaml",
  "thiserror 2.0.11",
  "tokio",
  "toml",
- "tonic",
- "tonic-reflection",
  "tower 0.5.2",
 ]
 
 [[package]]
 name = "relentless-dev-server-grpc"
-version = "0.1.0"
+version = "0.1.6"
 dependencies = [
  "num",
  "prost",
@@ -1623,7 +1614,7 @@ dependencies = [
 
 [[package]]
 name = "relentless-dev-server-http"
-version = "0.1.0"
+version = "0.1.6"
 dependencies = [
  "axum 0.8.1",
  "axum-extra",
@@ -1642,6 +1633,56 @@ dependencies = [
  "tower-http",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "relentless-grpc"
+version = "0.1.6"
+dependencies = [
+ "bytes",
+ "futures",
+ "http",
+ "http-body-util",
+ "prost",
+ "prost-build",
+ "prost-reflect",
+ "prost-types",
+ "relentless",
+ "relentless-http",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "thiserror 2.0.11",
+ "tokio",
+ "tonic",
+ "tonic-reflection",
+ "tower 0.5.2",
+]
+
+[[package]]
+name = "relentless-http"
+version = "0.1.6"
+dependencies = [
+ "assert-json-diff",
+ "axum 0.8.1",
+ "bytes",
+ "glob",
+ "http",
+ "http-body",
+ "http-body-util",
+ "http-serde",
+ "httptest",
+ "indoc",
+ "mime",
+ "relentless",
+ "relentless-dev-server-http",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "thiserror 2.0.11",
+ "tokio",
+ "tower 0.5.2",
 ]
 
 [[package]]

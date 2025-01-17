@@ -1,8 +1,0 @@
-name: basic assault test
-destinations:
-  test-api: http://localhost:3000
-
-testcases:
-  - target: /
-  - target: /health
-  - target: /healthz

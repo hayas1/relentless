@@ -26,28 +26,21 @@ jobs:
           ${{ steps.cargo-home.outputs.path }}
         key: cargo-${{ hashFiles('**/Cargo.toml') }}
 
-    - run: cargo test --manifest-path dev/server/http/Cargo.toml
-    - run: cargo fmt --check --manifest-path dev/server/http/Cargo.toml
-    - run: cargo clippy --tests --manifest-path dev/server/http/Cargo.toml -- --deny warnings
+    - name: Setup grpc for tests
+      run: ./dev/server/grpc/scripts/setup.sh
 
-    - run: ./dev/server/grpc/scripts/setup.sh
-    - run: cargo test --manifest-path dev/server/grpc/Cargo.toml
-    - run: cargo fmt --check --manifest-path dev/server/grpc/Cargo.toml
-    - run: cargo clippy --tests --manifest-path dev/server/grpc/Cargo.toml -- --deny warnings
+    - run: cargo test --all
+    - run: cargo test --all --no-default-features --features=json
+    - run: cargo test --all --no-default-features --features=yaml
+    - run: cargo test --all --no-default-features --features=json --features=yaml 
+    - run: cargo test --all --no-default-features --features=json --features=yaml --features=cli
+  
+    - run: cargo clippy --all --tests -- --deny warnings
+    - run: cargo fmt --all --check
     - run: clang-format ./dev/server/grpc/proto/*.proto --dry-run --Werror
+    - run: RUSTDOCFLAGS="-D warnings" cargo doc --all --no-deps
 
-    - run: cargo test
-    - run: cargo test --no-default-features
-    - run: cargo test --no-default-features --features=json
-    - run: cargo test --no-default-features --features=yaml
-    - run: cargo test --no-default-features --features=json --features=yaml
-    - run: cargo test --no-default-features --features=json --features=yaml --features=cli
-    - run: cargo fmt --check
-    - run: RUSTDOCFLAGS="-D warnings" cargo doc --no-deps
-    - run: cargo clippy --tests -- --deny warnings
-
-    - run: cargo install cargo-readme && cargo readme > README.md
-    - run: git add -N . && git diff --exit-code -- README.md
+    - run: cargo install cargo-rdme && cargo rdme --check
 
   e2e-test:
     runs-on: ubuntu-latest
@@ -83,8 +76,8 @@ jobs:
       run: |
         set -euo pipefail
         {
-          cargo run --features cli -- \
-            -f examples/config/assault.yaml examples/config/compare.yaml -d actual=http://localhost:3000 \
+          cargo run --manifest-path relentless-http/Cargo.toml --features cli -- \
+            -f relentless-http/examples/config/assault.yaml relentless-http/examples/config/compare.yaml -d actual=http://localhost:3000 \
             -s testcases repeats -r github-markdown \
             --no-color --ng-only
         } >> target/report.txt
@@ -92,7 +85,7 @@ jobs:
       run: |
         set -euo pipefail
         {
-          cargo run --features cli -- \
+          cargo run --manifest-path relentless-http/Cargo.toml --features cli -- \
             -f tests/config/basic/*.yaml -d actual=http://localhost:3001 \
             -s testcases repeats -r github-markdown \
             --no-color --ng-only

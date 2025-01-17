@@ -1,7 +1,10 @@
 [package]
 name = "relentless-dev-server-http"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+license-file.workspace = true
 
 [dependencies]
 axum = { version = "0.8.1", features = ["tokio", "original-uri"] }
