@@ -62,8 +62,8 @@ indoc = "2.0.5"
 
 [workspace]
 members = [
-    "implement/grpc",
-    "implement/http",
+    "relentless-grpc",
+    "relentless-http",
     "dev/server/grpc",
     "dev/server/http",
 ]

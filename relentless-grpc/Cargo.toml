@@ -16,7 +16,7 @@ cli = ["relentless/cli", "console-report"]
 console-report = ["relentless/console-report"]
 
 [dependencies]
-relentless = { path = "../..", features = ["json"] }
+relentless = { path = "../", features = ["json"] }
 
 tower = "0.5.2"
 tokio = { version = "1.43.0", features = ["full"] }
@@ -30,7 +30,7 @@ prost-reflect = { version = "0.14.3", features = [
 tonic = "0.12.3"
 tonic-reflection = "0.12.3"
 http-body-util = "0.1.2" # TODO only record
-relentless-http = { path = "../http" } # TODO only record
+relentless-http = { path = "../relentless-http" } # TODO only record
 
 bytes = "1.9.0"
 futures = "0.3.31"
