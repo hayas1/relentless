@@ -40,8 +40,7 @@ jobs:
     - run: clang-format ./dev/server/grpc/proto/*.proto --dry-run --Werror
     - run: RUSTDOCFLAGS="-D warnings" cargo doc --all --no-deps
 
-    # - run: cargo install cargo-readme && cargo readme > README.md
-    # - run: git add -N . && git diff --exit-code -- README.md
+    - run: cargo install cargo-rdme && cargo rdme --check
 
   e2e-test:
     runs-on: ubuntu-latest
@@ -77,8 +76,8 @@ jobs:
       run: |
         set -euo pipefail
         {
-          cargo run --manifest-path implement/http/Cargo.toml --features cli -- \
-            -f implement/http/examples/config/assault.yaml implement/http/examples/config/compare.yaml -d actual=http://localhost:3000 \
+          cargo run --manifest-path relentless-http/Cargo.toml --features cli -- \
+            -f relentless-http/examples/config/assault.yaml relentless-http/examples/config/compare.yaml -d actual=http://localhost:3000 \
             -s testcases repeats -r github-markdown \
             --no-color --ng-only
         } >> target/report.txt
@@ -86,7 +85,7 @@ jobs:
       run: |
         set -euo pipefail
         {
-          cargo run --manifest-path implement/http/Cargo.toml --features cli -- \
+          cargo run --manifest-path relentless-http/Cargo.toml --features cli -- \
             -f tests/config/basic/*.yaml -d actual=http://localhost:3001 \
             -s testcases repeats -r github-markdown \
             --no-color --ng-only

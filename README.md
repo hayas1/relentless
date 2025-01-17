@@ -1,7 +1,8 @@
 [![Workflow Status](https://github.com/hayas1/relentless/workflows/Master/badge.svg)](https://github.com/hayas1/relentless/actions?query=workflow%3A%22Master%22)
 ![Maintenance](https://img.shields.io/badge/maintenance-experimental-blue.svg)
 
-# relentless
+
+<!-- cargo-rdme start -->
 
 Relentless HTTP load testing / comparison testing tool
 
@@ -70,3 +71,5 @@ TODO <https://github.com/hayas1/relentless/blob/master/tests/tests.rs>
 ## Testing
 ### coverage
 <https://hayas1.github.io/relentless/tarpaulin-report.html>
+
+<!-- cargo-rdme end -->
