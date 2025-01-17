@@ -1,4 +1,4 @@
-use relentless_dev_server_http::{env::Env, serve};
+use relentless_http_dev_server::{env::Env, serve};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {

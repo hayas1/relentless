@@ -1,5 +1,5 @@
 use num::BigInt;
-use relentless_dev_server_grpc::service::counter::pb::counter_client::CounterClient;
+use relentless_grpc_dev_server::service::counter::pb::counter_client::CounterClient;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

@@ -1,5 +1,5 @@
 [package]
-name = "relentless-dev-server-http"
+name = "relentless-http-dev-server"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true

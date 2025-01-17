@@ -6,8 +6,8 @@ use relentless::interface::{
     command::{Assault, Relentless, ReportFormat, WorkerKind},
     report::github_markdown::CaseGithubMarkdownReport,
 };
-use relentless_dev_server_http::route;
 use relentless_http::command::HttpAssault;
+use relentless_http_dev_server::route;
 
 #[tokio::test]
 async fn test_github_markdown_report_format() {

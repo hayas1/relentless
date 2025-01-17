@@ -1,7 +1,7 @@
 #![cfg(all(feature = "json", feature = "yaml"))]
 use axum::body::Body;
 use relentless::interface::command::{Assault, Relentless};
-use relentless_dev_server_http::route;
+use relentless_http_dev_server::route;
 use relentless_http::command::HttpAssault;
 
 #[tokio::test]
