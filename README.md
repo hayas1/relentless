@@ -29,10 +29,10 @@ testcases:
 ```
 
 #### Run API for testing
-If you have no API for testing, you can use `relentless-dev-server-http`
+Optional: there is no API for testing, `relentless-http-dev-server` is provided.
 ```sh
-cargo install --git https://github.com/hayas1/relentless relentless-dev-server-http
-relentless-dev-server-http
+cargo install --git https://github.com/hayas1/relentless relentless-http-dev-server
+relentless-http-dev-server
 ```
 
 ### Run CLI
@@ -69,7 +69,7 @@ relentless-http = { git = "https://github.com/hayas1/relentless" }
 Same config can be used in both binary and library. See [Binary section](#prepare-config).
 
 #### Run API for testing
-Same `relentless-dev-server-http` can be used in both binary and library. See [Binary section](#run-api-for-testing).
+Same `relentless-http-dev-server` can be used in both binary and library. See [Binary section](#run-api-for-testing).
 
 ### Run Testing
 Example <https://github.com/hayas1/relentless/blob/master/relentless-http/examples/service.rs>
