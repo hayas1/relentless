@@ -5,8 +5,8 @@ use std::process::ExitCode;
 async fn main() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sync>> {
     use axum::body::Body;
     use relentless::interface::command::{Assault, Relentless};
-    use relentless_dev_server_http::route;
     use relentless_http::command::HttpAssault;
+    use relentless_http_dev_server::route;
 
     let assault = HttpAssault::<Body, Body>::new(Relentless {
         file: vec![

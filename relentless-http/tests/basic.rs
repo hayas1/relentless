@@ -5,8 +5,8 @@ use relentless::{
     interface::command::{Assault, Relentless, ReportFormat},
 };
 
-use relentless_dev_server_http::route;
 use relentless_http::command::HttpAssault;
+use relentless_http_dev_server::route;
 
 #[tokio::test]
 #[cfg(all(feature = "json", feature = "yaml"))]

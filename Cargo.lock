@@ -1584,7 +1584,7 @@ dependencies = [
  "jsonptr",
  "nom",
  "regex",
- "relentless-dev-server-http",
+ "relentless-http-dev-server",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -1595,7 +1595,33 @@ dependencies = [
 ]
 
 [[package]]
-name = "relentless-dev-server-grpc"
+name = "relentless-grpc"
+version = "0.1.6"
+dependencies = [
+ "bytes",
+ "futures",
+ "http",
+ "http-body-util",
+ "prost",
+ "prost-build",
+ "prost-reflect",
+ "prost-types",
+ "relentless",
+ "relentless-grpc-dev-server",
+ "relentless-http",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "thiserror 2.0.11",
+ "tokio",
+ "tokio-test",
+ "tonic",
+ "tonic-reflection",
+ "tower 0.5.2",
+]
+
+[[package]]
+name = "relentless-grpc-dev-server"
 version = "0.1.6"
 dependencies = [
  "num",
@@ -1613,7 +1639,34 @@ dependencies = [
 ]
 
 [[package]]
-name = "relentless-dev-server-http"
+name = "relentless-http"
+version = "0.1.6"
+dependencies = [
+ "assert-json-diff",
+ "axum 0.8.1",
+ "bytes",
+ "glob",
+ "http",
+ "http-body",
+ "http-body-util",
+ "http-serde",
+ "httptest",
+ "indoc",
+ "mime",
+ "relentless",
+ "relentless-http-dev-server",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "thiserror 2.0.11",
+ "tokio",
+ "tokio-test",
+ "tower 0.5.2",
+]
+
+[[package]]
+name = "relentless-http-dev-server"
 version = "0.1.6"
 dependencies = [
  "axum 0.8.1",
@@ -1633,56 +1686,6 @@ dependencies = [
  "tower-http",
  "tracing",
  "tracing-subscriber",
-]
-
-[[package]]
-name = "relentless-grpc"
-version = "0.1.6"
-dependencies = [
- "bytes",
- "futures",
- "http",
- "http-body-util",
- "prost",
- "prost-build",
- "prost-reflect",
- "prost-types",
- "relentless",
- "relentless-http",
- "serde",
- "serde_json",
- "serde_yaml",
- "thiserror 2.0.11",
- "tokio",
- "tonic",
- "tonic-reflection",
- "tower 0.5.2",
-]
-
-[[package]]
-name = "relentless-http"
-version = "0.1.6"
-dependencies = [
- "assert-json-diff",
- "axum 0.8.1",
- "bytes",
- "glob",
- "http",
- "http-body",
- "http-body-util",
- "http-serde",
- "httptest",
- "indoc",
- "mime",
- "relentless",
- "relentless-dev-server-http",
- "reqwest",
- "serde",
- "serde_json",
- "serde_yaml",
- "thiserror 2.0.11",
- "tokio",
- "tower 0.5.2",
 ]
 
 [[package]]
@@ -2184,6 +2187,19 @@ dependencies = [
  "futures-core",
  "pin-project-lite",
  "tokio",
+]
+
+[[package]]
+name = "tokio-test"
+version = "0.4.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2468baabc3311435b55dd935f702f42cd1b8abb7e754fb7dfb16bd36aa88f9f7"
+dependencies = [
+ "async-stream",
+ "bytes",
+ "futures-core",
+ "tokio",
+ "tokio-stream",
 ]
 
 [[package]]

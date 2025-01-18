@@ -6,8 +6,8 @@ use relentless::interface::{
     report::console::{CaseConsoleReport, RelentlessConsoleReport},
 };
 
-use relentless_dev_server_http::route::{self, counter::CounterResponse};
 use relentless_http::command::HttpAssault;
+use relentless_http_dev_server::route::{self, counter::CounterResponse};
 use tower::ServiceExt;
 
 #[tokio::test]
