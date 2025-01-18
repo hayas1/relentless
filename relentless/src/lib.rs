@@ -1,4 +1,4 @@
-//! Relentless HTTP / GRPC comparison testing tool
+//! Relentless load testing and comparison testing tool for HTTP / GRPC.
 //!
 //! # Usage
 //! Main usage of `relentless` is comparison testing for REST API servers with `relentless-http`.
@@ -59,8 +59,12 @@
 //! <https://hayas1.github.io/relentless/relentless>
 //!
 //! # Testing
-//! ## coverage
+//! ## Benchmarks
+//! TODO
+//!
+//! ## Coverage
 //! <https://hayas1.github.io/relentless/relentless/tarpaulin-report.html>
+//!
 
 pub mod assault;
 pub mod error;

@@ -4,7 +4,7 @@
 
 <!-- cargo-rdme start -->
 
-Relentless HTTP / GRPC comparison testing tool
+Relentless load testing and comparison testing tool for HTTP / GRPC.
 
 ## Usage
 Main usage of `relentless` is comparison testing for REST API servers with `relentless-http`.
@@ -65,7 +65,10 @@ In this case the `actual` and `expect` are the same server, so the request gets 
 <https://hayas1.github.io/relentless/relentless>
 
 ## Testing
-### coverage
+### Benchmarks
+TODO
+
+### Coverage
 <https://hayas1.github.io/relentless/relentless/tarpaulin-report.html>
 
 <!-- cargo-rdme end -->
