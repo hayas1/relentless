@@ -10,7 +10,7 @@
 //! ```
 //!
 //! ## Prepare Config
-//! Example `compare.yaml`
+//! For example, `compare.yaml`
 //! ```yaml
 //! name: basic comparison test
 //! destinations:
@@ -46,7 +46,7 @@
 //!   pass-rt: 3/3=100.00%    rps: 6req/22.37ms=268.23req/s
 //!   latency: min=2.774ms mean=8.194ms p50=5.219ms p90=22.127ms p99=22.127ms max=22.127ms
 //! ```
-//! In this case the actual and expected are the same server, so the request gets the same response and the test passes. ✅
+//! In this case the `actual` and `expect` are the same server, so the request gets the same response and the test passes. ✅
 //! - Each request is done **concurrently** by default.
 //!
 //! ### More details
