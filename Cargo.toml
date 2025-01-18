@@ -1,5 +1,5 @@
 [workspace.package]
-version = "0.1.6"
+version = "0.2.0"
 description = "Relentless load testing / comparison testing framework"
 authors = ["hayas1 <h4ystack@gmail.com>"]
 edition = "2021"
