@@ -88,6 +88,9 @@ jobs:
           target
           ${{ steps.cargo-home.outputs.path }}
         key: cargo-${{ hashFiles('**/Cargo.toml') }}
+    - name: Setup grpc for tests
+      run: ./dev/server/grpc/scripts/setup.sh
+
     - name: Release build
       run: cargo build --release --features=cli
     - name: Push tag
