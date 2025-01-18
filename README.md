@@ -6,8 +6,9 @@
 
 Relentless HTTP / GRPC comparison testing tool
 
-## Binary Usage for http API server
-More detail HTTP usage in [relentless-http](../relentless_http), and GRPC usage in [relentless-grpc](../relentless_grpc).
+## Usage
+Main usage of `relentless` is comparison testing for REST API servers with `relentless-http`.
+Other usages in [More details](#more-details) section.
 
 ### Install
 ```sh
@@ -39,7 +40,7 @@ relentless-http-dev-server
 ```sh
 relentless -f compare.yaml
 ```
-```sh
+```plaintext
 🚀 basic comparison test 🚀
   actual🌐 http://localhost:3000/
   expect🌐 http://localhost:3000/
@@ -53,6 +54,11 @@ relentless -f compare.yaml
 ```
 In this case the actual and expected are the same server, so the request gets the same response and the test passes. ✅
 - Each request is done **concurrently** by default.
+
+#### More details
+| | HTTP | GRPC |
+| --- | --- | --- |
+| Docs | [relentless-http](https://hayas1.github.io/relentless/relentless_http/) |[relentless-grpc](https://hayas1.github.io/relentless/relentless_grpc/) |
 
 ## Library Usage
 ### Install
