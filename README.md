@@ -29,7 +29,7 @@ testcases:
 ```
 
 #### Run API for testing
-Optional: there is no API for testing, `relentless-http-dev-server` is provided.
+Optional: if there is no API for testing, `relentless-http-dev-server` is provided.
 ```sh
 cargo install --git https://github.com/hayas1/relentless relentless-http-dev-server
 relentless-http-dev-server
