@@ -4,29 +4,8 @@ destinations:
 
 testcases:
   - target: greeter.Greeter/SayHello
-    description: wip request
-    setting:
-      allow: true
-      request:
-        message: 
-          json:
-            name: Rust
-      response:
-        message:
-          json:
-  - target: counter.Counter/Increment
     setting:
       request:
-        descriptor: 
-          protos: [./dev/server/grpc/proto/counter.proto]
-          import_path: [./dev/server/grpc/proto]
         message:
           json:
-            100
-      response:
-        message:
-          json:
-  - target: echo.Echo/EchoMetadata
-    setting:
-      request:
-      response:
+            name: John Doe

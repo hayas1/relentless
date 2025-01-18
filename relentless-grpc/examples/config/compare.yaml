@@ -5,34 +5,8 @@ destinations:
 
 testcases:
   - target: greeter.Greeter/SayHello
-    description: wip request
-    setting:
-      allow: true
-      template:
-        name:
-          actual: server1
-          expect: server2
-      request:
-        message: 
-          json:
-            name: ${name}
-      response:
-        message:
-          json:
-  - target: counter.Counter/Increment
-    setting:
-      allow: true # count will be different for each request
-      request:
-        descriptor: 
-          protos: [dev/server/grpc/proto/counter.proto]
-          import_path: [dev/server/grpc/proto]
-        message:
-          json:
-            100
-      response:
-        message:
-          json:
-  - target: echo.Echo/EchoMetadata
     setting:
       request:
-      response:
+        message:
+          json:
+            name: John Doe
