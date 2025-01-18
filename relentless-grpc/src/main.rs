@@ -8,7 +8,7 @@ pub async fn main() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sync>
 
     let assault = GrpcAssault::new(Relentless::parse_cli());
     let client = DefaultGrpcClient::<serde_json::Value>::new();
-    let record = assault.build_service(client); // TODO
+    let record = assault.build_service(client);
     Ok(assault.execute(record).await?)
 }
 
