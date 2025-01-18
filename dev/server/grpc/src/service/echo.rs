@@ -89,50 +89,75 @@ pub enum EchoError {
 
 #[cfg(test)]
 mod tests {
-    use pb::echo_server::Echo;
+    use pb::{echo_client::EchoClient, echo_server::EchoServer};
 
     use super::*;
 
     #[tokio::test]
     async fn test_echo() {
-        let echo = EchoImpl;
+        let server = EchoServer::new(EchoImpl);
+        let mut client = EchoClient::new(server);
 
         let request = Request::new(Any::from_msg(&"100".to_string()).unwrap());
-        let response = echo.echo(request).await.unwrap();
+        let response = client.echo(request).await.unwrap();
         assert_eq!(response.into_inner().to_msg::<String>().unwrap(), "100");
     }
 
     #[tokio::test]
     async fn test_echo_value() {
-        let echo = EchoImpl;
+        let server = EchoServer::new(EchoImpl);
+        let mut client = EchoClient::new(server);
 
         let request = Request::new(Value::from(200));
-        let response = echo.echo_value(request).await.unwrap();
+        let response = client.echo_value(request).await.unwrap();
         assert_eq!(response.into_inner(), Value::from(200));
     }
 
     #[tokio::test]
     async fn test_echo_metadata() {
-        let echo = EchoImpl;
+        let server = EchoServer::new(EchoImpl);
+        let mut client = EchoClient::new(server);
 
         let mut request = Request::new(());
         request.set_timeout(std::time::Duration::from_secs(1));
-        let response = echo.echo_metadata(request).await.unwrap().into_inner();
+        let response = client.echo_metadata(request).await.unwrap().into_inner();
         assert_eq!(
             response,
             pb::MetadataMap {
-                entries: vec![pb::MapEntry {
-                    entry: Some(pb::map_entry::Entry::Ascii(pb::AsciiEntry {
-                        key: "grpc-timeout".to_string(),
-                        value: "1000000u".to_string()
-                    }))
-                }]
+                entries: vec![
+                    pb::MapEntry {
+                        entry: Some(pb::map_entry::Entry::Ascii(pb::AsciiEntry {
+                            key: "grpc-timeout".to_string(),
+                            value: "1000000u".to_string()
+                        }))
+                    },
+                    pb::MapEntry {
+                        entry: Some(pb::map_entry::Entry::Ascii(pb::AsciiEntry {
+                            key: "te".to_string(),
+                            value: "trailers".to_string()
+                        }))
+                    },
+                    pb::MapEntry {
+                        entry: Some(pb::map_entry::Entry::Ascii(pb::AsciiEntry {
+                            key: "content-type".to_string(),
+                            value: "application/grpc".to_string()
+                        }))
+                    },
+                ]
             }
         );
         let mut metadata_map = tonic::metadata::MetadataMap::new();
         metadata_map.append(
             tonic::metadata::MetadataKey::from_static("grpc-timeout"),
             tonic::metadata::MetadataValue::from_static("1000000u"),
+        );
+        metadata_map.append(
+            tonic::metadata::MetadataKey::from_static("te"),
+            tonic::metadata::MetadataValue::from_static("trailers"),
+        );
+        metadata_map.append(
+            tonic::metadata::MetadataKey::from_static("content-type"),
+            tonic::metadata::MetadataValue::from_static("application/grpc"),
         );
         assert_eq!(
             tonic::metadata::MetadataMap::try_from(response).unwrap().into_headers(),

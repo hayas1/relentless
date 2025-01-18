@@ -131,40 +131,44 @@ impl From<CounterError> for String {
 
 #[cfg(test)]
 mod tests {
-    use pb::counter_server::Counter;
+    use pb::{counter_client::CounterClient, counter_server::CounterServer};
+    use tonic::Code;
 
     use super::*;
 
     #[tokio::test]
     async fn test_counter_basic() {
-        let counter = CounterImpl::new(BigInt::from(0));
+        let server = CounterServer::new(CounterImpl::new(BigInt::from(0)));
+        let mut client = CounterClient::new(server);
 
-        assert_eq!(counter.increment(Request::new(1)).await.unwrap().into_inner(), 1);
-        assert_eq!(counter.increment(Request::new(2)).await.unwrap().into_inner(), 3);
+        assert_eq!(client.increment(1).await.unwrap().into_inner(), 1);
+        assert_eq!(client.increment(2).await.unwrap().into_inner(), 3);
 
-        assert_eq!(counter.decrement(Request::new(1)).await.unwrap().into_inner(), 2);
-        assert_eq!(counter.decrement(Request::new(3)).await.unwrap().into_inner(), -1);
+        assert_eq!(client.decrement(1).await.unwrap().into_inner(), 2);
+        assert_eq!(client.decrement(3).await.unwrap().into_inner(), -1);
 
-        assert_eq!(counter.show(Request::new(())).await.unwrap().into_inner(), -1);
-        assert_eq!(counter.reset(Request::new(())).await.unwrap().into_inner(), 0);
+        assert_eq!(client.show(()).await.unwrap().into_inner(), -1);
+        assert_eq!(client.reset(()).await.unwrap().into_inner(), 0);
     }
 
     #[tokio::test]
     async fn test_counter_too_large_bigint() {
-        let counter = CounterImpl::new(BigInt::from(0));
+        let server = CounterServer::new(CounterImpl::new(BigInt::from(0)));
+        let mut client = CounterClient::new(server);
 
         let large: BigInt = "9999999999999999999999999999999".parse().unwrap();
         assert_eq!(
-            counter.bincrement(Request::new(large.clone().into())).await.unwrap().into_inner(),
+            client.bincrement(pb::BigInt::from(large.clone())).await.unwrap().into_inner(),
             large.clone().into()
         );
 
-        assert_eq!(
-            counter.show(Request::new(())).await.unwrap_err().to_string(),
-            Status::invalid_argument(CounterError::TooLarge(large.clone())).to_string(),
-        );
+        let err = client.show(()).await.unwrap_err();
+        assert_eq!(err.code(), Code::InvalidArgument);
+        assert_eq!(err.message(), CounterError::TooLarge(large.clone()).to_string());
 
-        assert_eq!(counter.breset(Request::new(())).await.unwrap().into_inner(), BigInt::from(0).into());
-        assert_eq!(counter.show(Request::new(())).await.unwrap().into_inner(), 0);
+        assert_eq!(client.bshow(()).await.unwrap().into_inner(), large.clone().into());
+
+        assert_eq!(client.breset(()).await.unwrap().into_inner(), BigInt::from(0).into());
+        assert_eq!(client.show(()).await.unwrap().into_inner(), 0);
     }
 }
