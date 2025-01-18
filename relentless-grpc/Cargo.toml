@@ -40,3 +40,5 @@ serde_json = "1.0.135"
 serde_yaml = { version = "0.9.34", optional = true }
 
 [dev-dependencies]
+relentless-grpc-dev-server = { path = "../dev/server/grpc" }
+tokio-test = "0.4.4"                                         # for async doc test
