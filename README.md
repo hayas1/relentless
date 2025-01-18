@@ -12,8 +12,9 @@ Other usages in [More details](#more-details) section.
 
 ### Install
 ```sh
-cargo install --git https://github.com/hayas1/relentless relentless-http
+cargo install --git https://github.com/hayas1/relentless relentless-http --features cli
 ```
+or get binary from [GitHub Releases](https://github.com/hayas1/relentless/releases).
 
 ### Prepare Config
 For example, `compare.yaml`
@@ -38,7 +39,7 @@ relentless-http-dev-server
 
 ### Run CLI
 ```sh
-relentless -f compare.yaml
+relentless-http -f compare.yaml
 ```
 ```plaintext
 🚀 basic comparison test 🚀
@@ -59,26 +60,6 @@ In this case the `actual` and `expect` are the same server, so the request gets 
 | | HTTP | GRPC |
 | --- | --- | --- |
 | Docs | [relentless-http](https://hayas1.github.io/relentless/relentless_http/) |[relentless-grpc](https://hayas1.github.io/relentless/relentless_grpc/) |
-
-## Library Usage
-### Install
-Often used in dependencies for testing.
-```sh
-cargo add --dev --git https://github.com/hayas1/relentless relentless-http
-```
-```toml
-[dev-dependencies]
-relentless-http = { git = "https://github.com/hayas1/relentless" }
-```
-
-### Prepare Config
-Same config can be used in both binary and library. See [Binary section](#prepare-config).
-
-#### Run API for testing
-Same `relentless-http-dev-server` can be used in both binary and library. See [Binary section](#run-api-for-testing).
-
-### Run Testing
-Example <https://github.com/hayas1/relentless/blob/master/relentless-http/examples/service.rs>
 
 ## Documents
 <https://hayas1.github.io/relentless/relentless>
