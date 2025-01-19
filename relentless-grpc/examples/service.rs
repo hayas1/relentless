@@ -5,6 +5,7 @@ use std::process::ExitCode;
 async fn main() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sync>> {
     use relentless::interface::command::{Assault, Relentless};
     use relentless_grpc::{client::DefaultGrpcClient, command::GrpcAssault};
+    use relentless_grpc_dev_server::service::greeter::{pb::greeter_server::GreeterServer, GreeterImpl};
 
     let assault = GrpcAssault::new(Relentless {
         file: vec![
@@ -16,7 +17,7 @@ async fn main() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sync>> {
     let (configs, errors) = assault.configs();
     errors.into_iter().for_each(|err| eprintln!("{}", err));
 
-    let service = DefaultGrpcClient::new();
+    let service = GreeterServer::new(GreeterImpl::default());
     let report = assault.assault_with(configs, service).await?;
 
     assault.report_with(&report, std::io::stdout())?;

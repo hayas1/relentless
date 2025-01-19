@@ -6,6 +6,13 @@ use relentless::{
 };
 
 #[derive(Error, Debug)]
+pub enum GrpcClientError {
+    #[error("todo")]
+    Todo,
+}
+impl IntoRelentlessError for GrpcClientError {}
+
+#[derive(Error, Debug)]
 pub enum GrpcRequestError {
     #[error("cannot parse target {}", .0)]
     FailToParse(String),

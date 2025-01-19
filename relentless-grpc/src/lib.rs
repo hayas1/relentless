@@ -57,6 +57,7 @@
 //! ```
 
 pub mod client;
+pub mod client2;
 pub mod command;
 pub mod error;
 pub mod evaluate;
