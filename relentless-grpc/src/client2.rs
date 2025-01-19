@@ -6,24 +6,28 @@ use std::{
     task::{Context, Poll},
 };
 
-use http::Uri;
+use http::{uri::PathAndQuery, Uri};
+use prost_reflect::{MethodDescriptor, ServiceDescriptor};
 use relentless::assault::service::origin_router::OriginRouter;
+use serde::Deserializer;
 use tonic::{
     body::BoxBody,
     client::{Grpc, GrpcService},
+    codec::Codec,
     transport::{Body, Channel},
 };
 use tower::Service;
 
-use crate::{client::DefaultGrpcRequest, error::GrpcClientError};
+use crate::error::GrpcClientError;
 
 #[derive(Debug, Clone)]
-pub struct DefaultGrpcClient<S, Req, Res> {
+pub struct DefaultGrpcClient<S, Mq> {
     inner: tonic::client::Grpc<S>,
-    phantom: PhantomData<(Req, Res)>,
+    phantom: PhantomData<Mq>,
 }
 
-impl<B, Req, Res> DefaultGrpcClient<OriginRouter<tonic::transport::Channel, B>, Req, Res> {
+// TODO tonic::client::Grpc has 1 origin, so OriginRouter will not work properly
+impl<B, Mq> DefaultGrpcClient<OriginRouter<tonic::transport::Channel, B>, Mq> {
     pub async fn new(all_destinations: &[Uri]) -> Result<Self, GrpcClientError> {
         let mut services = HashMap::new();
         for d in all_destinations {
@@ -34,16 +38,17 @@ impl<B, Req, Res> DefaultGrpcClient<OriginRouter<tonic::transport::Channel, B>, 
     }
 }
 
-impl<S, Mq, Ms> Service<DefaultGrpcRequest<Mq, Ms>> for DefaultGrpcClient<S, Mq, Ms>
+impl<S, Mq, C> Service<DefaultGrpcRequest<C, Mq>> for DefaultGrpcClient<S, Mq>
 where
-    S: GrpcService<BoxBody> + Send,
+    S: GrpcService<BoxBody> + Clone + Send + 'static,
     S::ResponseBody: Send,
     <S::ResponseBody as Body>::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
     S::Future: Send + 'static,
-    Mq: Send,
-    Ms: Send,
+    Mq: Send + Sync + 'static,
+    C: Codec<Encode = Mq> + Send + 'static,
+    C::Decode: Send + Sync + 'static,
 {
-    type Response = tonic::Response<Ms>;
+    type Response = tonic::Response<C::Decode>;
     type Error = GrpcClientError;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
@@ -51,13 +56,29 @@ where
         Poll::Ready(Ok(())) // TODO
     }
 
-    fn call(&mut self, req: DefaultGrpcRequest<Mq, Ms>) -> Self::Future {
+    fn call(&mut self, req: DefaultGrpcRequest<C, Mq>) -> Self::Future {
+        let mut inner = self.inner.clone();
         Box::pin(async move {
-            self.inner.ready().await.map_err(|_| GrpcClientError::Todo)?;
-            self.inner
-                .unary(tonic::Request::new(req.message), req.format_method_path(), req.codec)
-                .await
-                .map_err(|_| GrpcClientError::Todo)
+            let path = req.format_method_path();
+            let DefaultGrpcRequest { codec, message, .. } = req;
+            inner.ready().await.map_err(|_| GrpcClientError::Todo)?;
+            inner.unary(tonic::Request::new(message), path, codec).await.map_err(|_| GrpcClientError::Todo)
         })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct DefaultGrpcRequest<C, M> {
+    pub service: ServiceDescriptor,
+    pub method: MethodDescriptor,
+    pub codec: C,
+    pub message: M,
+}
+impl<C, M> DefaultGrpcRequest<C, M> {
+    pub fn format_method_path(&self) -> PathAndQuery {
+        // https://github.com/hyperium/tonic/blob/master/tonic-build/src/lib.rs#L212-L218
+        format!("/{}/{}", self.service.full_name(), self.method.name())
+            .parse()
+            .unwrap_or_else(|e| unreachable!("{}", e))
     }
 }
