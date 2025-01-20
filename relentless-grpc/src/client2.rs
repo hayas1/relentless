@@ -75,20 +75,3 @@ where
         })
     }
 }
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct DefaultGrpcRequest2<C, M> {
-    pub destination: Uri,
-    pub service: ServiceDescriptor,
-    pub method: MethodDescriptor,
-    pub codec: C,
-    pub message: M,
-}
-impl<C, M> DefaultGrpcRequest2<C, M> {
-    pub fn format_method_path(&self) -> PathAndQuery {
-        // https://github.com/hyperium/tonic/blob/master/tonic-build/src/lib.rs#L212-L218
-        format!("/{}/{}", self.service.full_name(), self.method.name())
-            .parse()
-            .unwrap_or_else(|e| unreachable!("{}", e))
-    }
-}
