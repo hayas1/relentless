@@ -8,8 +8,7 @@ use std::{
 
 use http::{uri::PathAndQuery, Uri};
 use prost_reflect::{MethodDescriptor, ServiceDescriptor};
-use relentless::assault::service::origin_router::OriginRouter;
-use serde::Deserializer;
+use serde::{Deserializer, Serializer};
 use tonic::{
     body::BoxBody,
     client::{Grpc, GrpcService},
@@ -18,16 +17,15 @@ use tonic::{
 };
 use tower::Service;
 
-use crate::error::GrpcClientError;
+use crate::{client::DefaultGrpcRequest, error::GrpcClientError};
 
 #[derive(Debug, Clone)]
-pub struct DefaultGrpcClient<S, Mq> {
+pub struct DefaultGrpcClient<S, De, Se> {
     inner: HashMap<Uri, tonic::client::Grpc<S>>,
-    phantom: PhantomData<Mq>,
+    phantom: PhantomData<(De, Se)>,
 }
 
-// TODO tonic::client::Grpc has 1 origin, so OriginRouter will not work properly
-impl<Mq> DefaultGrpcClient<tonic::transport::Channel, Mq> {
+impl<De, Se> DefaultGrpcClient<tonic::transport::Channel, De, Se> {
     pub async fn new(all_destinations: &[Uri]) -> Result<Self, GrpcClientError> {
         let mut clients = HashMap::new();
         for d in all_destinations {
@@ -37,18 +35,29 @@ impl<Mq> DefaultGrpcClient<tonic::transport::Channel, Mq> {
         Ok(Self { inner: clients, phantom: PhantomData })
     }
 }
+impl<S, De, Se> DefaultGrpcClient<S, De, Se>
+where
+    S: Clone,
+{
+    pub async fn from_services(services: &HashMap<Uri, S>) -> Result<Self, GrpcClientError> {
+        let clients = services.iter().map(|(d, s)| (d.clone(), tonic::client::Grpc::new(s.clone()))).collect();
+        Ok(Self { inner: clients, phantom: PhantomData })
+    }
+}
 
-impl<S, Mq, C> Service<DefaultGrpcRequest2<C, Mq>> for DefaultGrpcClient<S, Mq>
+impl<S, De> Service<DefaultGrpcRequest<De, serde_json::value::Serializer>>
+    for DefaultGrpcClient<S, De, serde_json::value::Serializer>
 where
     S: GrpcService<BoxBody> + Clone + Send + 'static,
     S::ResponseBody: Send,
     <S::ResponseBody as Body>::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
     S::Future: Send + 'static,
-    Mq: Send + Sync + 'static,
-    C: Codec<Encode = Mq> + Send + 'static,
-    C::Decode: Send + Sync + 'static,
+    De: for<'a> Deserializer<'a> + Send + Sync + 'static,
+    for<'a> <De as Deserializer<'a>>::Error: std::error::Error + Send + Sync + 'static,
+    // Se: Serializer + Send + 'static,
+    // Se::Ok: Send + 'static,
 {
-    type Response = tonic::Response<C::Decode>;
+    type Response = tonic::Response<serde_json::Value>;
     type Error = GrpcClientError;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
@@ -56,11 +65,11 @@ where
         Poll::Ready(Ok(())) // TODO
     }
 
-    fn call(&mut self, req: DefaultGrpcRequest2<C, Mq>) -> Self::Future {
+    fn call(&mut self, req: DefaultGrpcRequest<De, serde_json::value::Serializer>) -> Self::Future {
         let mut inner = self.inner[&req.destination].clone();
         Box::pin(async move {
             let path = req.format_method_path();
-            let DefaultGrpcRequest2 { codec, message, .. } = req;
+            let DefaultGrpcRequest { codec, message, .. } = req;
             inner.ready().await.map_err(|_| GrpcClientError::Todo)?;
             inner.unary(tonic::Request::new(message), path, codec).await.map_err(|_| GrpcClientError::Todo)
         })

@@ -66,6 +66,15 @@ pub trait Assault<Req, Res> {
             (ok.into_iter().map(Result::unwrap).collect(), err.into_iter().map(Result::unwrap_err).collect());
         (configs, errors)
     }
+    fn all_destinations(&self, configs: &[Config<Self::Request, Self::Response>]) -> Vec<http::Uri> {
+        let d = self.command().destinations().unwrap_or_default();
+        configs
+            .iter()
+            .flat_map(|c| c.worker_config.destinations.values())
+            .chain(d.values())
+            .map(|o| (**o).clone())
+            .collect()
+    }
 
     /// TODO document
     // TODO return type should be `impl Service<Req>` ?
