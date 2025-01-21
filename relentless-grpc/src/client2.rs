@@ -6,8 +6,7 @@ use std::{
     task::{Context, Poll},
 };
 
-use http::{uri::PathAndQuery, Uri};
-use prost_reflect::{MethodDescriptor, ServiceDescriptor};
+use http::Uri;
 use serde::{Deserializer, Serializer};
 use tonic::{
     body::BoxBody,
@@ -19,10 +18,15 @@ use tower::Service;
 
 use crate::{client::DefaultGrpcRequest, error::GrpcClientError};
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct DefaultGrpcClient<S, De, Se> {
     inner: HashMap<Uri, tonic::client::Grpc<S>>,
     phantom: PhantomData<(De, Se)>,
+}
+impl<S: Clone, De, Se> Clone for DefaultGrpcClient<S, De, Se> {
+    fn clone(&self) -> Self {
+        Self { inner: self.inner.clone(), phantom: PhantomData }
+    }
 }
 
 impl<De, Se> DefaultGrpcClient<tonic::transport::Channel, De, Se> {
