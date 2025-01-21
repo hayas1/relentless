@@ -142,6 +142,7 @@ impl GrpcRequest {
     }
 
     pub async fn descriptor_from_reflection(destination: &http::Uri, svc: &str) -> relentless::Result<DescriptorPool> {
+        // TODO do not use Channel directly, use Service
         let mut client = ServerReflectionClient::new(Channel::builder(destination.clone()).connect().await.box_err()?);
         let (host, service) = (
             destination.host().ok_or_else(|| GrpcRequestError::NoHost(destination.clone()))?.to_string(),

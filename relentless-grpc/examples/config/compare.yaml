@@ -7,6 +7,9 @@ testcases:
   - target: greeter.Greeter/SayHello
     setting:
       request:
+        descriptor:
+          protos: [./dev/server/grpc/proto/greeter.proto]
+          import_path: [./dev/server/grpc/proto]
         message:
           json:
             name: John Doe
