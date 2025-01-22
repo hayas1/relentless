@@ -49,8 +49,7 @@ where
     }
 }
 
-impl<S, De> Service<DefaultGrpcRequest<De, serde_json::value::Serializer>>
-    for DefaultGrpcClient<S, De, serde_json::value::Serializer>
+impl<S, De, Se> Service<DefaultGrpcRequest<De, Se>> for DefaultGrpcClient<S, De, Se>
 where
     S: GrpcService<BoxBody> + Clone + Send + 'static,
     S::ResponseBody: Send,
@@ -58,10 +57,11 @@ where
     S::Future: Send + 'static,
     De: for<'a> Deserializer<'a> + Send + Sync + 'static,
     for<'a> <De as Deserializer<'a>>::Error: std::error::Error + Send + Sync + 'static,
-    // Se: Serializer + Send + 'static,
-    // Se::Ok: Send + 'static,
+    Se: Serializer + Clone + Send + Sync + 'static,
+    Se::Ok: Send + Sync + 'static,
+    Se::Error: std::error::Error + Send + Sync + 'static,
 {
-    type Response = tonic::Response<serde_json::Value>;
+    type Response = tonic::Response<Se::Ok>;
     type Error = GrpcClientError;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
@@ -69,7 +69,7 @@ where
         Poll::Ready(Ok(())) // TODO
     }
 
-    fn call(&mut self, req: DefaultGrpcRequest<De, serde_json::value::Serializer>) -> Self::Future {
+    fn call(&mut self, req: DefaultGrpcRequest<De, Se>) -> Self::Future {
         let mut inner = self.inner[&req.destination].clone();
         Box::pin(async move {
             let path = req.format_method_path();

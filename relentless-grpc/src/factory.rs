@@ -98,7 +98,7 @@ impl RequestFactory<DefaultGrpcRequest<serde_json::Value, serde_json::value::Ser
         let destination = destination.clone();
         let (service, method) = Self::service_method(&pool, (svc, mth))?;
         let message = template.render_json_recursive(&self.message.produce())?;
-        let codec = MethodCodec::new(method.clone()); // TODO remove clone
+        let codec = MethodCodec::new(method.clone(), serde_json::value::Serializer); // TODO remove clone
 
         Ok(DefaultGrpcRequest { destination, service, method, codec, message })
     }

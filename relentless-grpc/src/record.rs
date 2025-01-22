@@ -54,7 +54,7 @@ impl<De, Se> CollectClone<DefaultGrpcRequest<De, Se>> for GrpcIoRecorder
 where
     De: for<'a> serde::Deserializer<'a> + DeserializeOwned + Send + Sync + 'static,
     for<'a> <De as serde::Deserializer<'a>>::Error: std::error::Error + Send + Sync + 'static,
-    Se: Send,
+    Se: Clone + Send,
 {
     type Error = std::io::Error;
     async fn collect_clone(
