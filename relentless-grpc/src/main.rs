@@ -4,10 +4,12 @@ use std::process::ExitCode;
 #[tokio::main]
 pub async fn main() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sync>> {
     use relentless::interface::command::{Assault, Relentless};
-    use relentless_grpc::{client::DefaultGrpcClient, command::GrpcAssault};
+    use relentless_grpc::{client2::DefaultGrpcClient, command::GrpcAssault};
 
     let assault = GrpcAssault::new(Relentless::parse_cli());
-    let client = DefaultGrpcClient::<serde_json::Value>::new();
+    let (configs, errors) = assault.configs();
+    errors.into_iter().for_each(|err| eprintln!("{}", err));
+    let client = DefaultGrpcClient::new(&assault.all_destinations(&configs)).await?;
     let record = assault.build_service(client);
     Ok(assault.execute(record).await?)
 }
