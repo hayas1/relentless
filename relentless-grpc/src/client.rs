@@ -23,14 +23,14 @@ use tower::Service;
 use crate::error::GrpcClientError;
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct DefaultGrpcRequest<D, S> {
+pub struct GrpcMethodRequest<D, S> {
     pub destination: http::Uri,
     pub service: ServiceDescriptor,
     pub method: MethodDescriptor,
     pub codec: MethodCodec<D, S>,
     pub message: D,
 }
-impl<D, S> DefaultGrpcRequest<D, S> {
+impl<D, S> GrpcMethodRequest<D, S> {
     pub fn format_method_path(&self) -> PathAndQuery {
         // https://github.com/hyperium/tonic/blob/master/tonic-build/src/lib.rs#L212-L218
         format!("/{}/{}", self.service.full_name(), self.method.name())
@@ -64,7 +64,7 @@ where
     }
 }
 
-impl<S, De, Se> Service<DefaultGrpcRequest<De, Se>> for DefaultGrpcClient<S>
+impl<S, De, Se> Service<GrpcMethodRequest<De, Se>> for DefaultGrpcClient<S>
 where
     S: GrpcService<BoxBody> + Clone + Send + 'static,
     S::ResponseBody: Send,
@@ -84,11 +84,11 @@ where
         Poll::Ready(Ok(())) // TODO
     }
 
-    fn call(&mut self, req: DefaultGrpcRequest<De, Se>) -> Self::Future {
+    fn call(&mut self, req: GrpcMethodRequest<De, Se>) -> Self::Future {
         let mut inner = self.inner[&req.destination].clone();
         Box::pin(async move {
             let path = req.format_method_path();
-            let DefaultGrpcRequest { codec, message, .. } = req;
+            let GrpcMethodRequest { codec, message, .. } = req;
             inner.ready().await.map_err(|_| GrpcClientError::Todo)?;
             inner.unary(tonic::Request::new(message), path, codec).await.map_err(|_| GrpcClientError::Todo)
         })

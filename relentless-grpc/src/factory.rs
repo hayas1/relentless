@@ -28,7 +28,7 @@ use relentless::{
 use crate::helper::JsonSerializer;
 
 use super::{
-    client::{DefaultGrpcRequest, MethodCodec},
+    client::{GrpcMethodRequest, MethodCodec},
     error::GrpcRequestError,
 };
 
@@ -87,14 +87,14 @@ impl Coalesce for GrpcMessage {
     }
 }
 
-impl RequestFactory<DefaultGrpcRequest<serde_json::Value, JsonSerializer>> for GrpcRequest {
+impl RequestFactory<GrpcMethodRequest<serde_json::Value, JsonSerializer>> for GrpcRequest {
     type Error = relentless::Error;
     async fn produce(
         &self,
         destination: &http::Uri,
         target: &str,
         template: &Template,
-    ) -> Result<DefaultGrpcRequest<serde_json::Value, JsonSerializer>, Self::Error> {
+    ) -> Result<GrpcMethodRequest<serde_json::Value, JsonSerializer>, Self::Error> {
         let (svc, mth) = target.split_once('/').ok_or_else(|| GrpcRequestError::FailToParse(target.to_string()))?; // TODO only one '/' ?
         let pool = self.descriptor_pool(destination, (svc, mth)).await?;
         let destination = destination.clone();
@@ -102,7 +102,7 @@ impl RequestFactory<DefaultGrpcRequest<serde_json::Value, JsonSerializer>> for G
         let message = template.render_json_recursive(&self.message.produce())?;
         let codec = MethodCodec::new(method.clone(), JsonSerializer::default()); // TODO remove clone
 
-        Ok(DefaultGrpcRequest { destination, service, method, codec, message })
+        Ok(GrpcMethodRequest { destination, service, method, codec, message })
     }
 }
 impl GrpcRequest {

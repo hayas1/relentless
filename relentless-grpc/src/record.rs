@@ -4,22 +4,22 @@ use bytes::Bytes;
 use relentless::assault::service::record::{CollectClone, IoRecord, RequestIoRecord};
 use serde::{de::DeserializeOwned, Deserialize};
 
-use crate::client::DefaultGrpcRequest;
+use crate::client::GrpcMethodRequest;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash)]
 pub struct GrpcIoRecorder;
 
-impl<De, Se> IoRecord<DefaultGrpcRequest<De, Se>> for GrpcIoRecorder
+impl<De, Se> IoRecord<GrpcMethodRequest<De, Se>> for GrpcIoRecorder
 where
     De: for<'a> serde::Deserializer<'a> + Send + Sync + 'static,
     for<'a> <De as serde::Deserializer<'a>>::Error: std::error::Error + Send + Sync + 'static,
     Se: Send,
 {
     type Error = std::io::Error;
-    fn extension(&self, _r: &DefaultGrpcRequest<De, Se>) -> &'static str {
+    fn extension(&self, _r: &GrpcMethodRequest<De, Se>) -> &'static str {
         "json"
     }
-    async fn record<W: std::io::Write>(&self, w: &mut W, r: DefaultGrpcRequest<De, Se>) -> Result<(), Self::Error> {
+    async fn record<W: std::io::Write>(&self, w: &mut W, r: GrpcMethodRequest<De, Se>) -> Result<(), Self::Error> {
         let value = serde_json::Value::deserialize(r.message)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
         write!(w, "{}", serde_json::to_string_pretty(&value).unwrap())
@@ -27,7 +27,7 @@ where
     async fn record_raw<W: std::io::Write + Send>(
         &self,
         w: &mut W,
-        r: DefaultGrpcRequest<De, Se>,
+        r: GrpcMethodRequest<De, Se>,
     ) -> Result<(), Self::Error> {
         let uri = r.destination;
         let (metadata, extension, message) = tonic::Request::new(r.message).into_parts();
@@ -50,7 +50,7 @@ where
         relentless_http::record::HttpIoRecorder.record_raw(w, http_request).await
     }
 }
-impl<De, Se> CollectClone<DefaultGrpcRequest<De, Se>> for GrpcIoRecorder
+impl<De, Se> CollectClone<GrpcMethodRequest<De, Se>> for GrpcIoRecorder
 where
     De: for<'a> serde::Deserializer<'a> + DeserializeOwned + Send + Sync + 'static,
     for<'a> <De as serde::Deserializer<'a>>::Error: std::error::Error + Send + Sync + 'static,
@@ -59,28 +59,28 @@ where
     type Error = std::io::Error;
     async fn collect_clone(
         &self,
-        r: DefaultGrpcRequest<De, Se>,
-    ) -> Result<(DefaultGrpcRequest<De, Se>, DefaultGrpcRequest<De, Se>), Self::Error> {
-        let DefaultGrpcRequest { destination, service, method, codec, message } = r;
+        r: GrpcMethodRequest<De, Se>,
+    ) -> Result<(GrpcMethodRequest<De, Se>, GrpcMethodRequest<De, Se>), Self::Error> {
+        let GrpcMethodRequest { destination, service, method, codec, message } = r;
         let value = serde_json::Value::deserialize(message)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
         let m1 = serde_json::from_value(value.clone())
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
         let m2 = serde_json::from_value(value).map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
         Ok((
-            DefaultGrpcRequest {
+            GrpcMethodRequest {
                 destination: destination.clone(),
                 service: service.clone(),
                 method: method.clone(),
                 codec: codec.clone(),
                 message: m1,
             },
-            DefaultGrpcRequest { destination, service, method, codec, message: m2 },
+            GrpcMethodRequest { destination, service, method, codec, message: m2 },
         ))
     }
 }
-impl<De, Se> RequestIoRecord<DefaultGrpcRequest<De, Se>> for GrpcIoRecorder {
-    fn record_dir(&self, r: &DefaultGrpcRequest<De, Se>) -> PathBuf {
+impl<De, Se> RequestIoRecord<GrpcMethodRequest<De, Se>> for GrpcIoRecorder {
+    fn record_dir(&self, r: &GrpcMethodRequest<De, Se>) -> PathBuf {
         http::uri::Builder::from(r.destination.clone())
             .path_and_query(r.format_method_path())
             .build()

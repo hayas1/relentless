@@ -2,7 +2,7 @@ use relentless::interface::command::{Assault, Relentless};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    client::DefaultGrpcRequest, evaluate::GrpcResponse, factory::GrpcRequest, helper::JsonSerializer,
+    client::GrpcMethodRequest, evaluate::GrpcResponse, factory::GrpcRequest, helper::JsonSerializer,
     record::GrpcIoRecorder,
 };
 
@@ -10,9 +10,7 @@ use crate::{
 pub struct GrpcAssault {
     relentless: Relentless,
 }
-impl Assault<DefaultGrpcRequest<serde_json::Value, JsonSerializer>, tonic::Response<serde_json::Value>>
-    for GrpcAssault
-{
+impl Assault<GrpcMethodRequest<serde_json::Value, JsonSerializer>, tonic::Response<serde_json::Value>> for GrpcAssault {
     type Request = GrpcRequest;
     type Response = GrpcResponse;
     type Recorder = GrpcIoRecorder;
