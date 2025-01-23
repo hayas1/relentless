@@ -4,7 +4,7 @@ use std::process::ExitCode;
 #[cfg(all(feature = "yaml", feature = "console-report"))]
 async fn main() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sync>> {
     use relentless::interface::command::{Assault, Relentless};
-    use relentless_grpc::{client::DefaultGrpcClient, command::GrpcAssault};
+    use relentless_grpc::{client::GrpcClient, command::GrpcAssault};
     use relentless_grpc_dev_server::service::{
         counter::{pb::counter_server::CounterServer, CounterImpl},
         echo::{pb::echo_server::EchoServer, EchoImpl},
@@ -28,8 +28,7 @@ async fn main() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sync>> {
         .add_service(CounterServer::new(CounterImpl::default()))
         .add_service(EchoServer::new(EchoImpl))
         .into_service();
-    let service =
-        DefaultGrpcClient::from_services(&destinations.into_iter().map(|d| (d, routes.clone())).collect()).await?;
+    let service = GrpcClient::from_services(&destinations.into_iter().map(|d| (d, routes.clone())).collect()).await?;
 
     let report = assault.assault_with(configs, service).await?;
 

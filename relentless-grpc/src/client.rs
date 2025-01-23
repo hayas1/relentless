@@ -40,11 +40,11 @@ impl<D, S> GrpcMethodRequest<D, S> {
 }
 
 #[derive(Debug, Clone)]
-pub struct DefaultGrpcClient<S> {
+pub struct GrpcClient<S> {
     inner: HashMap<Uri, tonic::client::Grpc<S>>,
 }
 
-impl DefaultGrpcClient<tonic::transport::Channel> {
+impl GrpcClient<tonic::transport::Channel> {
     pub async fn new(all_destinations: &[Uri]) -> Result<Self, GrpcClientError> {
         let mut clients = HashMap::new();
         for d in all_destinations {
@@ -54,7 +54,7 @@ impl DefaultGrpcClient<tonic::transport::Channel> {
         Ok(Self { inner: clients })
     }
 }
-impl<S> DefaultGrpcClient<S>
+impl<S> GrpcClient<S>
 where
     S: Clone,
 {
@@ -64,7 +64,7 @@ where
     }
 }
 
-impl<S, De, Se> Service<GrpcMethodRequest<De, Se>> for DefaultGrpcClient<S>
+impl<S, De, Se> Service<GrpcMethodRequest<De, Se>> for GrpcClient<S>
 where
     S: GrpcService<BoxBody> + Clone + Send + 'static,
     S::ResponseBody: Send,
