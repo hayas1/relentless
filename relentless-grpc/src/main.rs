@@ -4,7 +4,7 @@ use std::process::ExitCode;
 #[tokio::main]
 pub async fn main() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sync>> {
     use relentless::interface::command::{Assault, Relentless};
-    use relentless_grpc::{client2::DefaultGrpcClient, command::GrpcAssault};
+    use relentless_grpc::{client::DefaultGrpcClient, command::GrpcAssault};
 
     let assault = GrpcAssault::new(Relentless::parse_cli());
     let (configs, errors) = assault.configs();
