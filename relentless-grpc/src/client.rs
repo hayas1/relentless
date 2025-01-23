@@ -39,38 +39,32 @@ impl<D, S> DefaultGrpcRequest<D, S> {
     }
 }
 
-#[derive(Debug)]
-pub struct DefaultGrpcClient<S, De, Se> {
+#[derive(Debug, Clone)]
+pub struct DefaultGrpcClient<S> {
     inner: HashMap<Uri, tonic::client::Grpc<S>>,
-    phantom: PhantomData<(De, Se)>,
-}
-impl<S: Clone, De, Se> Clone for DefaultGrpcClient<S, De, Se> {
-    fn clone(&self) -> Self {
-        Self { inner: self.inner.clone(), phantom: PhantomData }
-    }
 }
 
-impl<De, Se> DefaultGrpcClient<tonic::transport::Channel, De, Se> {
+impl DefaultGrpcClient<tonic::transport::Channel> {
     pub async fn new(all_destinations: &[Uri]) -> Result<Self, GrpcClientError> {
         let mut clients = HashMap::new();
         for d in all_destinations {
             let channel = Channel::builder(d.clone()).connect().await.unwrap_or_else(|e| todo!("{}", e));
             clients.insert(d.clone(), tonic::client::Grpc::new(channel));
         }
-        Ok(Self { inner: clients, phantom: PhantomData })
+        Ok(Self { inner: clients })
     }
 }
-impl<S, De, Se> DefaultGrpcClient<S, De, Se>
+impl<S> DefaultGrpcClient<S>
 where
     S: Clone,
 {
     pub async fn from_services(services: &HashMap<Uri, S>) -> Result<Self, GrpcClientError> {
         let clients = services.iter().map(|(d, s)| (d.clone(), tonic::client::Grpc::new(s.clone()))).collect();
-        Ok(Self { inner: clients, phantom: PhantomData })
+        Ok(Self { inner: clients })
     }
 }
 
-impl<S, De, Se> Service<DefaultGrpcRequest<De, Se>> for DefaultGrpcClient<S, De, Se>
+impl<S, De, Se> Service<DefaultGrpcRequest<De, Se>> for DefaultGrpcClient<S>
 where
     S: GrpcService<BoxBody> + Clone + Send + 'static,
     S::ResponseBody: Send,
