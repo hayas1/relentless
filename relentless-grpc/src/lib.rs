@@ -22,12 +22,14 @@
 //! ## Testing
 //! ```
 //! # tokio_test::block_on(async {
-//! use relentless::interface::{
-//!     command::{Assault, Relentless},
-//!     config::{Config, Format},
+//! use relentless::interface::{config::{Config, Format}, command::{Assault, Relentless}};
+//! use relentless_grpc::{client::GrpcClient, command::GrpcAssault};
+//! use relentless_grpc_dev_server::service::{
+//!     counter::{pb::counter_server::CounterServer, CounterImpl},
+//!     echo::{pb::echo_server::EchoServer, EchoImpl},
+//!     greeter::{pb::greeter_server::GreeterServer, GreeterImpl},
 //! };
-//! use relentless_grpc::{client::DefaultGrpcClient, command::GrpcAssault};
-//! use relentless_grpc_dev_server::service;
+//! use tonic::transport::Server;
 //!
 //! let assault = GrpcAssault::new(Relentless {
 //!     file: vec![], // files can be specified also
@@ -36,23 +38,32 @@
 //! let config = r#"
 //!   name: basic grpc comparison test
 //!   destinations:
-//!       actual: http://localhost:50051
-//!       expect: http://localhost:50051
+//!     actual: http://localhost:50051
+//!     expect: http://localhost:50051
 //!
 //!   testcases:
 //!   - target: greeter.Greeter/SayHello
 //!     setting:
 //!       request:
+//!         descriptor:
+//!           protos: [../dev/server/grpc/proto/greeter.proto]
+//!           import_path: [../dev/server/grpc/proto]
 //!         message:
 //!           json:
 //!             name: John Doe
 //! "#;
 //!
-//! // TODO let configs = vec![Config::read_str(config, Format::Yaml).unwrap()];
-//! // TODO let service = service::app(Default::default());
-//! // TODO let report = assault.assault_with(configs, service).await.unwrap();
+//! let configs = vec![Config::read_str(config, Format::Yaml).unwrap()];
+//! let destinations = assault.all_destinations(&configs);
+//! let routes = Server::builder()
+//!     .add_service(GreeterServer::new(GreeterImpl))
+//!     .add_service(CounterServer::new(CounterImpl::default()))
+//!     .add_service(EchoServer::new(EchoImpl))
+//!     .into_service();
+//! let service = GrpcClient::from_services(&destinations.into_iter().map(|d| (d, routes.clone())).collect()).await.unwrap();
+//! let report = assault.assault_with(configs, service).await.unwrap();
 //!
-//! // TODO assert!(assault.pass(&report));
+//! assert!(assault.pass(&report));
 //! # })
 //! ```
 
