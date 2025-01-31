@@ -20,6 +20,9 @@
 //! ```
 //!
 //! ## Testing
+#[cfg_attr(
+    feature = "yaml",
+    doc = r##"
 //! ```
 //! # tokio_test::block_on(async {
 //! use relentless::interface::{config::{Config, Format}, command::{Assault, Relentless}};
@@ -65,8 +68,9 @@
 //!
 //! assert!(assault.pass(&report));
 //! # })
-//! ```
-
+```
+"##
+)]
 pub mod client;
 pub mod command;
 pub mod error;
