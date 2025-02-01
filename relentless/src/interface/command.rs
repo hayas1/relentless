@@ -27,7 +27,7 @@ use super::{
 
 #[allow(async_fn_in_trait)] // TODO #[warn(async_fn_in_trait)] by default
 pub trait Assault<Req, Res> {
-    type Request: Configuration + Coalesce + RequestFactory<Req>;
+    type Request: Configuration + Coalesce;
     type Response: Configuration + Coalesce + Evaluate<Res>;
     type Recorder;
 
@@ -37,7 +37,8 @@ pub trait Assault<Req, Res> {
     #[cfg(feature = "cli")]
     async fn execute<S>(&self, service: S) -> crate::Result<ExitCode>
     where
-        <Self::Request as RequestFactory<Req>>::Error: std::error::Error + Send + Sync + 'static,
+        Self::Request: RequestFactory<Req, S>,
+        <Self::Request as RequestFactory<Req, S>>::Error: std::error::Error + Send + Sync + 'static,
         <Self::Response as Evaluate<Res>>::Message: Display,
         S: Service<Req, Response = Res> + Clone + Send + 'static,
         S::Error: std::error::Error + Send + Sync + 'static,
@@ -101,7 +102,8 @@ pub trait Assault<Req, Res> {
         service: S,
     ) -> crate::Result<Report<<Self::Response as Evaluate<Res>>::Message, Self::Request, Self::Response>>
     where
-        <Self::Request as RequestFactory<Req>>::Error: std::error::Error + Send + Sync + 'static,
+        Self::Request: RequestFactory<Req, S>,
+        <Self::Request as RequestFactory<Req, S>>::Error: std::error::Error + Send + Sync + 'static,
         S: Service<Req, Response = Res> + Clone + Send + 'static,
         S::Error: std::error::Error + Send + Sync + 'static,
         S::Future: Send + 'static,
@@ -112,15 +114,6 @@ pub trait Assault<Req, Res> {
         Ok(report)
     }
 
-    // fn report(
-    //     &self,
-    //     report: &Report<<Self::Response as Evaluate<Res>>::Message, Self::Request, Self::Response>,
-    // ) -> Result<ExitCode, std::fmt::Error>
-    // where
-    //     <Self::Response as Evaluate<Res>>::Message: Display,
-    // {
-    //     self.report_with(report, std::io::stdout())
-    // }
     fn report_with<W>(
         &self,
         report: &Report<<Self::Response as Evaluate<Res>>::Message, Self::Request, Self::Response>,

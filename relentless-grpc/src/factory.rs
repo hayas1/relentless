@@ -87,10 +87,11 @@ impl Coalesce for GrpcMessage {
     }
 }
 
-impl RequestFactory<GrpcMethodRequest<serde_json::Value, JsonSerializer>> for GrpcRequest {
+impl<S> RequestFactory<GrpcMethodRequest<serde_json::Value, JsonSerializer>, S> for GrpcRequest {
     type Error = relentless::Error;
     async fn produce(
         &self,
+        service: S,
         destination: &http::Uri,
         target: &str,
         template: &Template,

@@ -86,15 +86,17 @@ impl Coalesce for HttpBody {
     }
 }
 
-impl<B> RequestFactory<http::Request<B>> for HttpRequest
+impl<B, S> RequestFactory<http::Request<B>, S> for HttpRequest
 where
     B: Body,
     HttpBody: BodyFactory<B>,
     <HttpBody as BodyFactory<B>>::Error: std::error::Error + Send + Sync + 'static,
 {
     type Error = relentless::Error;
+
     async fn produce(
         &self,
+        _service: S,
         destination: &http::Uri,
         target: &str,
         template: &Template,
