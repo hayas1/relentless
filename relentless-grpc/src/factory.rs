@@ -24,6 +24,7 @@ use relentless::{
         template::Template,
     },
 };
+use tower::Service;
 
 use crate::helper::JsonSerializer;
 
@@ -87,7 +88,10 @@ impl Coalesce for GrpcMessage {
     }
 }
 
-impl<S> RequestFactory<GrpcMethodRequest<serde_json::Value, JsonSerializer>, S> for GrpcRequest {
+impl<S> RequestFactory<GrpcMethodRequest<serde_json::Value, JsonSerializer>, S> for GrpcRequest
+where
+    S: Service<GrpcMethodRequest<serde_json::Value, JsonSerializer>>,
+{
     type Error = relentless::Error;
     async fn produce(
         &self,
