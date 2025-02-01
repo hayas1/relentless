@@ -17,7 +17,7 @@ use tonic_reflection::pb::v1::{
 };
 
 use relentless::{
-    assault::factory::RequestFactory,
+    assault::{factory::RequestFactory, service},
     error::IntoResult,
     interface::{
         helper::{coalesce::Coalesce, is_default::IsDefault},
@@ -97,7 +97,7 @@ impl<S> RequestFactory<GrpcMethodRequest<serde_json::Value, JsonSerializer>, S> 
         template: &Template,
     ) -> Result<GrpcMethodRequest<serde_json::Value, JsonSerializer>, Self::Error> {
         let (svc, mth) = target.split_once('/').ok_or_else(|| GrpcRequestError::FailToParse(target.to_string()))?; // TODO only one '/' ?
-        let pool = self.descriptor_pool(destination, (svc, mth)).await?;
+        let pool = self.descriptor_pool(service, destination, (svc, mth)).await?;
         let destination = destination.clone();
         let (service, method) = Self::service_method(&pool, (svc, mth))?;
         let message = template.render_json_recursive(&self.message.produce())?;
@@ -116,16 +116,17 @@ impl GrpcRequest {
             svc.methods().find(|m| m.name() == method).ok_or_else(|| GrpcRequestError::NoMethod(method.to_string()))?;
         Ok((svc, mth))
     }
-    pub async fn descriptor_pool(
+    pub async fn descriptor_pool<S>(
         &self,
+        service: S,
         destination: &http::Uri,
-        (service, _method): (&str, &str),
+        (svc, mth): (&str, &str),
     ) -> relentless::Result<DescriptorPool> {
         // TODO cache
         match &self.descriptor {
             DescriptorFrom::Protos { protos, import_path } => Self::descriptor_from_protos(protos, import_path).await,
             DescriptorFrom::Bin(path) => Self::descriptor_from_file(path).await,
-            DescriptorFrom::Reflection => Self::descriptor_from_reflection(destination, service).await,
+            DescriptorFrom::Reflection => Self::descriptor_from_reflection(service, destination, svc).await,
         }
     }
 
@@ -144,7 +145,11 @@ impl GrpcRequest {
         DescriptorPool::decode(Bytes::from(descriptor_bytes)).box_err()
     }
 
-    pub async fn descriptor_from_reflection(destination: &http::Uri, svc: &str) -> relentless::Result<DescriptorPool> {
+    pub async fn descriptor_from_reflection<S>(
+        service: S,
+        destination: &http::Uri,
+        svc: &str,
+    ) -> relentless::Result<DescriptorPool> {
         // TODO do not use Channel directly, use Service
         let mut client = ServerReflectionClient::new(Channel::builder(destination.clone()).connect().await.box_err()?);
         let (host, service) = (
