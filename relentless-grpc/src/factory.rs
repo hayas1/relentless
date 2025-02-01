@@ -17,7 +17,7 @@ use tonic_reflection::pb::v1::{
 };
 
 use relentless::{
-    assault::{factory::RequestFactory, service},
+    assault::factory::RequestFactory,
     error::IntoResult,
     interface::{
         helper::{coalesce::Coalesce, is_default::IsDefault},
@@ -124,7 +124,7 @@ impl GrpcRequest {
         &self,
         service: S,
         destination: &http::Uri,
-        (svc, mth): (&str, &str),
+        (svc, _mth): (&str, &str),
     ) -> relentless::Result<DescriptorPool> {
         // TODO cache
         match &self.descriptor {
@@ -150,7 +150,7 @@ impl GrpcRequest {
     }
 
     pub async fn descriptor_from_reflection<S>(
-        service: S,
+        _service: S,
         destination: &http::Uri,
         svc: &str,
     ) -> relentless::Result<DescriptorPool> {
