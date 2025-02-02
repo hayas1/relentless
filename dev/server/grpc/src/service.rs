@@ -20,6 +20,7 @@ pub async fn app(env: Env) -> Router<Stack<LoggingLayer, Identity>> {
 pub async fn app_with(env: Env, initial_count: BigInt) -> Router<Stack<LoggingLayer, Identity>> {
     let (mut health_reporter, health_service) = tonic_health::server::health_reporter();
     health_reporter.set_serving::<HealthServer<HealthService>>().await;
+    health_reporter.set_serving::<GreeterServer<greeter::GreeterImpl>>().await;
     health_reporter.set_serving::<CounterServer<counter::CounterImpl>>().await;
     health_reporter.set_serving::<EchoServer<echo::EchoImpl>>().await;
 

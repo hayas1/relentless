@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     future::Future,
     marker::PhantomData,
     pin::Pin,
@@ -6,28 +7,30 @@ use std::{
 };
 
 use bytes::Buf;
-use http::uri::PathAndQuery;
+use http::{uri::PathAndQuery, Uri};
 use prost::Message;
 use prost_reflect::{DynamicMessage, MessageDescriptor, MethodDescriptor, ServiceDescriptor};
 use serde::{Deserializer, Serialize, Serializer};
 use tonic::{
+    body::BoxBody,
+    client::GrpcService,
     codec::{Codec, Decoder, Encoder},
-    transport::Channel,
+    transport::{Body, Channel},
     Status,
 };
 use tower::Service;
 
-use relentless::error::IntoResult;
+use crate::error::GrpcClientError;
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct DefaultGrpcRequest<D, S> {
+pub struct GrpcMethodRequest<D, S> {
     pub destination: http::Uri,
     pub service: ServiceDescriptor,
     pub method: MethodDescriptor,
     pub codec: MethodCodec<D, S>,
     pub message: D,
 }
-impl<D, S> DefaultGrpcRequest<D, S> {
+impl<D, S> GrpcMethodRequest<D, S> {
     pub fn format_method_path(&self) -> PathAndQuery {
         // https://github.com/hyperium/tonic/blob/master/tonic-build/src/lib.rs#L212-L218
         format!("/{}/{}", self.service.full_name(), self.method.name())
@@ -36,50 +39,76 @@ impl<D, S> DefaultGrpcRequest<D, S> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash)]
-pub struct DefaultGrpcClient<D> {
-    phantom: PhantomData<D>,
+#[derive(Debug, Clone)]
+pub struct GrpcClient<S> {
+    inner: HashMap<Uri, tonic::client::Grpc<S>>,
 }
-impl<D> DefaultGrpcClient<D> {
-    pub fn new() -> Self {
-        Self { phantom: PhantomData }
+
+impl GrpcClient<tonic::transport::Channel> {
+    pub async fn new(all_destinations: &[Uri]) -> Result<Self, GrpcClientError> {
+        let mut clients = HashMap::new();
+        for d in all_destinations {
+            let channel = Channel::builder(d.clone()).connect().await.unwrap_or_else(|e| todo!("{}", e));
+            clients.insert(d.clone(), tonic::client::Grpc::new(channel));
+        }
+        Ok(Self { inner: clients })
     }
 }
-impl<D> Service<DefaultGrpcRequest<D, serde_json::value::Serializer>> for DefaultGrpcClient<D>
+impl<S> GrpcClient<S>
 where
-    D: for<'a> Deserializer<'a> + Send + Sync + 'static,
-    for<'a> <D as Deserializer<'a>>::Error: std::error::Error + Send + Sync + 'static,
+    S: Clone,
 {
-    type Response = tonic::Response<<serde_json::value::Serializer as Serializer>::Ok>;
-    type Error = relentless::Error;
+    pub async fn from_services(services: &HashMap<Uri, S>) -> Result<Self, GrpcClientError> {
+        let clients = services.iter().map(|(d, s)| (d.clone(), tonic::client::Grpc::new(s.clone()))).collect();
+        Ok(Self { inner: clients })
+    }
+}
+
+impl<S, De, Se> Service<GrpcMethodRequest<De, Se>> for GrpcClient<S>
+where
+    S: GrpcService<BoxBody> + Clone + Send + 'static,
+    S::ResponseBody: Send,
+    <S::ResponseBody as Body>::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
+    S::Future: Send + 'static,
+    De: for<'a> Deserializer<'a> + Send + Sync + 'static,
+    for<'a> <De as Deserializer<'a>>::Error: std::error::Error + Send + Sync + 'static,
+    Se: Serializer + Clone + Send + Sync + 'static,
+    Se::Ok: Send + Sync + 'static,
+    Se::Error: std::error::Error + Send + Sync + 'static,
+{
+    type Response = tonic::Response<Se::Ok>;
+    type Error = GrpcClientError;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
+        Poll::Ready(Ok(())) // TODO
     }
 
-    fn call(&mut self, request: DefaultGrpcRequest<D, serde_json::value::Serializer>) -> Self::Future {
-        let path = request.format_method_path();
+    fn call(&mut self, req: GrpcMethodRequest<De, Se>) -> Self::Future {
+        let mut inner = self.inner[&req.destination].clone();
         Box::pin(async move {
-            let mut client = tonic::client::Grpc::new(Channel::builder(request.destination).connect().await.box_err()?);
-            client.ready().await.box_err()?;
-            client.unary(tonic::Request::new(request.message), path, request.codec).await.box_err()
+            let path = req.format_method_path();
+            let GrpcMethodRequest { codec, message, .. } = req;
+            inner.ready().await.map_err(|_| GrpcClientError::Todo)?;
+            inner.unary(tonic::Request::new(message), path, codec).await.map_err(|_| GrpcClientError::Todo)
         })
     }
 }
+
 #[derive(Debug, PartialEq, Eq)]
 pub struct MethodCodec<D, S> {
     method: MethodDescriptor,
+    serializer: S,
     phantom: PhantomData<(D, S)>,
 }
-impl<D, S> Clone for MethodCodec<D, S> {
+impl<D, S: Clone> Clone for MethodCodec<D, S> {
     fn clone(&self) -> Self {
-        Self { method: self.method.clone(), phantom: PhantomData }
+        Self { method: self.method.clone(), serializer: self.serializer.clone(), phantom: PhantomData }
     }
 }
 impl<D, S> MethodCodec<D, S> {
-    pub fn new(method: MethodDescriptor) -> Self {
-        Self { method, phantom: PhantomData }
+    pub fn new(method: MethodDescriptor, serializer: S) -> Self {
+        Self { method, serializer, phantom: PhantomData }
     }
 }
 
@@ -87,18 +116,21 @@ impl<D, S> Codec for MethodCodec<D, S>
 where
     D: for<'a> Deserializer<'a> + Send + 'static,
     for<'a> <D as Deserializer<'a>>::Error: std::error::Error + Send + Sync + 'static,
+    S: Serializer + Clone + Send + 'static,
+    S::Ok: Send + 'static,
+    S::Error: std::error::Error + Send + Sync + 'static,
 {
     type Encode = D;
-    type Decode = <serde_json::value::Serializer as Serializer>::Ok;
+    type Decode = S::Ok;
     type Encoder = MethodEncoder<D>;
-    type Decoder = MethodDecoder<serde_json::value::Serializer>;
+    type Decoder = MethodDecoder<S>;
 
     fn encoder(&mut self) -> Self::Encoder {
         MethodEncoder(self.method.input(), PhantomData)
     }
 
     fn decoder(&mut self) -> Self::Decoder {
-        MethodDecoder(self.method.output(), PhantomData)
+        MethodDecoder(self.method.output(), self.serializer.clone())
     }
 }
 
@@ -123,25 +155,26 @@ where
 }
 
 #[derive(Debug)]
-pub struct MethodDecoder<S>(MessageDescriptor, PhantomData<S>);
-impl Decoder for MethodDecoder<serde_json::value::Serializer>
-// where
-//     S: Serializer + Send + 'static,
-//     S::Ok: Send + 'static,
+pub struct MethodDecoder<S>(MessageDescriptor, S);
+impl<S> Decoder for MethodDecoder<S>
+where
+    S: Serializer + Clone + Send + 'static,
+    S::Ok: Send + 'static,
+    S::Error: std::error::Error + Send + Sync + 'static,
 {
-    type Item = <serde_json::value::Serializer as Serializer>::Ok;
+    type Item = S::Ok;
     type Error = Status;
 
     fn decode(&mut self, src: &mut tonic::codec::DecodeBuf<'_>) -> Result<Option<Self::Item>, Self::Error> {
         if !src.has_remaining() {
             return Ok(None);
         }
-        let Self(descriptor, _phantom) = self;
+        let Self(descriptor, serializer) = self;
         let dynamic_message = DynamicMessage::decode(descriptor.clone(), src) // TODO `decode` requires ownership of MethodDescriptor
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
         Ok(Some(
             dynamic_message
-                .serialize(serde_json::value::Serializer)
+                .serialize(serializer.clone())
                 .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?,
         ))
     }

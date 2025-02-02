@@ -27,7 +27,7 @@ use super::{
 
 #[allow(async_fn_in_trait)] // TODO #[warn(async_fn_in_trait)] by default
 pub trait Assault<Req, Res> {
-    type Request: Configuration + Coalesce + RequestFactory<Req>;
+    type Request: Configuration + Coalesce;
     type Response: Configuration + Coalesce + Evaluate<Res>;
     type Recorder;
 
@@ -37,7 +37,8 @@ pub trait Assault<Req, Res> {
     #[cfg(feature = "cli")]
     async fn execute<S>(&self, service: S) -> crate::Result<ExitCode>
     where
-        <Self::Request as RequestFactory<Req>>::Error: std::error::Error + Send + Sync + 'static,
+        Self::Request: RequestFactory<Req, S>,
+        <Self::Request as RequestFactory<Req, S>>::Error: std::error::Error + Send + Sync + 'static,
         <Self::Response as Evaluate<Res>>::Message: Display,
         S: Service<Req, Response = Res> + Clone + Send + 'static,
         S::Error: std::error::Error + Send + Sync + 'static,
@@ -66,6 +67,15 @@ pub trait Assault<Req, Res> {
             (ok.into_iter().map(Result::unwrap).collect(), err.into_iter().map(Result::unwrap_err).collect());
         (configs, errors)
     }
+    fn all_destinations(&self, configs: &[Config<Self::Request, Self::Response>]) -> Vec<http::Uri> {
+        let d = self.command().destinations().unwrap_or_default();
+        configs
+            .iter()
+            .flat_map(|c| c.worker_config.destinations.values())
+            .chain(d.values())
+            .map(|o| (**o).clone())
+            .collect()
+    }
 
     /// TODO document
     // TODO return type should be `impl Service<Req>` ?
@@ -92,7 +102,8 @@ pub trait Assault<Req, Res> {
         service: S,
     ) -> crate::Result<Report<<Self::Response as Evaluate<Res>>::Message, Self::Request, Self::Response>>
     where
-        <Self::Request as RequestFactory<Req>>::Error: std::error::Error + Send + Sync + 'static,
+        Self::Request: RequestFactory<Req, S>,
+        <Self::Request as RequestFactory<Req, S>>::Error: std::error::Error + Send + Sync + 'static,
         S: Service<Req, Response = Res> + Clone + Send + 'static,
         S::Error: std::error::Error + Send + Sync + 'static,
         S::Future: Send + 'static,
@@ -103,15 +114,6 @@ pub trait Assault<Req, Res> {
         Ok(report)
     }
 
-    // fn report(
-    //     &self,
-    //     report: &Report<<Self::Response as Evaluate<Res>>::Message, Self::Request, Self::Response>,
-    // ) -> Result<ExitCode, std::fmt::Error>
-    // where
-    //     <Self::Response as Evaluate<Res>>::Message: Display,
-    // {
-    //     self.report_with(report, std::io::stdout())
-    // }
     fn report_with<W>(
         &self,
         report: &Report<<Self::Response as Evaluate<Res>>::Message, Self::Request, Self::Response>,
@@ -290,90 +292,6 @@ impl Relentless {
     pub fn quantile_set(&self) -> Vec<f64> {
         self.percentile_set().iter().map(|p| p / 100.).collect()
     }
-
-    // /// TODO document
-    // pub fn configs<Q: Configuration, P: Configuration>(&self) -> (Vec<Config<Q, P>>, Vec<crate::Error>) {
-    //     let Self { file, .. } = self;
-    //     let (ok, err): (Vec<_>, _) = file.iter().map(Config::<Q, P>::read).partition(Result::is_ok);
-    //     let (configs, errors) =
-    //         (ok.into_iter().map(Result::unwrap).collect(), err.into_iter().map(Result::unwrap_err).collect());
-    //     (configs, errors)
-    // }
-
-    // /// TODO document
-    // #[cfg(all(feature = "default-http-client", feature = "cli"))]
-    // pub async fn assault(
-    //     &self,
-    // ) -> crate::Result<Report<crate::implement::service_http::error::HttpEvaluateError, HttpRequest, HttpResponse>>
-    // {
-    //     let (configs, cannot_read) = self.configs();
-    //     for err in cannot_read {
-    //         eprintln!("{}", err);
-    //     }
-    //     let service = self.build_service(DefaultHttpClient::<reqwest::Body, reqwest::Body>::new().await?);
-    //     let report = self.assault_with(configs, service).await?;
-    //     Ok(report)
-    // }
-    // #[cfg(feature = "json")]
-    // pub async fn assault_grpc(&self) -> crate::Result<Report<GrpcEvaluateError, GrpcRequest, GrpcResponse>> {
-    //     let (configs, cannot_read) = self.configs();
-    //     for err in cannot_read {
-    //         eprintln!("{}", err);
-    //     }
-    //     let service = self.build_service(DefaultGrpcClient::<serde_json::Value>::new());
-    //     let report = self.assault_with(configs, service).await?;
-    //     Ok(report)
-    // }
-    // /// TODO document
-    // pub async fn assault_with<Q, P, S, Req>(
-    //     &self,
-    //     configs: Vec<Config<Q, P>>,
-    //     service: S,
-    // ) -> crate::Result<Report<P::Message, Q, P>>
-    // where
-    //     Q: Configuration + Coalesce + RequestFactory<Req>,
-    //     Q::Error: std::error::Error + Send + Sync + 'static,
-    //     P: Configuration + Coalesce + Evaluate<S::Response>,
-    //     S: Service<Req> + Clone + Send + 'static,
-    //     S::Error: std::error::Error + Send + Sync + 'static,
-    //     S::Future: Send + 'static,
-    // {
-    //     let control = Control::new(service);
-    //     let report = control.assault(self, configs).await?;
-    //     Ok(report)
-    // }
-
-    // pub fn report<M, Q, P>(&self, report: &Report<M, Q, P>) -> Result<ExitCode, std::fmt::Error>
-    // where
-    //     M: Display,
-    //     Q: Configuration + Coalesce,
-    //     P: Configuration + Coalesce,
-    // {
-    //     self.report_with(report, std::io::stdout())
-    // }
-    // pub fn report_with<M, W, Q, P>(&self, report: &Report<M, Q, P>, mut write: W) -> Result<ExitCode, std::fmt::Error>
-    // where
-    //     M: Display,
-    //     W: Write,
-    //     Q: Configuration + Coalesce,
-    //     P: Configuration + Coalesce,
-    // {
-    //     let Self { no_color, report_format, .. } = self;
-    //     #[cfg(feature = "console-report")]
-    //     console::set_colors_enabled(!no_color);
-
-    //     match (report.skip_report(self), report_format) {
-    //         (false, ReportFormat::NullDevice) => (),
-    //         #[cfg(feature = "console-report")]
-    //         (false, ReportFormat::Console) => report.console_report(self, &mut ReportWriter::new(0, &mut write))?,
-    //         (false, ReportFormat::GithubMarkdown) => {
-    //             report.github_markdown_report(self, &mut ReportWriter::new(0, &mut write))?
-    //         }
-    //         _ => (),
-    //     };
-
-    //     Ok(report.exit_code(self))
-    // }
 }
 
 #[cfg(test)]

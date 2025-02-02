@@ -34,7 +34,7 @@ pub struct Control<Q, P, S, Req> {
 }
 impl<Q, P, S, Req> Control<Q, P, S, Req>
 where
-    Q: Configuration + Coalesce + RequestFactory<Req>,
+    Q: Configuration + Coalesce + RequestFactory<Req, S>,
     Q::Error: std::error::Error + Send + Sync + 'static,
     P: Configuration + Coalesce + Evaluate<S::Response>,
     S: Service<Req> + Clone + Send + 'static,
@@ -74,7 +74,7 @@ pub struct Worker<Q, P, S, Req> {
 }
 impl<Q, P, S, Req> Worker<Q, P, S, Req>
 where
-    Q: Configuration + Coalesce + RequestFactory<Req>,
+    Q: Configuration + Coalesce + RequestFactory<Req, S>,
     Q::Error: std::error::Error + Send + Sync + 'static,
     P: Configuration + Coalesce + Evaluate<S::Response>,
     S: Service<Req> + Clone + Send + 'static,
@@ -116,7 +116,7 @@ pub struct Case<Q, P, S, Req> {
 }
 impl<Q, P, S, Req> Case<Q, P, S, Req>
 where
-    Q: Configuration + Coalesce + RequestFactory<Req>,
+    Q: Configuration + Coalesce + RequestFactory<Req, S>,
     Q::Error: std::error::Error + Send + Sync + 'static,
     P: Configuration + Coalesce + Evaluate<S::Response>,
     S: Service<Req> + Clone + Send + 'static,
@@ -160,7 +160,8 @@ where
         let client = self.client.clone();
 
         let repeat_buffer = if cmd.is_sequential(WorkerKind::Repeats) { 1 } else { setting.repeat.times().max(1) };
-        Ok(Self::request_stream(destinations, target, setting)
+        Ok(self
+            .request_stream(destinations, target, setting)
             .map(move |repeating| {
                 let client = client.clone();
                 async move {
@@ -191,23 +192,29 @@ where
     }
 
     pub fn request_stream<'a>(
+        &self,
         destinations: &'a Destinations<http_serde_priv::Uri>,
         target: &'a str,
         setting: &'a Setting<Q, P>,
     ) -> impl Stream<Item = Destinations<Result<Req, Q::Error>>> + 'a {
         let Setting { request, template, repeat, .. } = setting;
+        let client = self.client.clone();
 
         stream::iter(repeat.range())
-            .map(move |_| async move {
-                stream::iter(destinations.iter())
-                    .map(|(name, destination)| async {
-                        let default_empty = Template::new();
-                        let template = template.get(name).unwrap_or(&default_empty);
-                        (name.to_string(), request.produce(destination, target, template).await)
-                    })
-                    .buffer_unordered(destinations.len())
-                    .collect()
-                    .await
+            .map(move |_| {
+                let client = client.clone();
+                async move {
+                    stream::iter(destinations.iter())
+                        .map(|(name, destination)| async {
+                            let default_empty = Template::new();
+                            let template = template.get(name).unwrap_or(&default_empty);
+                            let client = client.clone();
+                            (name.to_string(), request.produce(client, destination, target, template).await)
+                        })
+                        .buffer_unordered(destinations.len())
+                        .collect()
+                        .await
+                }
             })
             .buffer_unordered(repeat.times())
     }

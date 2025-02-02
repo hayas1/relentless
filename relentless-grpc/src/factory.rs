@@ -24,9 +24,12 @@ use relentless::{
         template::Template,
     },
 };
+use tower::Service;
+
+use crate::helper::JsonSerializer;
 
 use super::{
-    client::{DefaultGrpcRequest, MethodCodec},
+    client::{GrpcMethodRequest, MethodCodec},
     error::GrpcRequestError,
 };
 
@@ -85,22 +88,26 @@ impl Coalesce for GrpcMessage {
     }
 }
 
-impl RequestFactory<DefaultGrpcRequest<serde_json::Value, serde_json::value::Serializer>> for GrpcRequest {
+impl<S> RequestFactory<GrpcMethodRequest<serde_json::Value, JsonSerializer>, S> for GrpcRequest
+where
+    S: Service<GrpcMethodRequest<serde_json::Value, JsonSerializer>>,
+{
     type Error = relentless::Error;
     async fn produce(
         &self,
+        service: S,
         destination: &http::Uri,
         target: &str,
         template: &Template,
-    ) -> Result<DefaultGrpcRequest<serde_json::Value, serde_json::value::Serializer>, Self::Error> {
+    ) -> Result<GrpcMethodRequest<serde_json::Value, JsonSerializer>, Self::Error> {
         let (svc, mth) = target.split_once('/').ok_or_else(|| GrpcRequestError::FailToParse(target.to_string()))?; // TODO only one '/' ?
-        let pool = self.descriptor_pool(destination, (svc, mth)).await?;
+        let pool = self.descriptor_pool(service, destination, (svc, mth)).await?;
         let destination = destination.clone();
         let (service, method) = Self::service_method(&pool, (svc, mth))?;
         let message = template.render_json_recursive(&self.message.produce())?;
-        let codec = MethodCodec::new(method.clone()); // TODO remove clone
+        let codec = MethodCodec::new(method.clone(), JsonSerializer::default()); // TODO remove clone
 
-        Ok(DefaultGrpcRequest { destination, service, method, codec, message })
+        Ok(GrpcMethodRequest { destination, service, method, codec, message })
     }
 }
 impl GrpcRequest {
@@ -113,16 +120,17 @@ impl GrpcRequest {
             svc.methods().find(|m| m.name() == method).ok_or_else(|| GrpcRequestError::NoMethod(method.to_string()))?;
         Ok((svc, mth))
     }
-    pub async fn descriptor_pool(
+    pub async fn descriptor_pool<S>(
         &self,
+        service: S,
         destination: &http::Uri,
-        (service, _method): (&str, &str),
+        (svc, _mth): (&str, &str),
     ) -> relentless::Result<DescriptorPool> {
         // TODO cache
         match &self.descriptor {
             DescriptorFrom::Protos { protos, import_path } => Self::descriptor_from_protos(protos, import_path).await,
             DescriptorFrom::Bin(path) => Self::descriptor_from_file(path).await,
-            DescriptorFrom::Reflection => Self::descriptor_from_reflection(destination, service).await,
+            DescriptorFrom::Reflection => Self::descriptor_from_reflection(service, destination, svc).await,
         }
     }
 
@@ -141,7 +149,12 @@ impl GrpcRequest {
         DescriptorPool::decode(Bytes::from(descriptor_bytes)).box_err()
     }
 
-    pub async fn descriptor_from_reflection(destination: &http::Uri, svc: &str) -> relentless::Result<DescriptorPool> {
+    pub async fn descriptor_from_reflection<S>(
+        _service: S,
+        destination: &http::Uri,
+        svc: &str,
+    ) -> relentless::Result<DescriptorPool> {
+        // TODO!!! do not use Channel directly, use Service
         let mut client = ServerReflectionClient::new(Channel::builder(destination.clone()).connect().await.box_err()?);
         let (host, service) = (
             destination.host().ok_or_else(|| GrpcRequestError::NoHost(destination.clone()))?.to_string(),

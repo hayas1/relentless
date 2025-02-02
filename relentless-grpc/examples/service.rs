@@ -4,7 +4,13 @@ use std::process::ExitCode;
 #[cfg(all(feature = "yaml", feature = "console-report"))]
 async fn main() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sync>> {
     use relentless::interface::command::{Assault, Relentless};
-    use relentless_grpc::{client::DefaultGrpcClient, command::GrpcAssault};
+    use relentless_grpc::{client::GrpcClient, command::GrpcAssault};
+    use relentless_grpc_dev_server::service::{
+        counter::{pb::counter_server::CounterServer, CounterImpl},
+        echo::{pb::echo_server::EchoServer, EchoImpl},
+        greeter::{pb::greeter_server::GreeterServer, GreeterImpl},
+    };
+    use tonic::transport::Server;
 
     let assault = GrpcAssault::new(Relentless {
         file: vec![
@@ -16,7 +22,14 @@ async fn main() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sync>> {
     let (configs, errors) = assault.configs();
     errors.into_iter().for_each(|err| eprintln!("{}", err));
 
-    let service = DefaultGrpcClient::new();
+    let destinations = assault.all_destinations(&configs);
+    let routes = Server::builder()
+        .add_service(GreeterServer::new(GreeterImpl))
+        .add_service(CounterServer::new(CounterImpl::default()))
+        .add_service(EchoServer::new(EchoImpl))
+        .into_service();
+    let service = GrpcClient::from_services(&destinations.into_iter().map(|d| (d, routes.clone())).collect()).await?;
+
     let report = assault.assault_with(configs, service).await?;
 
     assault.report_with(&report, std::io::stdout())?;
