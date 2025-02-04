@@ -1915,6 +1915,8 @@ dependencies = [
  "once_cell",
  "slab",
  "tokio",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
