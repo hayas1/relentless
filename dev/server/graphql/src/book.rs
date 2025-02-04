@@ -1,11 +1,10 @@
-use std::sync::Arc;
-
 use async_graphql::{Context, Enum, Object, Result, Schema, Subscription, ID};
-use futures::{lock::Mutex, Stream, StreamExt};
+use futures::{Stream, StreamExt};
 use slab::Slab;
 
-use crate::simple_broker::SimpleBroker;
+use crate::{simple_broker::SimpleBroker, state::AppState};
 
+pub type BookState = Slab<Book>;
 pub type BooksSchema = Schema<QueryRoot, MutationRoot, SubscriptionRoot>;
 
 #[derive(Clone)]
@@ -30,14 +29,12 @@ impl Book {
     }
 }
 
-pub type Storage = Arc<Mutex<Slab<Book>>>;
-
 pub struct QueryRoot;
 
 #[Object]
 impl QueryRoot {
     async fn books(&self, ctx: &Context<'_>) -> Vec<Book> {
-        let books = ctx.data_unchecked::<Storage>().lock().await;
+        let books = ctx.data_unchecked::<AppState>().books.lock().await;
         books.iter().map(|(_, book)| book).cloned().collect()
     }
 }
@@ -47,7 +44,7 @@ pub struct MutationRoot;
 #[Object]
 impl MutationRoot {
     async fn create_book(&self, ctx: &Context<'_>, name: String, author: String) -> ID {
-        let mut books = ctx.data_unchecked::<Storage>().lock().await;
+        let mut books = ctx.data_unchecked::<AppState>().books.lock().await;
         let entry = books.vacant_entry();
         let id: ID = entry.key().into();
         let book = Book { id: id.clone(), name, author };
@@ -57,7 +54,7 @@ impl MutationRoot {
     }
 
     async fn delete_book(&self, ctx: &Context<'_>, id: ID) -> Result<bool> {
-        let mut books = ctx.data_unchecked::<Storage>().lock().await;
+        let mut books = ctx.data_unchecked::<AppState>().books.lock().await;
         let id = id.parse::<usize>()?;
         if books.contains(id) {
             books.remove(id);
@@ -92,7 +89,7 @@ impl BookChanged {
     }
 
     async fn book(&self, ctx: &Context<'_>) -> Result<Option<Book>> {
-        let books = ctx.data_unchecked::<Storage>().lock().await;
+        let books = ctx.data_unchecked::<AppState>().books.lock().await;
         let id = self.id.parse::<usize>()?;
         Ok(books.get(id).cloned())
     }

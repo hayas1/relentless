@@ -7,8 +7,9 @@ use axum::{
 };
 
 use crate::{
-    book::{MutationRoot, QueryRoot, Storage, SubscriptionRoot},
+    book::{MutationRoot, QueryRoot, SubscriptionRoot},
     env::Env,
+    state::AppState,
 };
 
 async fn graphiql() -> impl IntoResponse {
@@ -16,16 +17,14 @@ async fn graphiql() -> impl IntoResponse {
 }
 
 pub fn app(env: Env) -> Router<()> {
-    let _ = env;
-    app_with()
+    let state = AppState { env, ..Default::default() };
+    app_with(state)
 }
-// pub fn app_with(state: AppState) -> Router<()> {
-pub fn app_with() -> Router<()> {
-    router()
+pub fn app_with(state: AppState) -> Router<()> {
+    router(state)
 }
-// pub fn router(state: AppState) -> Router<()> {
-pub fn router() -> Router<()> {
-    let schema = Schema::build(QueryRoot, MutationRoot, SubscriptionRoot).data(Storage::default()).finish();
+pub fn router(state: AppState) -> Router<()> {
+    let schema = Schema::build(QueryRoot, MutationRoot, SubscriptionRoot).data(state).finish();
 
     Router::new()
         .route("/", get(graphiql).post_service(GraphQL::new(schema.clone())))

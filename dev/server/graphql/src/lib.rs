@@ -2,6 +2,7 @@ pub mod book;
 pub mod env;
 pub mod route;
 pub mod simple_broker;
+pub mod state;
 
 pub async fn serve(env: env::Env) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     //     tracing_subscriber::fmt::init();
