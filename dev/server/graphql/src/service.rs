@@ -6,7 +6,7 @@ use axum::{response::Html, routing::get, Router};
 
 use crate::{
     env::Env,
-    route::book::{MutationRoot, QueryRoot, SubscriptionRoot},
+    service::book::{MutationRoot, QueryRoot, SubscriptionRoot},
     state::AppState,
 };
 
