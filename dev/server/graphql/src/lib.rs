@@ -1,4 +1,3 @@
-pub mod book;
 pub mod env;
 pub mod route;
 pub mod simple_broker;

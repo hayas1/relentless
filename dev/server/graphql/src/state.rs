@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use futures::lock::Mutex;
 
-use crate::{book::BookState, env::Env};
+use crate::{env::Env, route::book::BookState};
 
 #[derive(Clone, Default)]
 pub struct AppState {

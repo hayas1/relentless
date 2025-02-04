@@ -1,20 +1,14 @@
+pub mod book;
+
 use async_graphql::{http::GraphiQLSource, Schema};
 use async_graphql_axum::{GraphQL, GraphQLSubscription};
-use axum::{
-    response::{self, IntoResponse},
-    routing::get,
-    Router,
-};
+use axum::{response::Html, routing::get, Router};
 
 use crate::{
-    book::{MutationRoot, QueryRoot, SubscriptionRoot},
     env::Env,
+    route::book::{MutationRoot, QueryRoot, SubscriptionRoot},
     state::AppState,
 };
-
-async fn graphiql() -> impl IntoResponse {
-    response::Html(GraphiQLSource::build().endpoint("/").subscription_endpoint("/ws").finish())
-}
 
 pub fn app(env: Env) -> Router<()> {
     let state = AppState { env, ..Default::default() };
@@ -25,6 +19,8 @@ pub fn app_with(state: AppState) -> Router<()> {
 }
 pub fn router(state: AppState) -> Router<()> {
     let schema = Schema::build(QueryRoot, MutationRoot, SubscriptionRoot).data(state).finish();
+
+    let graphiql = || async move { Html(GraphiQLSource::build().endpoint("/").subscription_endpoint("/ws").finish()) };
 
     Router::new()
         .route("/", get(graphiql).post_service(GraphQL::new(schema.clone())))
