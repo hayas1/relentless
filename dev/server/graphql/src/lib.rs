@@ -1,11 +1,19 @@
 pub mod book;
+pub mod env;
 pub mod route;
 pub mod simple_broker;
 
-pub async fn serve() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:8000").await?;
-    let app = route::app();
+pub async fn serve(env: env::Env) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    //     tracing_subscriber::fmt::init();
+    let listener = tokio::net::TcpListener::bind(&env.bind()).await?;
+    let app = route::app(env);
 
-    axum::serve(listener, app).await?;
+    //     tracing::info!("start app on {}", listener.local_addr()?);
+    axum::serve(listener, app)
+        .with_graceful_shutdown(async {
+            tokio::signal::ctrl_c().await.expect("failed to install Ctrl+C handler");
+        })
+        .await?;
+    //     tracing::info!("stop app");
     Ok(())
 }

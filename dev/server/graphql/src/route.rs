@@ -6,14 +6,25 @@ use axum::{
     Router,
 };
 
-use crate::book::{MutationRoot, QueryRoot, Storage, SubscriptionRoot};
+use crate::{
+    book::{MutationRoot, QueryRoot, Storage, SubscriptionRoot},
+    env::Env,
+};
 
 async fn graphiql() -> impl IntoResponse {
     response::Html(GraphiQLSource::build().endpoint("/").subscription_endpoint("/ws").finish())
 }
 
-// pub fn app(env: Env) -> NormalizePath<Router<()>> {
-pub fn app() -> Router<()> {
+pub fn app(env: Env) -> Router<()> {
+    let _ = env;
+    app_with()
+}
+// pub fn app_with(state: AppState) -> Router<()> {
+pub fn app_with() -> Router<()> {
+    router()
+}
+// pub fn router(state: AppState) -> Router<()> {
+pub fn router() -> Router<()> {
     let schema = Schema::build(QueryRoot, MutationRoot, SubscriptionRoot).data(Storage::default()).finish();
 
     Router::new()
