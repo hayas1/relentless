@@ -1,3 +1,4 @@
+// https://github.com/async-graphql/examples/blob/master/models/books/src/simple_broker.rs
 use std::{
     any::{Any, TypeId},
     collections::HashMap,
