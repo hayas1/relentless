@@ -1,8 +1,10 @@
-use async_graphql::{Context, Enum, Object, Result, Schema, Subscription, ID};
+use async_graphql::{Context, Object, Result, Schema, Subscription, ID};
 use futures::{Stream, StreamExt};
 use slab::Slab;
 
 use crate::{simple_broker::SimpleBroker, state::AppState};
+
+use super::{MutationRoot, MutationType, QueryRoot, SubscriptionRoot};
 
 pub type BookState = Slab<Book>;
 pub type BooksSchema = Schema<QueryRoot, MutationRoot, SubscriptionRoot>;
@@ -29,8 +31,6 @@ impl Book {
     }
 }
 
-pub struct QueryRoot;
-
 #[Object]
 impl QueryRoot {
     async fn books(&self, ctx: &Context<'_>) -> Vec<Book> {
@@ -38,8 +38,6 @@ impl QueryRoot {
         books.iter().map(|(_, book)| book).cloned().collect()
     }
 }
-
-pub struct MutationRoot;
 
 #[Object]
 impl MutationRoot {
@@ -66,12 +64,6 @@ impl MutationRoot {
     }
 }
 
-#[derive(Enum, Eq, PartialEq, Copy, Clone)]
-enum MutationType {
-    Created,
-    Deleted,
-}
-
 #[derive(Clone)]
 struct BookChanged {
     mutation_type: MutationType,
@@ -94,8 +86,6 @@ impl BookChanged {
         Ok(books.get(id).cloned())
     }
 }
-
-pub struct SubscriptionRoot;
 
 #[Subscription]
 impl SubscriptionRoot {
