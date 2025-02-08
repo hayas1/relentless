@@ -1,4 +1,4 @@
-pub mod book;
+pub mod root;
 
 use async_graphql::{http::GraphiQLSource, Enum, Schema};
 use async_graphql_axum::{GraphQL, GraphQLSubscription};
