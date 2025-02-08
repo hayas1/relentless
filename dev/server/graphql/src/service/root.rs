@@ -6,17 +6,17 @@ use crate::{simple_broker::SimpleBroker, state::AppState};
 
 use super::{MutationRoot, MutationType, QueryRoot, SubscriptionRoot};
 
-pub type RootState = Slab<Root>;
-pub type RootSchema = Schema<QueryRoot, MutationRoot, SubscriptionRoot>;
+pub type ContentState = Slab<Content>;
+pub type ContentSchema = Schema<QueryRoot, MutationRoot, SubscriptionRoot>;
 
 #[derive(Clone)]
-pub struct Root {
+pub struct Content {
     id: ID,
     name: String,
 }
 
 #[Object]
-impl Root {
+impl Content {
     async fn id(&self) -> &str {
         &self.id
     }
@@ -28,30 +28,30 @@ impl Root {
 
 #[Object]
 impl QueryRoot {
-    async fn roots(&self, ctx: &Context<'_>) -> Vec<Root> {
-        let roots = ctx.data_unchecked::<AppState>().roots.lock().await;
-        roots.iter().map(|(_, root)| root).cloned().collect()
+    async fn contents(&self, ctx: &Context<'_>) -> Vec<Content> {
+        let contents = ctx.data_unchecked::<AppState>().contents.lock().await;
+        contents.iter().map(|(_, root)| root).cloned().collect()
     }
 }
 
 #[Object]
 impl MutationRoot {
-    async fn create_root(&self, ctx: &Context<'_>, name: String) -> ID {
-        let mut roots = ctx.data_unchecked::<AppState>().roots.lock().await;
-        let entry = roots.vacant_entry();
+    async fn create_content(&self, ctx: &Context<'_>, name: String) -> ID {
+        let mut contents = ctx.data_unchecked::<AppState>().contents.lock().await;
+        let entry = contents.vacant_entry();
         let id: ID = entry.key().into();
-        let root = Root { id: id.clone(), name };
-        entry.insert(root);
-        SimpleBroker::publish(RootChanged { mutation_type: MutationType::Created, id: id.clone() });
+        let content = Content { id: id.clone(), name };
+        entry.insert(content);
+        SimpleBroker::publish(ContentChanged { mutation_type: MutationType::Created, id: id.clone() });
         id
     }
 
-    async fn delete_root(&self, ctx: &Context<'_>, id: ID) -> Result<bool> {
-        let mut roots = ctx.data_unchecked::<AppState>().roots.lock().await;
+    async fn delete_content(&self, ctx: &Context<'_>, id: ID) -> Result<bool> {
+        let mut contents = ctx.data_unchecked::<AppState>().contents.lock().await;
         let id = id.parse::<usize>()?;
-        if roots.contains(id) {
-            roots.remove(id);
-            SimpleBroker::publish(RootChanged { mutation_type: MutationType::Deleted, id: id.into() });
+        if contents.contains(id) {
+            contents.remove(id);
+            SimpleBroker::publish(ContentChanged { mutation_type: MutationType::Deleted, id: id.into() });
             Ok(true)
         } else {
             Ok(false)
@@ -60,13 +60,13 @@ impl MutationRoot {
 }
 
 #[derive(Clone)]
-struct RootChanged {
+struct ContentChanged {
     mutation_type: MutationType,
     id: ID,
 }
 
 #[Object]
-impl RootChanged {
+impl ContentChanged {
     async fn mutation_type(&self) -> MutationType {
         self.mutation_type
     }
@@ -75,10 +75,10 @@ impl RootChanged {
         &self.id
     }
 
-    async fn root(&self, ctx: &Context<'_>) -> Result<Option<Root>> {
-        let roots = ctx.data_unchecked::<AppState>().roots.lock().await;
+    async fn content(&self, ctx: &Context<'_>) -> Result<Option<Content>> {
+        let contents = ctx.data_unchecked::<AppState>().contents.lock().await;
         let id = self.id.parse::<usize>()?;
-        Ok(roots.get(id).cloned())
+        Ok(contents.get(id).cloned())
     }
 }
 
@@ -94,8 +94,8 @@ impl SubscriptionRoot {
         }
     }
 
-    async fn roots(&self, mutation_type: Option<MutationType>) -> impl Stream<Item = RootChanged> {
-        SimpleBroker::<RootChanged>::subscribe().filter(move |event| {
+    async fn contents(&self, mutation_type: Option<MutationType>) -> impl Stream<Item = ContentChanged> {
+        SimpleBroker::<ContentChanged>::subscribe().filter(move |event| {
             let res = if let Some(mutation_type) = mutation_type { event.mutation_type == mutation_type } else { true };
             async move { res }
         })
