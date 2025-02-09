@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use futures::lock::Mutex;
 
-use crate::{env::Env, service::root::ContentState};
+use crate::{env::Env, service::content::ContentState};
 
 #[derive(Clone, Default)]
 pub struct AppState {
