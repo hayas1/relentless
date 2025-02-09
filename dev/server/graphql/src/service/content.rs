@@ -30,7 +30,7 @@ impl Content {
 impl QueryRoot {
     async fn contents(&self, ctx: &Context<'_>) -> Vec<Content> {
         let contents = ctx.data_unchecked::<AppState>().contents.lock().await;
-        contents.iter().map(|(_, root)| root).cloned().collect()
+        contents.iter().map(|(_, content)| content).cloned().collect()
     }
 }
 
