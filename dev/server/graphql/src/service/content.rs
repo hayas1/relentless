@@ -47,3 +47,32 @@ impl ContentChanged {
         Ok(contents.get(id).cloned())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use async_graphql::value;
+    use futures::lock::Mutex;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_content() {
+        let contents: Arc<Mutex<Slab<Content>>> = Default::default();
+        contents.lock().await.insert(Content { id: "0".into(), name: "test".into() });
+        let state = AppState { contents, ..Default::default() };
+        let schema = Schema::build(QueryRoot, MutationRoot, SubscriptionRoot).data(state).finish();
+
+        let query = r#"
+            query {
+                content(id: "0") {
+                    id
+                    name
+                }
+            }
+        "#;
+        let res = schema.execute(query).await.data;
+        assert_eq!(res, value!({"content": {"id": "0", "name": "test" }}));
+    }
+}
