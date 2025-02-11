@@ -27,6 +27,11 @@ pub fn router(state: AppState) -> Router<()> {
 pub struct QueryRoot;
 #[Object]
 impl QueryRoot {
+    async fn content(&self, ctx: &Context<'_>, id: ID) -> Option<content::Content> {
+        let contents = ctx.data_unchecked::<AppState>().contents.lock().await;
+        let id = id.parse::<usize>().ok()?;
+        contents.get(id).cloned()
+    }
     async fn contents(&self, ctx: &Context<'_>) -> Vec<content::Content> {
         let contents = ctx.data_unchecked::<AppState>().contents.lock().await;
         contents.iter().map(|(_, content)| content).cloned().collect()
