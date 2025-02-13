@@ -111,4 +111,39 @@ mod tests {
         let res = schema.execute(query).await.data;
         assert_eq!(res, value!({"contents": [{"id": "0"}, {"id": "1"}, {"id": "2"}]}));
     }
+
+    #[tokio::test]
+    async fn test_delete_content() {
+        let contents: Arc<Mutex<Slab<Content>>> = Default::default();
+        contents.lock().await.insert(Content { id: "0".into(), name: "test".into() });
+        let state = AppState { contents, ..Default::default() };
+        let schema = Schema::build(QueryRoot, MutationRoot, SubscriptionRoot).data(state).finish();
+
+        let query = r#"
+            query {
+                contents {
+                    id
+                }
+            }
+        "#;
+        let res = schema.execute(query).await.data;
+        assert_eq!(res, value!({"contents": [{"id": "0"}]}));
+
+        let mutation = r#"
+            mutation {
+              deleteContent(id: "0")
+            }
+        "#;
+        schema.execute(mutation).await;
+
+        let query = r#"
+            query {
+                contents {
+                    id
+                }
+            }
+        "#;
+        let res = schema.execute(query).await.data;
+        assert_eq!(res, value!({"contents": []}));
+    }
 }
