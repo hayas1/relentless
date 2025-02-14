@@ -136,13 +136,6 @@ mod tests {
         "#;
         schema.execute(mutation).await;
 
-        let query = r#"
-            query {
-                contents {
-                    id
-                }
-            }
-        "#;
         let res = schema.execute(query).await.data;
         assert_eq!(res, value!({"contents": []}));
     }
