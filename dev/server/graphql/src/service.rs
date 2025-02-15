@@ -36,6 +36,11 @@ impl QueryRoot {
         let contents = ctx.data_unchecked::<AppState>().contents.lock().await;
         contents.iter().map(|(_, content)| content).cloned().collect()
     }
+
+    async fn wait(&self, _ctx: &Context<'_>, ms: u64) -> u64 {
+        tokio::time::sleep(std::time::Duration::from_millis(ms)).await;
+        ms
+    }
 }
 
 pub struct MutationRoot;
