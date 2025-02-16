@@ -21,10 +21,10 @@ relentless = { path = "../relentless", features = ["json"] }
 tower = "0.5.2"
 tokio = { version = "1.43.0", features = ["full"] }
 http = "1.2.0"
-prost = "0.13.4"
-prost-types = "0.13.4"
-prost-build = "0.13.4"
-prost-reflect = { version = "0.14.3", features = [
+prost = "0.13.5"
+prost-types = "0.13.5"
+prost-build = "0.13.5"
+prost-reflect = { version = "0.14.6", features = [
     "serde",
 ] } # https://github.com/hyperium/tonic/issues/2028
 tonic = "0.12.3"
@@ -32,11 +32,11 @@ tonic-reflection = "0.12.3"
 http-body-util = "0.1.2" # TODO only record
 relentless-http = { path = "../relentless-http" } # TODO only record
 
-bytes = "1.9.0"
+bytes = "1.10.0"
 futures = "0.3.31"
 thiserror = "2.0.11"
 serde = { version = "1.0.217", features = ["derive"] }
-serde_json = "1.0.135"
+serde_json = "1.0.138"
 serde_yaml = { version = "0.9.34", optional = true }
 
 [dev-dependencies]
