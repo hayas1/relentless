@@ -5,11 +5,10 @@ use std::{
 
 use axum::{extract::Query, response::Result, routing::get, Json, Router};
 use num::Bounded;
-use rand::{
-    distributions::{DistString, Distribution},
-    Rng,
+use rand::{distr::SampleString, Rng};
+use rand_distr::{
+    uniform::SampleUniform, Alphanumeric, Binomial, Distribution, StandardNormal, StandardUniform, Uniform,
 };
-use rand_distr::{uniform::SampleUniform, Alphanumeric, Binomial, Standard, StandardNormal, Uniform};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -19,15 +18,15 @@ use super::PinResponseFuture;
 
 pub fn route_random() -> Router<AppState> {
     Router::new()
-        .route("/", get(random_handler::<f64, _>(Standard)))
+        .route("/", get(random_handler::<f64, _>(StandardUniform)))
         .route("/string", get(RandomString::handler(Alphanumeric)))
-        .route("/response", get(RandomResponse::handler(Standard, Standard, Alphanumeric)))
+        .route("/response", get(RandomResponse::handler(StandardUniform, StandardUniform, Alphanumeric)))
         .route("/json", get(randjson))
-        .route("/standard", get(random_handler::<f64, _>(Standard)))
-        .route("/standard/int", get(random_handler::<i64, _>(Standard)))
-        .route("/standard/float", get(random_handler::<f64, _>(Standard)))
-        .route("/standard/string", get(RandomString::handler(Standard)))
-        .route("/standard/response", get(RandomResponse::handler(Standard, Standard, Standard)))
+        .route("/standard", get(random_handler::<f64, _>(StandardUniform)))
+        .route("/standard/int", get(random_handler::<i64, _>(StandardUniform)))
+        .route("/standard/float", get(random_handler::<f64, _>(StandardUniform)))
+        .route("/standard/string", get(RandomString::handler(StandardUniform)))
+        .route("/standard/response", get(RandomResponse::handler(StandardUniform, StandardUniform, StandardUniform)))
         .route("/alphanumeric", get(RandomString::handler(Alphanumeric)))
         .route("/normal", get(random_handler::<f64, _>(StandardNormal)))
         .route("/normal/float", get(random_handler::<f64, _>(StandardNormal)))
@@ -46,7 +45,7 @@ where
 {
     move || {
         Box::pin(async move {
-            let mut rng = rand::thread_rng();
+            let mut rng = rand::rng();
             Ok(distribution.sample(&mut rng).to_string())
         })
     }
@@ -60,11 +59,11 @@ pub struct RandomString {
 impl RandomString {
     pub fn handler<D>(distribution: D) -> impl FnOnce(Query<RandomString>) -> PinResponseFuture<Result<String>> + Clone
     where
-        D: DistString + Clone + Send + 'static,
+        D: SampleString + Clone + Send + 'static,
     {
         move |Query(rs): Query<RandomString>| {
             Box::pin(async move {
-                let mut rng = rand::thread_rng();
+                let mut rng = rand::rng();
                 Ok(distribution.sample_string(&mut rng, rs.length()))
             })
         }
@@ -89,11 +88,11 @@ impl RandomResponse {
     where
         DI: Distribution<i64> + Clone + Send + 'static,
         DF: Distribution<f64> + Clone + Send + 'static,
-        DS: DistString + Clone + Send + 'static,
+        DS: SampleString + Clone + Send + 'static,
     {
         move |Query(rs): Query<RandomString>| {
             Box::pin(async move {
-                let mut rng = rand::thread_rng();
+                let mut rng = rand::rng();
                 Ok(Json(RandomResponse {
                     int: int_distribution.sample(&mut rng),
                     float: float_distribution.sample(&mut rng),
@@ -149,7 +148,7 @@ pub trait DistRange<T>: Distribution<T> {
     {
         move |Query(r): Query<DistRangeParam<T>>| {
             Box::pin(async move {
-                let mut rng = rand::thread_rng();
+                let mut rng = rand::rng();
                 let dist = Self::new(&r).ok_or_else(|| RandomError::EmptyRange(r))?;
                 Ok(dist.sample(&mut rng).to_string())
             })
@@ -167,9 +166,11 @@ where
             Bound::Unbounded => &T::min_value(),
         };
         match range.end_bound() {
-            Bound::Included(end) => (start <= end).then(|| Uniform::new_inclusive(start, end)),
-            Bound::Excluded(end) => (start < end).then(|| Uniform::new(start, end)),
-            Bound::Unbounded => (start <= &T::max_value()).then(|| Uniform::new_inclusive(start, T::max_value())), // TODO float max cause panic and empty reply
+            Bound::Included(end) => (start <= end).then(|| Uniform::new_inclusive(start, end).expect("# TODO")),
+            Bound::Excluded(end) => (start < end).then(|| Uniform::new(start, end).expect("# TODO")),
+            Bound::Unbounded => {
+                (start <= &T::max_value()).then(|| Uniform::new_inclusive(start, T::max_value()).expect("# TODO"))
+            } // TODO float max cause panic and empty reply
         }
     }
 }
@@ -178,21 +179,21 @@ where
 pub async fn randjson() -> Result<Json<Value>> {
     let (max_size, max_depth) = (10, 3);
     fn recursive_json(max_size: usize, max_depth: i32) -> Value {
-        let mut rng = rand::thread_rng();
-        let size = rng.gen_range(0..max_size);
+        let mut rng = rand::rng();
+        let size = rng.random_range(0..max_size);
         if max_depth == 0 || max_size == 0 {
-            match rng.gen_range(0..4) {
+            match rng.random_range(0..4) {
                 0 => Value::Null,
-                1 => Value::Number(rng.gen::<i64>().into()),
-                2 => Value::Bool(rng.gen::<bool>()),
+                1 => Value::Number(rng.random::<i64>().into()),
+                2 => Value::Bool(rng.random::<bool>()),
                 3 => Value::String(Alphanumeric.sample_string(&mut rng, size)),
                 _ => unreachable!(),
             }
         } else {
-            match rng.gen_range(0..6) {
+            match rng.random_range(0..6) {
                 0 => Value::Null,
-                1 => Value::Number(rng.gen::<i64>().into()),
-                2 => Value::Bool(rng.gen::<bool>()),
+                1 => Value::Number(rng.random::<i64>().into()),
+                2 => Value::Bool(rng.random::<bool>()),
                 3 => Value::String(Alphanumeric.sample_string(&mut rng, size)),
                 4 => Value::Array((0..size).map(|_| recursive_json(max_size, max_depth - 1)).collect()),
                 5 => Value::Object(
@@ -229,7 +230,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_random_handler() {
-        let int = random_handler::<i64, _>(Standard)().await.unwrap();
+        let int = random_handler::<i64, _>(StandardUniform)().await.unwrap();
 
         assert!(int.parse::<i64>().is_ok());
     }
