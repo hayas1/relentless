@@ -6,7 +6,7 @@ use axum::{
     Json, Router,
 };
 use chrono::Local;
-use rand::distributions::DistString;
+use rand::distr::SampleString;
 use rand_distr::Alphanumeric;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -143,7 +143,7 @@ impl Jsonizer {
         match v.strip_prefix('$') {
             Some("randint") => Ok(json!(rand::random::<i64>())),
             Some("rand") => Ok(json!(rand::random::<f64>())),
-            Some("rands") => Ok(json!(Alphanumeric.sample_string(&mut rand::thread_rng(), 32))),
+            Some("rands") => Ok(json!(Alphanumeric.sample_string(&mut rand::rng(), 32))),
             Some("now") => Ok(json!(Local::now().to_rfc3339())),
             Some(s) => {
                 if s.starts_with('$') {

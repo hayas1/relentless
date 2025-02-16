@@ -172,10 +172,10 @@ pub mod random {
 
     use super::*;
 
-    #[derive(Error, Debug, Clone, PartialEq, Eq)]
+    #[derive(Error, Debug)]
     pub enum RandomError<T: Display> {
-        #[error("`{0}` is empty range")]
-        EmptyRange(DistRangeParam<T>),
+        #[error("`{0}`: {1}")]
+        InvalidRange(DistRangeParam<T>, Box<dyn std::error::Error + Send + Sync>),
     }
 
     impl<T: Display + Debug + Send + Sync + 'static> IntoResponse for RandomError<T> {
