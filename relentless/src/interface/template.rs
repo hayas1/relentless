@@ -12,7 +12,7 @@ use nom::{
     combinator::map_res,
     multi::many0,
     sequence::delimited,
-    IResult,
+    IResult, Parser,
 };
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "json")]
@@ -113,23 +113,23 @@ impl Variable {
     }
 
     pub fn parse_environment_variable(input: &str) -> IResult<&str, Self> {
-        map_res(delimited(alt((tag("${ENV:"), tag("${env:"))), alphanumeric1, tag("}")), |key: &str| {
-            Ok::<_, Infallible>(Self::Environment(key.to_string()))
-        })(input)
+        let parser = delimited(alt((tag("${ENV:"), tag("${env:"))), alphanumeric1, tag("}"));
+        map_res(parser, |key: &str| Ok::<_, Infallible>(Self::Environment(key.to_string()))).parse(input)
     }
 
     pub fn parse_variable(input: &str) -> IResult<&str, Self> {
-        map_res(delimited(tag("${"), alphanumeric1, tag("}")), |key: &str| {
-            Ok::<_, Infallible>(Self::Defined(key.to_string()))
-        })(input)
+        let parser = delimited(tag("${"), alphanumeric1, tag("}"));
+        map_res(parser, |key: &str| Ok::<_, Infallible>(Self::Defined(key.to_string()))).parse(input)
     }
 
     pub fn parse_literal(input: &str) -> IResult<&str, Self> {
-        map_res(is_not("${"), |text: &str| Ok::<_, Infallible>(Self::Literal(text.to_string())))(input)
+        let parser = is_not("${");
+        map_res(parser, |text: &str| Ok::<_, Infallible>(Self::Literal(text.to_string()))).parse(input)
     }
 
     pub fn parse(input: &str) -> IResult<&str, Vec<Self>> {
-        many0(alt((Self::parse_environment_variable, Self::parse_variable, Self::parse_literal)))(input)
+        let parser = alt((Self::parse_environment_variable, Self::parse_variable, Self::parse_literal));
+        many0(parser).parse(input)
     }
 }
 
