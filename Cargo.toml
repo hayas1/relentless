@@ -12,6 +12,7 @@ members = [
     "relentless",
     "relentless-grpc",
     "relentless-http",
+    "dev/server/graphql",
     "dev/server/grpc",
     "dev/server/http",
 ]
