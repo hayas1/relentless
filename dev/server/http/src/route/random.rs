@@ -136,7 +136,9 @@ impl<T: Display> Display for DistRangeParam<T> {
     }
 }
 pub trait DistRange<T>: Distribution<T> {
-    fn new<R>(range: &R) -> Option<Self>
+    type Error;
+
+    fn new<R>(range: &R) -> Result<Self, Self::Error>
     where
         R: RangeBounds<T>,
         Self: Sized;
@@ -144,12 +146,13 @@ pub trait DistRange<T>: Distribution<T> {
     fn handler() -> impl FnOnce(Query<DistRangeParam<T>>) -> PinResponseFuture<Result<String>> + Clone
     where
         Self: DistRange<T> + Sized,
+        Self::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
         T: Display + Debug + Clone + Send + Sync + 'static,
     {
         move |Query(r): Query<DistRangeParam<T>>| {
             Box::pin(async move {
                 let mut rng = rand::rng();
-                let dist = Self::new(&r).ok_or_else(|| RandomError::EmptyRange(r))?;
+                let dist = Self::new(&r).map_err(|e| RandomError::InvalidRange(r, e.into()))?;
                 Ok(dist.sample(&mut rng).to_string())
             })
         }
@@ -159,18 +162,17 @@ impl<T> DistRange<T> for Uniform<T>
 where
     T: SampleUniform + PartialOrd + Bounded,
 {
-    fn new<R: RangeBounds<T>>(range: &R) -> Option<Self> {
+    type Error = rand::distr::uniform::Error;
+    fn new<R: RangeBounds<T>>(range: &R) -> Result<Self, Self::Error> {
         let start = match range.start_bound() {
             Bound::Included(s) => s,
             Bound::Excluded(s) => s, // TODO? &(*s + 1),
             Bound::Unbounded => &T::min_value(),
         };
         match range.end_bound() {
-            Bound::Included(end) => (start <= end).then(|| Uniform::new_inclusive(start, end).expect("# TODO")),
-            Bound::Excluded(end) => (start < end).then(|| Uniform::new(start, end).expect("# TODO")),
-            Bound::Unbounded => {
-                (start <= &T::max_value()).then(|| Uniform::new_inclusive(start, T::max_value()).expect("# TODO"))
-            } // TODO float max cause panic and empty reply
+            Bound::Included(end) => Uniform::new_inclusive(start, end),
+            Bound::Excluded(end) => Uniform::new(start, end),
+            Bound::Unbounded => Uniform::new_inclusive(start, T::max_value()),
         }
     }
 }
@@ -307,8 +309,11 @@ mod tests {
             APP_DEFAULT_ERROR_CODE,
             ErrorResponseInner {
                 msg: BadRequest::msg().to_string(),
-                detail: RandomError::EmptyRange(DistRangeParam { low: Some(100), high: Some(0), inclusive: false })
-                    .to_string(),
+                detail: RandomError::InvalidRange(
+                    DistRangeParam { low: Some(100), high: Some(0), inclusive: false },
+                    Box::new(rand::distr::uniform::Error::EmptyRange),
+                )
+                .to_string(),
             },
         )
         .await;
