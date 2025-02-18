@@ -12,7 +12,7 @@ pub struct HttpAssault<ReqB, ResB> {
     relentless: Relentless,
     phantom: PhantomData<(ReqB, ResB)>,
 }
-impl<ReqB, ResB> Assault<http::Request<ReqB>, http::Response<ResB>> for HttpAssault<ReqB, ResB>
+impl<S, ReqB, ResB> Assault<S, http::Request<ReqB>, http::Response<ResB>> for HttpAssault<ReqB, ResB>
 where
     ReqB: Body + From<Bytes> + Default,
     ResB: Body + From<Bytes> + Default,
@@ -20,8 +20,8 @@ where
 {
     type Request = HttpRequest;
     type Response = HttpResponse;
-    type Recorder = HttpIoRecorder;
     type Layer = ();
+    type Recorder = HttpIoRecorder;
 
     fn command(&self) -> &Relentless {
         &self.relentless

@@ -10,11 +10,13 @@ use crate::{
 pub struct GrpcAssault {
     relentless: Relentless,
 }
-impl Assault<GrpcMethodRequest<serde_json::Value, JsonSerializer>, tonic::Response<serde_json::Value>> for GrpcAssault {
+impl<S> Assault<S, GrpcMethodRequest<serde_json::Value, JsonSerializer>, tonic::Response<serde_json::Value>>
+    for GrpcAssault
+{
     type Request = GrpcRequest;
     type Response = GrpcResponse;
-    type Recorder = GrpcIoRecorder;
     type Layer = ();
+    type Recorder = GrpcIoRecorder;
 
     fn command(&self) -> &Relentless {
         &self.relentless
