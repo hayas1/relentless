@@ -3,7 +3,7 @@ use std::{fmt::Display, io::Write, path::PathBuf, process::ExitCode};
 #[cfg(feature = "cli")]
 use clap::{Parser, ValueEnum};
 use serde::{Deserialize, Serialize};
-use tower::{Layer, Service, ServiceBuilder};
+use tower::{Service, ServiceBuilder};
 
 #[cfg(feature = "console-report")]
 use crate::interface::report::console::ConsoleReport;
@@ -26,18 +26,18 @@ use super::{
 };
 
 #[allow(async_fn_in_trait)] // TODO #[warn(async_fn_in_trait)] by default
-pub trait Assault<S, Req, Res> {
+pub trait Assault<Req, Res> {
     type Request: Configuration + Coalesce;
     type Response: Configuration + Coalesce + Evaluate<Res>;
-    type Layer: Layer<S>;
     type Recorder;
+    type Layer;
 
     fn command(&self) -> &Relentless;
     fn recorder(&self) -> Self::Recorder;
     fn layer(&self) -> Self::Layer;
 
     #[cfg(feature = "cli")]
-    async fn execute(&self, service: S) -> crate::Result<ExitCode>
+    async fn execute<S>(&self, service: S) -> crate::Result<ExitCode>
     where
         Self::Request: RequestFactory<Req, S>,
         <Self::Request as RequestFactory<Req, S>>::Error: std::error::Error + Send + Sync + 'static,
@@ -81,7 +81,7 @@ pub trait Assault<S, Req, Res> {
 
     /// TODO document
     // TODO return type should be `impl Service<Req>` ?
-    fn build_service(&self, service: S) -> RecordService<S, Self::Recorder>
+    fn build_service<S>(&self, service: S) -> RecordService<S, Self::Recorder>
     where
         Self::Recorder: IoRecord<Req>
             + CollectClone<Req>
@@ -98,7 +98,7 @@ pub trait Assault<S, Req, Res> {
             .layer(RecordLayer::new(self.command().output_record.clone(), self.recorder()))
             .service(service)
     }
-    async fn assault_with(
+    async fn assault_with<S>(
         &self,
         configs: Vec<Config<Self::Request, Self::Response>>,
         service: S,
