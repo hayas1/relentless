@@ -30,9 +30,11 @@ pub trait Assault<Req, Res> {
     type Request: Configuration + Coalesce;
     type Response: Configuration + Coalesce + Evaluate<Res>;
     type Recorder;
+    type Layer;
 
     fn command(&self) -> &Relentless;
     fn recorder(&self) -> Self::Recorder;
+    fn layer(&self) -> Self::Layer;
 
     #[cfg(feature = "cli")]
     async fn execute<S>(&self, service: S) -> crate::Result<ExitCode>
