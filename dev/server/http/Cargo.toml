@@ -9,17 +9,17 @@ license-file.workspace = true
 [dependencies]
 axum = { version = "0.8.1", features = ["tokio", "original-uri"] }
 axum-extra = "0.10.0"
-chrono = { version = "0.4.39", features = ["serde"] }
+chrono = { version = "0.4.40", features = ["serde"] }
 http-serde = "2.1.1"
 num = { version = "0.4.3", features = ["serde"] }
 rand = "0.9.0"
-rand_distr = "0.5.0"
-serde = { version = "1.0.217", features = ["derive"] }
-serde_json = "1.0.138"
+rand_distr = "0.5.1"
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = "1.0.140"
 # serde_qs = "0.13.0"
 serde_urlencoded = "0.7.1"
-thiserror = "2.0.11"
-tokio = { version = "1.43.0", features = ["full"] }
+thiserror = "2.0.12"
+tokio = { version = "1.44.0", features = ["full"] }
 tower = { version = "0.5.2", features = ["util"] }
 tower-http = { version = "0.6.2", features = ["normalize-path"] }
 tracing = "0.1.41"
