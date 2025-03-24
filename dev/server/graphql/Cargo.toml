@@ -9,8 +9,8 @@ license-file.workspace = true
 readme.workspace = true
 
 [dependencies]
-async-graphql = "7.0.15"
-async-graphql-axum = "7.0.15"
+async-graphql = "7.0.16"
+async-graphql-axum = "7.0.16"
 async-stream = "0.3.6"
 axum = "0.8.1"
 futures = "0.3.31"
