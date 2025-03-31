@@ -7,8 +7,8 @@ repository.workspace = true
 license-file.workspace = true
 
 [dependencies]
-axum = { version = "0.8.1", features = ["tokio", "original-uri"] }
-axum-extra = "0.10.0"
+axum = { version = "0.8.3", features = ["tokio", "original-uri"] }
+axum-extra = "0.10.1"
 chrono = { version = "0.4.40", features = ["serde"] }
 http-serde = "2.1.1"
 num = { version = "0.4.3", features = ["serde"] }
