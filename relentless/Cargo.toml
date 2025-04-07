@@ -18,7 +18,7 @@ console-report = ["console"]
 
 
 [dependencies]
-tokio = { version = "1.44.1", features = ["full"] }
+tokio = { version = "1.44.2", features = ["full"] }
 # tokio-stream = "0.1.17" # TODO map of tokio-stream may not collect as Vec<T>Item (it reduce Vec<Future>), so use futures
 futures = "0.3.31"
 tower = { version = "0.5.2", features = ["timeout", "util"] }
@@ -35,7 +35,7 @@ toml = { version = "0.8.20", optional = true }
 json-patch = { version = "4.0.0", optional = true }
 jsonptr = { version = "0.7.1", optional = true }
 
-clap = { version = "4.5.32", features = ["derive"], optional = true }
+clap = { version = "4.5.35", features = ["derive"], optional = true }
 console = { version = "0.15.11", optional = true }
 nom = "8.0.0"
 # average = "0.15.1" # Quantile (that use p2 algorithm) do not impl Extend
@@ -44,7 +44,7 @@ hdrhistogram = "7.5.4"
 
 [dev-dependencies]
 relentless-http-dev-server = { path = "../dev/server/http" }
-axum = "0.8.1"
+axum = "0.8.3"
 glob = "0.3.2"
 httptest = "0.16.3"
 http-body-util = "0.1.3"
