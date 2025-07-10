@@ -14,7 +14,6 @@ impl Assault<GrpcMethodRequest<serde_json::Value, JsonSerializer>, tonic::Respon
     type Request = GrpcRequest;
     type Response = GrpcResponse;
     type Recorder = GrpcIoRecorder;
-    type Layer = ();
 
     fn command(&self) -> &Relentless {
         &self.relentless
@@ -22,7 +21,6 @@ impl Assault<GrpcMethodRequest<serde_json::Value, JsonSerializer>, tonic::Respon
     fn recorder(&self) -> Self::Recorder {
         GrpcIoRecorder
     }
-    fn layer(&self) -> Self::Layer {}
 }
 
 impl GrpcAssault {

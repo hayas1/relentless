@@ -21,7 +21,6 @@ where
     type Request = HttpRequest;
     type Response = HttpResponse;
     type Recorder = HttpIoRecorder;
-    type Layer = ();
 
     fn command(&self) -> &Relentless {
         &self.relentless
@@ -29,7 +28,6 @@ where
     fn recorder(&self) -> Self::Recorder {
         HttpIoRecorder
     }
-    fn layer(&self) -> Self::Layer {}
 }
 
 impl<ReqB, ResB> HttpAssault<ReqB, ResB> {
