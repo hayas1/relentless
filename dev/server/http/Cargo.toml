@@ -27,3 +27,6 @@ tracing-subscriber = "0.3.19"
 
 [dev-dependencies]
 mime = "0.3.17"
+
+[lints.clippy]
+result_large_err = "allow" # TODO

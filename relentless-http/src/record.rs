@@ -31,9 +31,9 @@ where
     async fn record_raw<W: std::io::Write + Send>(&self, w: &mut W, r: http::Request<B>) -> Result<(), Self::Error> {
         let (http::request::Parts { method, uri, version, headers, .. }, body) = r.into_parts();
 
-        writeln!(w, "{} {} {:?}", method, uri, version)?;
+        writeln!(w, "{method} {uri} {version:?}")?;
         for (header, value) in headers.iter() {
-            writeln!(w, "{}: {:?}", header, value)?;
+            writeln!(w, "{header}: {value:?}")?;
         }
         writeln!(w)?;
         if let Ok(b) = BodyExt::collect(body).await.map(Collected::to_bytes) {
@@ -90,9 +90,9 @@ where
     async fn record_raw<W: std::io::Write>(&self, w: &mut W, r: http::Response<B>) -> Result<(), Self::Error> {
         let (http::response::Parts { version, status, headers, .. }, body) = r.into_parts();
 
-        writeln!(w, "{:?} {}", version, status)?;
+        writeln!(w, "{version:?} {status}")?;
         for (header, value) in headers.iter() {
-            writeln!(w, "{}: {:?}", header, value)?;
+            writeln!(w, "{header}: {value:?}")?;
         }
         writeln!(w)?;
         if let Ok(b) = BodyExt::collect(body).await.map(Collected::to_bytes) {

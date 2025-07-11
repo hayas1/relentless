@@ -26,3 +26,6 @@ thiserror = "2.0.12"
 
 [build-dependencies]
 tonic-build = "0.13.1"
+
+[lints.clippy]
+result_large_err = "allow" # TODO https://github.com/hyperium/tonic/issues/2253

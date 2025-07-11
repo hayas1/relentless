@@ -16,7 +16,7 @@ async fn main() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sync>> {
         ..Default::default()
     });
     let (configs, errors) = assault.configs();
-    errors.into_iter().for_each(|err| eprintln!("{}", err));
+    errors.into_iter().for_each(|err| eprintln!("{err}"));
 
     let service = route::app_with(Default::default());
     let report = assault.assault_with(configs, service).await?;

@@ -459,5 +459,5 @@ async fn test_measure_config() {
     }
     assert!(assault.pass(&report));
     assert!(assault.allow(&report));
-    println!("{}", out);
+    println!("{out}");
 }

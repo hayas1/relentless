@@ -50,7 +50,7 @@ pub trait Assault<Req, Res> {
         }
 
         let (configs, errors) = self.configs();
-        errors.into_iter().for_each(|err| eprintln!("{}", err));
+        errors.into_iter().for_each(|err| eprintln!("{err}"));
 
         let report = self.assault_with(configs, service).await?;
         self.report_with(&report, std::io::stdout()).box_err()?;

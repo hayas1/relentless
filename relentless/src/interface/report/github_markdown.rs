@@ -30,7 +30,7 @@ pub trait GithubMarkdownReport: Reportable {
 
         write!(w, "| | min | mean |")?;
         for percentile in cmd.percentile_set() {
-            write!(w, " p{} |", percentile)?;
+            write!(w, " p{percentile} |")?;
         }
         writeln!(w, " max |")?;
 
@@ -40,15 +40,15 @@ pub trait GithubMarkdownReport: Reportable {
         }
         writeln!(w, " --- |")?;
 
-        write!(w, "| latency | {:.3?} | {:.3?} |", min, mean)?;
+        write!(w, "| latency | {min:.3?} | {mean:.3?} |")?;
         for q in quantile {
-            write!(w, " {:.3?} |", q)?;
+            write!(w, " {q:.3?} |")?;
         }
-        writeln!(w, " {:.3?} |", max)?;
+        writeln!(w, " {max:.3?} |")?;
 
         writeln!(w)?;
         write!(w, "pass rate: {}/{}={:.2}%, ", pass, count, pass_rate * 100.)?;
-        writeln!(w, "rps: {}req/{:.2?}={:.2}req/s", req, duration, rps)?;
+        writeln!(w, "rps: {req}req/{duration:.2?}={rps:.2}req/s")?;
 
         Ok(())
     }
@@ -161,7 +161,7 @@ impl<T: Display, Q: Clone + Coalesce, P: Clone + Coalesce> GithubMarkdownReport 
 
         let side =
             if self.pass() { CaseGithubMarkdownReport::PASS_EMOJI } else { CaseGithubMarkdownReport::FAIL_EMOJI };
-        write!(w, "- {} `{}` ", side, target)?;
+        write!(w, "- {side} `{target}` ")?;
         if let Repeat(Some(ref repeat)) = setting.repeat {
             write!(w, "{}{}/{} ", CaseGithubMarkdownReport::REPEAT_EMOJI, self.passed, repeat)?;
         }
