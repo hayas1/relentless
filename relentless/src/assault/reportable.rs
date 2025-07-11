@@ -178,7 +178,7 @@ impl<W: IoWrite> FmtWrite for ReportWriter<W> {
                     write!(self.buf, "{}", self.indent()).map_err(|_| std::fmt::Error)?;
                     self.at_start_line = false;
                 }
-                writeln!(self.buf, "{}", line).map_err(|_| std::fmt::Error)?;
+                writeln!(self.buf, "{line}").map_err(|_| std::fmt::Error)?;
                 self.at_start_line = true;
             }
         } else {
@@ -186,7 +186,7 @@ impl<W: IoWrite> FmtWrite for ReportWriter<W> {
                 write!(self.buf, "{}", self.indent()).map_err(|_| std::fmt::Error)?;
                 self.at_start_line = false;
             }
-            write!(self.buf, "{}", s).map_err(|_| std::fmt::Error)?;
+            write!(self.buf, "{s}").map_err(|_| std::fmt::Error)?;
         }
         Ok(())
     }

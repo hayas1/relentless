@@ -12,7 +12,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let request2 = Request::new(Value::from(200));
     let response2 = echo_client.echo_value(request2).await?;
-    println!("RESPONSE2={:?}", response2);
+    println!("RESPONSE2={response2:?}");
 
     Ok(())
 }

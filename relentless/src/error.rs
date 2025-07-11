@@ -106,14 +106,14 @@ impl Display for InterfaceError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::UndefinedSerializeFormatPath(s) => {
-                write!(f, "no serde format is enabled for path `{}`", s)
+                write!(f, "no serde format is enabled for path `{s}`")
             }
             Self::UndefinedSerializeFormatContent(s) => {
-                write!(f, "no serde format is enabled for content `{}`", s)
+                write!(f, "no serde format is enabled for content `{s}`")
             }
-            Self::KeyValueFormat(s) => write!(f, "should be KEY=VALUE format, but `{}` has no `=`", s),
-            Self::UnknownFormatExtension(s) => write!(f, "`{}` is unknown extension format", s),
-            Self::CannotReadConfig(s, e) => write!(f, "[{}] {}", s, e),
+            Self::KeyValueFormat(s) => write!(f, "should be KEY=VALUE format, but `{s}` has no `=`"),
+            Self::UnknownFormatExtension(s) => write!(f, "`{s}` is unknown extension format"),
+            Self::CannotReadConfig(s, e) => write!(f, "[{s}] {e}"),
             Self::CannotSpecifyFormat => write!(f, "cannot specify format"),
             Self::NanPercentile => write!(f, "nan is not number"),
         }
@@ -139,9 +139,9 @@ impl Error for TemplateError {
 impl Display for TemplateError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::NomParseError(s) => write!(f, "{}", s),
-            Self::RemainingTemplate(s) => write!(f, "remaining template: {}", s),
-            Self::VariableNotDefined(s) => write!(f, "variable `{}` is not defined", s),
+            Self::NomParseError(s) => write!(f, "{s}"),
+            Self::RemainingTemplate(s) => write!(f, "remaining template: {s}"),
+            Self::VariableNotDefined(s) => write!(f, "variable `{s}` is not defined"),
         }
     }
 }
@@ -183,8 +183,8 @@ impl Error for PlaintextEvaluateError {
 impl Display for PlaintextEvaluateError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::FailToCompileRegex(e) => write!(f, "{}", e),
-            Self::FailToMatch(re, haystack) => write!(f, "regex `{}` does not match `{}`", re, haystack),
+            Self::FailToCompileRegex(e) => write!(f, "{e}"),
+            Self::FailToMatch(re, haystack) => write!(f, "regex `{re}` does not match `{haystack}`"),
         }
     }
 }
@@ -212,9 +212,9 @@ impl Error for JsonEvaluateError {
 impl Display for JsonEvaluateError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::FailToPatchJson(e) => write!(f, "{}", e),
-            Self::FailToParseJson(e) => write!(f, "{}", e),
-            Self::Diff(e) => write!(f, "diff in `{}`", e),
+            Self::FailToPatchJson(e) => write!(f, "{e}"),
+            Self::FailToParseJson(e) => write!(f, "{e}"),
+            Self::Diff(e) => write!(f, "diff in `{e}`"),
         }
     }
 }
@@ -235,7 +235,7 @@ mod tests {
     #[test]
     fn test_box_error_conversion() {
         fn f() -> RelentlessResult<()> {
-            Err(std::io::Error::new(std::io::ErrorKind::Other, "test")).box_err()?
+            Err(std::io::Error::other("test")).box_err()?
         }
         let err = f().unwrap_err();
         assert!(matches!(err.downcast_ref().unwrap(), std::io::Error { .. }));

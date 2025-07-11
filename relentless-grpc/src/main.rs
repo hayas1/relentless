@@ -8,7 +8,7 @@ pub async fn main() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sync>
 
     let assault = GrpcAssault::new(Relentless::parse_cli());
     let (configs, errors) = assault.configs();
-    errors.into_iter().for_each(|err| eprintln!("{}", err));
+    errors.into_iter().for_each(|err| eprintln!("{err}"));
     let client = GrpcClient::new(&assault.all_destinations(&configs)).await?;
     let record = assault.build_service(client);
     Ok(assault.execute(record).await?)

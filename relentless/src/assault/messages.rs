@@ -21,9 +21,9 @@ impl<M: Display> Display for Messages<M> {
         let (m, n) = (self.0.len(), 3);
         for (i, wrap) in self.0[..n.min(m)].iter().enumerate() {
             if i < n.min(m) - 1 {
-                writeln!(f, "{}", wrap)?;
+                writeln!(f, "{wrap}")?;
             } else {
-                write!(f, "{}", wrap)?;
+                write!(f, "{wrap}")?;
             }
         }
         if m > n {
