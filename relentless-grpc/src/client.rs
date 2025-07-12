@@ -12,7 +12,7 @@ use prost::Message;
 use prost_reflect::{DynamicMessage, MessageDescriptor, MethodDescriptor, ServiceDescriptor};
 use serde::{Deserializer, Serialize, Serializer};
 use tonic::{
-    body::BoxBody,
+    body::Body as BoxBody,
     client::GrpcService,
     codec::{Codec, Decoder, Encoder},
     transport::{Body, Channel},
