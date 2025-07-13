@@ -10,7 +10,7 @@ async fn main() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sync>> {
         echo::{pb::echo_server::EchoServer, EchoImpl},
         greeter::{pb::greeter_server::GreeterServer, GreeterImpl},
     };
-    use tonic::transport::Server;
+    use tonic::service::Routes;
 
     let assault = GrpcAssault::new(Relentless {
         file: vec![
@@ -23,11 +23,12 @@ async fn main() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sync>> {
     errors.into_iter().for_each(|err| eprintln!("{err}"));
 
     let destinations = assault.all_destinations(&configs);
-    let routes = Server::builder()
+    let mut builder = Routes::builder();
+    builder
         .add_service(GreeterServer::new(GreeterImpl))
         .add_service(CounterServer::new(CounterImpl::default()))
-        .add_service(EchoServer::new(EchoImpl))
-        .into_service();
+        .add_service(EchoServer::new(EchoImpl));
+    let routes = builder.routes();
     let service = GrpcClient::from_services(&destinations.into_iter().map(|d| (d, routes.clone())).collect()).await?;
 
     let report = assault.assault_with(configs, service).await?;
