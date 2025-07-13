@@ -7,13 +7,13 @@ repository.workspace = true
 license-file.workspace = true
 
 [dependencies]
-prost = "0.13.0"
-prost-types = "0.13.0"
+prost = "0.14.1"
+prost-types = "0.14.1"
 tonic = "0.13.1"
 tonic-health = "0.13.1"
 tonic-reflection = "0.13.1"
 tower = "0.5.2"
-tokio = { version = "1.45.1", features = [
+tokio = { version = "1.46.1", features = [
     "macros",
     "rt-multi-thread",
     "signal",

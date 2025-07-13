@@ -18,7 +18,7 @@ console-report = ["console"]
 
 
 [dependencies]
-tokio = { version = "1.45.1", features = ["full"] }
+tokio = { version = "1.46.1", features = ["full"] }
 # tokio-stream = "0.1.17" # TODO map of tokio-stream may not collect as Vec<T>Item (it reduce Vec<Future>), so use futures
 futures = "0.3.31"
 tower = { version = "0.5.2", features = ["timeout", "util"] }
@@ -31,11 +31,11 @@ regex = "1.11.1"
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = { version = "1.0.140", optional = true }
 serde_yaml = { version = "0.9.34", optional = true }
-toml = { version = "0.8.23", optional = true }
+toml = { version = "0.9.2", optional = true }
 json-patch = { version = "4.0.0", optional = true }
 jsonptr = { version = "0.7.1", optional = true }
 
-clap = { version = "4.5.40", features = ["derive"], optional = true }
+clap = { version = "4.5.41", features = ["derive"], optional = true }
 console = { version = "0.15.11", optional = true }
 nom = "8.0.0"
 # average = "0.15.1" # Quantile (that use p2 algorithm) do not impl Extend
