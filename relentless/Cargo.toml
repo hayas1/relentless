@@ -18,7 +18,7 @@ console-report = ["console"]
 
 
 [dependencies]
-tokio = { version = "1.45.1", features = ["full"] }
+tokio = { version = "1.47.1", features = ["full"] }
 # tokio-stream = "0.1.17" # TODO map of tokio-stream may not collect as Vec<T>Item (it reduce Vec<Future>), so use futures
 futures = "0.3.31"
 tower = { version = "0.5.2", features = ["timeout", "util"] }
@@ -26,16 +26,16 @@ http = "1.3.1"
 http-serde = "2.1.1"
 bytes = "1.10.1"
 
-thiserror = "2.0.12"                                   # TODO 
+thiserror = "2.0.15"                                   # TODO 
 regex = "1.11.1"
 serde = { version = "1.0.219", features = ["derive"] }
-serde_json = { version = "1.0.140", optional = true }
+serde_json = { version = "1.0.142", optional = true }
 serde_yaml = { version = "0.9.34", optional = true }
-toml = { version = "0.8.23", optional = true }
+toml = { version = "0.9.5", optional = true }
 json-patch = { version = "4.0.0", optional = true }
 jsonptr = { version = "0.7.1", optional = true }
 
-clap = { version = "4.5.40", features = ["derive"], optional = true }
+clap = { version = "4.5.45", features = ["derive"], optional = true }
 console = { version = "0.15.11", optional = true }
 nom = "8.0.0"
 # average = "0.15.1" # Quantile (that use p2 algorithm) do not impl Extend
@@ -45,9 +45,9 @@ hdrhistogram = "7.5.4"
 [dev-dependencies]
 relentless-http-dev-server = { path = "../dev/server/http" }
 axum = "0.8.1"
-glob = "0.3.2"
+glob = "0.3.3"
 httptest = "0.16.3"
 http-body-util = "0.1.3"
 assert-json-diff = "2.0.2"
-serde_json = "1.0.140"
+serde_json = "1.0.142"
 indoc = "2.0.6"
