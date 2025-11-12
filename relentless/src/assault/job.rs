@@ -1,9 +1,23 @@
-use std::path::PathBuf;
+use std::{
+    future::Future,
+    path::PathBuf,
+    pin::Pin,
+    sync::Arc,
+    task::{Context, Poll},
+};
 
 use clap::{Args, Parser};
+use futures::{StreamExt, TryStreamExt};
 use serde::{Deserialize, Serialize};
+use tower::{Service, ServiceExt};
 
-use crate::report::ReportFormat;
+use crate::{
+    assault::{
+        hierarchy::Hierarchy,
+        suite::{Suite, SuiteReport},
+    },
+    report::ReportFormat,
+};
 
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 #[cfg_attr(feature = "cli", derive(Parser))]
@@ -55,9 +69,13 @@ pub struct JobSpec {
     #[cfg_attr(feature = "cli", arg(env, short, long, value_enum, default_value_t))]
     pub report_format: ReportFormat,
 
-    /// *EXPERIMENTAL* output directory
+    /// record output
     #[cfg_attr(feature = "cli", arg(env, short, long))]
     pub output_record: bool,
+
+    /// without async for each requests
+    #[cfg_attr(feature = "cli", arg(env, short, long, num_args=0.., value_delimiter = ' '))]
+    pub sequential: Vec<Hierarchy>, // TODO dedup in advance
 
     /// requests per second
     #[cfg_attr(feature = "cli", arg(env, long))]
@@ -66,4 +84,35 @@ pub struct JobSpec {
     /// duration
     #[cfg_attr(feature = "cli", arg(env, long))]
     pub duration: Option<u64>, // TODO Duration
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Job {
+    spec: JobSpec,
+}
+#[derive(Debug, Clone, PartialEq)]
+pub struct JobReport<Q, P> {
+    suites: Vec<SuiteReport<Q, P>>,
+}
+impl<Q: Send + 'static, P: Send + 'static> Service<Vec<Suite<Q, P>>> for Job {
+    type Response = JobReport<Q, P>;
+    type Error = ();
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
+
+    fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn call(&mut self, suites: Vec<Suite<Q, P>>) -> Self::Future {
+        let spec = Arc::new(self.spec.clone());
+        let buffers = if Hierarchy::Job.contains(&self.spec.sequential) { 1 } else { suites.len().max(1) };
+        Box::pin(async move {
+            let suites = futures::stream::iter(suites)
+                .map(|suite| suite.oneshot(spec.clone()))
+                .buffer_unordered(buffers)
+                .try_collect()
+                .await?;
+            Ok(JobReport { suites })
+        })
+    }
 }

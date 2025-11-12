@@ -1,6 +1,13 @@
-use std::{ops::Range, time::Duration};
+use std::{
+    future::Future,
+    ops::Range,
+    pin::Pin,
+    task::{Context, Poll},
+    time::Duration,
+};
 
 use serde::{Deserialize, Serialize};
+use tower::Service;
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
@@ -41,5 +48,27 @@ impl Repeat {
     }
     pub fn times(&self) -> usize {
         self.0.unwrap_or(1)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct CaseReport<Q, P> {
+    profile: Profile<Q, P>,
+    passed: usize,
+    // messages: Messages<T>,
+    // aggregate: EvaluateAggregator,
+}
+
+impl<Q, P> Service<()> for Testcase<Q, P> {
+    type Response = CaseReport<Q, P>;
+    type Error = ();
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
+
+    fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn call(&mut self, _: ()) -> Self::Future {
+        Box::pin(async move { todo!() })
     }
 }
