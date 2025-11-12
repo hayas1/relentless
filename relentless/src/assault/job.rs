@@ -1,10 +1,9 @@
 use std::path::PathBuf;
 
-use clap::{Args, Parser, ValueEnum};
+use clap::{Args, Parser};
 use serde::{Deserialize, Serialize};
 
-#[cfg(feature = "cli")]
-use crate::error::CommandError;
+use crate::report::ReportFormat;
 
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 #[cfg_attr(feature = "cli", derive(Parser))]
@@ -21,13 +20,14 @@ pub struct Cli {
 }
 impl Cli {
     #[cfg(feature = "cli")]
-    pub fn separated<T, const D: char, U>(s: &str) -> Result<(T, U), CommandError>
+    pub fn separated<T, const D: char, U>(s: &str) -> Result<(T, U), crate::error::CommandError>
     where
         T: for<'a> From<&'a str>,
         U: for<'a> From<&'a str>,
     {
-        let (key, value) =
-            s.split_once(D).ok_or_else(|| CommandError::InvalidKeyValueFormat { delim: D, got: s.to_string() })?;
+        let (key, value) = s
+            .split_once(D)
+            .ok_or_else(|| crate::error::CommandError::InvalidKeyValueFormat { delim: D, got: s.to_string() })?;
         Ok((key.into(), value.into()))
     }
 }
@@ -66,20 +66,4 @@ pub struct JobSpec {
     /// duration
     #[cfg_attr(feature = "cli", arg(env, long))]
     pub duration: Option<u64>, // TODO Duration
-}
-
-#[cfg_attr(feature = "cli", derive(ValueEnum))]
-#[derive(Debug, Clone, PartialEq, Eq, Default, Hash, Serialize, Deserialize)]
-pub enum ReportFormat {
-    /// without report
-    #[cfg_attr(not(feature = "console-report"), default)]
-    NullDevice,
-
-    /// report to console
-    #[cfg(feature = "console-report")]
-    #[cfg_attr(feature = "console-report", default)]
-    Console,
-
-    /// report to markdown
-    GithubMarkdown,
 }
