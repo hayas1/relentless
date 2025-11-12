@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::spec::destinations::Destinations;
+use crate::assault::destinations::Destinations;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]

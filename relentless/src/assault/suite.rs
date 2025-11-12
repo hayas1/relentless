@@ -1,11 +1,11 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    http_newtype_serde,
-    spec::{
+    assault::{
         destinations::Destinations,
         testcase::{Profile, Testcase},
     },
+    http_newtype_serde,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
