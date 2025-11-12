@@ -15,7 +15,7 @@ pub struct Cli {
     #[cfg_attr(feature = "cli", arg(num_args=0.., value_delimiter = ' '))]
     pub file: Vec<PathBuf>,
 
-    /// config files of jobs
+    /// Spec of a job
     #[cfg_attr(feature = "cli", command(flatten))]
     pub job: JobSpec,
 }
@@ -26,9 +26,9 @@ impl Cli {
         T: for<'a> From<&'a str>,
         U: for<'a> From<&'a str>,
     {
-        let (k, value) =
+        let (key, value) =
             s.split_once(D).ok_or_else(|| CommandError::InvalidKeyValueFormat { delim: D, got: s.to_string() })?;
-        Ok((k.into(), value.into()))
+        Ok((key.into(), value.into()))
     }
 }
 

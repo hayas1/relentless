@@ -10,7 +10,7 @@ use crate::{
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
-pub struct Config<Q, P> {
+pub struct SuiteCase<Q, P> {
     #[serde(flatten, default)]
     pub suite: Suite<Q, P>,
 
