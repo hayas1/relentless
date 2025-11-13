@@ -2,7 +2,7 @@ use std::{ops::Range, sync::Arc, time::Duration};
 
 use serde::{Deserialize, Serialize};
 
-use crate::assault::{job::Job, suite::Suite};
+use crate::assault::{hierarchy::Hierarchy, job::Job, suite::Suite};
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
@@ -16,6 +16,8 @@ pub struct Testcase<Q, P> {
 }
 impl<Q, P> Testcase<Q, P> {
     pub fn assault<S>(&self, service: S, job: Arc<Job>, suite: Arc<Suite<Q, P>>) -> crate::Result<CaseReport<Q, P>> {
+        let buffers =
+            if Hierarchy::Testcase.contains(&job.sequential) { 1 } else { self.profile.repeat.times().max(1) };
         todo!()
     }
 }
