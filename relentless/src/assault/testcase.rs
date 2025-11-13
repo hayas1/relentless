@@ -1,13 +1,8 @@
-use std::{
-    future::Future,
-    ops::Range,
-    pin::Pin,
-    task::{Context, Poll},
-    time::Duration,
-};
+use std::{ops::Range, sync::Arc, time::Duration};
 
 use serde::{Deserialize, Serialize};
-use tower::Service;
+
+use crate::assault::{job::Job, suite::Suite};
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
@@ -18,6 +13,11 @@ pub struct Testcase<Q, P> {
 
     #[serde(default)]
     pub profile: Profile<Q, P>,
+}
+impl<Q, P> Testcase<Q, P> {
+    pub fn assault<S>(&self, service: S, job: Arc<Job>, suite: Arc<Suite<Q, P>>) -> crate::Result<CaseReport<Q, P>> {
+        todo!()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -57,18 +57,4 @@ pub struct CaseReport<Q, P> {
     passed: usize,
     // messages: Messages<T>,
     // aggregate: EvaluateAggregator,
-}
-
-impl<Q, P> Service<()> for Testcase<Q, P> {
-    type Response = CaseReport<Q, P>;
-    type Error = ();
-    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
-
-    fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
-    }
-
-    fn call(&mut self, _: ()) -> Self::Future {
-        Box::pin(async move { todo!() })
-    }
 }

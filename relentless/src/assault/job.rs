@@ -1,20 +1,13 @@
-use std::{
-    future::Future,
-    path::PathBuf,
-    pin::Pin,
-    sync::Arc,
-    task::{Context, Poll},
-};
+use std::{path::PathBuf, sync::Arc};
 
 use clap::{Args, Parser};
 use futures::{StreamExt, TryStreamExt};
 use serde::{Deserialize, Serialize};
-use tower::{Service, ServiceExt};
 
 use crate::{
     assault::{
         hierarchy::Hierarchy,
-        suite::{Suite, SuiteReport},
+        suite::{SuiteCases, SuiteReport},
     },
     report::ReportFormat,
 };
@@ -30,7 +23,7 @@ pub struct Cli {
 
     /// Spec of a job
     #[cfg_attr(feature = "cli", command(flatten))]
-    pub job: JobSpec,
+    pub job: Job,
 }
 impl Cli {
     #[cfg(feature = "cli")]
@@ -48,7 +41,7 @@ impl Cli {
 
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 #[cfg_attr(feature = "cli", derive(Args))]
-pub struct JobSpec {
+pub struct Job {
     /// override destinations
     #[cfg_attr(feature = "cli", arg(short, long, num_args=0.., value_parser = Cli::separated::<String, '=', String>))]
     pub destination: Vec<(String, String)>,
@@ -85,34 +78,25 @@ pub struct JobSpec {
     #[cfg_attr(feature = "cli", arg(env, long))]
     pub duration: Option<u64>, // TODO Duration
 }
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct Job {
-    spec: JobSpec,
+impl Job {
+    pub async fn assault<S, Q, P>(self, service: S, suites: Vec<SuiteCases<Q, P>>) -> crate::Result<JobReport<Q, P>>
+    where
+        S: Clone + Send + 'static,
+        Q: Send + Sync + 'static,
+        P: Send + Sync + 'static,
+    {
+        let job = Arc::new(self);
+        let buffers = if Hierarchy::Job.contains(&job.sequential) { 1 } else { suites.len().max(1) };
+        let suites = futures::stream::iter(suites)
+            .map(|sc| sc.assault(service.clone(), job.clone()))
+            .buffer_unordered(buffers)
+            .try_collect()
+            .await?;
+        Ok(JobReport { suites })
+    }
 }
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct JobReport<Q, P> {
     suites: Vec<SuiteReport<Q, P>>,
-}
-impl<Q: Send + 'static, P: Send + 'static> Service<Vec<Suite<Q, P>>> for Job {
-    type Response = JobReport<Q, P>;
-    type Error = ();
-    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
-
-    fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
-    }
-
-    fn call(&mut self, suites: Vec<Suite<Q, P>>) -> Self::Future {
-        let spec = Arc::new(self.spec.clone());
-        let buffers = if Hierarchy::Job.contains(&self.spec.sequential) { 1 } else { suites.len().max(1) };
-        Box::pin(async move {
-            let suites = futures::stream::iter(suites)
-                .map(|suite| suite.oneshot(spec.clone()))
-                .buffer_unordered(buffers)
-                .try_collect()
-                .await?;
-            Ok(JobReport { suites })
-        })
-    }
 }
