@@ -5,31 +5,38 @@ pub type RelentlessResult<T> = Result<T, RelentlessError>;
 pub enum RelentlessError {
     CommandError(CommandError),
     Box(Box<dyn std::error::Error>),
+    Custom(String),
 }
 impl std::error::Error for RelentlessError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
-            RelentlessError::CommandError(e) => Some(e),
-            RelentlessError::Box(e) => e.source(),
+            Self::CommandError(e) => Some(e),
+            Self::Box(e) => e.source(),
+            Self::Custom(_) => None,
         }
     }
 }
 impl Display for RelentlessError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            RelentlessError::CommandError(e) => e.fmt(f),
-            RelentlessError::Box(e) => e.fmt(f),
+            Self::CommandError(e) => e.fmt(f),
+            Self::Box(e) => e.fmt(f),
+            Self::Custom(e) => e.fmt(f),
         }
     }
 }
 impl RelentlessError {
+    pub fn custom<T: Display>(e: T) -> Self {
+        Self::Custom(e.to_string())
+    }
     pub fn boxed<E: std::error::Error + 'static>(e: E) -> Self {
-        RelentlessError::Box(Box::new(e))
+        Self::Box(Box::new(e))
     }
     pub fn error(&self) -> &(dyn std::error::Error + 'static) {
         match self {
-            RelentlessError::CommandError(e) => e as _,
-            RelentlessError::Box(e) => &**e,
+            Self::CommandError(e) => e as _,
+            Self::Box(e) => &**e,
+            Self::Custom(_) => self,
         }
     }
 }
@@ -40,14 +47,14 @@ pub enum CommandError {
 }
 impl From<CommandError> for RelentlessError {
     fn from(value: CommandError) -> Self {
-        RelentlessError::CommandError(value)
+        Self::CommandError(value)
     }
 }
 impl std::error::Error for CommandError {}
 impl Display for CommandError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            CommandError::InvalidKeyValueFormat { delim, got } => {
+            Self::InvalidKeyValueFormat { delim, got } => {
                 write!(f, "argument is not in key{delim}value format: {got}")
             }
         }
