@@ -1,4 +1,4 @@
-name: basic grpc assault test
+name: basic grpc shot test
 destinations:
   test-api: http://localhost:50051
 

@@ -1,4 +1,4 @@
-name: basic http assault test
+name: basic http shot test
 destinations:
   test-api: http://localhost:3000
 
