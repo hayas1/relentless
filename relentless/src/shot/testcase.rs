@@ -1,8 +1,8 @@
-use std::{ops::Range, sync::Arc, time::Duration};
+use std::{ops::Range, time::Duration};
 
 use serde::{Deserialize, Serialize};
 
-use crate::assault::{hierarchy::Hierarchy, job::Job, suite::Suite};
+use crate::shot::{hierarchy::Hierarchy, job::Job, suite::Suite};
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
@@ -13,13 +13,6 @@ pub struct Testcase<Q, P> {
 
     #[serde(default)]
     pub profile: Profile<Q, P>,
-}
-impl<Q, P> Testcase<Q, P> {
-    pub fn assault<S>(&self, service: S, job: Arc<Job>, suite: Arc<Suite<Q, P>>) -> crate::Result<CaseReport<Q, P>> {
-        let buffers =
-            if Hierarchy::Testcase.contains(&job.sequential) { 1 } else { self.profile.repeat.times().max(1) };
-        todo!()
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -59,4 +52,11 @@ pub struct CaseReport<Q, P> {
     passed: usize,
     // messages: Messages<T>,
     // aggregate: EvaluateAggregator,
+}
+impl<Q, P> Testcase<Q, P> {
+    pub async fn shot<S>(self, service: S, job: &Job, suite: &Suite<Q, P>) -> crate::Result<CaseReport<Q, P>> {
+        let buffers =
+            if Hierarchy::Testcase.contains(&job.sequential) { 1 } else { self.profile.repeat.times().max(1) };
+        Ok(CaseReport { profile: self.profile, passed: 0 })
+    }
 }

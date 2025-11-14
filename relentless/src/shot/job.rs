@@ -1,15 +1,15 @@
-use std::{path::PathBuf, sync::Arc};
+use std::{fs::File, path::PathBuf};
 
 use clap::{Args, Parser};
 use futures::{StreamExt, TryStreamExt};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    assault::{
-        hierarchy::Hierarchy,
-        suite::{SuiteCases, SuiteReport},
-    },
     report::ReportFormat,
+    shot::{
+        hierarchy::Hierarchy,
+        suite::{SuiteCase, SuiteReport},
+    },
 };
 
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
@@ -21,7 +21,7 @@ pub struct Cli {
     #[cfg_attr(feature = "cli", arg(num_args=0.., value_delimiter = ' '))]
     pub file: Vec<PathBuf>,
 
-    /// Spec of a job
+    /// spec of a job
     #[cfg_attr(feature = "cli", command(flatten))]
     pub job: Job,
 }
@@ -36,6 +36,16 @@ impl Cli {
             .split_once(D)
             .ok_or_else(|| crate::error::CommandError::InvalidKeyValueFormat { delim: D, got: s.to_string() })?;
         Ok((key.into(), value.into()))
+    }
+
+    pub async fn shot<S, Q, P>(self, service: S) -> crate::Result<JobReport<Q, P>>
+    where
+        S: Clone + Send + 'static,
+        Q: for<'a> Deserialize<'a> + Default + Send + Sync + 'static,
+        P: for<'a> Deserialize<'a> + Default + Send + Sync + 'static,
+    {
+        let suites = SuiteCases::from_files(&self.file)?;
+        suites.shot(service, &self.job).await
     }
 }
 
@@ -78,25 +88,39 @@ pub struct Job {
     #[cfg_attr(feature = "cli", arg(env, long))]
     pub duration: Option<u64>, // TODO Duration
 }
-impl Job {
-    pub async fn assault<S, Q, P>(self, service: S, suites: Vec<SuiteCases<Q, P>>) -> crate::Result<JobReport<Q, P>>
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SuiteCases<Q, P>(pub Vec<SuiteCase<Q, P>>);
+impl<Q, P> SuiteCases<Q, P>
+where
+    Q: for<'a> Deserialize<'a> + Default,
+    P: for<'a> Deserialize<'a> + Default,
+{
+    pub fn from_files(files: &[PathBuf]) -> crate::Result<Self> {
+        let suites: Result<Vec<_>, _> = files
+            .iter()
+            .map(|f| serde_yaml::from_reader(File::open(f).map_err(crate::Error::boxed)?).map_err(crate::Error::boxed))
+            .collect();
+        Ok(Self(suites?))
+    }
+}
+#[derive(Debug, Clone, PartialEq)]
+pub struct JobReport<Q, P> {
+    suites: Vec<SuiteReport<Q, P>>,
+}
+impl<Q, P> SuiteCases<Q, P> {
+    pub async fn shot<S>(self, service: S, job: &Job) -> crate::Result<JobReport<Q, P>>
     where
         S: Clone + Send + 'static,
         Q: Send + Sync + 'static,
         P: Send + Sync + 'static,
     {
-        let job = Arc::new(self);
-        let buffers = if Hierarchy::Job.contains(&job.sequential) { 1 } else { suites.len().max(1) };
-        let suites = futures::stream::iter(suites)
-            .map(|sc| sc.assault(service.clone(), job.clone()))
+        let buffers = if Hierarchy::Job.contains(&job.sequential) { 1 } else { self.0.len().max(1) };
+        let suites = futures::stream::iter(self.0)
+            .map(|sc| sc.shot(service.clone(), job))
             .buffer_unordered(buffers)
             .try_collect()
             .await?;
         Ok(JobReport { suites })
     }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct JobReport<Q, P> {
-    suites: Vec<SuiteReport<Q, P>>,
 }
