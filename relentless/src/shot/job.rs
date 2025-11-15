@@ -1,5 +1,6 @@
 use std::{fs::File, path::PathBuf};
 
+#[cfg(feature = "cli")]
 use clap::{Args, Parser};
 use futures::{StreamExt, TryStreamExt};
 use serde::{Deserialize, Serialize};
@@ -37,15 +38,16 @@ impl Cli {
             .ok_or_else(|| crate::error::CommandError::InvalidKeyValueFormat { delim: D, got: s.to_string() })?;
         Ok((key.into(), value.into()))
     }
-
-    pub async fn shot<S, Q, P>(self, service: S) -> crate::Result<JobReport<Q, P>>
+    #[cfg(feature = "cli")]
+    pub async fn shot<S, Q, P>(service: S) -> crate::Result<JobReport<Q, P>>
     where
         S: Clone + Send + 'static,
         Q: for<'a> Deserialize<'a> + Default + Send + Sync + 'static,
         P: for<'a> Deserialize<'a> + Default + Send + Sync + 'static,
     {
-        let suites = SuiteCases::from_files(&self.file)?;
-        suites.shot(service, &self.job).await
+        let cli = Self::parse();
+        let suites = SuiteCases::from_files(&cli.file)?;
+        suites.shot(service, &cli.job).await
     }
 }
 
@@ -122,5 +124,10 @@ impl<Q, P> SuiteCases<Q, P> {
             .try_collect()
             .await?;
         Ok(JobReport { suites })
+    }
+}
+impl<Q, P> JobReport<Q, P> {
+    pub fn pass(&self) -> bool {
+        true
     }
 }
