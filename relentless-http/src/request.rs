@@ -29,7 +29,7 @@ pub enum HttpRequestBody {
 }
 
 impl<ReqB: Body + Send, ResB: Send> Generator<HttpClient<ReqB, ResB>> for HttpRequest {
-    type Output = http::Request<ReqB>;
+    type Request = http::Request<ReqB>;
     type Error = reqwest::Error;
 
     async fn generate(
@@ -37,16 +37,16 @@ impl<ReqB: Body + Send, ResB: Send> Generator<HttpClient<ReqB, ResB>> for HttpRe
         service: HttpClient<ReqB, ResB>,
         destination: &http::Uri,
         target: &str,
-    ) -> Result<Self::Output, Self::Error> {
+    ) -> Result<Self::Request, Self::Error> {
         todo!()
     }
 }
 
 impl<ReqB: Body + From<Bytes> + Default + Send, ResB: Send> Generator<HttpClient<ReqB, ResB>> for HttpRequestBody {
-    type Output = ReqB;
+    type Request = ReqB;
     type Error = reqwest::Error;
 
-    async fn generate(&self, _: HttpClient<ReqB, ResB>, _: &http::Uri, _: &str) -> Result<Self::Output, Self::Error> {
+    async fn generate(&self, _: HttpClient<ReqB, ResB>, _: &http::Uri, _: &str) -> Result<Self::Request, Self::Error> {
         match self {
             Self::Empty => Ok(Default::default()),
             Self::Plaintext(s) => Ok(Bytes::from(s.to_string()).into()),

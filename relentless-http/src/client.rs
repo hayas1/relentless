@@ -5,7 +5,8 @@ use std::{
     task::{Context, Poll},
 };
 
-use relentless::shot::suite::Suite;
+use http_body::Body;
+use relentless::shot::{client::Client, suite::Suite, testcase::Profile};
 use tower::Service;
 
 use crate::{request::HttpRequest, response::HttpResponse};
@@ -22,6 +23,18 @@ impl<ReqB, ResB> Clone for HttpClient<ReqB, ResB> {
         // derive(Clone) do not implement Clone when ReqB or ResB are not implement Clone
         // https://github.com/rust-lang/rust/issues/26925
         Self { client: self.client.clone(), phantom: PhantomData }
+    }
+}
+impl<ReqB: Body + Send, ResB: Body + Send> Client<Self> for HttpClient<ReqB, ResB> {
+    type Generator = HttpRequest;
+    type Evaluator = HttpResponse;
+    type Error = relentless::Error;
+
+    async fn connect(
+        _destination: &http::Uri,
+        _profile: &Profile<Self::Generator, Self::Evaluator>,
+    ) -> Result<Self, Self::Error> {
+        HttpClient::new().await
     }
 }
 impl<ReqB, ResB> HttpClient<ReqB, ResB> {

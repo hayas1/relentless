@@ -5,7 +5,7 @@ use std::process::ExitCode;
 pub async fn main() -> Result<ExitCode, Box<dyn std::error::Error>> {
     use relentless::shot::job::Cli;
     use relentless_http::{client::HttpClient, request::HttpRequest, response::HttpResponse};
-    let report = Cli::shot::<_, HttpRequest, HttpResponse>(HttpClient::<reqwest::Body, reqwest::Body>::suite).await?;
+    let report = Cli::shot::<HttpClient<reqwest::Body, reqwest::Body>, HttpRequest, HttpResponse>().await?;
     Ok((!report.pass() as u8).into())
 }
 
