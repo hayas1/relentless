@@ -4,12 +4,13 @@ use std::{fs::File, path::PathBuf};
 use clap::{Args, Parser};
 use futures::{StreamExt, TryStreamExt};
 use serde::{Deserialize, Serialize};
+use tower::Service;
 
 use crate::{
     report::ReportFormat,
     shot::{
         hierarchy::Hierarchy,
-        suite::{SuiteCase, SuiteReport},
+        suite::{Suite, SuiteCase, SuiteReport},
     },
 };
 
@@ -39,15 +40,17 @@ impl Cli {
         Ok((key.into(), value.into()))
     }
     #[cfg(feature = "cli")]
-    pub async fn shot<S, Q, P>(service: S) -> crate::Result<JobReport<Q, P>>
+    pub async fn shot<S, Q, P>(
+        s: impl Clone + AsyncFn(&Suite<Q, P>) -> crate::Result<S>,
+    ) -> crate::Result<JobReport<Q, P>>
     where
-        S: Clone + Send + 'static,
+        S: Clone + Service<()> + Send + Sync + 'static,
         Q: for<'a> Deserialize<'a> + Default + Send + Sync + 'static,
         P: for<'a> Deserialize<'a> + Default + Send + Sync + 'static,
     {
         let cli = Self::parse();
         let suites = SuiteCases::from_files(&cli.file)?;
-        suites.shot(service, &cli.job).await
+        suites.shot(s, &cli.job).await
     }
 }
 
@@ -101,7 +104,10 @@ where
     pub fn from_files(files: &[PathBuf]) -> crate::Result<Self> {
         let suites: Result<Vec<_>, _> = files
             .iter()
-            .map(|f| serde_yaml::from_reader(File::open(f).map_err(crate::Error::boxed)?).map_err(crate::Error::boxed))
+            .map(|f| {
+                let file = File::open(f).map_err(crate::Error::boxed)?;
+                serde_yaml::from_reader(file).map_err(crate::Error::boxed)
+            })
             .collect();
         Ok(Self(suites?))
     }
@@ -111,15 +117,19 @@ pub struct JobReport<Q, P> {
     suites: Vec<SuiteReport<Q, P>>,
 }
 impl<Q, P> SuiteCases<Q, P> {
-    pub async fn shot<S>(self, service: S, job: &Job) -> crate::Result<JobReport<Q, P>>
+    pub async fn shot<S>(
+        self,
+        s: impl Clone + AsyncFn(&Suite<Q, P>) -> crate::Result<S>,
+        job: &Job,
+    ) -> crate::Result<JobReport<Q, P>>
     where
-        S: Clone + Send + 'static,
+        S: Clone + Service<()> + Send + Sync + 'static,
         Q: Send + Sync + 'static,
         P: Send + Sync + 'static,
     {
         let buffers = if Hierarchy::Job.contains(&job.sequential) { 1 } else { self.0.len().max(1) };
         let suites = futures::stream::iter(self.0)
-            .map(|sc| sc.shot(service.clone(), job))
+            .map(|sc| sc.shot(s.clone(), job))
             .buffer_unordered(buffers)
             .try_collect()
             .await?;
