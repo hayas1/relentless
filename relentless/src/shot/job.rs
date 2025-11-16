@@ -6,6 +6,8 @@ use futures::{StreamExt, TryStreamExt};
 use serde::{Deserialize, Serialize};
 use tower::Service;
 
+#[cfg(feature = "cli")]
+use crate::generator::Generator;
 use crate::{
     report::ReportFormat,
     shot::{
@@ -44,8 +46,8 @@ impl Cli {
         s: impl Clone + AsyncFn(&Suite<Q, P>) -> crate::Result<S>,
     ) -> crate::Result<JobReport<Q, P>>
     where
-        S: Clone + Service<()> + Send + Sync + 'static,
-        Q: for<'a> Deserialize<'a> + Default + Send + Sync + 'static,
+        S: Clone + Service<Q::Output> + Send + Sync + 'static,
+        Q: Generator<S> + for<'a> Deserialize<'a> + Default + Send + Sync + 'static,
         P: for<'a> Deserialize<'a> + Default + Send + Sync + 'static,
     {
         let cli = Self::parse();
@@ -123,8 +125,8 @@ impl<Q, P> SuiteCases<Q, P> {
         job: &Job,
     ) -> crate::Result<JobReport<Q, P>>
     where
-        S: Clone + Service<()> + Send + Sync + 'static,
-        Q: Send + Sync + 'static,
+        S: Clone + Service<Q::Output> + Send + Sync + 'static,
+        Q: Generator<S> + Send + Sync + 'static,
         P: Send + Sync + 'static,
     {
         let buffers = if Hierarchy::Job.contains(&job.sequential) { 1 } else { self.0.len().max(1) };

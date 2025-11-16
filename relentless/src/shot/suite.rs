@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use tower::{Service, ServiceExt};
 
 use crate::{
+    generator::Generator,
     http_newtype_serde,
     shot::{
         destinations::Destinations,
@@ -55,8 +56,8 @@ pub struct SuiteService<'a, S, Q, P> {
 }
 impl<'a, S, Q, P> Service<Testcase<Q, P>> for SuiteService<'a, S, Q, P>
 where
-    S: 'a + Clone + Service<()> + Send + Sync,
-    Q: Send + Sync + 'static,
+    S: 'a + Clone + Service<Q::Output> + Send + Sync,
+    Q: Generator<S> + Send + Sync + 'static,
     P: Send + Sync + 'static,
 {
     type Response = CaseReport<Q, P>;
@@ -74,8 +75,8 @@ where
 }
 impl<'a, S, Q, P> Service<Testcase<Q, P>> for &'a SuiteService<'a, S, Q, P>
 where
-    S: 'a + Clone + Service<()> + Send + Sync,
-    Q: Send + Sync + 'static,
+    S: 'a + Clone + Service<Q::Output> + Send + Sync,
+    Q: Generator<S> + Send + Sync + 'static,
     P: Send + Sync + 'static,
 {
     type Response = CaseReport<Q, P>;
@@ -103,8 +104,8 @@ impl<Q, P> SuiteCase<Q, P> {
         job: &Job,
     ) -> crate::Result<SuiteReport<Q, P>>
     where
-        S: Clone + Service<()> + Send + Sync + 'static,
-        Q: Send + Sync + 'static,
+        S: Clone + Service<Q::Output> + Send + Sync + 'static,
+        Q: Generator<S> + Send + Sync + 'static,
         P: Send + Sync + 'static,
     {
         let buffers = if Hierarchy::Suite.contains(&job.sequential) { 1 } else { self.testcases.len().max(1) };

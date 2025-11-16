@@ -1,5 +1,9 @@
-use relentless::http_newtype_serde;
+use bytes::Bytes;
+use http_body::Body;
+use relentless::{generator::Generator, http_newtype_serde};
 use serde::{Deserialize, Serialize};
+
+use crate::client::HttpClient;
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
@@ -22,4 +26,34 @@ pub enum HttpRequestBody {
     Plaintext(String),
     #[cfg(feature = "json")]
     Json(serde_json::Value),
+}
+
+impl<ReqB: Body + Send, ResB: Send> Generator<HttpClient<ReqB, ResB>> for HttpRequest {
+    type Output = http::Request<ReqB>;
+    type Error = reqwest::Error;
+
+    async fn generate(
+        &self,
+        service: HttpClient<ReqB, ResB>,
+        destination: &http::Uri,
+        target: &str,
+    ) -> Result<Self::Output, Self::Error> {
+        todo!()
+    }
+}
+
+impl<ReqB: Body + From<Bytes> + Default + Send, ResB: Send> Generator<HttpClient<ReqB, ResB>> for HttpRequestBody {
+    type Output = ReqB;
+    type Error = reqwest::Error;
+
+    async fn generate(&self, _: HttpClient<ReqB, ResB>, _: &http::Uri, _: &str) -> Result<Self::Output, Self::Error> {
+        match self {
+            Self::Empty => Ok(Default::default()),
+            Self::Plaintext(s) => Ok(Bytes::from(s.to_string()).into()),
+            #[cfg(feature = "json")]
+            Self::Json(v) => {
+                todo!()
+            }
+        }
+    }
 }
