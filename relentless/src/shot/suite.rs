@@ -12,6 +12,7 @@ use crate::{
     generator::Generator,
     http_newtype_serde,
     shot::{
+        client::Client,
         destinations::Destinations,
         hierarchy::Hierarchy,
         job::Job,
@@ -40,23 +41,27 @@ pub struct Suite<Q, P> {
     pub profile: Profile<Q, P>,
 }
 impl<Q, P> Suite<Q, P> {
-    pub async fn service<'a, S>(
+    pub async fn service<'a, S: Client<S, Generator = Q, Evaluator = P>>(
         &'a self,
         job: &'a Job,
-        s: impl AsyncFn(&Self) -> crate::Result<S>,
     ) -> crate::Result<SuiteService<'a, S, Q, P>> {
-        Ok(SuiteService { service: s(self).await?, job, suite: self })
+        let mut services = Destinations::default();
+        for (d, dest) in self.destinations.iter() {
+            services.insert(d.to_string(), S::connect(dest, &self.profile).await.unwrap_or_else(|_| todo!()));
+        }
+
+        Ok(SuiteService { services, job, suite: self })
     }
 }
 #[derive(Debug, Clone, PartialEq)]
 pub struct SuiteService<'a, S, Q, P> {
-    service: S,
+    services: Destinations<S>,
     job: &'a Job,
     suite: &'a Suite<Q, P>,
 }
 impl<'a, S, Q, P> Service<Testcase<Q, P>> for SuiteService<'a, S, Q, P>
 where
-    S: 'a + Clone + Service<Q::Output> + Send + Sync,
+    S: 'a + Clone + Service<Q::Request> + Send + Sync,
     Q: Generator<S> + Send + Sync + 'static,
     P: Send + Sync + 'static,
 {
@@ -65,17 +70,25 @@ where
     type Future = Pin<Box<dyn 'a + Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.service.poll_ready(cx)
+        match self
+            .services
+            .values_mut()
+            .try_fold(true, |sum, s| Ok(sum && matches!(s.poll_ready(cx)?, Poll::Ready(()))))
+        {
+            Ok(true) => Poll::Ready(Ok(())),
+            Ok(false) => Poll::Pending,
+            Err(e) => Poll::Ready(Err(e)),
+        }
     }
 
     fn call(&mut self, case: Testcase<Q, P>) -> Self::Future {
-        let (service, job, suite) = (self.service.clone(), self.job, self.suite);
+        let (service, job, suite) = (self.services.clone(), self.job, self.suite);
         Box::pin(async { Ok(case.shot(service, job, suite).await.unwrap()) })
     }
 }
 impl<'a, S, Q, P> Service<Testcase<Q, P>> for &'a SuiteService<'a, S, Q, P>
 where
-    S: 'a + Clone + Service<Q::Output> + Send + Sync,
+    S: 'a + Clone + Service<Q::Request> + Send + Sync,
     Q: Generator<S> + Send + Sync + 'static,
     P: Send + Sync + 'static,
 {
@@ -83,12 +96,12 @@ where
     type Error = S::Error;
     type Future = Pin<Box<dyn 'a + Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.service.clone().poll_ready(cx)
+    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
     }
 
     fn call(&mut self, case: Testcase<Q, P>) -> Self::Future {
-        let (service, job, suite) = (self.service.clone(), self.job, self.suite);
+        let (service, job, suite) = (self.services.clone(), self.job, self.suite);
         Box::pin(async { Ok(case.shot(service, job, suite).await.unwrap()) })
     }
 }
@@ -98,18 +111,14 @@ pub struct SuiteReport<Q, P> {
     cases: Vec<CaseReport<Q, P>>,
 }
 impl<Q, P> SuiteCase<Q, P> {
-    pub async fn shot<S>(
-        self,
-        s: impl AsyncFn(&Suite<Q, P>) -> crate::Result<S>,
-        job: &Job,
-    ) -> crate::Result<SuiteReport<Q, P>>
+    pub async fn shot<S>(self, job: &Job) -> crate::Result<SuiteReport<Q, P>>
     where
-        S: Clone + Service<Q::Output> + Send + Sync + 'static,
+        S: Clone + Client<S, Generator = Q, Evaluator = P> + Service<Q::Request> + Send + Sync + 'static,
         Q: Generator<S> + Send + Sync + 'static,
         P: Send + Sync + 'static,
     {
         let buffers = if Hierarchy::Suite.contains(&job.sequential) { 1 } else { self.testcases.len().max(1) };
-        let suite = &self.suite.service(job, s).await?;
+        let suite = &self.suite.service(job).await?;
         let cases = futures::stream::iter(self.testcases)
             .map(|testcase| suite.oneshot(testcase))
             .buffer_unordered(buffers)

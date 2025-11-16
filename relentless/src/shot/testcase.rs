@@ -2,7 +2,7 @@ use std::{ops::Range, time::Duration};
 
 use serde::{Deserialize, Serialize};
 
-use crate::shot::{hierarchy::Hierarchy, job::Job, suite::Suite};
+use crate::shot::{destinations::Destinations, hierarchy::Hierarchy, job::Job, suite::Suite};
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
@@ -54,7 +54,12 @@ pub struct CaseReport<Q, P> {
     // aggregate: EvaluateAggregator,
 }
 impl<Q, P> Testcase<Q, P> {
-    pub async fn shot<S>(self, service: S, job: &Job, suite: &Suite<Q, P>) -> crate::Result<CaseReport<Q, P>> {
+    pub async fn shot<S>(
+        self,
+        services: Destinations<S>,
+        job: &Job,
+        suite: &Suite<Q, P>,
+    ) -> crate::Result<CaseReport<Q, P>> {
         let buffers =
             if Hierarchy::Testcase.contains(&job.sequential) { 1 } else { self.profile.repeat.times().max(1) };
         Ok(CaseReport { profile: self.profile, passed: 0 })
