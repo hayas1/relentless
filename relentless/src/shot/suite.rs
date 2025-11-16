@@ -73,7 +73,7 @@ where
         match self
             .services
             .values_mut()
-            .try_fold(true, |sum, s| Ok(sum && matches!(s.poll_ready(cx)?, Poll::Ready(()))))
+            .try_fold(true, |and, s| Ok(and && matches!(s.poll_ready(cx)?, Poll::Ready(()))))
         {
             Ok(true) => Poll::Ready(Ok(())),
             Ok(false) => Poll::Pending,
