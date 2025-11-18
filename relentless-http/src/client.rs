@@ -5,11 +5,7 @@ use std::{
     task::{Context, Poll},
 };
 
-use http_body::Body;
-use relentless::shot::{client::Client, suite::Suite, testcase::Profile};
 use tower::Service;
-
-use crate::{request::HttpRequest, response::HttpResponse};
 
 pub const APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),);
 
@@ -25,28 +21,30 @@ impl<ReqB, ResB> Clone for HttpClient<ReqB, ResB> {
         Self { client: self.client.clone(), phantom: PhantomData }
     }
 }
-impl<ReqB: Body + Send, ResB: Body + Send> Client<Self> for HttpClient<ReqB, ResB> {
-    type Generator = HttpRequest;
-    type Evaluator = HttpResponse;
-    type Error = relentless::Error;
-
-    async fn connect(
-        _destination: &http::Uri,
-        _profile: &Profile<Self::Generator, Self::Evaluator>,
-    ) -> Result<Self, Self::Error> {
-        HttpClient::new().await
-    }
-}
 impl<ReqB, ResB> HttpClient<ReqB, ResB> {
-    pub async fn suite(_: &Suite<HttpRequest, HttpResponse>) -> relentless::Result<HttpClient<ReqB, ResB>> {
-        HttpClient::new().await
-    }
     pub async fn new() -> relentless::Result<Self> {
         let client = reqwest::Client::builder().user_agent(APP_USER_AGENT).build().map_err(relentless::Error::boxed)?;
         Ok(Self { client, phantom: PhantomData })
     }
 }
 
+impl<ReqB, ResB> Service<http::Uri> for HttpClient<ReqB, ResB>
+where
+    ReqB: Into<reqwest::Body> + 'static,
+    ResB: From<reqwest::Body> + 'static,
+{
+    type Response = Self;
+    type Error = relentless::Error;
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
+
+    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn call(&mut self, _uri: http::Uri) -> Self::Future {
+        Box::pin(Self::new())
+    }
+}
 impl<ReqB, ResB> Service<http::Request<ReqB>> for HttpClient<ReqB, ResB>
 where
     ReqB: Into<reqwest::Body>,
