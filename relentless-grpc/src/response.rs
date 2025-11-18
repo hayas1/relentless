@@ -1,5 +1,10 @@
-use relentless::evaluator::{json::JsonEvaluator, plaintext::PlaintextEvaluator};
+use relentless::{
+    evaluator::{json::JsonEvaluator, plaintext::PlaintextEvaluator, Evaluator},
+    shot::destinations::Destinations,
+};
 use serde::{Deserialize, Serialize};
+
+use crate::client::GrpcClient;
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
@@ -37,4 +42,12 @@ pub enum GrpcResponseMessage {
     AnyOrEqual,
     Plaintext(PlaintextEvaluator),
     Json(JsonEvaluator),
+}
+
+impl<S: Send> Evaluator<GrpcClient<S>> for GrpcResponse {
+    type Response = Result<tonic::Response<S>, tonic::Status>;
+
+    async fn evaluate(&self, res: Destinations<Self::Response>) -> bool {
+        todo!()
+    }
 }
