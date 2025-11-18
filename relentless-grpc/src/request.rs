@@ -4,7 +4,7 @@ use http::uri::PathAndQuery;
 use relentless::generator::Generator;
 use serde::{Deserialize, Serialize};
 
-use crate::client::MethodCodec;
+use crate::codec::MethodCodec;
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
