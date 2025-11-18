@@ -4,11 +4,10 @@ use std::{fs::File, path::PathBuf};
 use clap::{Args, Parser};
 use futures::{StreamExt, TryStreamExt};
 use serde::{Deserialize, Serialize};
-use tower::Service;
+use tower::{MakeService, Service};
 
-#[cfg(feature = "cli")]
-use crate::{generator::Generator, shot::client::Client};
 use crate::{
+    generator::Generator,
     report::ReportFormat,
     shot::{
         hierarchy::Hierarchy,
@@ -42,15 +41,16 @@ impl Cli {
         Ok((key.into(), value.into()))
     }
     #[cfg(feature = "cli")]
-    pub async fn shot<S, Q, P>() -> crate::Result<JobReport<Q, P>>
+    pub async fn shot<M, Q, P>(make_service: M) -> crate::Result<JobReport<Q, P>>
     where
-        S: Clone + Client<S, Generator = Q, Evaluator = P> + Service<Q::Request> + Send + Sync + 'static,
-        Q: Generator<S> + for<'a> Deserialize<'a> + Default + Send + Sync + 'static,
+        M: Clone + MakeService<http::Uri, Q::Request>,
+        M::Service: Clone + Service<Q::Request> + Send + Sync,
+        Q: Generator + for<'a> Deserialize<'a> + Default + Send + Sync + 'static,
         P: for<'a> Deserialize<'a> + Default + Send + Sync + 'static,
     {
         let cli = Self::parse();
         let suites = SuiteCases::from_files(&cli.file)?;
-        suites.shot(&cli.job).await
+        suites.shot(make_service, &cli.job).await
     }
 }
 
@@ -117,15 +117,19 @@ pub struct JobReport<Q, P> {
     suites: Vec<SuiteReport<Q, P>>,
 }
 impl<Q, P> SuiteCases<Q, P> {
-    pub async fn shot<S>(self, job: &Job) -> crate::Result<JobReport<Q, P>>
+    pub async fn shot<M>(self, make_service: M, job: &Job) -> crate::Result<JobReport<Q, P>>
     where
-        S: Clone + Client<S, Generator = Q, Evaluator = P> + Service<Q::Request> + Send + Sync + 'static,
-        Q: Generator<S> + Send + Sync + 'static,
+        M: Clone + MakeService<http::Uri, Q::Request>,
+        M::Service: Clone + Service<Q::Request> + Send + Sync,
+        Q: Generator + Send + Sync + 'static,
         P: Send + Sync + 'static,
     {
         let buffers = if Hierarchy::Job.contains(&job.sequential) { 1 } else { self.0.len().max(1) };
-        let suites =
-            futures::stream::iter(self.0).map(|sc| sc.shot(job)).buffer_unordered(buffers).try_collect().await?;
+        let suites = futures::stream::iter(self.0)
+            .map(|sc| sc.shot(make_service.clone(), job))
+            .buffer_unordered(buffers)
+            .try_collect()
+            .await?;
         Ok(JobReport { suites })
     }
 }

@@ -1,11 +1,10 @@
 #[trait_variant::make(Send)]
-pub trait Generator<S>: Sized {
+pub trait Generator: Sized {
     type Request;
     type Error;
 
     async fn generate(
         &self,
-        service: S,
         destination: &http::Uri,
         target: &str,
         // template: &Template,
