@@ -5,7 +5,7 @@ destinations:
 
 testcases:
   - target: greeter.Greeter/SayHello
-    setting:
+    profile:
       request:
         descriptor:
           protos: [./dev/server/grpc/proto/greeter.proto]
