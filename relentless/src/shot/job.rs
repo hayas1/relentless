@@ -26,7 +26,7 @@ pub struct Cli {
 
     /// spec of a job
     #[cfg_attr(feature = "cli", command(flatten))]
-    pub job: Job,
+    pub job: JobSpec,
 }
 impl Cli {
     #[cfg(feature = "cli")]
@@ -49,14 +49,14 @@ impl Cli {
         P: for<'a> Deserialize<'a> + Default + Send + Sync + 'static,
     {
         let cli = Self::parse();
-        let suites = SuiteCases::from_files(&cli.file)?;
+        let suites = Job::from_files(&cli.file)?;
         suites.shot(make_service, &cli.job).await
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 #[cfg_attr(feature = "cli", derive(Args))]
-pub struct Job {
+pub struct JobSpec {
     /// override destinations
     #[cfg_attr(feature = "cli", arg(short, long, num_args=0.., value_parser = Cli::separated::<String, '=', String>))]
     pub destination: Vec<(String, String)>,
@@ -95,8 +95,8 @@ pub struct Job {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SuiteCases<Q, P>(pub Vec<SuiteCase<Q, P>>);
-impl<Q, P> SuiteCases<Q, P>
+pub struct Job<Q, P>(pub Vec<SuiteCase<Q, P>>);
+impl<Q, P> Job<Q, P>
 where
     Q: for<'a> Deserialize<'a> + Default,
     P: for<'a> Deserialize<'a> + Default,
@@ -116,8 +116,8 @@ where
 pub struct JobReport<Q, P> {
     suites: Vec<SuiteReport<Q, P>>,
 }
-impl<Q, P> SuiteCases<Q, P> {
-    pub async fn shot<M>(self, make_service: M, job: &Job) -> crate::Result<JobReport<Q, P>>
+impl<Q, P> Job<Q, P> {
+    pub async fn shot<M>(self, make_service: M, job: &JobSpec) -> crate::Result<JobReport<Q, P>>
     where
         M: Clone + MakeService<http::Uri, Q::Request>,
         M::Service: Clone + Service<Q::Request> + Send + Sync,

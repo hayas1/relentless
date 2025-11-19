@@ -14,7 +14,7 @@ use crate::{
     shot::{
         destinations::Destinations,
         hierarchy::Hierarchy,
-        job::Job,
+        job::JobSpec,
         testcase::{CaseReport, Profile, Testcase},
     },
 };
@@ -43,7 +43,7 @@ impl<Q, P> Suite<Q, P> {
     pub async fn service<'a, M>(
         &'a self,
         make_service: M,
-        job: &'a Job,
+        job: &'a JobSpec,
     ) -> crate::Result<SuiteService<'a, M::Service, Q, P>>
     where
         M: Clone + MakeService<http::Uri, Q::Request>,
@@ -63,7 +63,7 @@ impl<Q, P> Suite<Q, P> {
 #[derive(Debug, Clone, PartialEq)]
 pub struct SuiteService<'a, S, Q, P> {
     services: Destinations<S>,
-    job: &'a Job,
+    job: &'a JobSpec,
     suite: &'a Suite<Q, P>,
 }
 impl<'a, S, Q, P> Service<Testcase<Q, P>> for SuiteService<'a, S, Q, P>
@@ -118,7 +118,7 @@ pub struct SuiteReport<Q, P> {
     cases: Vec<CaseReport<Q, P>>,
 }
 impl<Q, P> SuiteCase<Q, P> {
-    pub async fn shot<M>(self, make_service: M, job: &Job) -> crate::Result<SuiteReport<Q, P>>
+    pub async fn shot<M>(self, make_service: M, job: &JobSpec) -> crate::Result<SuiteReport<Q, P>>
     where
         M: Clone + MakeService<http::Uri, Q::Request>,
         M::Service: Clone + Service<Q::Request> + Send + Sync,
