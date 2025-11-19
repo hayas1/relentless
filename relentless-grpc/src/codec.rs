@@ -9,23 +9,23 @@ use tonic::{
 };
 
 #[derive(Debug, PartialEq, Eq)]
-pub struct MethodCodec<D, S> {
+pub struct DynamicCodec<D, S> {
     method: MethodDescriptor,
     serializer: S,
     phantom: PhantomData<(D, S)>,
 }
-impl<D, S: Clone> Clone for MethodCodec<D, S> {
+impl<D, S: Clone> Clone for DynamicCodec<D, S> {
     fn clone(&self) -> Self {
         Self { method: self.method.clone(), serializer: self.serializer.clone(), phantom: PhantomData }
     }
 }
-impl<D, S> MethodCodec<D, S> {
+impl<D, S> DynamicCodec<D, S> {
     pub fn new(method: MethodDescriptor, serializer: S) -> Self {
         Self { method, serializer, phantom: PhantomData }
     }
 }
 
-impl<D, S> Codec for MethodCodec<D, S>
+impl<D, S> Codec for DynamicCodec<D, S>
 where
     D: for<'a> Deserializer<'a> + Send + 'static,
     for<'a> <D as Deserializer<'a>>::Error: std::error::Error + Send + Sync + 'static,
@@ -35,21 +35,21 @@ where
 {
     type Encode = D;
     type Decode = S::Ok;
-    type Encoder = MethodEncoder<D>;
-    type Decoder = MethodDecoder<S>;
+    type Encoder = DynamicEncoder<D>;
+    type Decoder = DynamicDecoder<S>;
 
     fn encoder(&mut self) -> Self::Encoder {
-        MethodEncoder(self.method.input(), PhantomData)
+        DynamicEncoder(self.method.input(), PhantomData)
     }
 
     fn decoder(&mut self) -> Self::Decoder {
-        MethodDecoder(self.method.output(), self.serializer.clone())
+        DynamicDecoder(self.method.output(), self.serializer.clone())
     }
 }
 
 #[derive(Debug)]
-pub struct MethodEncoder<D>(MessageDescriptor, PhantomData<D>);
-impl<D> Encoder for MethodEncoder<D>
+pub struct DynamicEncoder<D>(MessageDescriptor, PhantomData<D>);
+impl<D> Encoder for DynamicEncoder<D>
 where
     D: for<'a> Deserializer<'a>,
     for<'a> <D as Deserializer<'a>>::Error: std::error::Error + Send + Sync + 'static,
@@ -68,8 +68,8 @@ where
 }
 
 #[derive(Debug)]
-pub struct MethodDecoder<S>(MessageDescriptor, S);
-impl<S> Decoder for MethodDecoder<S>
+pub struct DynamicDecoder<S>(MessageDescriptor, S);
+impl<S> Decoder for DynamicDecoder<S>
 where
     S: Serializer + Clone + Send + 'static,
     S::Ok: Send + 'static,

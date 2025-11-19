@@ -14,7 +14,7 @@ use tonic::{
 };
 use tower::Service;
 
-use crate::codec::MethodCodec;
+use crate::codec::DynamicCodec;
 
 #[derive(Debug, Clone)]
 pub struct GrpcClient<G>(tonic::client::Grpc<G>);
@@ -55,7 +55,7 @@ impl Service<http::Uri> for GrpcChannel {
 //     }
 // }
 
-impl<G, D, S> Service<(tonic::Request<D>, PathAndQuery, MethodCodec<D, S>)> for GrpcClient<G>
+impl<G, D, S> Service<(tonic::Request<D>, PathAndQuery, DynamicCodec<D, S>)> for GrpcClient<G>
 where
     G: GrpcService<BoxBody> + Clone + Send + 'static,
     G::ResponseBody: Send,
@@ -75,11 +75,11 @@ where
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, req: (tonic::Request<D>, PathAndQuery, MethodCodec<D, S>)) -> Self::Future {
+    fn call(&mut self, req: (tonic::Request<D>, PathAndQuery, DynamicCodec<D, S>)) -> Self::Future {
         let mut inner = self.0.clone();
         Box::pin(async move {
             let (request, path, codec) = req;
-            inner.ready().await.map_err(|e| tonic::Status::unknown(format!("Service was not ready: {}", e.into())))?;
+            inner.ready().await.map_err(|e| Status::unknown(format!("Service was not ready: {}", e.into())))?; // ref https://github.com/hyperium/tonic/blob/v0.14.2/tonic-build/src/client.rs#L240-L242
             inner.unary(request, path, codec).await
         })
     }
