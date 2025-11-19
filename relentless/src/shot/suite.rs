@@ -40,14 +40,15 @@ pub struct Suite<Q, P> {
     pub profile: Profile<Q, P>,
 }
 impl<Q, P> Suite<Q, P> {
-    pub async fn service<'a, M>(
+    pub async fn service<'a, M, S>(
         &'a self,
         make_service: M,
         job: &'a JobSpec,
     ) -> crate::Result<SuiteService<'a, M::Service, Q, P>>
     where
-        M: Clone + MakeService<http::Uri, Q::Request>,
-        Q: Generator,
+        M: Clone + MakeService<http::Uri, Q::Request, Service = S>,
+        S: Clone + Service<Q::Request> + Send,
+        Q: Generator<S>,
     {
         let mut services = Destinations::default();
         for (d, http_newtype_serde::Uri(dest)) in self.destinations.iter() {
@@ -69,7 +70,7 @@ pub struct SuiteService<'a, S, Q, P> {
 impl<'a, S, Q, P> Service<Testcase<Q, P>> for SuiteService<'a, S, Q, P>
 where
     S: 'a + Clone + Service<Q::Request> + Send,
-    Q: Generator + Send + Sync + 'static,
+    Q: Generator<S> + Send + Sync + 'static,
     P: Send + Sync + 'static,
 {
     type Response = CaseReport<Q, P>;
@@ -96,7 +97,7 @@ where
 impl<'a, S, Q, P> Service<Testcase<Q, P>> for &'a SuiteService<'a, S, Q, P>
 where
     S: 'a + Clone + Service<Q::Request> + Send,
-    Q: Generator + Send + Sync + 'static,
+    Q: Generator<S> + Send + Sync + 'static,
     P: Send + Sync + 'static,
 {
     type Response = CaseReport<Q, P>;
@@ -118,11 +119,11 @@ pub struct SuiteReport<Q, P> {
     cases: Vec<CaseReport<Q, P>>,
 }
 impl<Q, P> SuiteCase<Q, P> {
-    pub async fn shot<M>(self, make_service: M, job: &JobSpec) -> crate::Result<SuiteReport<Q, P>>
+    pub async fn shot<M, S>(self, make_service: M, job: &JobSpec) -> crate::Result<SuiteReport<Q, P>>
     where
-        M: Clone + MakeService<http::Uri, Q::Request>,
-        M::Service: Clone + Service<Q::Request> + Send,
-        Q: Generator + Send + Sync + 'static,
+        M: Clone + MakeService<http::Uri, Q::Request, Service = S>,
+        S: Clone + Service<Q::Request> + Send,
+        Q: Generator<S> + Send + Sync + 'static,
         P: Send + Sync + 'static,
     {
         let buffers = if Hierarchy::Suite.contains(&job.sequential) { 1 } else { self.testcases.len().max(1) };

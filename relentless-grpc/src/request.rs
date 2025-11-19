@@ -4,7 +4,7 @@ use http::uri::PathAndQuery;
 use relentless::generator::Generator;
 use serde::{Deserialize, Serialize};
 
-use crate::codec::DynamicCodec;
+use crate::{client::GrpcClient, codec::DynamicCodec};
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
@@ -41,11 +41,16 @@ pub enum GrpcRequestMessage {
     Json(serde_json::Value),
 }
 
-impl<D: Send + Sync, S: Send + Sync> Generator for GrpcRequest<D, S> {
+impl<G: Send, D: Send + Sync, S: Send + Sync> Generator<GrpcClient<G>> for GrpcRequest<D, S> {
     type Request = (tonic::Request<D>, PathAndQuery, DynamicCodec<D, S>);
     type Error = tonic::Status;
 
-    async fn generate(&self, _destination: &http::Uri, _target: &str) -> Result<Self::Request, Self::Error> {
+    async fn generate(
+        &self,
+        _service: GrpcClient<G>,
+        _destination: &http::Uri,
+        _target: &str,
+    ) -> Result<Self::Request, Self::Error> {
         todo!()
     }
 }

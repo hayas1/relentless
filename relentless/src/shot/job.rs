@@ -41,11 +41,11 @@ impl Cli {
         Ok((key.into(), value.into()))
     }
     #[cfg(feature = "cli")]
-    pub async fn shot<M, Q, P>(make_service: M) -> crate::Result<JobReport<Q, P>>
+    pub async fn shot<M, S, Q, P>(make_service: M) -> crate::Result<JobReport<Q, P>>
     where
-        M: Clone + MakeService<http::Uri, Q::Request>,
-        M::Service: Clone + Service<Q::Request> + Send,
-        Q: Generator + for<'a> Deserialize<'a> + Default + Send + Sync + 'static,
+        M: Clone + MakeService<http::Uri, Q::Request, Service = S>,
+        S: Clone + Service<Q::Request> + Send,
+        Q: Generator<S> + for<'a> Deserialize<'a> + Default + Send + Sync + 'static,
         P: for<'a> Deserialize<'a> + Default + Send + Sync + 'static,
     {
         let cli = Self::parse();
@@ -117,11 +117,11 @@ pub struct JobReport<Q, P> {
     suites: Vec<SuiteReport<Q, P>>,
 }
 impl<Q, P> Job<Q, P> {
-    pub async fn shot<M>(self, make_service: M, job: &JobSpec) -> crate::Result<JobReport<Q, P>>
+    pub async fn shot<M, S>(self, make_service: M, job: &JobSpec) -> crate::Result<JobReport<Q, P>>
     where
-        M: Clone + MakeService<http::Uri, Q::Request>,
-        M::Service: Clone + Service<Q::Request> + Send,
-        Q: Generator + Send + Sync + 'static,
+        M: Clone + MakeService<http::Uri, Q::Request, Service = S>,
+        S: Clone + Service<Q::Request> + Send,
+        Q: Generator<S> + Send + Sync + 'static,
         P: Send + Sync + 'static,
     {
         let buffers = if Hierarchy::Job.contains(&job.sequential) { 1 } else { self.0.len().max(1) };
