@@ -68,7 +68,7 @@ pub struct SuiteService<'a, S, Q, P> {
 }
 impl<'a, S, Q, P> Service<Testcase<Q, P>> for SuiteService<'a, S, Q, P>
 where
-    S: 'a + Clone + Service<Q::Request> + Send + Sync,
+    S: 'a + Clone + Service<Q::Request> + Send,
     Q: Generator + Send + Sync + 'static,
     P: Send + Sync + 'static,
 {
@@ -95,7 +95,7 @@ where
 }
 impl<'a, S, Q, P> Service<Testcase<Q, P>> for &'a SuiteService<'a, S, Q, P>
 where
-    S: 'a + Clone + Service<Q::Request> + Send + Sync,
+    S: 'a + Clone + Service<Q::Request> + Send,
     Q: Generator + Send + Sync + 'static,
     P: Send + Sync + 'static,
 {
@@ -121,7 +121,7 @@ impl<Q, P> SuiteCase<Q, P> {
     pub async fn shot<M>(self, make_service: M, job: &JobSpec) -> crate::Result<SuiteReport<Q, P>>
     where
         M: Clone + MakeService<http::Uri, Q::Request>,
-        M::Service: Clone + Service<Q::Request> + Send + Sync,
+        M::Service: Clone + Service<Q::Request> + Send,
         Q: Generator + Send + Sync + 'static,
         P: Send + Sync + 'static,
     {
