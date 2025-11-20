@@ -17,7 +17,7 @@ use tower::Service;
 use crate::codec::DynamicCodec;
 
 #[derive(Debug, Clone)]
-pub struct GrpcClient<G>(tonic::client::Grpc<G>);
+pub struct GrpcClient<G>(G);
 
 #[derive(Debug, Clone)]
 pub struct GrpcChannel;
@@ -33,27 +33,10 @@ impl Service<http::Uri> for GrpcChannel {
     fn call(&mut self, destination: http::Uri) -> Self::Future {
         Box::pin(async move {
             let channel = Channel::builder(destination).connect().await?;
-            Ok(GrpcClient(tonic::client::Grpc::new(channel)))
+            Ok(GrpcClient(channel))
         })
     }
 }
-
-// impl GrpcClient<tonic::transport::Channel> {
-//     pub async fn new(destination: http::Uri) -> relentless::Result<Self> {
-//         let channel = Channel::builder(destination).connect().await.unwrap_or_else(|e| todo!("{}", e));
-//         Ok(Self(tonic::client::Grpc::new(channel)))
-//     }
-// }
-
-// impl<S> GrpcClient<S>
-// where
-//     S: Clone,
-// {
-//     pub async fn from_services(services: &HashMap<Uri, S>) -> relentless::Result<Self> {
-//         let clients = services.iter().map(|(d, s)| (d.clone(), tonic::client::Grpc::new(s.clone()))).collect();
-//         Ok(Self { inner: clients })
-//     }
-// }
 
 impl<G, D, S> Service<(tonic::Request<D>, PathAndQuery, DynamicCodec<D, S>)> for GrpcClient<G>
 where
@@ -76,11 +59,11 @@ where
     }
 
     fn call(&mut self, req: (tonic::Request<D>, PathAndQuery, DynamicCodec<D, S>)) -> Self::Future {
-        let mut inner = self.0.clone();
+        let mut client = tonic::client::Grpc::new(self.0.clone());
         Box::pin(async move {
             let (request, path, codec) = req;
-            inner.ready().await.map_err(|e| Status::unknown(format!("Service was not ready: {}", e.into())))?; // ref https://github.com/hyperium/tonic/blob/v0.14.2/tonic-build/src/client.rs#L240-L242
-            inner.unary(request, path, codec).await
+            client.ready().await.map_err(|e| Status::unknown(format!("Service was not ready: {}", e.into())))?; // ref https://github.com/hyperium/tonic/blob/v0.14.2/tonic-build/src/client.rs#L240-L242
+            client.unary(request, path, codec).await
         })
     }
 }
