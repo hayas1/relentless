@@ -1,3 +1,4 @@
+pub mod contract;
 pub mod destinations;
 pub mod hierarchy;
 pub mod job;

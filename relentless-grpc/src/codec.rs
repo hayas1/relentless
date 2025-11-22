@@ -1,12 +1,89 @@
-use std::marker::PhantomData;
+use std::{
+    future::Future,
+    marker::PhantomData,
+    pin::Pin,
+    str::FromStr,
+    task::{Context, Poll},
+};
 
-use bytes::Buf;
-use prost_reflect::{prost::Message, DynamicMessage, MessageDescriptor, MethodDescriptor};
+use bytes::{Buf, Bytes};
+use http::uri::PathAndQuery;
+use prost_reflect::{prost::Message, DescriptorPool, DynamicMessage, MessageDescriptor, MethodDescriptor};
+use relentless::shot::contract::Contract;
 use serde::{Deserializer, Serialize, Serializer};
 use tonic::{
+    client::GrpcService,
     codec::{Codec, Decoder, Encoder},
     Status,
 };
+use tower::{Layer, Service};
+
+use crate::{request::GrpcRequest, wip::JsonSerializer};
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DescriptorLayer<D, S> {
+    pool: DescriptorPool,
+    phantom: PhantomData<(D, S)>,
+}
+impl<G, D, S> Layer<G> for DescriptorLayer<D, S> {
+    type Service = DescriptorService<G>;
+
+    fn layer(&self, service: G) -> Self::Service {
+        DescriptorService { pool: self.pool.clone(), service }
+    }
+}
+impl<G: Send, D: Send, S: Send> Contract<G, GrpcRequest> for DescriptorLayer<D, S>
+where
+    G: GrpcService<tonic::body::Body> + Clone + Send + 'static,
+    G::ResponseBody: Send,
+    <G::ResponseBody as tonic::transport::Body>::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
+    G::Future: Send + 'static,
+    D: for<'a> Deserializer<'a> + Send + Sync + 'static,
+    for<'a> <D as Deserializer<'a>>::Error: std::error::Error + Send + Sync + 'static,
+{
+    type Request = (tonic::Request<D>, String);
+    type Error = Status;
+
+    async fn new(service: G, request: GrpcRequest) -> Result<Self, Self::Error> {
+        let mut descriptor_bytes = Vec::new();
+        // File::open(path)?.read_to_end(&mut descriptor_bytes)?;
+        Ok(Self { pool: DescriptorPool::decode(Bytes::from(descriptor_bytes)).unwrap(), phantom: PhantomData })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DescriptorService<G> {
+    pool: DescriptorPool,
+    service: G,
+}
+impl<G, D> Service<(tonic::Request<D>, String)> for DescriptorService<G>
+where
+    G: GrpcService<tonic::body::Body> + Clone + Send + 'static,
+    G::ResponseBody: Send,
+    <G::ResponseBody as tonic::transport::Body>::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
+    G::Future: Send + 'static,
+    D: for<'a> Deserializer<'a> + Send + Sync + 'static,
+    for<'a> <D as Deserializer<'a>>::Error: std::error::Error + Send + Sync + 'static,
+{
+    type Response = tonic::Response<<JsonSerializer as Serializer>::Ok>;
+    type Error = Status;
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
+
+    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn call(&mut self, req: (tonic::Request<D>, String)) -> Self::Future {
+        let mut grpc = tonic::client::Grpc::new(self.service.clone());
+        let (request, target) = req;
+        let path = PathAndQuery::from_str(&target).unwrap();
+        let (svc, mtd) = target.split_once('/').unwrap();
+        let service = self.pool.get_service_by_name(svc).unwrap();
+        let method = service.methods().find(|m| m.name() == mtd).unwrap();
+        let codec = DynamicCodec::new(method, JsonSerializer::default());
+        Box::pin(async move { grpc.unary(request, path, codec).await })
+    }
+}
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct DynamicCodec<D, S> {

@@ -8,16 +8,13 @@ use crate::{client::GrpcClient, codec::DynamicCodec};
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
-pub struct GrpcRequest<D, S> {
+pub struct GrpcRequest {
     #[serde(default)]
     #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
     descriptor: GrpcDescriptor,
     #[serde(default)]
     #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
     message: GrpcRequestMessage,
-
-    #[serde(skip_serializing, skip_deserializing)]
-    phantom: PhantomData<(D, S)>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case", untagged)]
@@ -39,18 +36,4 @@ pub enum GrpcRequestMessage {
     Empty,
     Plaintext(String),
     Json(serde_json::Value),
-}
-
-impl<G: Send, D: Send + Sync, S: Send + Sync> Generator<GrpcClient<G>> for GrpcRequest<D, S> {
-    type Request = (tonic::Request<D>, PathAndQuery, DynamicCodec<D, S>);
-    type Error = tonic::Status;
-
-    async fn generate(
-        &self,
-        _service: GrpcClient<G>,
-        _destination: &http::Uri,
-        _target: &str,
-    ) -> Result<Self::Request, Self::Error> {
-        todo!()
-    }
 }
