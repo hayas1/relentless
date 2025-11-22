@@ -44,8 +44,8 @@ pub enum GrpcResponseMessage {
     Json(JsonEvaluator),
 }
 
-impl<S: Send> ResponseSink<Result<tonic::Response<S>, tonic::Status>> for GrpcResponse {
-    async fn consume(&self, res: Destinations<Result<tonic::Response<S>, tonic::Status>>) -> bool {
+impl<Se: Send> ResponseSink<Result<tonic::Response<Se>, tonic::Status>> for GrpcResponse {
+    async fn consume(&self, res: Destinations<Result<tonic::Response<Se>, tonic::Status>>) -> bool {
         todo!()
     }
 }

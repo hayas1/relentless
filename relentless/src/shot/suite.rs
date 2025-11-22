@@ -125,9 +125,8 @@ impl<Q, P> SuiteCase<Q, P> {
         M: Clone + MakeService<http::Uri, C::TransportReq, Service = S>,
         S: Clone + Service<C::TransportReq, Response = C::TransportRes> + Send,
         C: Contract<S, ReqSource = Q, ResSink = P>,
-        C::Service:
-            for<'x> Service<RequestSource<'x, C::ReqSource>, Response = C::Response, Error = C::ServiceError> + Send,
-        Q: Send + Sync + 'static,
+        C::Service: Service<C::Request, Response = C::Response, Error = C::ServiceError> + Send,
+        Q: RequestSource<C::Request> + Send + Sync + 'static,
         P: ResponseSink<Result<C::Response, C::ServiceError>> + Send + Sync + 'static,
     {
         let buffers = if Hierarchy::Suite.contains(&job.sequential) { 1 } else { self.testcases.len().max(1) };

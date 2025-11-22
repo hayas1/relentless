@@ -48,9 +48,8 @@ impl Cli {
         M: Clone + MakeService<http::Uri, C::TransportReq, Service = S>,
         S: Clone + Service<C::TransportReq, Response = C::TransportRes> + Send,
         C: Contract<S>,
-        C::Service:
-            for<'x> Service<RequestSource<'x, C::ReqSource>, Response = C::Response, Error = C::ServiceError> + Send,
-        C::ReqSource: for<'x> Deserialize<'x> + Default + Send + Sync + 'static,
+        C::Service: Service<C::Request, Response = C::Response, Error = C::ServiceError> + Send,
+        C::ReqSource: for<'x> Deserialize<'x> + Default + RequestSource<C::Request> + Send + Sync + 'static,
         C::ResSink: for<'x> Deserialize<'x>
             + Default
             + ResponseSink<Result<C::Response, C::ServiceError>>
@@ -132,9 +131,8 @@ impl<Q, P> Job<Q, P> {
         M: Clone + MakeService<http::Uri, C::TransportReq, Service = S>,
         S: Clone + Service<C::TransportReq, Response = C::TransportRes> + Send,
         C: Contract<S, ReqSource = Q, ResSink = P>,
-        C::Service:
-            for<'x> Service<RequestSource<'x, C::ReqSource>, Response = C::Response, Error = C::ServiceError> + Send,
-        Q: Send + Sync + 'static,
+        C::Service: Service<C::Request, Response = C::Response, Error = C::ServiceError> + Send,
+        Q: RequestSource<C::Request> + Send + Sync + 'static,
         P: ResponseSink<Result<C::Response, C::ServiceError>> + Send + Sync + 'static,
     {
         let buffers = if Hierarchy::Job.contains(&job.sequential) { 1 } else { self.0.len().max(1) };

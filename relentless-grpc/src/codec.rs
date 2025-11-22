@@ -8,7 +8,7 @@ use std::{
 use bytes::{Buf, Bytes};
 use http::uri::PathAndQuery;
 use prost_reflect::{prost::Message, DescriptorPool, DynamicMessage, MessageDescriptor, MethodDescriptor};
-use relentless::shot::contract::{Contract, RequestSource};
+use relentless::shot::contract::Contract;
 use serde::{Deserializer, Serialize, Serializer};
 use tonic::{
     client::GrpcService,
@@ -62,7 +62,7 @@ pub struct DescriptorService<G, D, S> {
     service: G,
     phantom: PhantomData<(D, S)>,
 }
-impl<'a, G, D, S> Service<RequestSource<'a, GrpcRequest>> for DescriptorService<G, D, S>
+impl<G, D, S> Service<(PathAndQuery, tonic::Request<D>)> for DescriptorService<G, D, S>
 where
     G: GrpcService<tonic::body::Body> + Clone + Send + 'static,
     G::ResponseBody: Send,
@@ -79,9 +79,9 @@ where
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, req: RequestSource<'a, GrpcRequest>) -> Self::Future {
+    fn call(&mut self, req: (PathAndQuery, tonic::Request<D>)) -> Self::Future {
         let mut grpc = tonic::client::Grpc::new(self.service.clone());
-        let (target, request) = GrpcRequest::produce::<D>(req);
+        let (target, request) = req;
         let method = get_method(self.pool.clone(), &target).unwrap();
         let codec = DynamicCodec::new(method, JsonSerializer::default());
         Box::pin(async move {

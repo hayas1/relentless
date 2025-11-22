@@ -71,8 +71,8 @@ impl<Q, P> Testcase<Q, P> {
     where
         S: Clone + Service<C::TransportReq, Response = C::TransportRes> + Send,
         C: Contract<S, ReqSource = Q, ResSink = P>,
-        C::Service: for<'x> Service<RequestSource<'x, C::ReqSource>, Response = C::Response, Error = C::ServiceError>,
-        Q: Send + Sync + 'static,
+        C::Service: Service<C::Request, Response = C::Response, Error = C::ServiceError>,
+        Q: RequestSource<C::Request> + Send + Sync + 'static,
         P: ResponseSink<Result<C::Response, C::ServiceError>> + Send + Sync + 'static,
     {
         let buffers =
@@ -85,7 +85,7 @@ impl<Q, P> Testcase<Q, P> {
                 let service = layer.layer(service.clone());
 
                 let destination = suite.destinations.get(name).unwrap_or_else(|| todo!());
-                let request = RequestSource { destination, target, source: &profile.request };
+                let request = profile.request.produce(destination, target).await.unwrap_or_else(|_| todo!());
                 let response = service.oneshot(request).await;
                 Ok::<_, Infallible>((name.clone(), response))
             })

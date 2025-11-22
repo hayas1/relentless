@@ -16,14 +16,13 @@ pub trait Contract<S>: Sized + Layer<S> {
     async fn new(service: S, request: &Self::ReqSource) -> Result<Self, Self::Error>;
 }
 
-pub struct RequestSource<'a, Q> {
-    pub destination: &'a http::Uri,
-    pub target: &'a str,
-    pub source: &'a Q,
-    // pub template: Template
+#[trait_variant::make(Send)]
+pub trait RequestSource<De> {
+    type Error;
+    async fn produce(&self, destination: &http::Uri, target: &str) -> Result<De, Self::Error>;
 }
 
 #[trait_variant::make(Send)]
-pub trait ResponseSink<S> {
-    async fn consume(&self, res: Destinations<S>) -> bool;
+pub trait ResponseSink<Se> {
+    async fn consume(&self, res: Destinations<Se>) -> bool;
 }

@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{convert::Infallible, path::PathBuf};
 
 use http::uri::PathAndQuery;
 use relentless::shot::contract::RequestSource;
@@ -35,8 +35,9 @@ pub enum GrpcRequestMessage {
     Json(serde_json::Value),
 }
 
-impl GrpcRequest {
-    pub fn produce<'a, D>(s: RequestSource<'a, Self>) -> (PathAndQuery, tonic::Request<D>) {
+impl<De> RequestSource<De> for GrpcRequest {
+    type Error = Infallible;
+    async fn produce(&self, destination: &http::Uri, target: &str) -> Result<De, Self::Error> {
         todo!()
     }
 }
