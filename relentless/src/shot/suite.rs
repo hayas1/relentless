@@ -5,7 +5,7 @@ use tower::{MakeService, Service};
 use crate::{
     http_newtype_serde,
     shot::{
-        contract::{Contract, RequestSource},
+        contract::{Contract, RequestSource, ResponseSink},
         destinations::Destinations,
         hierarchy::Hierarchy,
         job::JobSpec,
@@ -122,12 +122,13 @@ pub struct SuiteReport<Q, P> {
 impl<Q, P> SuiteCase<Q, P> {
     pub async fn shot<M, S, C>(self, make_service: M, job: &JobSpec) -> crate::Result<SuiteReport<Q, P>>
     where
-        M: Clone + MakeService<http::Uri, C::Request, Service = S>,
-        S: Clone + Service<C::Request, Response = C::Response> + Send,
+        M: Clone + MakeService<http::Uri, C::TransportReq, Service = S>,
+        S: Clone + Service<C::TransportReq, Response = C::TransportRes> + Send,
         C: Contract<S, ReqSource = Q, ResSink = P>,
-        C::Service: for<'x> Service<RequestSource<'x, C::ReqSource>> + Send,
+        C::Service:
+            for<'x> Service<RequestSource<'x, C::ReqSource>, Response = C::Response, Error = C::ServiceError> + Send,
         Q: Send + Sync + 'static,
-        P: Send + Sync + 'static,
+        P: ResponseSink<Result<C::Response, C::ServiceError>> + Send + Sync + 'static,
     {
         let buffers = if Hierarchy::Suite.contains(&job.sequential) { 1 } else { self.testcases.len().max(1) };
         let mut services = Destinations::default();

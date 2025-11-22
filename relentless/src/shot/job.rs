@@ -11,6 +11,7 @@ use crate::shot::contract::{Contract, RequestSource};
 use crate::{
     report::ReportFormat,
     shot::{
+        contract::ResponseSink,
         hierarchy::Hierarchy,
         suite::{SuiteCase, SuiteReport},
     },
@@ -44,12 +45,18 @@ impl Cli {
     #[cfg(feature = "cli")]
     pub async fn shot<M, S, C>(make_service: M) -> crate::Result<JobReport<C::ReqSource, C::ResSink>>
     where
-        M: Clone + MakeService<http::Uri, C::Request, Service = S>,
-        S: Clone + Service<C::Request, Response = C::Response> + Send,
+        M: Clone + MakeService<http::Uri, C::TransportReq, Service = S>,
+        S: Clone + Service<C::TransportReq, Response = C::TransportRes> + Send,
         C: Contract<S>,
-        C::Service: for<'x> Service<RequestSource<'x, C::ReqSource>> + Send,
+        C::Service:
+            for<'x> Service<RequestSource<'x, C::ReqSource>, Response = C::Response, Error = C::ServiceError> + Send,
         C::ReqSource: for<'x> Deserialize<'x> + Default + Send + Sync + 'static,
-        C::ResSink: for<'x> Deserialize<'x> + Default + Send + Sync + 'static,
+        C::ResSink: for<'x> Deserialize<'x>
+            + Default
+            + ResponseSink<Result<C::Response, C::ServiceError>>
+            + Send
+            + Sync
+            + 'static,
     {
         let cli = Self::parse();
         let suites = Job::from_files(&cli.file)?;
@@ -122,12 +129,13 @@ pub struct JobReport<Q, P> {
 impl<Q, P> Job<Q, P> {
     pub async fn shot<M, S, C>(self, make_service: M, job: &JobSpec) -> crate::Result<JobReport<Q, P>>
     where
-        M: Clone + MakeService<http::Uri, C::Request, Service = S>,
-        S: Clone + Service<C::Request, Response = C::Response> + Send,
+        M: Clone + MakeService<http::Uri, C::TransportReq, Service = S>,
+        S: Clone + Service<C::TransportReq, Response = C::TransportRes> + Send,
         C: Contract<S, ReqSource = Q, ResSink = P>,
-        C::Service: for<'x> Service<RequestSource<'x, C::ReqSource>> + Send,
+        C::Service:
+            for<'x> Service<RequestSource<'x, C::ReqSource>, Response = C::Response, Error = C::ServiceError> + Send,
         Q: Send + Sync + 'static,
-        P: Send + Sync + 'static,
+        P: ResponseSink<Result<C::Response, C::ServiceError>> + Send + Sync + 'static,
     {
         let buffers = if Hierarchy::Job.contains(&job.sequential) { 1 } else { self.0.len().max(1) };
         let suites = futures::stream::iter(self.0)

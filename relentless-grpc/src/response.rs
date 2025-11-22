@@ -1,6 +1,6 @@
 use relentless::{
-    evaluator::{json::JsonEvaluator, plaintext::PlaintextEvaluator, Evaluator},
-    shot::destinations::Destinations,
+    evaluator::{json::JsonEvaluator, plaintext::PlaintextEvaluator},
+    shot::{contract::ResponseSink, destinations::Destinations},
 };
 use serde::{Deserialize, Serialize};
 
@@ -44,10 +44,8 @@ pub enum GrpcResponseMessage {
     Json(JsonEvaluator),
 }
 
-impl<S: Send> Evaluator<GrpcClient<S>> for GrpcResponse {
-    type Response = Result<tonic::Response<S>, tonic::Status>;
-
-    async fn evaluate(&self, res: Destinations<Self::Response>) -> bool {
+impl<S: Send> ResponseSink<Result<tonic::Response<S>, tonic::Status>> for GrpcResponse {
+    async fn consume(&self, res: Destinations<Result<tonic::Response<S>, tonic::Status>>) -> bool {
         todo!()
     }
 }

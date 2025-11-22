@@ -1,11 +1,11 @@
-use std::{ops::Range, time::Duration};
+use std::{convert::Infallible, ops::Range, time::Duration};
 
 use futures::{StreamExt, TryStreamExt};
 use serde::{Deserialize, Serialize};
 use tower::{timeout::TimeoutLayer, Service, ServiceBuilder, ServiceExt};
 
 use crate::shot::{
-    contract::{Contract, RequestSource},
+    contract::{Contract, RequestSource, ResponseSink},
     destinations::Destinations,
     hierarchy::Hierarchy,
     job::JobSpec,
@@ -69,11 +69,11 @@ impl<Q, P> Testcase<Q, P> {
         suite: &Suite<Q, P>,
     ) -> crate::Result<CaseReport<Q, P>>
     where
-        S: Clone + Service<C::Request, Response = C::Response> + Send,
+        S: Clone + Service<C::TransportReq, Response = C::TransportRes> + Send,
         C: Contract<S, ReqSource = Q, ResSink = P>,
-        C::Service: for<'x> Service<RequestSource<'x, C::ReqSource>>,
+        C::Service: for<'x> Service<RequestSource<'x, C::ReqSource>, Response = C::Response, Error = C::ServiceError>,
         Q: Send + Sync + 'static,
-        P: Send + Sync + 'static,
+        P: ResponseSink<Result<C::Response, C::ServiceError>> + Send + Sync + 'static,
     {
         let buffers =
             if Hierarchy::Testcase.contains(&job.sequential) { 1 } else { self.profile.repeat.times().max(1) };
@@ -86,13 +86,14 @@ impl<Q, P> Testcase<Q, P> {
 
                 let destination = suite.destinations.get(name).unwrap_or_else(|| todo!());
                 let request = RequestSource { destination, target, source: &profile.request };
-                let response = service.oneshot(request).await?;
-                Ok::<_, <C::Service as Service<RequestSource<'_, C::ReqSource>>>::Error>((name.clone(), response))
+                let response = service.oneshot(request).await;
+                Ok::<_, Infallible>((name.clone(), response))
             })
             .buffer_unordered(services.len())
             .try_collect()
             .await
             .unwrap_or_else(|_| todo!());
-        Ok(CaseReport { profile: todo!(), passed: 0 })
+        let pass = profile.response.consume(result).await;
+        Ok(CaseReport { profile: todo!(), passed: pass as usize })
     }
 }

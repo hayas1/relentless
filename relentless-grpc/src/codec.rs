@@ -41,9 +41,12 @@ where
     for<'x> <D as Deserializer<'x>>::Error: std::error::Error + Send + Sync + 'static,
 {
     type ReqSource = GrpcRequest;
-    type Request = http::Request<tonic::body::Body>;
+    type Request = (PathAndQuery, tonic::Request<D>);
+    type TransportReq = http::Request<tonic::body::Body>;
     type ResSink = GrpcResponse;
-    type Response = http::Response<tonic::body::Body>;
+    type Response = tonic::Response<S>;
+    type TransportRes = http::Response<tonic::body::Body>;
+    type ServiceError = tonic::Status;
     type Error = Status;
 
     async fn new(service: G, request: &GrpcRequest) -> Result<Self, Self::Error> {
