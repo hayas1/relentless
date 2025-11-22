@@ -78,23 +78,21 @@ impl<Q, P> Testcase<Q, P> {
         let buffers =
             if Hierarchy::Testcase.contains(&job.sequential) { 1 } else { self.profile.repeat.times().max(1) };
         let profile = &self.profile;
-        let result: Vec<bool> = futures::stream::iter(services.iter())
-            .map(move |(name, service)| {
-                let target = self.target.clone();
-                async move {
-                    let layer = C::new(service.clone(), &profile.request).await.unwrap_or_else(|_| todo!());
-                    let service = layer.layer(service.clone());
+        let target = &self.target.clone();
+        let result: Destinations<_> = futures::stream::iter(services.iter())
+            .map(|(name, service)| async move {
+                let layer = C::new(service.clone(), &profile.request).await.unwrap_or_else(|_| todo!());
+                let service = layer.layer(service.clone());
 
-                    let destination = suite.destinations.get(name).unwrap_or_else(|| todo!());
-                    let request = RequestSource { destination, target: &target, source: &profile.request };
-                    let response = service.oneshot(request).await;
-                    Ok::<_, ()>(true)
-                }
+                let destination = suite.destinations.get(name).unwrap_or_else(|| todo!());
+                let request = RequestSource { destination, target, source: &profile.request };
+                let response = service.oneshot(request).await?;
+                Ok::<_, <C::Service as Service<RequestSource<'_, C::ReqSource>>>::Error>((name.clone(), response))
             })
-            .buffer_unordered(buffers)
+            .buffer_unordered(services.len())
             .try_collect()
             .await
-            .unwrap();
-        Ok(CaseReport { profile: self.profile, passed: 0 })
+            .unwrap_or_else(|_| todo!());
+        Ok(CaseReport { profile: todo!(), passed: 0 })
     }
 }

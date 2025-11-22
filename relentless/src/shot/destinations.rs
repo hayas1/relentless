@@ -33,3 +33,8 @@ impl<T> IntoIterator for Destinations<T> {
         self.0.into_iter()
     }
 }
+impl<T> Extend<(String, T)> for Destinations<T> {
+    fn extend<I: IntoIterator<Item = (String, T)>>(&mut self, iter: I) {
+        self.0.extend(iter)
+    }
+}

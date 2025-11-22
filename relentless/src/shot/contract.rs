@@ -13,7 +13,7 @@ pub trait Contract<S>: Sized + Layer<S> {
 
 pub struct RequestSource<'a, Q> {
     pub destination: &'a http::Uri,
-    pub target: &'a String,
+    pub target: &'a str,
     pub source: &'a Q,
     // pub template: Template
 }
