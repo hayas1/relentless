@@ -1,10 +1,8 @@
-use std::{marker::PhantomData, path::PathBuf};
+use std::path::PathBuf;
 
 use http::uri::PathAndQuery;
 use relentless::shot::contract::RequestSource;
 use serde::{Deserialize, Serialize};
-
-use crate::{client::GrpcClient, codec::DynamicCodec};
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
@@ -37,13 +35,8 @@ pub enum GrpcRequestMessage {
     Json(serde_json::Value),
 }
 
-impl<D> RequestSource<(PathAndQuery, tonic::Request<D>)> for GrpcRequest {
-    type Error = tonic::Status;
-    async fn produce(
-        self,
-        destination: &http::Uri,
-        target: &str,
-    ) -> Result<(PathAndQuery, tonic::Request<D>), Self::Error> {
+impl GrpcRequest {
+    pub fn produce<D>(s: RequestSource<Self>) -> (PathAndQuery, tonic::Request<D>) {
         todo!()
     }
 }

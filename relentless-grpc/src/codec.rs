@@ -9,7 +9,7 @@ use std::{
 use bytes::{Buf, Bytes};
 use http::uri::PathAndQuery;
 use prost_reflect::{prost::Message, DescriptorPool, DynamicMessage, MessageDescriptor, MethodDescriptor};
-use relentless::shot::contract::Contract;
+use relentless::shot::contract::{Contract, RequestSource};
 use serde::{Deserializer, Serialize, Serializer};
 use tonic::{
     client::GrpcService,
@@ -26,10 +26,10 @@ pub struct DescriptorLayer<D, S> {
     phantom: PhantomData<(D, S)>,
 }
 impl<G, D, S> Layer<G> for DescriptorLayer<D, S> {
-    type Service = DescriptorService<G>;
+    type Service = DescriptorService<G, D, S>;
 
     fn layer(&self, service: G) -> Self::Service {
-        DescriptorService { pool: self.pool.clone(), service }
+        DescriptorService { pool: self.pool.clone(), service, phantom: PhantomData }
     }
 }
 impl<G: Send, D: Send, S: Send> Contract<G> for DescriptorLayer<D, S>
@@ -55,11 +55,12 @@ where
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DescriptorService<G> {
+pub struct DescriptorService<G, D, S> {
     pool: DescriptorPool,
     service: G,
+    phantom: PhantomData<(D, S)>,
 }
-impl<G, D> Service<(PathAndQuery, tonic::Request<D>)> for DescriptorService<G>
+impl<G, D, S> Service<RequestSource<GrpcRequest>> for DescriptorService<G, D, S>
 where
     G: GrpcService<tonic::body::Body> + Clone + Send + 'static,
     G::ResponseBody: Send,
@@ -76,9 +77,9 @@ where
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, req: (PathAndQuery, tonic::Request<D>)) -> Self::Future {
+    fn call(&mut self, req: RequestSource<GrpcRequest>) -> Self::Future {
         let mut grpc = tonic::client::Grpc::new(self.service.clone());
-        let (target, request) = req;
+        let (target, request) = GrpcRequest::produce::<D>(req);
         let method = get_method(self.pool.clone(), &target).unwrap();
         let codec = DynamicCodec::new(method, JsonSerializer::default());
         Box::pin(async move {

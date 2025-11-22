@@ -11,7 +11,7 @@ use tower::{MakeService, Service, ServiceExt};
 use crate::{
     http_newtype_serde,
     shot::{
-        contract::Contract,
+        contract::{Contract, RequestSource},
         destinations::Destinations,
         hierarchy::Hierarchy,
         job::JobSpec,
@@ -49,6 +49,7 @@ impl<Q, P> Suite<Q, P> {
         M: Clone + MakeService<http::Uri, C::Request, Service = S>,
         S: Clone + Service<C::Request, Response = C::Response> + Send,
         C: Contract<S, ReqSource = Q, ResSink = P>,
+        C::Service: Service<RequestSource<C::ReqSource>>,
     {
         let mut services = Destinations::default();
         for (d, http_newtype_serde::Uri(dest)) in self.destinations.iter() {
@@ -71,6 +72,7 @@ impl<'a, S, C> Service<Testcase<C::ReqSource, C::ResSink>> for SuiteService<'a, 
 where
     S: 'a + Clone + Service<C::Request, Response = C::Response> + Send,
     C: Contract<S>,
+    C::Service: Service<RequestSource<C::ReqSource>>,
     C::ReqSource: Send + Sync + 'static,
     C::ResSink: Send + Sync + 'static,
 {
@@ -99,6 +101,7 @@ impl<'a, S, C> Service<Testcase<C::ReqSource, C::ResSink>> for &'a SuiteService<
 where
     S: 'a + Clone + Service<C::Request, Response = C::Response> + Send,
     C: Contract<S>,
+    C::Service: Service<RequestSource<C::ReqSource>>,
     C::ReqSource: Send + Sync + 'static,
     C::ResSink: Send + Sync + 'static,
 {
@@ -126,6 +129,7 @@ impl<Q, P> SuiteCase<Q, P> {
         M: Clone + MakeService<http::Uri, C::Request, Service = S>,
         S: Clone + Service<C::Request, Response = C::Response> + Send,
         C: Contract<S, ReqSource = Q, ResSink = P>,
+        C::Service: Service<RequestSource<C::ReqSource>>,
         Q: Send + Sync + 'static,
         P: Send + Sync + 'static,
     {

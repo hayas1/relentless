@@ -11,14 +11,9 @@ pub trait Contract<S>: Sized + Layer<S> {
     async fn new(service: S, request: Self::ReqSource) -> Result<Self, Self::Error>;
 }
 
-#[trait_variant::make(Send)]
-pub trait RequestSource<Req> {
-    type Error;
-
-    async fn produce(
-        self,
-        destination: &http::Uri,
-        target: &str,
-        // template: &Template,
-    ) -> Result<Req, Self::Error>;
+pub struct RequestSource<Q> {
+    pub destination: http::Uri,
+    pub target: String,
+    pub source: Q,
+    // pub template: Template
 }
