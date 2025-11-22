@@ -1,6 +1,5 @@
 pub mod error;
 pub mod evaluator;
-pub mod generator;
 pub mod http_newtype_serde;
 pub mod report;
 pub mod shot;

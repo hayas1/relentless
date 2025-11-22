@@ -45,7 +45,7 @@ impl Cli {
     pub async fn shot<M, S, C>(make_service: M) -> crate::Result<JobReport<C::ReqSource, C::ResSink>>
     where
         M: Clone + MakeService<http::Uri, C::Request, Service = S>,
-        S: Clone + Service<C::Request> + Send,
+        S: Clone + Service<C::Request, Response = C::Response> + Send,
         C: Contract<S>,
         C::ReqSource: for<'a> Deserialize<'a> + Default + Send + Sync + 'static,
         C::ResSink: for<'a> Deserialize<'a> + Default + Send + Sync + 'static,
@@ -122,7 +122,7 @@ impl<Q, P> Job<Q, P> {
     pub async fn shot<M, S, C>(self, make_service: M, job: &JobSpec) -> crate::Result<JobReport<Q, P>>
     where
         M: Clone + MakeService<http::Uri, C::Request, Service = S>,
-        S: Clone + Service<C::Request> + Send,
+        S: Clone + Service<C::Request, Response = C::Response> + Send,
         C: Contract<S, ReqSource = Q, ResSink = P>,
         Q: Send + Sync + 'static,
         P: Send + Sync + 'static,

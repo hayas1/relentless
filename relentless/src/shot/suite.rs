@@ -47,7 +47,7 @@ impl<Q, P> Suite<Q, P> {
     ) -> crate::Result<SuiteService<'a, M::Service, C>>
     where
         M: Clone + MakeService<http::Uri, C::Request, Service = S>,
-        S: Clone + Service<C::Request> + Send,
+        S: Clone + Service<C::Request, Response = C::Response> + Send,
         C: Contract<S, ReqSource = Q, ResSink = P>,
     {
         let mut services = Destinations::default();
@@ -69,7 +69,7 @@ pub struct SuiteService<'a, S, C: Contract<S>> {
 }
 impl<'a, S, C> Service<Testcase<C::ReqSource, C::ResSink>> for SuiteService<'a, S, C>
 where
-    S: 'a + Clone + Service<C::Request> + Send,
+    S: 'a + Clone + Service<C::Request, Response = C::Response> + Send,
     C: Contract<S>,
     C::ReqSource: Send + Sync + 'static,
     C::ResSink: Send + Sync + 'static,
@@ -97,7 +97,7 @@ where
 }
 impl<'a, S, C> Service<Testcase<C::ReqSource, C::ResSink>> for &'a SuiteService<'a, S, C>
 where
-    S: 'a + Clone + Service<C::Request> + Send,
+    S: 'a + Clone + Service<C::Request, Response = C::Response> + Send,
     C: Contract<S>,
     C::ReqSource: Send + Sync + 'static,
     C::ResSink: Send + Sync + 'static,
@@ -124,7 +124,7 @@ impl<Q, P> SuiteCase<Q, P> {
     pub async fn shot<M, S, C>(self, make_service: M, job: &JobSpec) -> crate::Result<SuiteReport<Q, P>>
     where
         M: Clone + MakeService<http::Uri, C::Request, Service = S>,
-        S: Clone + Service<C::Request> + Send,
+        S: Clone + Service<C::Request, Response = C::Response> + Send,
         C: Contract<S, ReqSource = Q, ResSink = P>,
         Q: Send + Sync + 'static,
         P: Send + Sync + 'static,
