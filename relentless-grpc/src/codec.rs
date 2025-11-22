@@ -40,12 +40,11 @@ where
     G::Future: Send + 'static,
     D: for<'a> Deserializer<'a> + Send + Sync + 'static,
     for<'a> <D as Deserializer<'a>>::Error: std::error::Error + Send + Sync + 'static,
-    S: Serializer + Clone + Send + Sync + 'static,
 {
     type ReqSource = GrpcRequest;
     type Request = http::Request<tonic::body::Body>;
     type ResSink = GrpcResponse;
-    type Response = S::Ok;
+    type Response = http::Response<tonic::body::Body>;
     type Error = Status;
 
     async fn new(service: G, request: GrpcRequest) -> Result<Self, Self::Error> {
@@ -60,7 +59,7 @@ pub struct DescriptorService<G> {
     pool: DescriptorPool,
     service: G,
 }
-impl<G, D> Service<(String, tonic::Request<D>)> for DescriptorService<G>
+impl<G, D> Service<(PathAndQuery, tonic::Request<D>)> for DescriptorService<G>
 where
     G: GrpcService<tonic::body::Body> + Clone + Send + 'static,
     G::ResponseBody: Send,
@@ -77,16 +76,22 @@ where
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, req: (String, tonic::Request<D>)) -> Self::Future {
+    fn call(&mut self, req: (PathAndQuery, tonic::Request<D>)) -> Self::Future {
         let mut grpc = tonic::client::Grpc::new(self.service.clone());
         let (target, request) = req;
-        let path = PathAndQuery::from_str(&target).unwrap();
-        let (svc, mtd) = target.split_once('/').unwrap();
-        let service = self.pool.get_service_by_name(svc).unwrap();
-        let method = service.methods().find(|m| m.name() == mtd).unwrap();
+        let method = get_method(self.pool.clone(), &target).unwrap();
         let codec = DynamicCodec::new(method, JsonSerializer::default());
-        Box::pin(async move { grpc.unary(request, path, codec).await })
+        Box::pin(async move {
+            grpc.ready().await.map_err(|e| Status::unknown(format!("Service was not ready: {}", e.into())))?; // ref https://github.com/hyperium/tonic/blob/v0.14.2/tonic-build/src/client.rs#L240-L242
+            grpc.unary(request, target, codec).await
+        })
     }
+}
+fn get_method(pool: DescriptorPool, target: &PathAndQuery) -> Option<MethodDescriptor> {
+    let (svc, mtd) = target.as_str().split_once('/')?;
+    let service = pool.get_service_by_name(svc)?;
+    let method = service.methods().find(|m| m.name() == mtd)?;
+    Some(method)
 }
 
 #[derive(Debug, PartialEq, Eq)]
