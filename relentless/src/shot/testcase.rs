@@ -71,22 +71,22 @@ impl<Q, P> Testcase<Q, P> {
     where
         S: Clone + Service<C::Request, Response = C::Response> + Send,
         C: Contract<S, ReqSource = Q, ResSink = P>,
-        C::Service: for<'x> Service<RequestSource<&'x C::ReqSource>>,
+        C::Service: for<'x> Service<RequestSource<'x, C::ReqSource>>,
         Q: Send + Sync + 'static,
         P: Send + Sync + 'static,
     {
         let buffers =
             if Hierarchy::Testcase.contains(&job.sequential) { 1 } else { self.profile.repeat.times().max(1) };
         let profile = &self.profile;
-        let requests: Vec<bool> = futures::stream::iter(services.iter())
+        let result: Vec<bool> = futures::stream::iter(services.iter())
             .map(move |(name, service)| {
                 let target = self.target.clone();
                 async move {
                     let layer = C::new(service.clone(), &profile.request).await.unwrap_or_else(|_| todo!());
                     let service = layer.layer(service.clone());
 
-                    let destination = suite.destinations.get(name).unwrap_or_else(|| todo!()).clone().into();
-                    let request = RequestSource { destination, target, source: &profile.request };
+                    let destination = suite.destinations.get(name).unwrap_or_else(|| todo!());
+                    let request = RequestSource { destination, target: &target, source: &profile.request };
                     let response = service.oneshot(request).await;
                     Ok::<_, ()>(true)
                 }

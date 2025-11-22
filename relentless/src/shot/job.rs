@@ -33,8 +33,8 @@ impl Cli {
     #[cfg(feature = "cli")]
     pub fn separated<T, const D: char, U>(s: &str) -> Result<(T, U), crate::error::CommandError>
     where
-        T: for<'a> From<&'a str>,
-        U: for<'a> From<&'a str>,
+        T: for<'x> From<&'x str>,
+        U: for<'x> From<&'x str>,
     {
         let (key, value) = s
             .split_once(D)
@@ -47,9 +47,9 @@ impl Cli {
         M: Clone + MakeService<http::Uri, C::Request, Service = S>,
         S: Clone + Service<C::Request, Response = C::Response> + Send,
         C: Contract<S>,
-        C::Service: for<'x> Service<RequestSource<&'x C::ReqSource>> + Send,
-        C::ReqSource: for<'a> Deserialize<'a> + Default + Send + Sync + 'static,
-        C::ResSink: for<'a> Deserialize<'a> + Default + Send + Sync + 'static,
+        C::Service: for<'x> Service<RequestSource<'x, C::ReqSource>> + Send,
+        C::ReqSource: for<'x> Deserialize<'x> + Default + Send + Sync + 'static,
+        C::ResSink: for<'x> Deserialize<'x> + Default + Send + Sync + 'static,
     {
         let cli = Self::parse();
         let suites = Job::from_files(&cli.file)?;
@@ -101,8 +101,8 @@ pub struct JobSpec {
 pub struct Job<Q, P>(pub Vec<SuiteCase<Q, P>>);
 impl<Q, P> Job<Q, P>
 where
-    Q: for<'a> Deserialize<'a> + Default,
-    P: for<'a> Deserialize<'a> + Default,
+    Q: for<'x> Deserialize<'x> + Default,
+    P: for<'x> Deserialize<'x> + Default,
 {
     pub fn from_files(files: &[PathBuf]) -> crate::Result<Self> {
         let suites: Result<Vec<_>, _> = files
@@ -125,7 +125,7 @@ impl<Q, P> Job<Q, P> {
         M: Clone + MakeService<http::Uri, C::Request, Service = S>,
         S: Clone + Service<C::Request, Response = C::Response> + Send,
         C: Contract<S, ReqSource = Q, ResSink = P>,
-        C::Service: for<'x> Service<RequestSource<&'x C::ReqSource>> + Send,
+        C::Service: for<'x> Service<RequestSource<'x, C::ReqSource>> + Send,
         Q: Send + Sync + 'static,
         P: Send + Sync + 'static,
     {

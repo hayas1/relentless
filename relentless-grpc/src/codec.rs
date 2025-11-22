@@ -2,7 +2,6 @@ use std::{
     future::Future,
     marker::PhantomData,
     pin::Pin,
-    str::FromStr,
     task::{Context, Poll},
 };
 
@@ -38,8 +37,8 @@ where
     G::ResponseBody: Send,
     <G::ResponseBody as tonic::transport::Body>::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
     G::Future: Send + 'static,
-    D: for<'a> Deserializer<'a> + Send + Sync + 'static,
-    for<'a> <D as Deserializer<'a>>::Error: std::error::Error + Send + Sync + 'static,
+    D: for<'x> Deserializer<'x> + Send + Sync + 'static,
+    for<'x> <D as Deserializer<'x>>::Error: std::error::Error + Send + Sync + 'static,
 {
     type ReqSource = GrpcRequest;
     type Request = http::Request<tonic::body::Body>;
@@ -60,14 +59,14 @@ pub struct DescriptorService<G, D, S> {
     service: G,
     phantom: PhantomData<(D, S)>,
 }
-impl<G, D, S> Service<RequestSource<&GrpcRequest>> for DescriptorService<G, D, S>
+impl<'a, G, D, S> Service<RequestSource<'a, GrpcRequest>> for DescriptorService<G, D, S>
 where
     G: GrpcService<tonic::body::Body> + Clone + Send + 'static,
     G::ResponseBody: Send,
     <G::ResponseBody as tonic::transport::Body>::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
     G::Future: Send + 'static,
-    D: for<'a> Deserializer<'a> + Send + Sync + 'static,
-    for<'a> <D as Deserializer<'a>>::Error: std::error::Error + Send + Sync + 'static,
+    D: for<'x> Deserializer<'x> + Send + Sync + 'static,
+    for<'x> <D as Deserializer<'x>>::Error: std::error::Error + Send + Sync + 'static,
 {
     type Response = tonic::Response<<JsonSerializer as Serializer>::Ok>;
     type Error = Status;
@@ -77,7 +76,7 @@ where
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, req: RequestSource<&GrpcRequest>) -> Self::Future {
+    fn call(&mut self, req: RequestSource<'a, GrpcRequest>) -> Self::Future {
         let mut grpc = tonic::client::Grpc::new(self.service.clone());
         let (target, request) = GrpcRequest::produce::<D>(req);
         let method = get_method(self.pool.clone(), &target).unwrap();
@@ -114,8 +113,8 @@ impl<D, S> DynamicCodec<D, S> {
 
 impl<D, S> Codec for DynamicCodec<D, S>
 where
-    D: for<'a> Deserializer<'a> + Send + 'static,
-    for<'a> <D as Deserializer<'a>>::Error: std::error::Error + Send + Sync + 'static,
+    D: for<'x> Deserializer<'x> + Send + 'static,
+    for<'x> <D as Deserializer<'x>>::Error: std::error::Error + Send + Sync + 'static,
     S: Serializer + Clone + Send + 'static,
     S::Ok: Send + 'static,
     S::Error: std::error::Error + Send + Sync + 'static,
@@ -138,8 +137,8 @@ where
 pub struct DynamicEncoder<D>(MessageDescriptor, PhantomData<D>);
 impl<D> Encoder for DynamicEncoder<D>
 where
-    D: for<'a> Deserializer<'a>,
-    for<'a> <D as Deserializer<'a>>::Error: std::error::Error + Send + Sync + 'static,
+    D: for<'x> Deserializer<'x>,
+    for<'x> <D as Deserializer<'x>>::Error: std::error::Error + Send + Sync + 'static,
 {
     type Item = D;
     type Error = Status;

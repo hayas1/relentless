@@ -11,9 +11,9 @@ pub trait Contract<S>: Sized + Layer<S> {
     async fn new(service: S, request: &Self::ReqSource) -> Result<Self, Self::Error>;
 }
 
-pub struct RequestSource<Q> {
-    pub destination: http::Uri,
-    pub target: String,
-    pub source: Q,
+pub struct RequestSource<'a, Q> {
+    pub destination: &'a http::Uri,
+    pub target: &'a String,
+    pub source: &'a Q,
     // pub template: Template
 }
