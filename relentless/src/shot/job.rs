@@ -47,7 +47,7 @@ impl Cli {
         M: Clone + MakeService<http::Uri, C::Request, Service = S>,
         S: Clone + Service<C::Request, Response = C::Response> + Send,
         C: Contract<S>,
-        C::Service: Service<RequestSource<C::ReqSource>>,
+        C::Service: for<'x> Service<RequestSource<&'x C::ReqSource>> + Send,
         C::ReqSource: for<'a> Deserialize<'a> + Default + Send + Sync + 'static,
         C::ResSink: for<'a> Deserialize<'a> + Default + Send + Sync + 'static,
     {
@@ -125,7 +125,7 @@ impl<Q, P> Job<Q, P> {
         M: Clone + MakeService<http::Uri, C::Request, Service = S>,
         S: Clone + Service<C::Request, Response = C::Response> + Send,
         C: Contract<S, ReqSource = Q, ResSink = P>,
-        C::Service: Service<RequestSource<C::ReqSource>>,
+        C::Service: for<'x> Service<RequestSource<&'x C::ReqSource>> + Send,
         Q: Send + Sync + 'static,
         P: Send + Sync + 'static,
     {

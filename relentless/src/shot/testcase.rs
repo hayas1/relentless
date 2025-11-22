@@ -1,8 +1,16 @@
 use std::{ops::Range, time::Duration};
 
+use futures::{StreamExt, TryStreamExt};
 use serde::{Deserialize, Serialize};
+use tower::{timeout::TimeoutLayer, Service, ServiceBuilder, ServiceExt};
 
-use crate::shot::{destinations::Destinations, hierarchy::Hierarchy, job::JobSpec, suite::Suite};
+use crate::shot::{
+    contract::{Contract, RequestSource},
+    destinations::Destinations,
+    hierarchy::Hierarchy,
+    job::JobSpec,
+    suite::Suite,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
@@ -54,14 +62,39 @@ pub struct CaseReport<Q, P> {
     // aggregate: EvaluateAggregator,
 }
 impl<Q, P> Testcase<Q, P> {
-    pub async fn shot<S>(
+    pub async fn shot<S, C>(
         self,
-        services: Destinations<S>,
+        services: &Destinations<S>,
         job: &JobSpec,
         suite: &Suite<Q, P>,
-    ) -> crate::Result<CaseReport<Q, P>> {
+    ) -> crate::Result<CaseReport<Q, P>>
+    where
+        S: Clone + Service<C::Request, Response = C::Response> + Send,
+        C: Contract<S, ReqSource = Q, ResSink = P>,
+        C::Service: for<'x> Service<RequestSource<&'x C::ReqSource>>,
+        Q: Send + Sync + 'static,
+        P: Send + Sync + 'static,
+    {
         let buffers =
             if Hierarchy::Testcase.contains(&job.sequential) { 1 } else { self.profile.repeat.times().max(1) };
+        let profile = &self.profile;
+        let requests: Vec<bool> = futures::stream::iter(services.iter())
+            .map(move |(name, service)| {
+                let target = self.target.clone();
+                async move {
+                    let layer = C::new(service.clone(), &profile.request).await.unwrap_or_else(|_| todo!());
+                    let service = layer.layer(service.clone());
+
+                    let destination = suite.destinations.get(name).unwrap_or_else(|| todo!()).clone().into();
+                    let request = RequestSource { destination, target, source: &profile.request };
+                    let response = service.oneshot(request).await;
+                    Ok::<_, ()>(true)
+                }
+            })
+            .buffer_unordered(buffers)
+            .try_collect()
+            .await
+            .unwrap();
         Ok(CaseReport { profile: self.profile, passed: 0 })
     }
 }

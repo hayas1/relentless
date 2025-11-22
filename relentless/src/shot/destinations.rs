@@ -26,3 +26,10 @@ impl<T> DerefMut for Destinations<T> {
         &mut self.0
     }
 }
+impl<T> IntoIterator for Destinations<T> {
+    type Item = <HashMap<String, T> as IntoIterator>::Item;
+    type IntoIter = <HashMap<String, T> as IntoIterator>::IntoIter;
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}

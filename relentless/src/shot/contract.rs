@@ -8,7 +8,7 @@ pub trait Contract<S>: Sized + Layer<S> {
     type Response;
     type Error;
 
-    async fn new(service: S, request: Self::ReqSource) -> Result<Self, Self::Error>;
+    async fn new(service: S, request: &Self::ReqSource) -> Result<Self, Self::Error>;
 }
 
 pub struct RequestSource<Q> {

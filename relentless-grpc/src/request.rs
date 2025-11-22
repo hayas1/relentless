@@ -36,7 +36,7 @@ pub enum GrpcRequestMessage {
 }
 
 impl GrpcRequest {
-    pub fn produce<D>(s: RequestSource<Self>) -> (PathAndQuery, tonic::Request<D>) {
+    pub fn produce<D>(s: RequestSource<&Self>) -> (PathAndQuery, tonic::Request<D>) {
         todo!()
     }
 }

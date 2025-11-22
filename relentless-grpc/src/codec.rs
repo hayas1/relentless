@@ -47,7 +47,7 @@ where
     type Response = http::Response<tonic::body::Body>;
     type Error = Status;
 
-    async fn new(service: G, request: GrpcRequest) -> Result<Self, Self::Error> {
+    async fn new(service: G, request: &GrpcRequest) -> Result<Self, Self::Error> {
         let mut descriptor_bytes = Vec::new();
         // File::open(path)?.read_to_end(&mut descriptor_bytes)?;
         Ok(Self { pool: DescriptorPool::decode(Bytes::from(descriptor_bytes)).unwrap(), phantom: PhantomData })
@@ -60,7 +60,7 @@ pub struct DescriptorService<G, D, S> {
     service: G,
     phantom: PhantomData<(D, S)>,
 }
-impl<G, D, S> Service<RequestSource<GrpcRequest>> for DescriptorService<G, D, S>
+impl<G, D, S> Service<RequestSource<&GrpcRequest>> for DescriptorService<G, D, S>
 where
     G: GrpcService<tonic::body::Body> + Clone + Send + 'static,
     G::ResponseBody: Send,
@@ -77,7 +77,7 @@ where
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, req: RequestSource<GrpcRequest>) -> Self::Future {
+    fn call(&mut self, req: RequestSource<&GrpcRequest>) -> Self::Future {
         let mut grpc = tonic::client::Grpc::new(self.service.clone());
         let (target, request) = GrpcRequest::produce::<D>(req);
         let method = get_method(self.pool.clone(), &target).unwrap();
