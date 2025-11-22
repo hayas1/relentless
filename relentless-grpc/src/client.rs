@@ -22,7 +22,7 @@ pub struct GrpcClient<G>(G);
 #[derive(Debug, Clone)]
 pub struct GrpcChannel;
 impl Service<http::Uri> for GrpcChannel {
-    type Response = GrpcClient<tonic::transport::Channel>;
+    type Response = tonic::transport::Channel;
     type Error = tonic::transport::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
@@ -33,7 +33,7 @@ impl Service<http::Uri> for GrpcChannel {
     fn call(&mut self, destination: http::Uri) -> Self::Future {
         Box::pin(async move {
             let channel = Channel::builder(destination).connect().await?;
-            Ok(GrpcClient(channel))
+            Ok(channel)
         })
     }
 }

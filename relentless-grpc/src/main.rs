@@ -4,8 +4,8 @@ use std::process::ExitCode;
 #[tokio::main]
 pub async fn main() -> Result<ExitCode, Box<dyn std::error::Error>> {
     use relentless::shot::job::Cli;
-    use relentless_grpc::{client::GrpcChannel, request::GrpcRequest, response::GrpcResponse, wip::JsonSerializer};
-    let report = Cli::shot::<_, _, GrpcRequest<serde_json::Value, JsonSerializer>, GrpcResponse>(GrpcChannel).await?;
+    use relentless_grpc::{client::GrpcChannel, codec::DescriptorLayer, wip::JsonSerializer};
+    let report = Cli::shot::<_, _, DescriptorLayer<serde_json::Value, JsonSerializer>>(GrpcChannel).await?;
     Ok((!report.pass() as u8).into())
 }
 

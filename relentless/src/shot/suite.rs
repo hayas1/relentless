@@ -9,9 +9,9 @@ use serde::{Deserialize, Serialize};
 use tower::{MakeService, Service, ServiceExt};
 
 use crate::{
-    generator::Generator,
     http_newtype_serde,
     shot::{
+        contract::Contract,
         destinations::Destinations,
         hierarchy::Hierarchy,
         job::JobSpec,
@@ -40,15 +40,15 @@ pub struct Suite<Q, P> {
     pub profile: Profile<Q, P>,
 }
 impl<Q, P> Suite<Q, P> {
-    pub async fn service<'a, M, S>(
+    pub async fn service<'a, M, S, C>(
         &'a self,
         make_service: M,
         job: &'a JobSpec,
-    ) -> crate::Result<SuiteService<'a, M::Service, Q, P>>
+    ) -> crate::Result<SuiteService<'a, M::Service, C>>
     where
-        M: Clone + MakeService<http::Uri, Q::Request, Service = S>,
-        S: Clone + Service<Q::Request> + Send,
-        Q: Generator<S>,
+        M: Clone + MakeService<http::Uri, C::Request, Service = S>,
+        S: Clone + Service<C::Request> + Send,
+        C: Contract<S, ReqSource = Q, ResSink = P>,
     {
         let mut services = Destinations::default();
         for (d, http_newtype_serde::Uri(dest)) in self.destinations.iter() {
@@ -62,18 +62,19 @@ impl<Q, P> Suite<Q, P> {
     }
 }
 #[derive(Debug, Clone, PartialEq)]
-pub struct SuiteService<'a, S, Q, P> {
+pub struct SuiteService<'a, S, C: Contract<S>> {
     services: Destinations<S>,
     job: &'a JobSpec,
-    suite: &'a Suite<Q, P>,
+    suite: &'a Suite<C::ReqSource, C::ResSink>,
 }
-impl<'a, S, Q, P> Service<Testcase<Q, P>> for SuiteService<'a, S, Q, P>
+impl<'a, S, C> Service<Testcase<C::ReqSource, C::ResSink>> for SuiteService<'a, S, C>
 where
-    S: 'a + Clone + Service<Q::Request> + Send,
-    Q: Generator<S> + Send + Sync + 'static,
-    P: Send + Sync + 'static,
+    S: 'a + Clone + Service<C::Request> + Send,
+    C: Contract<S>,
+    C::ReqSource: Send + Sync + 'static,
+    C::ResSink: Send + Sync + 'static,
 {
-    type Response = CaseReport<Q, P>;
+    type Response = CaseReport<C::ReqSource, C::ResSink>;
     type Error = S::Error;
     type Future = Pin<Box<dyn 'a + Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
@@ -89,18 +90,19 @@ where
         }
     }
 
-    fn call(&mut self, case: Testcase<Q, P>) -> Self::Future {
+    fn call(&mut self, case: Testcase<C::ReqSource, C::ResSink>) -> Self::Future {
         let (service, job, suite) = (self.services.clone(), self.job, self.suite);
         Box::pin(async { Ok(case.shot(service, job, suite).await.unwrap()) })
     }
 }
-impl<'a, S, Q, P> Service<Testcase<Q, P>> for &'a SuiteService<'a, S, Q, P>
+impl<'a, S, C> Service<Testcase<C::ReqSource, C::ResSink>> for &'a SuiteService<'a, S, C>
 where
-    S: 'a + Clone + Service<Q::Request> + Send,
-    Q: Generator<S> + Send + Sync + 'static,
-    P: Send + Sync + 'static,
+    S: 'a + Clone + Service<C::Request> + Send,
+    C: Contract<S>,
+    C::ReqSource: Send + Sync + 'static,
+    C::ResSink: Send + Sync + 'static,
 {
-    type Response = CaseReport<Q, P>;
+    type Response = CaseReport<C::ReqSource, C::ResSink>;
     type Error = S::Error;
     type Future = Pin<Box<dyn 'a + Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
@@ -108,7 +110,7 @@ where
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, case: Testcase<Q, P>) -> Self::Future {
+    fn call(&mut self, case: Testcase<C::ReqSource, C::ResSink>) -> Self::Future {
         let (service, job, suite) = (self.services.clone(), self.job, self.suite);
         Box::pin(async { Ok(case.shot(service, job, suite).await.unwrap()) })
     }
@@ -119,15 +121,16 @@ pub struct SuiteReport<Q, P> {
     cases: Vec<CaseReport<Q, P>>,
 }
 impl<Q, P> SuiteCase<Q, P> {
-    pub async fn shot<M, S>(self, make_service: M, job: &JobSpec) -> crate::Result<SuiteReport<Q, P>>
+    pub async fn shot<M, S, C>(self, make_service: M, job: &JobSpec) -> crate::Result<SuiteReport<Q, P>>
     where
-        M: Clone + MakeService<http::Uri, Q::Request, Service = S>,
-        S: Clone + Service<Q::Request> + Send,
-        Q: Generator<S> + Send + Sync + 'static,
+        M: Clone + MakeService<http::Uri, C::Request, Service = S>,
+        S: Clone + Service<C::Request> + Send,
+        C: Contract<S, ReqSource = Q, ResSink = P>,
+        Q: Send + Sync + 'static,
         P: Send + Sync + 'static,
     {
         let buffers = if Hierarchy::Suite.contains(&job.sequential) { 1 } else { self.testcases.len().max(1) };
-        let suite = &self.suite.service(make_service, job).await?;
+        let suite = &self.suite.service::<_, _, C>(make_service, job).await?;
         let cases = futures::stream::iter(self.testcases)
             .map(|testcase| suite.oneshot(testcase))
             .buffer_unordered(buffers)

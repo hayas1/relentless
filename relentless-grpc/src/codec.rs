@@ -18,7 +18,7 @@ use tonic::{
 };
 use tower::{Layer, Service};
 
-use crate::{request::GrpcRequest, wip::JsonSerializer};
+use crate::{request::GrpcRequest, response::GrpcResponse, wip::JsonSerializer};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DescriptorLayer<D, S> {
@@ -32,7 +32,7 @@ impl<G, D, S> Layer<G> for DescriptorLayer<D, S> {
         DescriptorService { pool: self.pool.clone(), service }
     }
 }
-impl<G: Send, D: Send, S: Send> Contract<G, GrpcRequest> for DescriptorLayer<D, S>
+impl<G: Send, D: Send, S: Send> Contract<G> for DescriptorLayer<D, S>
 where
     G: GrpcService<tonic::body::Body> + Clone + Send + 'static,
     G::ResponseBody: Send,
@@ -40,8 +40,12 @@ where
     G::Future: Send + 'static,
     D: for<'a> Deserializer<'a> + Send + Sync + 'static,
     for<'a> <D as Deserializer<'a>>::Error: std::error::Error + Send + Sync + 'static,
+    S: Serializer + Clone + Send + Sync + 'static,
 {
-    type Request = (tonic::Request<D>, String);
+    type ReqSource = GrpcRequest;
+    type Request = http::Request<tonic::body::Body>;
+    type ResSink = GrpcResponse;
+    type Response = S::Ok;
     type Error = Status;
 
     async fn new(service: G, request: GrpcRequest) -> Result<Self, Self::Error> {
@@ -56,7 +60,7 @@ pub struct DescriptorService<G> {
     pool: DescriptorPool,
     service: G,
 }
-impl<G, D> Service<(tonic::Request<D>, String)> for DescriptorService<G>
+impl<G, D> Service<(String, tonic::Request<D>)> for DescriptorService<G>
 where
     G: GrpcService<tonic::body::Body> + Clone + Send + 'static,
     G::ResponseBody: Send,
@@ -73,9 +77,9 @@ where
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, req: (tonic::Request<D>, String)) -> Self::Future {
+    fn call(&mut self, req: (String, tonic::Request<D>)) -> Self::Future {
         let mut grpc = tonic::client::Grpc::new(self.service.clone());
-        let (request, target) = req;
+        let (target, request) = req;
         let path = PathAndQuery::from_str(&target).unwrap();
         let (svc, mtd) = target.split_once('/').unwrap();
         let service = self.pool.get_service_by_name(svc).unwrap();

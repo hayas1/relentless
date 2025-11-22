@@ -1,12 +1,12 @@
-use tower::{Layer, Service};
+use tower::Layer;
 
 #[trait_variant::make(Send)]
-pub trait Contract<S, Q>: Sized + Layer<S>
-where
-    Self::Service: Service<Self::Request>,
-{
+pub trait Contract<S>: Sized + Layer<S> {
+    type ReqSource;
     type Request;
+    type ResSink;
+    type Response;
     type Error;
 
-    async fn new(service: S, request: Q) -> Result<Self, Self::Error>;
+    async fn new(service: S, request: Self::ReqSource) -> Result<Self, Self::Error>;
 }

@@ -6,8 +6,9 @@ use futures::{StreamExt, TryStreamExt};
 use serde::{Deserialize, Serialize};
 use tower::{MakeService, Service};
 
+#[cfg(feature = "cli")]
+use crate::shot::contract::Contract;
 use crate::{
-    generator::Generator,
     report::ReportFormat,
     shot::{
         hierarchy::Hierarchy,
@@ -41,16 +42,17 @@ impl Cli {
         Ok((key.into(), value.into()))
     }
     #[cfg(feature = "cli")]
-    pub async fn shot<M, S, Q, P>(make_service: M) -> crate::Result<JobReport<Q, P>>
+    pub async fn shot<M, S, C>(make_service: M) -> crate::Result<JobReport<C::ReqSource, C::ResSink>>
     where
-        M: Clone + MakeService<http::Uri, Q::Request, Service = S>,
-        S: Clone + Service<Q::Request> + Send,
-        Q: Generator<S> + for<'a> Deserialize<'a> + Default + Send + Sync + 'static,
-        P: for<'a> Deserialize<'a> + Default + Send + Sync + 'static,
+        M: Clone + MakeService<http::Uri, C::Request, Service = S>,
+        S: Clone + Service<C::Request> + Send,
+        C: Contract<S>,
+        C::ReqSource: for<'a> Deserialize<'a> + Default + Send + Sync + 'static,
+        C::ResSink: for<'a> Deserialize<'a> + Default + Send + Sync + 'static,
     {
         let cli = Self::parse();
         let suites = Job::from_files(&cli.file)?;
-        suites.shot(make_service, &cli.job).await
+        suites.shot::<_, _, C>(make_service, &cli.job).await
     }
 }
 
@@ -117,16 +119,17 @@ pub struct JobReport<Q, P> {
     suites: Vec<SuiteReport<Q, P>>,
 }
 impl<Q, P> Job<Q, P> {
-    pub async fn shot<M, S>(self, make_service: M, job: &JobSpec) -> crate::Result<JobReport<Q, P>>
+    pub async fn shot<M, S, C>(self, make_service: M, job: &JobSpec) -> crate::Result<JobReport<Q, P>>
     where
-        M: Clone + MakeService<http::Uri, Q::Request, Service = S>,
-        S: Clone + Service<Q::Request> + Send,
-        Q: Generator<S> + Send + Sync + 'static,
+        M: Clone + MakeService<http::Uri, C::Request, Service = S>,
+        S: Clone + Service<C::Request> + Send,
+        C: Contract<S, ReqSource = Q, ResSink = P>,
+        Q: Send + Sync + 'static,
         P: Send + Sync + 'static,
     {
         let buffers = if Hierarchy::Job.contains(&job.sequential) { 1 } else { self.0.len().max(1) };
         let suites = futures::stream::iter(self.0)
-            .map(|sc| sc.shot(make_service.clone(), job))
+            .map(|sc| sc.shot::<_, _, C>(make_service.clone(), job))
             .buffer_unordered(buffers)
             .try_collect()
             .await?;
