@@ -4,9 +4,10 @@ use std::process::ExitCode;
 #[tokio::main]
 pub async fn main() -> Result<ExitCode, Box<dyn std::error::Error>> {
     use relentless::shot::job::Cli;
-    use relentless_http::{client::HttpClient, request::HttpRequest, response::HttpResponse};
+    use relentless_http::{client::HttpClient, service::HttpContract};
     let client = HttpClient::<reqwest::Body, reqwest::Body>::new().await?;
-    let report = Cli::shot::<_, _, HttpRequest, HttpResponse>(client).await?;
+    let make = tower::make::Shared::new(client);
+    let report = Cli::shot::<_, _, HttpContract<_, _>>(make).await?;
     Ok((!report.pass() as u8).into())
 }
 

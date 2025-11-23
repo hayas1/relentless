@@ -1,11 +1,9 @@
-use std::marker::PhantomData;
+use std::convert::Infallible;
 
 use bytes::Bytes;
 use http_body::Body;
-use relentless::{generator::Generator, http_newtype_serde};
+use relentless::{http_newtype_serde, shot::contract::RequestSource};
 use serde::{Deserialize, Serialize};
-
-use crate::client::HttpClient;
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
@@ -30,27 +28,21 @@ pub enum HttpRequestBody {
     Json(serde_json::Value),
 }
 
-impl<ReqB: Body + Send + Sync, ResB: Send> Generator<HttpClient<ReqB, ResB>> for HttpRequest {
-    type Request = http::Request<ReqB>;
-    type Error = reqwest::Error;
+impl<ReqB: Body + From<Bytes> + Default + Send + Sync> RequestSource<http::Request<ReqB>> for HttpRequest {
+    type Error = Infallible;
 
-    async fn generate(
-        &self,
-        _service: HttpClient<ReqB, ResB>,
-        _destination: &http::Uri,
-        _target: &str,
-    ) -> Result<Self::Request, Self::Error> {
-        todo!()
+    async fn produce(&self, destination: &http::Uri, target: &str) -> Result<http::Request<ReqB>, Self::Error> {
+        let b = self.body.produce(destination, target).await?;
+        let request =
+            http::Request::builder().uri(destination).method(http::Method::GET).body(b).unwrap_or_else(|_| todo!());
+        Ok(request)
     }
 }
 
-impl<ReqB: Body + From<Bytes> + Default + Send + Sync, ResB: Send> Generator<HttpClient<ReqB, ResB>>
-    for HttpRequestBody
-{
-    type Request = ReqB;
-    type Error = reqwest::Error;
+impl<ReqB: Body + From<Bytes> + Default + Send + Sync> RequestSource<ReqB> for HttpRequestBody {
+    type Error = Infallible;
 
-    async fn generate(&self, _: HttpClient<ReqB, ResB>, _: &http::Uri, _: &str) -> Result<Self::Request, Self::Error> {
+    async fn produce(&self, destination: &http::Uri, target: &str) -> Result<ReqB, Self::Error> {
         match self {
             Self::Empty => Ok(Default::default()),
             Self::Plaintext(s) => Ok(Bytes::from(s.to_string()).into()),

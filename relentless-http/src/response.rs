@@ -2,13 +2,11 @@ use http_body::Body;
 #[cfg(feature = "json")]
 use relentless::evaluator::json::JsonEvaluator;
 use relentless::{
-    evaluator::{expect::ExpectEvaluator, plaintext::PlaintextEvaluator, Evaluator},
+    evaluator::{expect::ExpectEvaluator, plaintext::PlaintextEvaluator},
     http_newtype_serde,
-    shot::destinations::Destinations,
+    shot::{contract::ResponseSink, destinations::Destinations},
 };
 use serde::{Deserialize, Serialize};
-
-use crate::client::HttpClient;
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
@@ -49,10 +47,8 @@ pub enum HttpRequestBody {
     Json(JsonEvaluator),
 }
 
-impl<ReqB: Send, ResB: Body + Send> Evaluator<HttpClient<ReqB, ResB>> for HttpResponse {
-    type Response = http::Response<ResB>;
-
-    async fn evaluate(&self, res: Destinations<Self::Response>) -> bool {
+impl<ResB: Body + Send, E: Send> ResponseSink<Result<http::Response<ResB>, E>> for HttpResponse {
+    async fn consume(&self, res: Destinations<Result<http::Response<ResB>, E>>) -> bool {
         todo!()
     }
 }

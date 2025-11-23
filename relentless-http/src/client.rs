@@ -27,24 +27,6 @@ impl<ReqB, ResB> HttpClient<ReqB, ResB> {
         Ok(Self { client, phantom: PhantomData })
     }
 }
-
-impl<ReqB, ResB> Service<http::Uri> for HttpClient<ReqB, ResB>
-where
-    ReqB: Into<reqwest::Body> + 'static,
-    ResB: From<reqwest::Body> + 'static,
-{
-    type Response = Self;
-    type Error = relentless::Error;
-    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
-
-    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
-    }
-
-    fn call(&mut self, _uri: http::Uri) -> Self::Future {
-        Box::pin(Self::new())
-    }
-}
 impl<ReqB, ResB> Service<http::Request<ReqB>> for HttpClient<ReqB, ResB>
 where
     ReqB: Into<reqwest::Body>,
