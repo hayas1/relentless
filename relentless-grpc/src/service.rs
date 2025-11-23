@@ -64,7 +64,7 @@ where
     type ResSink = GrpcResponse;
 
     type MakeError = Infallible;
-    async fn new(service: G, request: &GrpcRequest) -> Result<Self, Self::MakeError> {
+    async fn new(service: G, req: &GrpcRequest, _: &GrpcResponse) -> Result<Self, Self::MakeError> {
         let mut descriptor_bytes = Vec::new();
         // File::open(path)?.read_to_end(&mut descriptor_bytes)?;
         Ok(Self { pool: DescriptorPool::decode(Bytes::from(descriptor_bytes)).unwrap(), phantom: PhantomData })

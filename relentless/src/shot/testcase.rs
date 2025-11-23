@@ -71,7 +71,7 @@ impl<Q, P> Testcase<Q, P> {
     ) -> crate::Result<CaseReport<Q, P>>
     where
         S: Clone + Service<C::TransportReq, Response = C::TransportRes> + Send,
-        N: MakeContract<S, Q, C, C::MakeError>,
+        N: MakeContract<S, Q, P, C, C::MakeError>,
         C: Contract<S, ReqSource = Q, ResSink = P> + Layer<S>,
         C::Service: Service<C::Request, Response = C::Response>,
         Q: RequestSource<C::Request>,
@@ -86,7 +86,7 @@ impl<Q, P> Testcase<Q, P> {
                 let (make_contract, target) = (make_contract_ref, target_ref);
                 async move {
                     let layer = make_contract
-                        .make_contract(service.clone(), &profile.request)
+                        .make_contract(service.clone(), &profile.request, &profile.response)
                         .await
                         .unwrap_or_else(|_| todo!());
                     let service = layer.layer(service.clone());

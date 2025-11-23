@@ -49,7 +49,7 @@ impl Cli {
     where
         M: Clone + MakeService<http::Uri, C::TransportReq, Service = S>,
         S: Clone + Service<C::TransportReq, Response = C::TransportRes> + Send,
-        N: MakeContract<S, C::ReqSource, C, C::MakeError>,
+        N: MakeContract<S, C::ReqSource, C::ResSink, C, C::MakeError>,
         C: Contract<S> + Layer<S>,
         C::Service: Service<C::Request, Response = C::Response> + Send,
         C::ReqSource: for<'x> Deserialize<'x> + Default + RequestSource<C::Request>,
@@ -133,7 +133,7 @@ impl<Q, P> Job<Q, P> {
     where
         M: Clone + MakeService<http::Uri, C::TransportReq, Service = S>,
         S: Clone + Service<C::TransportReq, Response = C::TransportRes> + Send,
-        N: MakeContract<S, Q, C, C::MakeError>,
+        N: MakeContract<S, Q, P, C, C::MakeError>,
         C: Contract<S, ReqSource = Q, ResSink = P> + Layer<S>,
         C::Service: Service<C::Request, Response = C::Response> + Send,
         Q: RequestSource<C::Request>,
