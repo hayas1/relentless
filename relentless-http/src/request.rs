@@ -42,7 +42,7 @@ impl<ReqB: Body + From<Bytes> + Default> RequestSource<http::Request<ReqB>> for 
 impl<ReqB: Body + From<Bytes> + Default> RequestSource<ReqB> for HttpRequestBody {
     type Error = Infallible;
 
-    async fn produce(&self, destination: &http::Uri, target: &str) -> Result<ReqB, Self::Error> {
+    async fn produce(&self, _: &http::Uri, _: &str) -> Result<ReqB, Self::Error> {
         match self {
             Self::Empty => Ok(Default::default()),
             Self::Plaintext(s) => Ok(Bytes::from(s.to_string()).into()),
