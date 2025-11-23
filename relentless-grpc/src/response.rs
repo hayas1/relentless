@@ -1,3 +1,5 @@
+use std::convert::Infallible;
+
 use relentless::{
     evaluator::{json::JsonEvaluator, plaintext::PlaintextEvaluator},
     shot::{contract::ResponseSink, destinations::Destinations},
@@ -43,7 +45,8 @@ pub enum GrpcResponseMessage {
 }
 
 impl<Se: Send> ResponseSink<Result<tonic::Response<Se>, tonic::Status>> for GrpcResponse {
-    async fn consume(&self, res: Destinations<Result<tonic::Response<Se>, tonic::Status>>) -> bool {
+    type Error = Infallible;
+    async fn consume(&self, res: Destinations<Result<tonic::Response<Se>, tonic::Status>>) -> Result<(), Self::Error> {
         todo!()
     }
 }

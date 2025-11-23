@@ -25,5 +25,6 @@ pub trait RequestSource<De> {
 
 #[trait_variant::make(Send)]
 pub trait ResponseSink<Se> {
-    async fn consume(&self, res: Destinations<Se>) -> bool;
+    type Error;
+    async fn consume(&self, res: Destinations<Se>) -> Result<(), Self::Error>;
 }

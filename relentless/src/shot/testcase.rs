@@ -97,6 +97,6 @@ impl<Q, P> Testcase<Q, P> {
             .await
             .unwrap_or_else(|_| todo!());
         let pass = profile.response.consume(result).await;
-        Ok(CaseReport { case: self, passed: pass as usize })
+        Ok(CaseReport { case: self, passed: pass.is_ok() as usize })
     }
 }

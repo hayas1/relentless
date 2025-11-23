@@ -1,3 +1,5 @@
+use std::convert::Infallible;
+
 use http_body::Body;
 #[cfg(feature = "json")]
 use relentless::evaluator::json::JsonEvaluator;
@@ -48,7 +50,8 @@ pub enum HttpRequestBody {
 }
 
 impl<ResB: Body + Send, E: Send> ResponseSink<Result<http::Response<ResB>, E>> for HttpResponse {
-    async fn consume(&self, res: Destinations<Result<http::Response<ResB>, E>>) -> bool {
+    type Error = Infallible;
+    async fn consume(&self, res: Destinations<Result<http::Response<ResB>, E>>) -> Result<(), Self::Error> {
         todo!()
     }
 }
