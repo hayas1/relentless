@@ -28,7 +28,7 @@ pub enum HttpRequestBody {
     Json(serde_json::Value),
 }
 
-impl<ReqB: Body + From<Bytes> + Default + Send + Sync> RequestSource<http::Request<ReqB>> for HttpRequest {
+impl<ReqB: Body + From<Bytes> + Default> RequestSource<http::Request<ReqB>> for HttpRequest {
     type Error = Infallible;
 
     async fn produce(&self, destination: &http::Uri, target: &str) -> Result<http::Request<ReqB>, Self::Error> {
@@ -39,7 +39,7 @@ impl<ReqB: Body + From<Bytes> + Default + Send + Sync> RequestSource<http::Reque
     }
 }
 
-impl<ReqB: Body + From<Bytes> + Default + Send + Sync> RequestSource<ReqB> for HttpRequestBody {
+impl<ReqB: Body + From<Bytes> + Default> RequestSource<ReqB> for HttpRequestBody {
     type Error = Infallible;
 
     async fn produce(&self, destination: &http::Uri, target: &str) -> Result<ReqB, Self::Error> {
