@@ -7,9 +7,10 @@ pub trait Contract<S>: Sized + Layer<S> {
     type ReqSource;
     type Request;
     type TransportReq;
-    type ResSink;
-    type Response;
     type TransportRes;
+    type Response;
+    type ResSink;
+
     type ServiceError;
     type Error;
 

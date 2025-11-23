@@ -56,7 +56,7 @@ impl Repeat {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct CaseReport<Q, P> {
-    profile: Profile<Q, P>,
+    case: Testcase<Q, P>,
     passed: usize,
     // messages: Messages<T>,
     // aggregate: EvaluateAggregator,
@@ -77,23 +77,26 @@ impl<Q, P> Testcase<Q, P> {
     {
         let buffers =
             if Hierarchy::Testcase.contains(&job.sequential) { 1 } else { self.profile.repeat.times().max(1) };
+        let target_ref = &self.target;
         let profile = &self.profile;
-        let target = &self.target.clone();
         let result: Destinations<_> = futures::stream::iter(services.iter())
-            .map(|(name, service)| async move {
-                let layer = C::new(service.clone(), &profile.request).await.unwrap_or_else(|_| todo!());
-                let service = layer.layer(service.clone());
+            .map(move |(name, service)| {
+                let target = target_ref;
+                async move {
+                    let layer = C::new(service.clone(), &profile.request).await.unwrap_or_else(|_| todo!());
+                    let service = layer.layer(service.clone());
 
-                let destination = suite.destinations.get(name).unwrap_or_else(|| todo!());
-                let request = profile.request.produce(destination, target).await.unwrap_or_else(|_| todo!());
-                let response = service.oneshot(request).await;
-                Ok::<_, Infallible>((name.clone(), response))
+                    let destination = suite.destinations.get(name).unwrap_or_else(|| todo!());
+                    let request = profile.request.produce(destination, target).await.unwrap_or_else(|_| todo!());
+                    let response = service.oneshot(request).await;
+                    Ok::<_, Infallible>((name.clone(), response))
+                }
             })
             .buffer_unordered(services.len())
             .try_collect()
             .await
             .unwrap_or_else(|_| todo!());
         let pass = profile.response.consume(result).await;
-        Ok(CaseReport { profile: todo!(), passed: pass as usize })
+        Ok(CaseReport { case: self, passed: pass as usize })
     }
 }

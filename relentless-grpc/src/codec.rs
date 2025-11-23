@@ -43,9 +43,10 @@ where
     type ReqSource = GrpcRequest;
     type Request = (PathAndQuery, tonic::Request<D>);
     type TransportReq = http::Request<tonic::body::Body>;
-    type ResSink = GrpcResponse;
-    type Response = tonic::Response<S>;
     type TransportRes = http::Response<tonic::body::Body>;
+    type Response = tonic::Response<S>;
+    type ResSink = GrpcResponse;
+
     type ServiceError = tonic::Status;
     type Error = Status;
 
