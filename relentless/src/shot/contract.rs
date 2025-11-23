@@ -13,18 +13,18 @@ pub trait Contract<S>: Sized {
     type Response;
     type ResSink;
 
-    type MakeError;
-    async fn new(service: S, req: &Self::ReqSource, res: &Self::ResSink) -> Result<Self, Self::MakeError>;
+    type SignError;
+    async fn new(service: S, req: &Self::ReqSource, res: &Self::ResSink) -> Result<Self, Self::SignError>;
 }
 pub type TransportError<C, S> = <S as Service<<C as Contract<S>>::TransportReq>>::Error;
 pub type ServiceError<C, S> = <<C as Layer<S>>::Service as Service<<C as Contract<S>>::Request>>::Error;
 
-pub trait MakeContract<S, Q, P, C, E>: AsyncFn(S, &Q, &P) -> Result<C, E> {
-    fn make_contract(&self, service: S, req: &Q, res: &P) -> impl Future<Output = Result<C, E>> {
+pub trait SignContract<S, Q, P, C, E>: AsyncFn(S, &Q, &P) -> Result<C, E> {
+    fn sign_contract(&self, service: S, req: &Q, res: &P) -> impl Future<Output = Result<C, E>> {
         async { self(service, req, res).await }
     }
 }
-impl<F, S, Q, P, C, E> MakeContract<S, Q, P, C, E> for F where F: AsyncFn(S, &Q, &P) -> Result<C, E> {}
+impl<F, S, Q, P, C, E> SignContract<S, Q, P, C, E> for F where F: AsyncFn(S, &Q, &P) -> Result<C, E> {}
 
 #[trait_variant::make(Send)]
 pub trait RequestSource<De> {

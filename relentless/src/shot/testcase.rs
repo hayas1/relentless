@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use tower::{timeout::TimeoutLayer, Layer, Service, ServiceBuilder, ServiceExt};
 
 use crate::shot::{
-    contract::{Contract, MakeContract, RequestSource, ResponseSink, ServiceError},
+    contract::{Contract, RequestSource, ResponseSink, ServiceError, SignContract},
     destinations::Destinations,
     hierarchy::Hierarchy,
     job::JobSpec,
@@ -62,31 +62,31 @@ pub struct CaseReport<Q, P> {
     // aggregate: EvaluateAggregator,
 }
 impl<Q, P> Testcase<Q, P> {
-    pub async fn shot<S, N, C>(
+    pub async fn shot<T, S, C>(
         self,
-        services: &Destinations<S>,
-        make_contract: &N,
+        services: &Destinations<T>,
+        sign_contract: &S,
         job: &JobSpec,
         suite: &Suite<Q, P>,
     ) -> crate::Result<CaseReport<Q, P>>
     where
-        S: Clone + Service<C::TransportReq, Response = C::TransportRes> + Send,
-        N: MakeContract<S, Q, P, C, C::MakeError>,
-        C: Contract<S, ReqSource = Q, ResSink = P> + Layer<S>,
+        T: Clone + Service<C::TransportReq, Response = C::TransportRes> + Send,
+        S: SignContract<T, Q, P, C, C::SignError>,
+        C: Contract<T, ReqSource = Q, ResSink = P> + Layer<T>,
         C::Service: Service<C::Request, Response = C::Response>,
         Q: RequestSource<C::Request>,
-        P: ResponseSink<Result<C::Response, ServiceError<C, S>>>,
+        P: ResponseSink<Result<C::Response, ServiceError<C, T>>>,
     {
         let buffers =
             if Hierarchy::Testcase.contains(&job.sequential) { 1 } else { self.profile.repeat.times().max(1) };
-        let (make_contract_ref, target_ref) = (&make_contract, &self.target);
+        let (sign_contract_ref, target_ref) = (&sign_contract, &self.target);
         let profile = &self.profile;
         let result: Destinations<_> = futures::stream::iter(services.iter())
             .map(move |(name, service)| {
-                let (make_contract, target) = (make_contract_ref, target_ref);
+                let (sign_contract, target) = (sign_contract_ref, target_ref);
                 async move {
-                    let layer = make_contract
-                        .make_contract(service.clone(), &profile.request, &profile.response)
+                    let layer = sign_contract
+                        .sign_contract(service.clone(), &profile.request, &profile.response)
                         .await
                         .unwrap_or_else(|_| todo!());
                     let service = layer.layer(service.clone());

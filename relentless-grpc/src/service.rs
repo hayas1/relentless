@@ -63,8 +63,8 @@ where
     type Response = tonic::Response<<JsonSerializer as Serializer>::Ok>;
     type ResSink = GrpcResponse;
 
-    type MakeError = Infallible;
-    async fn new(service: G, req: &GrpcRequest, _: &GrpcResponse) -> Result<Self, Self::MakeError> {
+    type SignError = Infallible;
+    async fn new(service: G, req: &GrpcRequest, _: &GrpcResponse) -> Result<Self, Self::SignError> {
         let mut descriptor_bytes = Vec::new();
         // File::open(path)?.read_to_end(&mut descriptor_bytes)?;
         Ok(Self { pool: DescriptorPool::decode(Bytes::from(descriptor_bytes)).unwrap(), phantom: PhantomData })

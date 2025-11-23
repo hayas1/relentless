@@ -87,8 +87,8 @@ where
     type Response = Self::TransportRes;
     type ResSink = HttpResponse;
 
-    type MakeError = Infallible;
-    async fn new(_: S, _: &HttpRequest, _: &HttpResponse) -> Result<Self, Self::MakeError> {
+    type SignError = Infallible;
+    async fn new(_: S, _: &HttpRequest, _: &HttpResponse) -> Result<Self, Self::SignError> {
         Ok(HttpContract { phantom: PhantomData })
     }
 }

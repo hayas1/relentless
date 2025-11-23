@@ -5,7 +5,7 @@ use tower::{Layer, MakeService, Service};
 use crate::{
     http_newtype_serde,
     shot::{
-        contract::{Contract, MakeContract, RequestSource, ResponseSink, ServiceError},
+        contract::{Contract, RequestSource, ResponseSink, ServiceError, SignContract},
         destinations::Destinations,
         hierarchy::Hierarchy,
         job::JobSpec,
@@ -120,20 +120,20 @@ pub struct SuiteReport<Q, P> {
     cases: Vec<CaseReport<Q, P>>,
 }
 impl<Q, P> SuiteCase<Q, P> {
-    pub async fn shot<M, S, N, C>(
+    pub async fn shot<M, T, S, C>(
         self,
         make_service: M,
-        make_contract: &N,
+        sign_contract: &S,
         job: &JobSpec,
     ) -> crate::Result<SuiteReport<Q, P>>
     where
-        M: Clone + MakeService<http::Uri, C::TransportReq, Service = S>,
-        S: Clone + Service<C::TransportReq, Response = C::TransportRes> + Send,
-        N: MakeContract<S, Q, P, C, C::MakeError>,
-        C: Contract<S, ReqSource = Q, ResSink = P> + Layer<S>,
+        M: Clone + MakeService<http::Uri, C::TransportReq, Service = T>,
+        T: Clone + Service<C::TransportReq, Response = C::TransportRes> + Send,
+        S: SignContract<T, Q, P, C, C::SignError>,
+        C: Contract<T, ReqSource = Q, ResSink = P> + Layer<T>,
         C::Service: Service<C::Request, Response = C::Response> + Send,
         Q: RequestSource<C::Request>,
-        P: ResponseSink<Result<C::Response, ServiceError<C, S>>>,
+        P: ResponseSink<Result<C::Response, ServiceError<C, T>>>,
     {
         let buffers = if Hierarchy::Suite.contains(&job.sequential) { 1 } else { self.testcases.len().max(1) };
         let mut services = Destinations::default();
@@ -144,7 +144,7 @@ impl<Q, P> SuiteCase<Q, P> {
             );
         }
         let cases = futures::stream::iter(self.testcases)
-            .map(|t| t.shot(&services, make_contract, job, &self.suite))
+            .map(|t| t.shot(&services, sign_contract, job, &self.suite))
             .buffer_unordered(buffers)
             .try_collect()
             .await
