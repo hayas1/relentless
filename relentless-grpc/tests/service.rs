@@ -2,7 +2,7 @@ use relentless::{
     report::ReportFormat,
     shot::job::{Job, JobSpec},
 };
-use relentless_grpc::{request::GrpcRequest, response::GrpcResponse, service::DynamicContract};
+use relentless_grpc::{request::GrpcRequest, response::GrpcResponse, service::DynamicContract, wip::JsonSerializer};
 use relentless_grpc_dev_server::service::greeter::{pb::greeter_server::GreeterServer, GreeterImpl};
 use tower::make::Shared;
 
@@ -13,7 +13,7 @@ async fn test_example_yaml_config() {
     let job = Job::<GrpcRequest, GrpcResponse>::from_files(&files.unwrap()).unwrap();
 
     let server = Shared::new(GreeterServer::new(GreeterImpl));
-    let report = job.shot(server, DynamicContract::<serde_json::Value, _>::new, &spec).await.unwrap();
+    let report = job.shot(server, DynamicContract::<serde_json::Value, JsonSerializer>::new, &spec).await.unwrap();
 
     assert!(report.pass());
 }

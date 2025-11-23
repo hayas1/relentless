@@ -6,7 +6,7 @@ use std::{
     task::{Context, Poll},
 };
 
-use relentless::shot::contract::Contract;
+use relentless::shot::contract::{Contract, RequestSource, ResponseSink};
 use tower::{layer::util::Identity, Layer, Service};
 
 use crate::{request::HttpRequest, response::HttpResponse};
@@ -91,8 +91,6 @@ where
     type TransportRes = http::Response<ResB>;
     type Response = Self::TransportRes;
     type ResSink = HttpResponse;
-
-    type ServiceError = S::Error;
 }
 
 #[cfg(test)]

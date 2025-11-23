@@ -67,10 +67,8 @@ where
     type Request = (PathAndQuery, tonic::Request<D>);
     type TransportReq = http::Request<tonic::body::Body>;
     type TransportRes = http::Response<tonic::body::Body>;
-    type Response = tonic::Response<S>;
+    type Response = tonic::Response<<JsonSerializer as Serializer>::Ok>;
     type ResSink = GrpcResponse;
-
-    type ServiceError = tonic::Status;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

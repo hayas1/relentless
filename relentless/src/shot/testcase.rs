@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use tower::{timeout::TimeoutLayer, Layer, Service, ServiceBuilder, ServiceExt};
 
 use crate::shot::{
-    contract::{Contract, MakeContract, RequestSource, ResponseSink},
+    contract::{Contract, MakeContract, RequestSource, ResponseSink, ServiceError},
     destinations::Destinations,
     hierarchy::Hierarchy,
     job::JobSpec,
@@ -73,9 +73,9 @@ impl<Q, P> Testcase<Q, P> {
         S: Clone + Service<C::TransportReq, Response = C::TransportRes> + Send,
         N: MakeContract<S, Q, C, Infallible>,
         C: Contract<S, ReqSource = Q, ResSink = P> + Layer<S>,
-        C::Service: Service<C::Request, Response = C::Response, Error = C::ServiceError>,
-        Q: RequestSource<C::Request> + 'static,
-        P: ResponseSink<Result<C::Response, C::ServiceError>> + 'static,
+        C::Service: Service<C::Request, Response = C::Response>,
+        Q: RequestSource<C::Request>,
+        P: ResponseSink<Result<C::Response, ServiceError<C, S>>>,
     {
         let buffers =
             if Hierarchy::Testcase.contains(&job.sequential) { 1 } else { self.profile.repeat.times().max(1) };

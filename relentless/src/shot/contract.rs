@@ -1,18 +1,20 @@
 use std::future::Future;
 
+use tower::{Layer, Service};
+
 use crate::shot::destinations::Destinations;
 
 #[trait_variant::make(Send)]
-pub trait Contract<S>: Sized {
+pub trait Contract<S> {
     type ReqSource;
     type Request;
     type TransportReq;
     type TransportRes;
     type Response;
     type ResSink;
-
-    type ServiceError;
 }
+pub type TransportError<C, S> = <S as Service<<C as Contract<S>>::TransportReq>>::Error;
+pub type ServiceError<C, S> = <<C as Layer<S>>::Service as Service<<C as Contract<S>>::Request>>::Error;
 
 pub trait MakeContract<S, Q, C, E>: AsyncFn(S, &Q) -> Result<C, E> {
     fn make_contract(&self, service: S, request: &Q) -> impl Future<Output = Result<C, E>> {

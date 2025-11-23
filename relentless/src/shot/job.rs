@@ -8,13 +8,10 @@ use serde::{Deserialize, Serialize};
 use tower::Layer;
 use tower::{MakeService, Service};
 
-use crate::shot::contract::MakeContract;
-#[cfg(feature = "cli")]
-use crate::shot::contract::{Contract, RequestSource};
 use crate::{
     report::ReportFormat,
     shot::{
-        contract::ResponseSink,
+        contract::{Contract, MakeContract, RequestSource, ResponseSink, ServiceError},
         hierarchy::Hierarchy,
         suite::{SuiteCase, SuiteReport},
     },
@@ -55,9 +52,9 @@ impl Cli {
         S: Clone + Service<C::TransportReq, Response = C::TransportRes> + Send,
         N: MakeContract<S, C::ReqSource, C, Infallible>,
         C: Contract<S> + Layer<S>,
-        C::Service: Service<C::Request, Response = C::Response, Error = C::ServiceError> + Send,
-        C::ReqSource: for<'x> Deserialize<'x> + Default + RequestSource<C::Request> + 'static,
-        C::ResSink: for<'x> Deserialize<'x> + Default + ResponseSink<Result<C::Response, C::ServiceError>> + 'static,
+        C::Service: Service<C::Request, Response = C::Response> + Send,
+        C::ReqSource: for<'x> Deserialize<'x> + Default + RequestSource<C::Request>,
+        C::ResSink: for<'x> Deserialize<'x> + Default + ResponseSink<Result<C::Response, ServiceError<C, S>>>,
     {
         let cli = Self::parse();
         let suites = Job::from_files(&cli.file)?;
@@ -139,9 +136,9 @@ impl<Q, P> Job<Q, P> {
         S: Clone + Service<C::TransportReq, Response = C::TransportRes> + Send,
         N: MakeContract<S, Q, C, Infallible>,
         C: Contract<S, ReqSource = Q, ResSink = P> + Layer<S>,
-        C::Service: Service<C::Request, Response = C::Response, Error = C::ServiceError> + Send,
-        Q: RequestSource<C::Request> + 'static,
-        P: ResponseSink<Result<C::Response, C::ServiceError>> + 'static,
+        C::Service: Service<C::Request, Response = C::Response> + Send,
+        Q: RequestSource<C::Request>,
+        P: ResponseSink<Result<C::Response, ServiceError<C, S>>>,
     {
         let buffers = if Hierarchy::Job.contains(&job.sequential) { 1 } else { self.0.len().max(1) };
         let suites = futures::stream::iter(self.0)
