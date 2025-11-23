@@ -49,13 +49,8 @@ impl Cli {
         S: Clone + Service<C::TransportReq, Response = C::TransportRes> + Send,
         C: Contract<S>,
         C::Service: Service<C::Request, Response = C::Response, Error = C::ServiceError> + Send,
-        C::ReqSource: for<'x> Deserialize<'x> + Default + RequestSource<C::Request> + Send + Sync + 'static,
-        C::ResSink: for<'x> Deserialize<'x>
-            + Default
-            + ResponseSink<Result<C::Response, C::ServiceError>>
-            + Send
-            + Sync
-            + 'static,
+        C::ReqSource: for<'x> Deserialize<'x> + Default + RequestSource<C::Request> + 'static,
+        C::ResSink: for<'x> Deserialize<'x> + Default + ResponseSink<Result<C::Response, C::ServiceError>> + 'static,
     {
         let cli = Self::parse();
         let suites = Job::from_files(&cli.file)?;
@@ -132,8 +127,8 @@ impl<Q, P> Job<Q, P> {
         S: Clone + Service<C::TransportReq, Response = C::TransportRes> + Send,
         C: Contract<S, ReqSource = Q, ResSink = P>,
         C::Service: Service<C::Request, Response = C::Response, Error = C::ServiceError> + Send,
-        Q: RequestSource<C::Request> + Send + Sync + 'static,
-        P: ResponseSink<Result<C::Response, C::ServiceError>> + Send + Sync + 'static,
+        Q: RequestSource<C::Request> + 'static,
+        P: ResponseSink<Result<C::Response, C::ServiceError>> + 'static,
     {
         let buffers = if Hierarchy::Job.contains(&job.sequential) { 1 } else { self.0.len().max(1) };
         let suites = futures::stream::iter(self.0)

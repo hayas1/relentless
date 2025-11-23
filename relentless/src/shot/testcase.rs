@@ -72,8 +72,8 @@ impl<Q, P> Testcase<Q, P> {
         S: Clone + Service<C::TransportReq, Response = C::TransportRes> + Send,
         C: Contract<S, ReqSource = Q, ResSink = P>,
         C::Service: Service<C::Request, Response = C::Response, Error = C::ServiceError>,
-        Q: RequestSource<C::Request> + Send + Sync + 'static,
-        P: ResponseSink<Result<C::Response, C::ServiceError>> + Send + Sync + 'static,
+        Q: RequestSource<C::Request> + 'static,
+        P: ResponseSink<Result<C::Response, C::ServiceError>> + 'static,
     {
         let buffers =
             if Hierarchy::Testcase.contains(&job.sequential) { 1 } else { self.profile.repeat.times().max(1) };
