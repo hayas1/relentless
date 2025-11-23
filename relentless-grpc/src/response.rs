@@ -4,8 +4,6 @@ use relentless::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::client::GrpcClient;
-
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct GrpcResponse {
