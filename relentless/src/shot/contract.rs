@@ -1,9 +1,7 @@
-use tower::Layer;
-
 use crate::shot::destinations::Destinations;
 
 #[trait_variant::make(Send)]
-pub trait Contract<S>: Sized + Layer<S> {
+pub trait Contract<S>: Sized {
     type ReqSource;
     type Request;
     type TransportReq;

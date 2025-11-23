@@ -1,6 +1,6 @@
 use futures::{StreamExt, TryStreamExt};
 use serde::{Deserialize, Serialize};
-use tower::{MakeService, Service};
+use tower::{Layer, MakeService, Service};
 
 use crate::{
     http_newtype_serde,
@@ -124,7 +124,7 @@ impl<Q, P> SuiteCase<Q, P> {
     where
         M: Clone + MakeService<http::Uri, C::TransportReq, Service = S>,
         S: Clone + Service<C::TransportReq, Response = C::TransportRes> + Send,
-        C: Contract<S, ReqSource = Q, ResSink = P>,
+        C: Contract<S, ReqSource = Q, ResSink = P> + Layer<S>,
         C::Service: Service<C::Request, Response = C::Response, Error = C::ServiceError> + Send,
         Q: RequestSource<C::Request> + 'static,
         P: ResponseSink<Result<C::Response, C::ServiceError>> + 'static,

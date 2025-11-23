@@ -2,7 +2,7 @@ use std::{convert::Infallible, ops::Range, time::Duration};
 
 use futures::{StreamExt, TryStreamExt};
 use serde::{Deserialize, Serialize};
-use tower::{timeout::TimeoutLayer, Service, ServiceBuilder, ServiceExt};
+use tower::{timeout::TimeoutLayer, Layer, Service, ServiceBuilder, ServiceExt};
 
 use crate::shot::{
     contract::{Contract, RequestSource, ResponseSink},
@@ -70,7 +70,7 @@ impl<Q, P> Testcase<Q, P> {
     ) -> crate::Result<CaseReport<Q, P>>
     where
         S: Clone + Service<C::TransportReq, Response = C::TransportRes> + Send,
-        C: Contract<S, ReqSource = Q, ResSink = P>,
+        C: Contract<S, ReqSource = Q, ResSink = P> + Layer<S>,
         C::Service: Service<C::Request, Response = C::Response, Error = C::ServiceError>,
         Q: RequestSource<C::Request> + 'static,
         P: ResponseSink<Result<C::Response, C::ServiceError>> + 'static,

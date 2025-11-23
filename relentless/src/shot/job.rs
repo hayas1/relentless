@@ -4,6 +4,7 @@ use std::{fs::File, path::PathBuf};
 use clap::{Args, Parser};
 use futures::{StreamExt, TryStreamExt};
 use serde::{Deserialize, Serialize};
+use tower::Layer;
 use tower::{MakeService, Service};
 
 #[cfg(feature = "cli")]
@@ -47,7 +48,7 @@ impl Cli {
     where
         M: Clone + MakeService<http::Uri, C::TransportReq, Service = S>,
         S: Clone + Service<C::TransportReq, Response = C::TransportRes> + Send,
-        C: Contract<S>,
+        C: Contract<S> + Layer<S>,
         C::Service: Service<C::Request, Response = C::Response, Error = C::ServiceError> + Send,
         C::ReqSource: for<'x> Deserialize<'x> + Default + RequestSource<C::Request> + 'static,
         C::ResSink: for<'x> Deserialize<'x> + Default + ResponseSink<Result<C::Response, C::ServiceError>> + 'static,
@@ -125,7 +126,7 @@ impl<Q, P> Job<Q, P> {
     where
         M: Clone + MakeService<http::Uri, C::TransportReq, Service = S>,
         S: Clone + Service<C::TransportReq, Response = C::TransportRes> + Send,
-        C: Contract<S, ReqSource = Q, ResSink = P>,
+        C: Contract<S, ReqSource = Q, ResSink = P> + Layer<S>,
         C::Service: Service<C::Request, Response = C::Response, Error = C::ServiceError> + Send,
         Q: RequestSource<C::Request> + 'static,
         P: ResponseSink<Result<C::Response, C::ServiceError>> + 'static,
