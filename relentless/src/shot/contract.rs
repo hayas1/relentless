@@ -5,13 +5,16 @@ use tower::{Layer, Service};
 use crate::shot::destinations::Destinations;
 
 #[trait_variant::make(Send)]
-pub trait Contract<S> {
+pub trait Contract<S>: Sized {
     type ReqSource;
     type Request;
     type TransportReq;
     type TransportRes;
     type Response;
     type ResSink;
+
+    type MakeError;
+    async fn new(service: S, request: &Self::ReqSource) -> Result<Self, Self::MakeError>;
 }
 pub type TransportError<C, S> = <S as Service<<C as Contract<S>>::TransportReq>>::Error;
 pub type ServiceError<C, S> = <<C as Layer<S>>::Service as Service<<C as Contract<S>>::Request>>::Error;

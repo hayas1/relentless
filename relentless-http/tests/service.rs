@@ -1,7 +1,10 @@
 use axum::body::Body;
 use relentless::{
     report::ReportFormat,
-    shot::job::{Job, JobSpec},
+    shot::{
+        contract::Contract,
+        job::{Job, JobSpec},
+    },
 };
 use relentless_http::{request::HttpRequest, response::HttpResponse, service::HttpContract};
 

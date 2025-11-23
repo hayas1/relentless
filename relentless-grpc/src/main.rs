@@ -3,7 +3,7 @@ use std::process::ExitCode;
 #[cfg(feature = "cli")]
 #[tokio::main]
 pub async fn main() -> Result<ExitCode, Box<dyn std::error::Error>> {
-    use relentless::shot::job::Cli;
+    use relentless::shot::{contract::Contract, job::Cli};
     use relentless_grpc::{
         service::{DynamicContract, MakeChannel},
         wip::JsonSerializer,

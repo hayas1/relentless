@@ -40,13 +40,6 @@ pub struct DynamicContract<D, S> {
     pool: DescriptorPool,
     phantom: PhantomData<(D, S)>,
 }
-impl<D, S> DynamicContract<D, S> {
-    pub async fn new<G>(service: G, request: &GrpcRequest) -> Result<Self, Infallible> {
-        let mut descriptor_bytes = Vec::new();
-        // File::open(path)?.read_to_end(&mut descriptor_bytes)?;
-        Ok(Self { pool: DescriptorPool::decode(Bytes::from(descriptor_bytes)).unwrap(), phantom: PhantomData })
-    }
-}
 impl<G, D, S> Layer<G> for DynamicContract<D, S> {
     type Service = DynamicService<G, D, S>;
 
@@ -69,6 +62,13 @@ where
     type TransportRes = http::Response<tonic::body::Body>;
     type Response = tonic::Response<<JsonSerializer as Serializer>::Ok>;
     type ResSink = GrpcResponse;
+
+    type MakeError = Infallible;
+    async fn new(service: G, request: &GrpcRequest) -> Result<Self, Self::MakeError> {
+        let mut descriptor_bytes = Vec::new();
+        // File::open(path)?.read_to_end(&mut descriptor_bytes)?;
+        Ok(Self { pool: DescriptorPool::decode(Bytes::from(descriptor_bytes)).unwrap(), phantom: PhantomData })
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

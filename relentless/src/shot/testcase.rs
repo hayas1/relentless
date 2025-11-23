@@ -71,7 +71,7 @@ impl<Q, P> Testcase<Q, P> {
     ) -> crate::Result<CaseReport<Q, P>>
     where
         S: Clone + Service<C::TransportReq, Response = C::TransportRes> + Send,
-        N: MakeContract<S, Q, C, Infallible>,
+        N: MakeContract<S, Q, C, C::MakeError>,
         C: Contract<S, ReqSource = Q, ResSink = P> + Layer<S>,
         C::Service: Service<C::Request, Response = C::Response>,
         Q: RequestSource<C::Request>,

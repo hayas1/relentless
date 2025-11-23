@@ -1,6 +1,9 @@
 use relentless::{
     report::ReportFormat,
-    shot::job::{Job, JobSpec},
+    shot::{
+        contract::Contract,
+        job::{Job, JobSpec},
+    },
 };
 use relentless_grpc::{request::GrpcRequest, response::GrpcResponse, service::DynamicContract, wip::JsonSerializer};
 use relentless_grpc_dev_server::service::greeter::{pb::greeter_server::GreeterServer, GreeterImpl};
