@@ -67,6 +67,11 @@ where
 pub struct HttpContract<ReqB, ResB> {
     phantom: PhantomData<(ReqB, ResB)>,
 }
+impl<ReqB, ResB> HttpContract<ReqB, ResB> {
+    pub async fn new<S>(_: S, _: &HttpRequest) -> Result<Self, Infallible> {
+        Ok(HttpContract { phantom: PhantomData })
+    }
+}
 impl<S, ReqB, ResB> Layer<S> for HttpContract<ReqB, ResB> {
     type Service = <Identity as Layer<S>>::Service;
 
@@ -88,11 +93,6 @@ where
     type ResSink = HttpResponse;
 
     type ServiceError = S::Error;
-    type Error = Infallible;
-
-    async fn new(_: S, _: &Self::ReqSource) -> Result<Self, Self::Error> {
-        Ok(HttpContract { phantom: PhantomData })
-    }
 }
 
 #[cfg(test)]

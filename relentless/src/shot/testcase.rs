@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use tower::{timeout::TimeoutLayer, Layer, Service, ServiceBuilder, ServiceExt};
 
 use crate::shot::{
-    contract::{Contract, RequestSource, ResponseSink},
+    contract::{Contract, MakeContract, RequestSource, ResponseSink},
     destinations::Destinations,
     hierarchy::Hierarchy,
     job::JobSpec,
@@ -62,14 +62,16 @@ pub struct CaseReport<Q, P> {
     // aggregate: EvaluateAggregator,
 }
 impl<Q, P> Testcase<Q, P> {
-    pub async fn shot<S, C>(
+    pub async fn shot<S, N, C>(
         self,
         services: &Destinations<S>,
+        make_contract: &N,
         job: &JobSpec,
         suite: &Suite<Q, P>,
     ) -> crate::Result<CaseReport<Q, P>>
     where
         S: Clone + Service<C::TransportReq, Response = C::TransportRes> + Send,
+        N: MakeContract<S, Q, C, Infallible>,
         C: Contract<S, ReqSource = Q, ResSink = P> + Layer<S>,
         C::Service: Service<C::Request, Response = C::Response, Error = C::ServiceError>,
         Q: RequestSource<C::Request> + 'static,
@@ -77,13 +79,16 @@ impl<Q, P> Testcase<Q, P> {
     {
         let buffers =
             if Hierarchy::Testcase.contains(&job.sequential) { 1 } else { self.profile.repeat.times().max(1) };
-        let target_ref = &self.target;
+        let (make_contract_ref, target_ref) = (&make_contract, &self.target);
         let profile = &self.profile;
         let result: Destinations<_> = futures::stream::iter(services.iter())
             .map(move |(name, service)| {
-                let target = target_ref;
+                let (make_contract, target) = (make_contract_ref, target_ref);
                 async move {
-                    let layer = C::new(service.clone(), &profile.request).await.unwrap_or_else(|_| todo!());
+                    let layer = make_contract
+                        .make_contract(service.clone(), &profile.request)
+                        .await
+                        .unwrap_or_else(|_| todo!());
                     let service = layer.layer(service.clone());
 
                     let destination = suite.destinations.get(name).unwrap_or_else(|| todo!());

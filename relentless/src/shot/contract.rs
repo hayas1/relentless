@@ -1,3 +1,5 @@
+use std::future::Future;
+
 use crate::shot::destinations::Destinations;
 
 #[trait_variant::make(Send)]
@@ -10,10 +12,14 @@ pub trait Contract<S>: Sized {
     type ResSink;
 
     type ServiceError;
-    type Error;
-
-    async fn new(service: S, request: &Self::ReqSource) -> Result<Self, Self::Error>;
 }
+
+pub trait MakeContract<S, Q, C, E>: AsyncFn(S, &Q) -> Result<C, E> {
+    fn make_contract(&self, service: S, request: &Q) -> impl Future<Output = Result<C, E>> {
+        async { self(service, request).await }
+    }
+}
+impl<F, S, Q, C, E> MakeContract<S, Q, C, E> for F where F: AsyncFn(S, &Q) -> Result<C, E> {}
 
 #[trait_variant::make(Send)]
 pub trait RequestSource<De> {

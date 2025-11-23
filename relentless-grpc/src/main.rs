@@ -5,7 +5,7 @@ use std::process::ExitCode;
 pub async fn main() -> Result<ExitCode, Box<dyn std::error::Error>> {
     use relentless::shot::job::Cli;
     use relentless_grpc::service::{DynamicContract, MakeChannel};
-    let report = Cli::shot::<_, _, DynamicContract<serde_json::Value, _>>(MakeChannel).await?;
+    let report = Cli::shot(MakeChannel, DynamicContract::<serde_json::Value, _>::new).await?;
     Ok((!report.pass() as u8).into())
 }
 

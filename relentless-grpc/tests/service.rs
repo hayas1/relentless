@@ -13,7 +13,7 @@ async fn test_example_yaml_config() {
     let job = Job::<GrpcRequest, GrpcResponse>::from_files(&files.unwrap()).unwrap();
 
     let server = Shared::new(GreeterServer::new(GreeterImpl));
-    let report = job.shot::<_, _, DynamicContract<serde_json::Value, _>>(server, &spec).await.unwrap();
+    let report = job.shot(server, DynamicContract::<serde_json::Value, _>::new, &spec).await.unwrap();
 
     assert!(report.pass());
 }

@@ -13,7 +13,7 @@ async fn test_example_yaml_config() {
 
     let app = relentless_http_dev_server::route::app_with(Default::default());
     let make = axum::ServiceExt::<axum::extract::Request>::into_make_service(app);
-    let report = job.shot::<_, _, HttpContract<Body, Body>>(make, &spec).await.unwrap();
+    let report = job.shot(make, HttpContract::<Body, Body>::new, &spec).await.unwrap();
 
     assert!(report.pass());
 }

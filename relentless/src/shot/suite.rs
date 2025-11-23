@@ -1,3 +1,5 @@
+use std::convert::Infallible;
+
 use futures::{StreamExt, TryStreamExt};
 use serde::{Deserialize, Serialize};
 use tower::{Layer, MakeService, Service};
@@ -5,7 +7,7 @@ use tower::{Layer, MakeService, Service};
 use crate::{
     http_newtype_serde,
     shot::{
-        contract::{Contract, RequestSource, ResponseSink},
+        contract::{Contract, MakeContract, RequestSource, ResponseSink},
         destinations::Destinations,
         hierarchy::Hierarchy,
         job::JobSpec,
@@ -120,10 +122,16 @@ pub struct SuiteReport<Q, P> {
     cases: Vec<CaseReport<Q, P>>,
 }
 impl<Q, P> SuiteCase<Q, P> {
-    pub async fn shot<M, S, C>(self, make_service: M, job: &JobSpec) -> crate::Result<SuiteReport<Q, P>>
+    pub async fn shot<M, S, N, C>(
+        self,
+        make_service: M,
+        make_contract: &N,
+        job: &JobSpec,
+    ) -> crate::Result<SuiteReport<Q, P>>
     where
         M: Clone + MakeService<http::Uri, C::TransportReq, Service = S>,
         S: Clone + Service<C::TransportReq, Response = C::TransportRes> + Send,
+        N: MakeContract<S, Q, C, Infallible>,
         C: Contract<S, ReqSource = Q, ResSink = P> + Layer<S>,
         C::Service: Service<C::Request, Response = C::Response, Error = C::ServiceError> + Send,
         Q: RequestSource<C::Request> + 'static,
@@ -138,7 +146,7 @@ impl<Q, P> SuiteCase<Q, P> {
             );
         }
         let cases = futures::stream::iter(self.testcases)
-            .map(|t| t.shot::<_, C>(&services, job, &self.suite))
+            .map(|t| t.shot(&services, make_contract, job, &self.suite))
             .buffer_unordered(buffers)
             .try_collect()
             .await
