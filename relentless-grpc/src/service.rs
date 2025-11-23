@@ -35,18 +35,18 @@ impl Service<http::Uri> for MakeChannel {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DescriptorLayer<D, S> {
+pub struct DynamicContract<D, S> {
     pool: DescriptorPool,
     phantom: PhantomData<(D, S)>,
 }
-impl<G, D, S> Layer<G> for DescriptorLayer<D, S> {
-    type Service = DescriptorService<G, D, S>;
+impl<G, D, S> Layer<G> for DynamicContract<D, S> {
+    type Service = DynamicService<G, D, S>;
 
     fn layer(&self, service: G) -> Self::Service {
-        DescriptorService { pool: self.pool.clone(), service, phantom: PhantomData }
+        DynamicService { pool: self.pool.clone(), service, phantom: PhantomData }
     }
 }
-impl<G: Send, D: Send, S: Send> Contract<G> for DescriptorLayer<D, S>
+impl<G: Send, D: Send, S: Send> Contract<G> for DynamicContract<D, S>
 where
     G: GrpcService<tonic::body::Body> + Clone + Send + 'static,
     G::ResponseBody: Send,
@@ -73,12 +73,12 @@ where
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DescriptorService<G, D, S> {
+pub struct DynamicService<G, D, S> {
     pool: DescriptorPool,
     service: G,
     phantom: PhantomData<(D, S)>,
 }
-impl<G, D, S> Service<(PathAndQuery, tonic::Request<D>)> for DescriptorService<G, D, S>
+impl<G, D, S> Service<(PathAndQuery, tonic::Request<D>)> for DynamicService<G, D, S>
 where
     G: GrpcService<tonic::body::Body> + Clone + Send + 'static,
     G::ResponseBody: Send,
