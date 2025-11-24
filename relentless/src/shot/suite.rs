@@ -1,4 +1,4 @@
-use futures::{StreamExt, TryStreamExt};
+use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use tower::{Layer, MakeService, Service};
 
@@ -125,7 +125,7 @@ impl<Q, P> SuiteCase<Q, P> {
         make_service: M,
         sign_contract: &S,
         job: &JobSpec,
-    ) -> crate::Result<SuiteReport<Q, P, ShotError<T, C>>>
+    ) -> SuiteReport<Q, P, ShotError<T, C>>
     where
         M: Clone + MakeService<http::Uri, C::TransportReq, Service = T>,
         T: Clone + Service<C::TransportReq, Response = C::TransportRes> + Send,
@@ -146,9 +146,8 @@ impl<Q, P> SuiteCase<Q, P> {
         let cases = futures::stream::iter(self.testcases)
             .map(|t| t.shot(&services, sign_contract, job, &self.suite))
             .buffer_unordered(buffers)
-            .try_collect()
-            .await
-            .unwrap_or_else(|_| todo!());
-        Ok(SuiteReport { cases })
+            .collect()
+            .await;
+        SuiteReport { cases }
     }
 }

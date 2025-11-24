@@ -2,7 +2,7 @@ use std::{fs::File, path::PathBuf};
 
 #[cfg(feature = "cli")]
 use clap::{Args, Parser};
-use futures::{StreamExt, TryStreamExt};
+use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use tower::Layer;
 use tower::{MakeService, Service};
@@ -46,7 +46,7 @@ impl Cli {
     pub async fn shot<M, T, S, C>(
         make_service: M,
         sign_contract: S,
-    ) -> crate::Result<JobReport<C::ReqSource, C::ResSink, ShotError<T, C>>>
+    ) -> JobReport<C::ReqSource, C::ResSink, ShotError<T, C>>
     where
         M: Clone + MakeService<http::Uri, C::TransportReq, Service = T>,
         T: Clone + Service<C::TransportReq, Response = C::TransportRes> + Send,
@@ -57,7 +57,7 @@ impl Cli {
         C::ResSink: for<'x> Deserialize<'x> + Default + ResponseSink<Result<C::Response, ServiceError<T, C>>>,
     {
         let cli = Self::parse();
-        let suites = Job::from_files(&cli.file)?;
+        let suites = Job::from_files(&cli.file).unwrap();
         suites.shot(make_service, sign_contract, &cli.job).await
     }
 }
@@ -130,7 +130,7 @@ impl<Q, P> Job<Q, P> {
         make_service: M,
         sign_contract: S,
         job: &JobSpec,
-    ) -> crate::Result<JobReport<Q, P, ShotError<T, C>>>
+    ) -> JobReport<Q, P, ShotError<T, C>>
     where
         M: Clone + MakeService<http::Uri, C::TransportReq, Service = T>,
         T: Clone + Service<C::TransportReq, Response = C::TransportRes> + Send,
@@ -144,9 +144,9 @@ impl<Q, P> Job<Q, P> {
         let suites = futures::stream::iter(self.0)
             .map(|sc| sc.shot(make_service.clone(), &sign_contract, job))
             .buffer_unordered(buffers)
-            .try_collect()
-            .await?;
-        Ok(JobReport { suites })
+            .collect()
+            .await;
+        JobReport { suites }
     }
 }
 impl<Q, P, E> JobReport<Q, P, E> {

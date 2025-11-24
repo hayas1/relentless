@@ -69,7 +69,7 @@ impl<Q, P> Testcase<Q, P> {
         sign_contract: &S,
         job: &JobSpec,
         suite: &Suite<Q, P>,
-    ) -> crate::Result<CaseReport<Q, P, ShotError<T, C>>>
+    ) -> CaseReport<Q, P, ShotError<T, C>>
     where
         T: Clone + Service<C::TransportReq, Response = C::TransportRes> + Send,
         S: SignContract<T, Q, P, C, C::SignError>,
@@ -105,9 +105,9 @@ impl<Q, P> Testcase<Q, P> {
         match result {
             Ok(responses) => {
                 let pass = profile.response.consume(responses).await.map_err(ShotError::<T, C>::ResSink);
-                Ok(CaseReport { case: self, passed: pass.is_ok() as usize, errors: pass.err().into_iter().collect() })
+                CaseReport { case: self, passed: pass.is_ok() as usize, errors: pass.err().into_iter().collect() }
             }
-            Err(e) => Ok(CaseReport { case: self, passed: 0, errors: vec![e] }),
+            Err(e) => CaseReport { case: self, passed: 0, errors: vec![e] },
         }
     }
 }

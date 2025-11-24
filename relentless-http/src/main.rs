@@ -7,7 +7,7 @@ pub async fn main() -> Result<ExitCode, Box<dyn std::error::Error>> {
     use relentless_http::service::{HttpContract, ReqwestClient};
     let client = ReqwestClient::<reqwest::Body, reqwest::Body>::new().await?;
     let make = tower::make::Shared::new(client);
-    let report = Cli::shot(make, HttpContract::new).await?;
+    let report = Cli::shot(make, HttpContract::new).await;
     Ok((!report.pass() as u8).into())
 }
 
