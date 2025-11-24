@@ -5,7 +5,7 @@ use tower::{Layer, MakeService, Service};
 use crate::{
     http_newtype_serde,
     shot::{
-        contract::{Contract, RequestSource, ResponseSink, ServiceError, SignContract},
+        contract::{Contract, RequestSource, ResponseSink, ServiceError, ShotError, SignContract},
         destinations::Destinations,
         hierarchy::Hierarchy,
         job::JobSpec,
@@ -116,8 +116,8 @@ pub struct Suite<Q, P> {
 // }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct SuiteReport<Q, P> {
-    cases: Vec<CaseReport<Q, P>>,
+pub struct SuiteReport<Q, P, E> {
+    cases: Vec<CaseReport<Q, P, E>>,
 }
 impl<Q, P> SuiteCase<Q, P> {
     pub async fn shot<M, T, S, C>(
@@ -125,7 +125,7 @@ impl<Q, P> SuiteCase<Q, P> {
         make_service: M,
         sign_contract: &S,
         job: &JobSpec,
-    ) -> crate::Result<SuiteReport<Q, P>>
+    ) -> crate::Result<SuiteReport<Q, P, ShotError<T, C>>>
     where
         M: Clone + MakeService<http::Uri, C::TransportReq, Service = T>,
         T: Clone + Service<C::TransportReq, Response = C::TransportRes> + Send,
@@ -133,7 +133,7 @@ impl<Q, P> SuiteCase<Q, P> {
         C: Contract<T, ReqSource = Q, ResSink = P> + Layer<T>,
         C::Service: Service<C::Request, Response = C::Response> + Send,
         Q: RequestSource<C::Request>,
-        P: ResponseSink<Result<C::Response, ServiceError<C, T>>>,
+        P: ResponseSink<Result<C::Response, ServiceError<T, C>>>,
     {
         let buffers = if Hierarchy::Suite.contains(&job.sequential) { 1 } else { self.testcases.len().max(1) };
         let mut services = Destinations::default();

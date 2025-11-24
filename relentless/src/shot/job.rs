@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use tower::Layer;
 use tower::{MakeService, Service};
 
+use crate::shot::contract::ShotError;
 use crate::{
     report::ReportFormat,
     shot::{
@@ -45,7 +46,7 @@ impl Cli {
     pub async fn shot<M, T, S, C>(
         make_service: M,
         sign_contract: S,
-    ) -> crate::Result<JobReport<C::ReqSource, C::ResSink>>
+    ) -> crate::Result<JobReport<C::ReqSource, C::ResSink, ShotError<T, C>>>
     where
         M: Clone + MakeService<http::Uri, C::TransportReq, Service = T>,
         T: Clone + Service<C::TransportReq, Response = C::TransportRes> + Send,
@@ -53,7 +54,7 @@ impl Cli {
         C: Contract<T> + Layer<T>,
         C::Service: Service<C::Request, Response = C::Response> + Send,
         C::ReqSource: for<'x> Deserialize<'x> + Default + RequestSource<C::Request>,
-        C::ResSink: for<'x> Deserialize<'x> + Default + ResponseSink<Result<C::Response, ServiceError<C, T>>>,
+        C::ResSink: for<'x> Deserialize<'x> + Default + ResponseSink<Result<C::Response, ServiceError<T, C>>>,
     {
         let cli = Self::parse();
         let suites = Job::from_files(&cli.file)?;
@@ -120,8 +121,8 @@ where
     }
 }
 #[derive(Debug, Clone, PartialEq)]
-pub struct JobReport<Q, P> {
-    suites: Vec<SuiteReport<Q, P>>,
+pub struct JobReport<Q, P, E> {
+    suites: Vec<SuiteReport<Q, P, E>>,
 }
 impl<Q, P> Job<Q, P> {
     pub async fn shot<M, T, S, C>(
@@ -129,7 +130,7 @@ impl<Q, P> Job<Q, P> {
         make_service: M,
         sign_contract: S,
         job: &JobSpec,
-    ) -> crate::Result<JobReport<Q, P>>
+    ) -> crate::Result<JobReport<Q, P, ShotError<T, C>>>
     where
         M: Clone + MakeService<http::Uri, C::TransportReq, Service = T>,
         T: Clone + Service<C::TransportReq, Response = C::TransportRes> + Send,
@@ -137,7 +138,7 @@ impl<Q, P> Job<Q, P> {
         C: Contract<T, ReqSource = Q, ResSink = P> + Layer<T>,
         C::Service: Service<C::Request, Response = C::Response> + Send,
         Q: RequestSource<C::Request>,
-        P: ResponseSink<Result<C::Response, ServiceError<C, T>>>,
+        P: ResponseSink<Result<C::Response, ServiceError<T, C>>>,
     {
         let buffers = if Hierarchy::Job.contains(&job.sequential) { 1 } else { self.0.len().max(1) };
         let suites = futures::stream::iter(self.0)
@@ -148,7 +149,7 @@ impl<Q, P> Job<Q, P> {
         Ok(JobReport { suites })
     }
 }
-impl<Q, P> JobReport<Q, P> {
+impl<Q, P, E> JobReport<Q, P, E> {
     pub fn pass(&self) -> bool {
         true
     }
