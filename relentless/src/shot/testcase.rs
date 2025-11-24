@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use tower::{timeout::TimeoutLayer, Layer, Service, ServiceBuilder, ServiceExt};
 
 use crate::shot::{
-    contract::{Contract, RequestSource, ResponseSink, ServiceError, ShotError, SignContract},
+    contract::{Contract, ContractError, RequestSource, ResponseSink, ServiceError, SignContract},
     destinations::Destinations,
     hierarchy::Hierarchy,
     job::JobSpec,
@@ -55,12 +55,11 @@ impl Repeat {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct CaseReport<Q, P, E> {
+pub struct CaseReport<Q, P> {
     case: Testcase<Q, P>,
     passed: usize,
     // messages: Messages<T>,
     // aggregate: EvaluateAggregator,
-    errors: Vec<E>,
 }
 impl<Q, P> Testcase<Q, P> {
     pub async fn shot<T, S, C>(
@@ -69,7 +68,7 @@ impl<Q, P> Testcase<Q, P> {
         sign_contract: &S,
         job: &JobSpec,
         suite: &Suite<Q, P>,
-    ) -> CaseReport<Q, P, ShotError<T, C>>
+    ) -> crate::Result<CaseReport<Q, P>>
     where
         T: Clone + Service<C::TransportReq, Response = C::TransportRes> + Send,
         S: SignContract<T, Q, P, C, C::SignError>,
@@ -82,32 +81,33 @@ impl<Q, P> Testcase<Q, P> {
             if Hierarchy::Testcase.contains(&job.sequential) { 1 } else { self.profile.repeat.times().max(1) };
         let (sign_contract_ref, target_ref) = (&sign_contract, &self.target);
         let profile = &self.profile;
-        let result = futures::stream::iter(services.iter())
+        let responses = futures::stream::iter(services.iter())
             .map(move |(name, service)| {
                 let (sign_contract, target) = (sign_contract_ref, target_ref);
                 async move {
                     let layer = sign_contract
                         .sign_contract(service.clone(), &profile.request, &profile.response)
                         .await
-                        .map_err(ShotError::<T, C>::Sign)?;
+                        .map_err(ContractError::<T, C>::Sign)?;
                     let service = layer.layer(service.clone());
 
                     let destination = suite.destinations.get(name).unwrap_or_else(|| todo!());
                     let request =
-                        profile.request.produce(destination, target).await.map_err(ShotError::<T, C>::ReqSource)?;
+                        profile.request.produce(destination, target).await.map_err(ContractError::<T, C>::ReqSource)?;
                     let response = service.oneshot(request).await;
                     Ok((name.clone(), response))
                 }
             })
             .buffer_unordered(services.len())
             .try_collect()
-            .await;
-        match result {
-            Ok(responses) => {
-                let pass = profile.response.consume(responses).await.map_err(ShotError::<T, C>::ResSink);
-                CaseReport { case: self, passed: pass.is_ok() as usize, errors: pass.err().into_iter().collect() }
-            }
-            Err(e) => CaseReport { case: self, passed: 0, errors: vec![e] },
-        }
+            .await
+            .unwrap_or_else(|_: ContractError<T, C>| todo!());
+        let () = profile
+            .response
+            .consume(responses)
+            .await
+            .map_err(ContractError::<T, C>::ResSink)
+            .unwrap_or_else(|_| todo!());
+        Ok(CaseReport { case: self, passed: 1 })
     }
 }

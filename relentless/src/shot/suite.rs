@@ -1,11 +1,11 @@
-use futures::StreamExt;
+use futures::{StreamExt, TryStreamExt};
 use serde::{Deserialize, Serialize};
 use tower::{Layer, MakeService, Service};
 
 use crate::{
     http_newtype_serde,
     shot::{
-        contract::{Contract, RequestSource, ResponseSink, ServiceError, ShotError, SignContract},
+        contract::{Contract, RequestSource, ResponseSink, ServiceError, SignContract},
         destinations::Destinations,
         hierarchy::Hierarchy,
         job::JobSpec,
@@ -116,8 +116,8 @@ pub struct Suite<Q, P> {
 // }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct SuiteReport<Q, P, E> {
-    cases: Vec<CaseReport<Q, P, E>>,
+pub struct SuiteReport<Q, P> {
+    cases: Vec<CaseReport<Q, P>>,
 }
 impl<Q, P> SuiteCase<Q, P> {
     pub async fn shot<M, T, S, C>(
@@ -125,7 +125,7 @@ impl<Q, P> SuiteCase<Q, P> {
         make_service: M,
         sign_contract: &S,
         job: &JobSpec,
-    ) -> SuiteReport<Q, P, ShotError<T, C>>
+    ) -> crate::Result<SuiteReport<Q, P>>
     where
         M: Clone + MakeService<http::Uri, C::TransportReq, Service = T>,
         T: Clone + Service<C::TransportReq, Response = C::TransportRes> + Send,
@@ -138,16 +138,14 @@ impl<Q, P> SuiteCase<Q, P> {
         let buffers = if Hierarchy::Suite.contains(&job.sequential) { 1 } else { self.testcases.len().max(1) };
         let mut services = Destinations::default();
         for (d, http_newtype_serde::Uri(dest)) in self.suite.destinations.iter() {
-            services.insert(
-                d.to_string(),
-                make_service.clone().make_service(dest.clone()).await.unwrap_or_else(|_| todo!()),
-            );
+            let service = make_service.clone().make_service(dest.clone()).await.unwrap_or_else(|_| todo!());
+            services.insert(d.to_string(), service);
         }
         let cases = futures::stream::iter(self.testcases)
             .map(|t| t.shot(&services, sign_contract, job, &self.suite))
             .buffer_unordered(buffers)
-            .collect()
-            .await;
-        SuiteReport { cases }
+            .try_collect()
+            .await?;
+        Ok(SuiteReport { cases })
     }
 }

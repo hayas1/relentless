@@ -2,12 +2,11 @@ use std::{fs::File, path::PathBuf};
 
 #[cfg(feature = "cli")]
 use clap::{Args, Parser};
-use futures::StreamExt;
+use futures::{StreamExt, TryStreamExt};
 use serde::{Deserialize, Serialize};
 use tower::Layer;
 use tower::{MakeService, Service};
 
-use crate::shot::contract::ShotError;
 use crate::{
     report::ReportFormat,
     shot::{
@@ -46,7 +45,7 @@ impl Cli {
     pub async fn shot<M, T, S, C>(
         make_service: M,
         sign_contract: S,
-    ) -> JobReport<C::ReqSource, C::ResSink, ShotError<T, C>>
+    ) -> crate::Result<JobReport<C::ReqSource, C::ResSink>>
     where
         M: Clone + MakeService<http::Uri, C::TransportReq, Service = T>,
         T: Clone + Service<C::TransportReq, Response = C::TransportRes> + Send,
@@ -57,7 +56,7 @@ impl Cli {
         C::ResSink: for<'x> Deserialize<'x> + Default + ResponseSink<Result<C::Response, ServiceError<T, C>>>,
     {
         let cli = Self::parse();
-        let suites = Job::from_files(&cli.file).unwrap();
+        let suites = Job::from_files(&cli.file)?;
         suites.shot(make_service, sign_contract, &cli.job).await
     }
 }
@@ -121,8 +120,8 @@ where
     }
 }
 #[derive(Debug, Clone, PartialEq)]
-pub struct JobReport<Q, P, E> {
-    suites: Vec<SuiteReport<Q, P, E>>,
+pub struct JobReport<Q, P> {
+    suites: Vec<SuiteReport<Q, P>>,
 }
 impl<Q, P> Job<Q, P> {
     pub async fn shot<M, T, S, C>(
@@ -130,7 +129,7 @@ impl<Q, P> Job<Q, P> {
         make_service: M,
         sign_contract: S,
         job: &JobSpec,
-    ) -> JobReport<Q, P, ShotError<T, C>>
+    ) -> crate::Result<JobReport<Q, P>>
     where
         M: Clone + MakeService<http::Uri, C::TransportReq, Service = T>,
         T: Clone + Service<C::TransportReq, Response = C::TransportRes> + Send,
@@ -144,12 +143,12 @@ impl<Q, P> Job<Q, P> {
         let suites = futures::stream::iter(self.0)
             .map(|sc| sc.shot(make_service.clone(), &sign_contract, job))
             .buffer_unordered(buffers)
-            .collect()
-            .await;
-        JobReport { suites }
+            .try_collect()
+            .await?;
+        Ok(JobReport { suites })
     }
 }
-impl<Q, P, E> JobReport<Q, P, E> {
+impl<Q, P> JobReport<Q, P> {
     pub fn pass(&self) -> bool {
         true
     }

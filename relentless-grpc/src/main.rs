@@ -8,7 +8,7 @@ pub async fn main() -> Result<ExitCode, Box<dyn std::error::Error>> {
         service::{DynamicContract, MakeChannel},
         wip::JsonSerializer,
     };
-    let report = Cli::shot(MakeChannel, DynamicContract::<serde_json::Value, JsonSerializer>::new).await;
+    let report = Cli::shot(MakeChannel, DynamicContract::<serde_json::Value, JsonSerializer>::new).await?;
     Ok((!report.pass() as u8).into())
 }
 

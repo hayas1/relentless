@@ -3,7 +3,7 @@ use std::{
     future::Future,
 };
 
-use tower::{Layer, Service};
+use tower::{Layer, MakeService, Service};
 
 use crate::shot::destinations::Destinations;
 
@@ -19,6 +19,7 @@ pub trait Contract<T>: Sized {
     type SignError;
     async fn new(service: T, req: &Self::ReqSource, res: &Self::ResSink) -> Result<Self, Self::SignError>;
 }
+pub type MakeError<M, T, C> = <M as MakeService<http::Uri, <C as Contract<T>>::TransportReq>>::MakeError;
 pub type TransportError<T, C> = <T as Service<<C as Contract<T>>::TransportReq>>::Error;
 pub type ServiceResponse<T, C> = <<C as Layer<T>>::Service as Service<<C as Contract<T>>::Request>>::Response;
 pub type ServiceError<T, C> = <<C as Layer<T>>::Service as Service<<C as Contract<T>>::Request>>::Error;
@@ -45,7 +46,7 @@ pub trait ResponseSink<Se> {
     async fn consume(&self, res: Destinations<Se>) -> Result<(), Self::Error>;
 }
 
-pub type ShotError<T, C> = ErrorContract<
+pub type ContractError<T, C> = ContractErrorWrap<
     <C as Contract<T>>::SignError,
     TransportError<T, C>,
     ServiceError<T, C>,
@@ -53,14 +54,14 @@ pub type ShotError<T, C> = ErrorContract<
     ResSinkError<T, C>,
 >;
 #[derive(Debug, Clone, PartialEq)]
-pub enum ErrorContract<NE, TE, SE, QE, PE> {
+pub enum ContractErrorWrap<NE, TE, SE, QE, PE> {
     Sign(NE),
     Transport(TE),
     Service(SE),
     ReqSource(QE),
     ResSink(PE),
 }
-impl<NE, TE, SE, QE, PE> std::error::Error for ErrorContract<NE, TE, SE, QE, PE>
+impl<NE, TE, SE, QE, PE> std::error::Error for ContractErrorWrap<NE, TE, SE, QE, PE>
 where
     NE: std::error::Error + 'static,
     TE: std::error::Error + 'static,
@@ -78,7 +79,7 @@ where
         }
     }
 }
-impl<NE, TE, SE, QE, PE> Display for ErrorContract<NE, TE, SE, QE, PE>
+impl<NE, TE, SE, QE, PE> Display for ContractErrorWrap<NE, TE, SE, QE, PE>
 where
     NE: Display,
     TE: Display,
