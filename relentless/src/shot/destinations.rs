@@ -3,6 +3,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
+use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -12,7 +13,7 @@ impl<T> Default for Destinations<T> {
     fn default() -> Self {
         // derive(Default) do not implement Default when T are not implement Default
         // https://github.com/rust-lang/rust/issues/26925
-        Self(HashMap::new())
+        Self(HashMap::default())
     }
 }
 impl<T> Deref for Destinations<T> {
@@ -33,8 +34,13 @@ impl<T> IntoIterator for Destinations<T> {
         self.0.into_iter()
     }
 }
-impl<T> Extend<(String, T)> for Destinations<T> {
-    fn extend<I: IntoIterator<Item = (String, T)>>(&mut self, iter: I) {
-        self.0.extend(iter)
+impl<T, S: Into<String>> FromIterator<(S, T)> for Destinations<T> {
+    fn from_iter<I: IntoIterator<Item = (S, T)>>(iter: I) -> Self {
+        Self(iter.into_iter().map(|(d, v)| (d.into(), v)).collect())
+    }
+}
+impl<T, S: Into<String>> Extend<(S, T)> for Destinations<T> {
+    fn extend<I: IntoIterator<Item = (S, T)>>(&mut self, iter: I) {
+        self.0.extend(iter.into_iter().map(|(d, v)| (d.into(), v)))
     }
 }
