@@ -3,7 +3,6 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -34,12 +33,12 @@ impl<T> IntoIterator for Destinations<T> {
         self.0.into_iter()
     }
 }
-impl<T, S: Into<String>> FromIterator<(S, T)> for Destinations<T> {
+impl<S: Into<String>, T> FromIterator<(S, T)> for Destinations<T> {
     fn from_iter<I: IntoIterator<Item = (S, T)>>(iter: I) -> Self {
         Self(iter.into_iter().map(|(d, v)| (d.into(), v)).collect())
     }
 }
-impl<T, S: Into<String>> Extend<(S, T)> for Destinations<T> {
+impl<S: Into<String>, T> Extend<(S, T)> for Destinations<T> {
     fn extend<I: IntoIterator<Item = (S, T)>>(&mut self, iter: I) {
         self.0.extend(iter.into_iter().map(|(d, v)| (d.into(), v)))
     }
