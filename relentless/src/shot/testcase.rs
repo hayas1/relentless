@@ -1,5 +1,3 @@
-use std::{convert::Infallible, ops::Range, time::Duration};
-
 use futures::{StreamExt, TryStreamExt};
 use serde::{Deserialize, Serialize};
 use tower::{timeout::TimeoutLayer, Layer, Service, ServiceBuilder, ServiceExt};
@@ -9,6 +7,7 @@ use crate::shot::{
     destinations::Destinations,
     hierarchy::Hierarchy,
     job::JobSpec,
+    profile::Profile,
     suite::Suite,
 };
 
@@ -23,37 +22,6 @@ pub struct Testcase<Q, P> {
     pub profile: Profile<Q, P>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "kebab-case")]
-pub struct Profile<Q, P> {
-    #[serde(default)]
-    pub request: Q,
-
-    // #[serde(default, with = "transpose::transpose_template_serde")]
-    // pub template: Destinations<Template>,
-    #[serde(default)]
-    pub repeat: Repeat,
-    #[serde(default)]
-    pub timeout: Option<Duration>, // TODO parse from string? https://crates.io/crates/humantime ?
-    #[serde(default)]
-    pub allow: Option<bool>,
-
-    #[serde(default)]
-    pub response: P,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash, Serialize, Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "kebab-case")]
-pub struct Repeat(pub Option<usize>);
-impl Repeat {
-    pub fn range(&self) -> Range<usize> {
-        0..self.times()
-    }
-    pub fn times(&self) -> usize {
-        self.0.unwrap_or(1)
-    }
-}
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct CaseReport<Q, P> {
     case: Testcase<Q, P>,
@@ -64,7 +32,7 @@ pub struct CaseReport<Q, P> {
 impl<Q, P> Testcase<Q, P> {
     pub async fn shot<T, S, C>(
         self,
-        services: &Destinations<T>,
+        transports: &Destinations<T>,
         sign_contract: &S,
         job: &JobSpec,
         suite: &Suite<Q, P>,
@@ -79,35 +47,21 @@ impl<Q, P> Testcase<Q, P> {
     {
         let buffers =
             if Hierarchy::Testcase.contains(&job.sequential) { 1 } else { self.profile.repeat.times().max(1) };
-        let (sign_contract_ref, target_ref) = (&sign_contract, &self.target);
         let profile = &self.profile;
-        let responses = futures::stream::iter(services.iter())
-            .map(move |(name, service)| {
-                let (sign_contract, target) = (sign_contract_ref, target_ref);
-                async move {
-                    let layer = sign_contract
-                        .sign_contract(service.clone(), &profile.request, &profile.response)
-                        .await
-                        .map_err(ContractError::<T, C>::Sign)?;
-                    let service = layer.layer(service.clone());
-
-                    let destination = suite.destinations.get(name).unwrap_or_else(|| todo!());
-                    let request =
-                        profile.request.produce(destination, target).await.map_err(ContractError::<T, C>::ReqSource)?;
-                    let response = service.oneshot(request).await;
-                    Ok((name.clone(), response))
-                }
+        let services = futures::stream::iter(transports.iter())
+            .map(|(name, service)| async move {
+                let layer = sign_contract
+                    .sign_contract(service.clone(), &profile.request, &profile.response)
+                    .await
+                    .map_err(ContractError::<T, C>::Sign)?;
+                Ok((name, layer.layer(service.clone())))
             })
-            .buffer_unordered(services.len())
+            .buffer_unordered(transports.len().max(1))
             .try_collect()
             .await
             .unwrap_or_else(|_: ContractError<T, C>| todo!());
-        let () = profile
-            .response
-            .consume(responses)
-            .await
-            .map_err(ContractError::<T, C>::ResSink)
-            .unwrap_or_else(|_| todo!());
+        let destinations = suite.destinations.iter().map(|(d, u)| (d, (**u).clone())).collect();
+        let () = profile.shot::<T, C>(services, &destinations, &self.target).await.unwrap_or_else(|_| todo!());
         Ok(CaseReport { case: self, passed: 1 })
     }
 }

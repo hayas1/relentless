@@ -9,7 +9,8 @@ use crate::{
         destinations::Destinations,
         hierarchy::Hierarchy,
         job::JobSpec,
-        testcase::{CaseReport, Profile, Testcase},
+        profile::Profile,
+        testcase::{CaseReport, Testcase},
     },
 };
 
