@@ -1,6 +1,7 @@
 use std::{ops::Range, time::Duration};
 
 use futures::{StreamExt, TryStreamExt};
+use semigroup::Semigroup;
 use serde::{Deserialize, Serialize};
 use tower::{Layer, Service, ServiceExt};
 
@@ -9,7 +10,7 @@ use crate::shot::{
     destinations::Destinations,
 };
 
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, Semigroup)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct Profile<Q, P> {
     #[serde(default)]
@@ -20,16 +21,19 @@ pub struct Profile<Q, P> {
     #[serde(default)]
     pub repeat: Repeat,
     #[serde(default)]
+    #[semigroup(with = "semigroup::op::Coalesce")]
     pub timeout: Option<Duration>, // TODO parse from string? https://crates.io/crates/humantime ?
     #[serde(default)]
+    #[semigroup(with = "semigroup::op::Coalesce")]
     pub allow: Option<bool>,
 
     #[serde(default)]
     pub response: P,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash, Serialize, Deserialize, Semigroup)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
+#[semigroup(with = "semigroup::op::Coalesce")]
 pub struct Repeat(pub Option<usize>);
 impl Repeat {
     pub fn range(&self) -> Range<usize> {
