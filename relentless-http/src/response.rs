@@ -8,20 +8,19 @@ use relentless::{
     http_newtype_serde,
     shot::{contract::ResponseSink, destinations::Destinations},
 };
+use semigroup::Semigroup;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, Semigroup)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
+#[semigroup(with = "semigroup::op::Coalesce")]
 pub struct HttpResponse {
-    #[serde(default)]
     #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
-    pub status: HttpRequestStatus,
-    #[serde(default)]
+    pub status: Option<HttpRequestStatus>,
     #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
-    pub header: HttpRequestHeaders,
-    #[serde(default)]
+    pub header: Option<HttpRequestHeaders>,
     #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
-    pub body: HttpRequestBody,
+    pub body: Option<HttpRequestBody>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]

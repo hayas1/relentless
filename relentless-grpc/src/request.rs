@@ -1,18 +1,17 @@
 use std::{convert::Infallible, path::PathBuf};
 
-use http::uri::PathAndQuery;
 use relentless::shot::contract::RequestSource;
+use semigroup::Semigroup;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, Semigroup)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
+#[semigroup(with = "semigroup::op::Coalesce")]
 pub struct GrpcRequest {
-    #[serde(default)]
     #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
-    descriptor: GrpcDescriptor,
-    #[serde(default)]
+    descriptor: Option<GrpcDescriptor>,
     #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
-    message: GrpcRequestMessage,
+    message: Option<GrpcRequestMessage>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case", untagged)]

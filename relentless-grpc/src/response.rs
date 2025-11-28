@@ -4,20 +4,19 @@ use relentless::{
     evaluator::{json::JsonEvaluator, plaintext::PlaintextEvaluator},
     shot::{contract::ResponseSink, destinations::Destinations},
 };
+use semigroup::Semigroup;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, Semigroup)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
+#[semigroup(with = "semigroup::op::Coalesce")]
 pub struct GrpcResponse {
-    #[serde(default)]
     #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
-    pub status: GrpcResponseStatus,
-    #[serde(default)]
+    pub status: Option<GrpcResponseStatus>,
     #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
-    pub metadata_map: GrpcResponseMetadataMap,
-    #[serde(default)]
+    pub metadata_map: Option<GrpcResponseMetadataMap>,
     #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
-    pub message: GrpcResponseMessage,
+    pub message: Option<GrpcResponseMessage>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
