@@ -118,8 +118,8 @@ pub struct Suite<Q, P> {
 // }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct SuiteReport<Q, P> {
-    cases: Vec<CaseReport<Q, P>>,
+pub struct SuiteReport<'a, Q, P> {
+    cases: Vec<CaseReport<'a, Q, P>>,
 }
 impl<Q, P> SuiteCase<Q, P> {
     pub async fn shot<M, T, S, C>(

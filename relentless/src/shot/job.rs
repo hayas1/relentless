@@ -43,26 +43,14 @@ impl Cli {
         Ok((key.into(), value.into()))
     }
     #[cfg(feature = "cli")]
-    pub async fn shot<M, T, S, C>(
-        make_service: M,
-        sign_contract: S,
-    ) -> crate::Result<JobReport<C::ReqSource, C::ResSink>>
+    pub async fn job<Q, P>() -> crate::Result<(Job<Q, P>, JobSpec)>
     where
-        M: Clone + MakeService<http::Uri, C::TransportReq, Service = T>,
-        T: Clone + Service<C::TransportReq, Response = C::TransportRes> + Send,
-        S: SignContract<T, C::ReqSource, C::ResSink, C, C::SignError>,
-        C: Contract<T> + Layer<T>,
-        C::Service: Service<C::Request, Response = C::Response> + Send,
-        C::ReqSource: for<'x> Deserialize<'x> + Default + Clone + Semigroup + RequestSource<C::Request>,
-        C::ResSink: for<'x> Deserialize<'x>
-            + Default
-            + Clone
-            + Semigroup
-            + ResponseSink<Result<C::Response, ServiceError<T, C>>>,
+        Q: for<'x> Deserialize<'x> + Default,
+        P: for<'x> Deserialize<'x> + Default,
     {
         let cli = Self::parse();
         let suites = Job::from_files(&cli.file)?;
-        suites.shot(make_service, sign_contract, &cli.job).await
+        Ok((suites, cli.job))
     }
 }
 
@@ -125,8 +113,8 @@ where
     }
 }
 #[derive(Debug, Clone, PartialEq)]
-pub struct JobReport<Q, P> {
-    suites: Vec<SuiteReport<Q, P>>,
+pub struct JobReport<'a, Q, P> {
+    suites: Vec<SuiteReport<'a, Q, P>>,
 }
 impl<Q, P> Job<Q, P> {
     pub async fn shot<M, T, S, C>(
@@ -153,7 +141,7 @@ impl<Q, P> Job<Q, P> {
         Ok(JobReport { suites })
     }
 }
-impl<Q, P> JobReport<Q, P> {
+impl<Q, P> JobReport<'_, Q, P> {
     pub fn pass(&self) -> bool {
         true
     }

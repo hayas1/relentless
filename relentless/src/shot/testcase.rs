@@ -24,8 +24,8 @@ pub struct Testcase<Q, P> {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct CaseReport<Q, P> {
-    case: Testcase<Q, P>,
+pub struct CaseReport<'a, Q, P> {
+    case: &'a Testcase<Q, P>,
     passed: usize,
     // messages: Messages<T>,
     // aggregate: EvaluateAggregator,
@@ -63,6 +63,6 @@ impl<Q, P> Testcase<Q, P> {
             .unwrap_or_else(|_: ContractError<T, C>| todo!());
         let destinations = suite.destinations.iter().map(|(d, u)| (d, (**u).clone())).collect();
         let () = profile.shot::<T, C>(services, &destinations, &self.target).await.unwrap_or_else(|_| todo!());
-        Ok(CaseReport { case: self.clone(), passed: 1 })
+        Ok(CaseReport { case: self, passed: 1 })
     }
 }

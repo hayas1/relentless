@@ -5,9 +5,9 @@ use std::process::ExitCode;
 pub async fn main() -> Result<ExitCode, Box<dyn std::error::Error>> {
     use relentless::shot::{contract::Contract, job::Cli};
     use relentless_http::service::{HttpContract, ReqwestClient};
+    let (job, spec) = Cli::job().await?;
     let client = ReqwestClient::<reqwest::Body, reqwest::Body>::new().await?;
-    let make = tower::make::Shared::new(client);
-    let report = Cli::shot(make, HttpContract::new).await?;
+    let report = job.shot(tower::make::Shared::new(client), HttpContract::new, &spec).await?;
     Ok((!report.pass() as u8).into())
 }
 
