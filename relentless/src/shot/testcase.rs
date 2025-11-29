@@ -49,7 +49,7 @@ impl<Q, P> Testcase<Q, P> {
         let buffers =
             if Hierarchy::Testcase.contains(&job.sequential) { 1 } else { self.profile.repeat.times().max(1) };
         let profile = &self.profile.clone().semigroup(suite.profile.clone());
-        let services = futures::stream::iter(transports.iter())
+        let services = futures::stream::iter(transports)
             .map(|(name, service)| async move {
                 let layer = sign_contract
                     .sign_contract(service.clone(), &profile.request, &profile.response)

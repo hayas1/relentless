@@ -33,6 +33,13 @@ impl<T> IntoIterator for Destinations<T> {
         self.0.into_iter()
     }
 }
+impl<'a, T> IntoIterator for &'a Destinations<T> {
+    type Item = <&'a HashMap<String, T> as IntoIterator>::Item;
+    type IntoIter = <&'a HashMap<String, T> as IntoIterator>::IntoIter;
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
+    }
+}
 impl<S: Into<String>, T> FromIterator<(S, T)> for Destinations<T> {
     fn from_iter<I: IntoIterator<Item = (S, T)>>(iter: I) -> Self {
         Self(iter.into_iter().map(|(d, v)| (d.into(), v)).collect())
