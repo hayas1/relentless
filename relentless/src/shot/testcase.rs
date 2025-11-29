@@ -1,4 +1,5 @@
 use futures::{StreamExt, TryStreamExt};
+use semigroup::Semigroup;
 use serde::{Deserialize, Serialize};
 use tower::{timeout::TimeoutLayer, Layer, Service, ServiceBuilder, ServiceExt};
 
@@ -42,12 +43,12 @@ impl<Q, P> Testcase<Q, P> {
         S: SignContract<T, Q, P, C, C::SignError>,
         C: Contract<T, ReqSource = Q, ResSink = P> + Layer<T>,
         C::Service: Service<C::Request, Response = C::Response>,
-        Q: RequestSource<C::Request>,
-        P: ResponseSink<Result<C::Response, ServiceError<T, C>>>,
+        Q: Clone + Semigroup + RequestSource<C::Request>,
+        P: Clone + Semigroup + ResponseSink<Result<C::Response, ServiceError<T, C>>>,
     {
         let buffers =
             if Hierarchy::Testcase.contains(&job.sequential) { 1 } else { self.profile.repeat.times().max(1) };
-        let profile = &self.profile;
+        let profile = &self.profile.clone().semigroup(suite.profile.clone());
         let services = futures::stream::iter(transports.iter())
             .map(|(name, service)| async move {
                 let layer = sign_contract

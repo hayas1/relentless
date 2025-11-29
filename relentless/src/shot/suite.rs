@@ -1,4 +1,5 @@
 use futures::{StreamExt, TryStreamExt};
+use semigroup::Semigroup;
 use serde::{Deserialize, Serialize};
 use tower::{Layer, MakeService, Service};
 
@@ -17,7 +18,7 @@ use crate::{
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct SuiteCase<Q, P> {
-    #[serde(flatten, default)]
+    #[serde(flatten)]
     pub suite: Suite<Q, P>,
 
     #[serde(default)]
@@ -133,8 +134,8 @@ impl<Q, P> SuiteCase<Q, P> {
         S: SignContract<T, Q, P, C, C::SignError>,
         C: Contract<T, ReqSource = Q, ResSink = P> + Layer<T>,
         C::Service: Service<C::Request, Response = C::Response> + Send,
-        Q: RequestSource<C::Request>,
-        P: ResponseSink<Result<C::Response, ServiceError<T, C>>>,
+        Q: Clone + Semigroup + RequestSource<C::Request>,
+        P: Clone + Semigroup + ResponseSink<Result<C::Response, ServiceError<T, C>>>,
     {
         let buffers = if Hierarchy::Suite.contains(&job.sequential) { 1 } else { self.testcases.len().max(1) };
         let mut services = Destinations::default();

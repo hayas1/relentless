@@ -3,6 +3,7 @@ use std::{fs::File, path::PathBuf};
 #[cfg(feature = "cli")]
 use clap::{Args, Parser};
 use futures::{StreamExt, TryStreamExt};
+use semigroup::Semigroup;
 use serde::{Deserialize, Serialize};
 use tower::Layer;
 use tower::{MakeService, Service};
@@ -52,8 +53,12 @@ impl Cli {
         S: SignContract<T, C::ReqSource, C::ResSink, C, C::SignError>,
         C: Contract<T> + Layer<T>,
         C::Service: Service<C::Request, Response = C::Response> + Send,
-        C::ReqSource: for<'x> Deserialize<'x> + Default + RequestSource<C::Request>,
-        C::ResSink: for<'x> Deserialize<'x> + Default + ResponseSink<Result<C::Response, ServiceError<T, C>>>,
+        C::ReqSource: for<'x> Deserialize<'x> + Default + Clone + Semigroup + RequestSource<C::Request>,
+        C::ResSink: for<'x> Deserialize<'x>
+            + Default
+            + Clone
+            + Semigroup
+            + ResponseSink<Result<C::Response, ServiceError<T, C>>>,
     {
         let cli = Self::parse();
         let suites = Job::from_files(&cli.file)?;
@@ -136,8 +141,8 @@ impl<Q, P> Job<Q, P> {
         S: SignContract<T, Q, P, C, C::SignError>,
         C: Contract<T, ReqSource = Q, ResSink = P> + Layer<T>,
         C::Service: Service<C::Request, Response = C::Response> + Send,
-        Q: RequestSource<C::Request>,
-        P: ResponseSink<Result<C::Response, ServiceError<T, C>>>,
+        Q: Clone + Semigroup + RequestSource<C::Request>,
+        P: Clone + Semigroup + ResponseSink<Result<C::Response, ServiceError<T, C>>>,
     {
         let buffers = if Hierarchy::Job.contains(&job.sequential) { 1 } else { self.0.len().max(1) };
         let suites = futures::stream::iter(self.0)
