@@ -41,7 +41,7 @@ console = { version = "0.15.11", optional = true }
 nom = "8.0.0"
 # average = "0.15.1" # Quantile (that use p2 algorithm) do not impl Extend
 hdrhistogram = "7.5.4"
-semigroup = { version = "0.4.3", features = ["derive"] }
+semigroup = { version = "0.4.3", features = ["derive", "histogram"] }
 
 
 [dev-dependencies]

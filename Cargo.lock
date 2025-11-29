@@ -2218,6 +2218,7 @@ version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "91eb6b8df3926a7a897a9307a04a9f8c4dbc45a512d6aa0ea53b325f4668fb33"
 dependencies = [
+ "hdrhistogram",
  "semigroup_derive",
 ]
 
