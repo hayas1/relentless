@@ -123,7 +123,7 @@ pub struct SuiteReport<Q, P> {
 }
 impl<Q, P> SuiteCase<Q, P> {
     pub async fn shot<M, T, S, C>(
-        self,
+        &self,
         make_service: M,
         sign_contract: &S,
         job: &JobSpec,
@@ -143,7 +143,7 @@ impl<Q, P> SuiteCase<Q, P> {
             let service = make_service.clone().make_service(dest.clone()).await.unwrap_or_else(|_| todo!());
             services.insert(d.to_string(), service);
         }
-        let cases = futures::stream::iter(self.testcases)
+        let cases = futures::stream::iter(&self.testcases)
             .map(|t| t.shot(&services, sign_contract, job, &self.suite))
             .buffer_unordered(buffers)
             .try_collect()

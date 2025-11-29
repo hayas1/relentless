@@ -32,7 +32,7 @@ pub struct CaseReport<Q, P> {
 }
 impl<Q, P> Testcase<Q, P> {
     pub async fn shot<T, S, C>(
-        self,
+        &self,
         transports: &Destinations<T>,
         sign_contract: &S,
         job: &JobSpec,
@@ -63,6 +63,6 @@ impl<Q, P> Testcase<Q, P> {
             .unwrap_or_else(|_: ContractError<T, C>| todo!());
         let destinations = suite.destinations.iter().map(|(d, u)| (d, (**u).clone())).collect();
         let () = profile.shot::<T, C>(services, &destinations, &self.target).await.unwrap_or_else(|_| todo!());
-        Ok(CaseReport { case: self, passed: 1 })
+        Ok(CaseReport { case: self.clone(), passed: 1 })
     }
 }

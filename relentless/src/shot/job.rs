@@ -130,7 +130,7 @@ pub struct JobReport<Q, P> {
 }
 impl<Q, P> Job<Q, P> {
     pub async fn shot<M, T, S, C>(
-        self,
+        &self,
         make_service: M,
         sign_contract: S,
         job: &JobSpec,
@@ -145,7 +145,7 @@ impl<Q, P> Job<Q, P> {
         P: Clone + Semigroup + ResponseSink<Result<C::Response, ServiceError<T, C>>>,
     {
         let buffers = if Hierarchy::Job.contains(&job.sequential) { 1 } else { self.0.len().max(1) };
-        let suites = futures::stream::iter(self.0)
+        let suites = futures::stream::iter(&self.0)
             .map(|sc| sc.shot(make_service.clone(), &sign_contract, job))
             .buffer_unordered(buffers)
             .try_collect()
