@@ -6,7 +6,7 @@ use std::{
     time::{Instant, SystemTime},
 };
 
-use semigroup::{op::HdrHistogram, Semigroup};
+use semigroup::{op::HdrHistogram, Monoid, OptionMonoid, Semigroup};
 use tower::{Layer, Service};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -18,6 +18,9 @@ pub struct Metric {
 impl Metric {
     pub fn new(bytes: u64, timestamp: SystemTime, duration: (Instant, Instant)) -> Self {
         Self { bytes, timestamp, duration }
+    }
+    pub fn into_agg(self) -> MetricAgg {
+        self.into()
     }
 }
 
@@ -43,9 +46,14 @@ impl From<Metric> for MetricAgg {
 
 #[derive(Debug, Clone)]
 pub struct MeasureLayer {
-    agg: Arc<Mutex<MetricAgg>>,
+    agg: Arc<Mutex<OptionMonoid<MetricAgg>>>,
 }
-
+impl MeasureLayer {
+    pub fn new() -> Self {
+        let agg = Arc::new(Mutex::new(OptionMonoid::identity()));
+        Self { agg }
+    }
+}
 impl<S> Layer<S> for MeasureLayer {
     type Service = MeasureService<S>;
 
@@ -58,14 +66,13 @@ impl<S> Layer<S> for MeasureLayer {
 #[derive(Debug, Clone)]
 pub struct MeasureService<S> {
     inner: S,
-    agg: Arc<Mutex<MetricAgg>>,
+    agg: Arc<Mutex<OptionMonoid<MetricAgg>>>,
 }
 
 impl<S, Req> Service<Req> for MeasureService<S>
 where
     S: Service<Req> + Clone + Send + 'static,
     S::Response: Send,
-    S::Error: std::error::Error + Send + Sync + 'static,
     S::Future: Send + 'static,
 {
     type Response = S::Response;
@@ -85,9 +92,9 @@ where
             let result = fut.await;
             let end = Instant::now();
 
-            let metric = Metric::new(0, timestamp, (start, end));
+            let metric = Metric::new(0, timestamp, (start, end)).into_agg();
             let mut owned = agg.lock().unwrap();
-            *owned = owned.clone().semigroup(metric.into()); // TODO clone is expensive
+            owned.semigroup_assign(metric.into());
 
             result
         })
