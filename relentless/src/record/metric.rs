@@ -89,14 +89,15 @@ where
 
 #[pin_project(project = ResponseProj)]
 #[derive(Debug)]
-struct MeasureFuture<F> {
+pub struct MeasureFuture<F> {
     #[pin]
     fut: F,
+    start: Option<(SystemTime, Instant)>,
     agg: Arc<Mutex<OptionMonoid<MetricAgg>>>,
 }
 impl<F> MeasureFuture<F> {
     pub fn new(fut: F, agg: Arc<Mutex<OptionMonoid<MetricAgg>>>) -> Self {
-        Self { fut, agg }
+        Self { fut, start: None, agg }
     }
 }
 
@@ -108,16 +109,53 @@ where
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
-        let timestamp = SystemTime::now();
+        if this.start.is_none() {
+            *this.start = Some((SystemTime::now(), Instant::now()));
+        }
 
-        let start = Instant::now();
-        let result = this.fut.poll(cx)?;
-        let end = Instant::now();
+        match this.fut.poll(cx) {
+            Poll::Pending => Poll::Pending,
+            Poll::Ready(output) => {
+                let Some((timestamp, start)) = this.start.take() else { unreachable!() };
+                let end = Instant::now();
 
-        let metric = Metric::new(0, timestamp, (start, end)).into_agg();
-        let mut owned = this.agg.lock().unwrap();
-        owned.semigroup_assign(metric.into());
+                let metric = Metric::new(0, timestamp, (start, end)).into_agg();
+                let mut owned = this.agg.lock().unwrap();
+                owned.semigroup_assign(metric.into());
 
-        result.map(Ok)
+                Poll::Ready(output)
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{convert::Infallible, time::Duration};
+
+    use futures::StreamExt;
+    use tower::{ServiceBuilder, ServiceExt};
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_measure_layer() {
+        let measure = MeasureLayer::new();
+        let svc = tower::service_fn(|_| async {
+            tokio::time::sleep(Duration::from_secs(1)).await;
+            Ok::<_, Infallible>(())
+        });
+
+        let service = ServiceBuilder::new().layer(measure.clone()).service(svc);
+        let stream = futures::stream::iter(0..180)
+            .map(|_| async { service.clone().oneshot(()).await.unwrap() })
+            .buffer_unordered(180);
+
+        let count = stream.count().await;
+
+        let g = measure.agg.lock().unwrap();
+        let metric = g.as_ref().unwrap();
+        assert_eq!(metric.times, count as u64);
+        assert!((1000..1100).contains(&metric.latency.histogram().value_at_percentile(99.)))
     }
 }
