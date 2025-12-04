@@ -6,6 +6,7 @@ use std::{
     time::{Instant, SystemTime},
 };
 
+use pin_project::pin_project;
 use semigroup::{op::HdrHistogram, Monoid, OptionMonoid, Semigroup};
 use tower::{Layer, Service};
 
@@ -71,32 +72,52 @@ pub struct MeasureService<S> {
 
 impl<S, Req> Service<Req> for MeasureService<S>
 where
-    S: Service<Req> + Clone + Send + 'static,
-    S::Response: Send,
-    S::Future: Send + 'static,
+    S: Service<Req>,
 {
     type Response = S::Response;
     type Error = S::Error;
-    type Future = Pin<Box<dyn Future<Output = Result<S::Response, S::Error>> + Send>>;
+    type Future = MeasureFuture<S::Future>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.inner.poll_ready(cx)
     }
 
     fn call(&mut self, req: Req) -> Self::Future {
-        let (fut, agg) = (self.inner.call(req), self.agg.clone());
-        Box::pin(async move {
-            let timestamp = SystemTime::now();
+        MeasureFuture::new(self.inner.call(req), self.agg.clone())
+    }
+}
 
-            let start = Instant::now();
-            let result = fut.await;
-            let end = Instant::now();
+#[pin_project(project = ResponseProj)]
+#[derive(Debug)]
+struct MeasureFuture<F> {
+    #[pin]
+    fut: F,
+    agg: Arc<Mutex<OptionMonoid<MetricAgg>>>,
+}
+impl<F> MeasureFuture<F> {
+    pub fn new(fut: F, agg: Arc<Mutex<OptionMonoid<MetricAgg>>>) -> Self {
+        Self { fut, agg }
+    }
+}
 
-            let metric = Metric::new(0, timestamp, (start, end)).into_agg();
-            let mut owned = agg.lock().unwrap();
-            owned.semigroup_assign(metric.into());
+impl<F, T, E> Future for MeasureFuture<F>
+where
+    F: Future<Output = Result<T, E>>,
+{
+    type Output = Result<T, E>;
 
-            result
-        })
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let this = self.project();
+        let timestamp = SystemTime::now();
+
+        let start = Instant::now();
+        let result = this.fut.poll(cx)?;
+        let end = Instant::now();
+
+        let metric = Metric::new(0, timestamp, (start, end)).into_agg();
+        let mut owned = this.agg.lock().unwrap();
+        owned.semigroup_assign(metric.into());
+
+        result.map(Ok)
     }
 }
