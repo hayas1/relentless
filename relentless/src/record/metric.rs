@@ -88,16 +88,16 @@ where
 }
 
 #[pin_project(project = ResponseProj)]
-#[derive(Debug)]
 pub struct MeasureFuture<F> {
     #[pin]
     fut: F,
     start: Option<(SystemTime, Instant)>,
+    end: Option<Box<dyn FnOnce() -> Instant>>,
     agg: Arc<Mutex<OptionMonoid<MetricAgg>>>,
 }
 impl<F> MeasureFuture<F> {
     pub fn new(fut: F, agg: Arc<Mutex<OptionMonoid<MetricAgg>>>) -> Self {
-        Self { fut, start: None, agg }
+        Self { fut, start: None, end: Some(Box::new(Instant::now)), agg }
     }
 }
 
@@ -113,19 +113,16 @@ where
             *this.start = Some((SystemTime::now(), Instant::now()));
         }
 
-        match this.fut.poll(cx) {
-            Poll::Pending => Poll::Pending,
-            Poll::Ready(output) => {
-                let Some((timestamp, start)) = this.start.take() else { unreachable!() };
-                let end = Instant::now();
+        this.fut.poll(cx).map(|o| {
+            let Some((timestamp, start)) = this.start.take() else { unreachable!() };
+            let end = this.end.take().expect("poll after ready")();
 
-                let metric = Metric::new(0, timestamp, (start, end)).into_agg();
-                let mut owned = this.agg.lock().unwrap();
-                owned.semigroup_assign(metric.into());
+            let metric = Metric::new(0, timestamp, (start, end)).into_agg();
+            let mut owned = this.agg.lock().unwrap();
+            owned.semigroup_assign(metric.into());
 
-                Poll::Ready(output)
-            }
-        }
+            o
+        })
     }
 }
 
