@@ -418,6 +418,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "bytesize"
+version = "2.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6bd91ee7b2422bcb158d90ef4d14f75ef67f340943fc4149891dcce8f8b972a3"
+
+[[package]]
 name = "cc"
 version = "1.1.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1645,18 +1651,18 @@ dependencies = [
 
 [[package]]
 name = "pin-project"
-version = "1.1.7"
+version = "1.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "be57f64e946e500c8ee36ef6331845d40a93055567ec57e8fae13efd33759b95"
+checksum = "677f1add503faace112b9f1373e43e9e054bfdd22ff1a63c1bc485eaec6a6a8a"
 dependencies = [
  "pin-project-internal",
 ]
 
 [[package]]
 name = "pin-project-internal"
-version = "1.1.7"
+version = "1.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3c0f5fad0874fc7abcd4d750e76917eaebbecaa2c20bde22e1dbeeba8beb758c"
+checksum = "6e918e4ff8c4549eb882f14b3a4bc8c8bc93de829416eacf579f1207a8fbf861"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1907,6 +1913,7 @@ dependencies = [
  "assert-json-diff",
  "axum",
  "bytes",
+ "bytesize",
  "clap",
  "console",
  "futures",
@@ -1920,6 +1927,7 @@ dependencies = [
  "json-patch",
  "jsonptr",
  "nom 8.0.0",
+ "pin-project",
  "regex",
  "relentless-http-dev-server",
  "semigroup",
@@ -2219,6 +2227,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "91eb6b8df3926a7a897a9307a04a9f8c4dbc45a512d6aa0ea53b325f4668fb33"
 dependencies = [
  "hdrhistogram",
+ "num",
  "semigroup_derive",
 ]
 
