@@ -51,6 +51,6 @@ pub enum HttpRequestBody {
 impl<ResB: Body + Send, E: Send> ResponseSink<Result<http::Response<ResB>, E>> for HttpResponse {
     type Error = Infallible;
     async fn consume(&self, res: Destinations<Result<http::Response<ResB>, E>>) -> Result<(), Self::Error> {
-        todo!()
+        Ok(())
     }
 }
