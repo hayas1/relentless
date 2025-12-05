@@ -83,6 +83,9 @@ impl MeasureLayer {
         let agg = Arc::new(Mutex::new(MetricAgg::identity()));
         Self { agg }
     }
+    pub fn aggregated(&self) -> MetricAgg {
+        self.agg.lock().unwrap().clone()
+    }
 }
 impl<S> Layer<S> for MeasureLayer {
     type Service = MeasureService<S>;
@@ -116,7 +119,7 @@ where
     }
 }
 
-#[pin_project(project = ResponseProj)]
+#[pin_project]
 pub struct MeasureFuture<F> {
     #[pin]
     fut: F,
@@ -180,9 +183,9 @@ mod tests {
         let count = stream.count().await;
 
         // TODO runtime
-        let agg = measure.agg.lock().unwrap();
+        let agg = measure.aggregated();
         assert_eq!(agg.times(), count as u64);
-        assert!((175. ..180.).contains(&agg.rps()));
+        assert!((175.0..180.0).contains(&agg.rps()));
         assert!((Duration::from_millis(1000)..Duration::from_millis(1100)).contains(&agg.approx_latency_quantile(0.99)))
     }
 }
