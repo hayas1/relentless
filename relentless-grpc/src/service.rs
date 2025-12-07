@@ -17,9 +17,12 @@ use tower::{Layer, Service};
 use crate::{codec::DynamicCodec, request::GrpcRequest, response::GrpcResponse, wip::JsonSerializer};
 
 #[derive(Debug, Clone)]
-pub struct MakeChannel;
-impl Service<http::Uri> for MakeChannel {
-    type Response = tonic::transport::Channel;
+pub struct MakeChannel<L>(pub L);
+impl<L> Service<http::Uri> for MakeChannel<L>
+where
+    L: Layer<tonic::transport::Channel> + Clone + Send + 'static,
+{
+    type Response = L::Service;
     type Error = tonic::transport::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
@@ -28,9 +31,10 @@ impl Service<http::Uri> for MakeChannel {
     }
 
     fn call(&mut self, destination: http::Uri) -> Self::Future {
+        let layer = self.0.clone();
         Box::pin(async move {
             let channel = Channel::builder(destination).connect().await?;
-            Ok(channel)
+            Ok(layer.layer(channel))
         })
     }
 }
