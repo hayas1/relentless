@@ -5,13 +5,14 @@ use std::process::ExitCode;
 pub async fn main() -> Result<ExitCode, Box<dyn std::error::Error>> {
     use relentless::{record::metric::MeasureLayer, shot::job::Cli};
     use relentless_http::{contract::HttpContract, service::ReqwestClient};
+    use reqwest::Body;
     use tower::ServiceBuilder;
 
-    let (job, spec) = Cli::job::<HttpContract<reqwest::Body, reqwest::Body>, _, _>().await?;
+    let (job, spec) = Cli::job().await?;
     let measure = MeasureLayer::new();
     let client = ReqwestClient::new().await?;
     let service = ServiceBuilder::new().layer(&measure).service(client);
-    let report = job.shot(tower::make::Shared::new(service), &spec).await?;
+    let report = job.shot::<_, _, HttpContract<Body, Body>>(tower::make::Shared::new(service), &spec).await?;
     dbg!(measure.aggregated().times());
     Ok((!report.pass() as u8).into())
 }

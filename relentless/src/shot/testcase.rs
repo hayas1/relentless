@@ -40,7 +40,7 @@ impl<Q, P> Testcase<Q, P> {
     where
         T: Clone + Service<C::TransportReq, Response = C::TransportRes> + Send,
         S: SignContract<T, C> + Default,
-        C: Contract<T, ReqSource = Q, ResSink = P> + Layer<T>,
+        C: Contract<T, Sign = S, ReqSource = Q, ResSink = P> + Layer<T>,
         C::Service: Clone + Service<C::Request, Response = C::Response>,
         Q: Clone + Semigroup + RequestSource<C::Request>,
         P: Clone + Semigroup + ResponseSink<Result<C::Response, ServiceError<T, C>>>,

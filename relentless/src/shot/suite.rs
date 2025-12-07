@@ -126,7 +126,7 @@ impl<S, Q, P> SuiteCase<S, Q, P> {
         M: Clone + MakeService<http::Uri, C::TransportReq, Service = T>,
         T: Clone + Service<C::TransportReq, Response = C::TransportRes> + Send,
         S: SignContract<T, C> + Default,
-        C: Contract<T, ReqSource = Q, ResSink = P> + Layer<T>,
+        C: Contract<T, Sign = S, ReqSource = Q, ResSink = P> + Layer<T>,
         C::Service: Clone + Service<C::Request, Response = C::Response> + Send,
         Q: Clone + Semigroup + RequestSource<C::Request>,
         P: Clone + Semigroup + ResponseSink<Result<C::Response, ServiceError<T, C>>>,
