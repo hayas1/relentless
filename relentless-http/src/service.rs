@@ -7,6 +7,7 @@ use std::{
 };
 
 use relentless::shot::contract::{Contract, RequestSource, ResponseSink};
+use serde::{Deserialize, Serialize};
 use tower::{layer::util::Identity, Layer, Service};
 
 use crate::{request::HttpRequest, response::HttpResponse};
@@ -60,36 +61,6 @@ where
             }
             Err(e) => Box::pin(async { Err(e) }),
         }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct HttpContract<ReqB, ResB> {
-    phantom: PhantomData<(ReqB, ResB)>,
-}
-impl<S, ReqB, ResB> Layer<S> for HttpContract<ReqB, ResB> {
-    type Service = <Identity as Layer<S>>::Service;
-
-    fn layer(&self, service: S) -> Self::Service {
-        Identity::new().layer(service)
-    }
-}
-impl<S, ReqB, ResB> Contract<S> for HttpContract<ReqB, ResB>
-where
-    S: Service<http::Request<ReqB>, Response = http::Response<ResB>> + Send,
-    ReqB: Send,
-    ResB: Send,
-{
-    type ReqSource = HttpRequest;
-    type Request = Self::TransportReq;
-    type TransportReq = http::Request<ReqB>;
-    type TransportRes = http::Response<ResB>;
-    type Response = Self::TransportRes;
-    type ResSink = HttpResponse;
-
-    type SignError = Infallible;
-    async fn new(_: S, _: &HttpRequest, _: &HttpResponse) -> Result<Self, Self::SignError> {
-        Ok(HttpContract { phantom: PhantomData })
     }
 }
 
