@@ -1,4 +1,4 @@
-use std::{convert::Infallible, path::PathBuf};
+use std::convert::Infallible;
 
 use relentless::shot::contract::RequestSource;
 use semigroup::Semigroup;
@@ -9,23 +9,9 @@ use serde::{Deserialize, Serialize};
 #[semigroup(with = "semigroup::op::Coalesce")]
 pub struct GrpcRequest {
     #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
-    descriptor: Option<GrpcDescriptor>,
-    #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
     message: Option<GrpcRequestMessage>,
 }
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "kebab-case", untagged)]
-pub enum GrpcDescriptor {
-    Protos {
-        #[serde(default)]
-        protos: Vec<PathBuf>,
-        #[serde(default)]
-        import_path: Vec<PathBuf>,
-    },
-    Bin(PathBuf),
-    #[default]
-    Reflection,
-}
+
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub enum GrpcRequestMessage {
