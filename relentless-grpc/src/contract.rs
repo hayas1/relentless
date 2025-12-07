@@ -1,6 +1,8 @@
 use std::{
     convert::Infallible,
+    fs::File,
     future::Future,
+    io::Read,
     marker::PhantomData,
     path::PathBuf,
     pin::Pin,
@@ -34,14 +36,32 @@ impl<G, D, S> SignContract<G, DynamicContract<D, S>> for GrpcDescriptor
 where
     G: GrpcService<tonic::body::Body> + Clone + Send + 'static,
 {
-    type Error = Infallible;
+    type Error = relentless::Error;
     async fn sign_contract(&self, service: G) -> Result<DynamicContract<D, S>, Self::Error> {
+        let pool = match self {
+            Self::Protos { protos, import_path } => Self::from_protos(protos, import_path)?,
+            Self::Bin(path) => Self::descriptor_from_file(path)?,
+            Self::Reflection => Self::from_reflection(service).await?,
+        };
+        Ok(DynamicContract { pool, phantom: PhantomData })
+    }
+}
+impl GrpcDescriptor {
+    pub fn from_protos(protos: &[PathBuf], import_path: &[PathBuf]) -> relentless::Result<DescriptorPool> {
+        let builder = &mut prost_build::Config::new();
+        let fds = builder.load_fds(protos, import_path).map_err(relentless::Error::boxed)?;
+        DescriptorPool::from_file_descriptor_set(fds).map_err(relentless::Error::boxed)
+    }
+    pub fn descriptor_from_file(path: &PathBuf) -> relentless::Result<DescriptorPool> {
         let mut descriptor_bytes = Vec::new();
-        // File::open(path)?.read_to_end(&mut descriptor_bytes)?;
-        Ok(DynamicContract {
-            pool: DescriptorPool::decode(Bytes::from(descriptor_bytes)).unwrap(),
-            phantom: PhantomData,
-        })
+        File::open(path)
+            .map_err(relentless::Error::boxed)?
+            .read_to_end(&mut descriptor_bytes)
+            .map_err(relentless::Error::boxed)?;
+        DescriptorPool::decode(Bytes::from(descriptor_bytes)).map_err(relentless::Error::boxed)
+    }
+    pub async fn from_reflection<G: GrpcService<tonic::body::Body>>(service: G) -> relentless::Result<DescriptorPool> {
+        todo!()
     }
 }
 
