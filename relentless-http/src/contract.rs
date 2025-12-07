@@ -12,7 +12,7 @@ pub struct HttpContract<ReqB, ResB> {
 }
 impl<T, ReqB, ResB> SignContract<T, Self> for HttpContract<ReqB, ResB> {
     type Error = Infallible;
-    async fn sign_contract(&self, _: T) -> Result<Self, Self::Error> {
+    async fn sign_contract(&self, _: T, _: &http::Uri) -> Result<Self, Self::Error> {
         Ok(HttpContract { phantom: PhantomData })
     }
 }

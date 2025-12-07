@@ -29,7 +29,7 @@ pub type ResSinkError<T, C> =
 
 pub trait SignContract<T, C> {
     type Error;
-    fn sign_contract(&self, service: T) -> impl Future<Output = Result<C, Self::Error>>;
+    fn sign_contract(&self, service: T, destination: &http::Uri) -> impl Future<Output = Result<C, Self::Error>>;
 }
 
 #[trait_variant::make(Send)]

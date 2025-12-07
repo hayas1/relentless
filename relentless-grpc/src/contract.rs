@@ -12,7 +12,10 @@ use std::{
 use bytes::Bytes;
 use http::uri::PathAndQuery;
 use prost_reflect::DescriptorPool;
-use relentless::shot::contract::{Contract, SignContract};
+use relentless::shot::{
+    contract::{Contract, SignContract},
+    destinations,
+};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use tonic::{client::GrpcService, Status};
 use tower::{Layer, Service};
@@ -20,13 +23,13 @@ use tower::{Layer, Service};
 use crate::{codec::DynamicCodec, request::GrpcRequest, response::GrpcResponse, wip::JsonSerializer};
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "kebab-case", untagged)]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub enum GrpcDescriptor {
-    Protos {
+    ProtoFiles {
         #[serde(default)]
         protos: Vec<PathBuf>,
         #[serde(default)]
-        import_path: Vec<PathBuf>,
+        includes: Vec<PathBuf>,
     },
     Bin(PathBuf),
     #[default]
@@ -37,9 +40,9 @@ where
     G: GrpcService<tonic::body::Body> + Clone + Send + 'static,
 {
     type Error = relentless::Error;
-    async fn sign_contract(&self, service: G) -> Result<DynamicContract<D, S>, Self::Error> {
+    async fn sign_contract(&self, service: G, destination: &http::Uri) -> Result<DynamicContract<D, S>, Self::Error> {
         let pool = match self {
-            Self::Protos { protos, import_path } => Self::from_protos(protos, import_path)?,
+            Self::ProtoFiles { protos, includes: import_path } => Self::from_protos(protos, import_path)?,
             Self::Bin(path) => Self::descriptor_from_file(path)?,
             Self::Reflection => Self::from_reflection(service).await?,
         };
@@ -47,9 +50,9 @@ where
     }
 }
 impl GrpcDescriptor {
-    pub fn from_protos(protos: &[PathBuf], import_path: &[PathBuf]) -> relentless::Result<DescriptorPool> {
+    pub fn from_protos(protos: &[PathBuf], includes: &[PathBuf]) -> relentless::Result<DescriptorPool> {
         let builder = &mut prost_build::Config::new();
-        let fds = builder.load_fds(protos, import_path).map_err(relentless::Error::boxed)?;
+        let fds = builder.load_fds(protos, includes).map_err(relentless::Error::boxed)?;
         DescriptorPool::from_file_descriptor_set(fds).map_err(relentless::Error::boxed)
     }
     pub fn descriptor_from_file(path: &PathBuf) -> relentless::Result<DescriptorPool> {
