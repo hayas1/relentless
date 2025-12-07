@@ -1,10 +1,9 @@
-use futures::{StreamExt, TryStreamExt};
 use semigroup::Semigroup;
 use serde::{Deserialize, Serialize};
-use tower::{timeout::TimeoutLayer, Layer, Service, ServiceBuilder, ServiceExt};
+use tower::{Layer, Service};
 
 use crate::shot::{
-    contract::{Contract, ContractError, RequestSource, ResponseSink, ServiceError, SignContract},
+    contract::{Contract, RequestSource, ResponseSink, ServiceError, SignContract},
     destinations::Destinations,
     hierarchy::Hierarchy,
     job::JobSpec,
@@ -48,18 +47,6 @@ impl<Q, P> Testcase<Q, P> {
         let buffers =
             if Hierarchy::Testcase.contains(&job.sequential) { 1 } else { self.profile.repeat.times().max(1) };
         let profile = &self.profile.clone().semigroup(suite.profile.clone());
-        // let services = futures::stream::iter(transports)
-        //     .map(|(name, service)| async move {
-        //         let layer = sign_contract
-        //             .sign_contract(service.clone(), &profile.request, &profile.response)
-        //             .await
-        //             .map_err(ContractError::<T, C>::Sign)?;
-        //         Ok((name, layer.layer(service.clone())))
-        //     })
-        //     .buffer_unordered(transports.len().max(1))
-        //     .try_collect()
-        //     .await
-        //     .unwrap_or_else(|_: ContractError<T, C>| todo!());
         let destinations = suite.destinations.iter().map(|(d, u)| (d, (**u).clone())).collect();
         let () = profile.shot::<T, C>(services, &destinations, &self.target).await.unwrap_or_else(|_| todo!());
         Ok(CaseReport { case: self, passed: 1 })
