@@ -124,12 +124,12 @@ pub struct MeasureFuture<F> {
     #[pin]
     fut: F,
     start: Option<(SystemTime, Instant)>,
-    end: Option<Box<dyn FnOnce() -> Instant>>,
+    end: Option<()>,
     agg: Arc<Mutex<MetricAgg>>,
 }
 impl<F> MeasureFuture<F> {
     pub fn new(fut: F, agg: Arc<Mutex<MetricAgg>>) -> Self {
-        Self { fut, start: None, end: Some(Box::new(Instant::now)), agg }
+        Self { fut, start: None, end: Some(()), agg }
     }
 }
 
@@ -147,7 +147,8 @@ where
 
         this.fut.poll(cx).map(|o| {
             let Some((timestamp, start)) = this.start.take() else { unreachable!() };
-            let end = this.end.take().expect("poll after ready")();
+            let end = Instant::now();
+            let () = this.end.take().expect("poll after ready");
 
             let metric = Metric::new(0, timestamp, (start, end)).into_agg();
             let mut agg = this.agg.lock().unwrap();
@@ -182,7 +183,7 @@ mod tests {
 
         let count = stream.count().await;
 
-        // TODO runtime
+        // TODO depend on runtime ?
         let agg = measure.aggregated();
         assert_eq!(agg.times(), count as u64);
         assert!((175.0..180.0).contains(&agg.rps()));
