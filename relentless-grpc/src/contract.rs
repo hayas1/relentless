@@ -10,14 +10,18 @@ use std::{
 };
 
 use bytes::Bytes;
+use futures::{StreamExt, TryStreamExt};
 use http::uri::PathAndQuery;
+use prost::Message;
 use prost_reflect::DescriptorPool;
-use relentless::shot::{
-    contract::{Contract, SignContract},
-    destinations,
-};
+use prost_types::FileDescriptorProto;
+use relentless::shot::contract::{Contract, SignContract};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use tonic::{client::GrpcService, Status};
+use tonic::{client::GrpcService, transport::Body, Status};
+use tonic_reflection::pb::v1::{
+    server_reflection_client::ServerReflectionClient, server_reflection_request::MessageRequest,
+    server_reflection_response::MessageResponse, ServerReflectionRequest, ServiceResponse,
+};
 use tower::{Layer, Service};
 
 use crate::{codec::DynamicCodec, request::GrpcRequest, response::GrpcResponse, wip::JsonSerializer};
@@ -37,14 +41,16 @@ pub enum GrpcDescriptor {
 }
 impl<G, D, S> SignContract<G, DynamicContract<D, S>> for GrpcDescriptor
 where
-    G: GrpcService<tonic::body::Body> + Clone + Send + 'static,
+    G: GrpcService<tonic::body::Body>,
+    G::ResponseBody: Body<Data = Bytes> + Send + 'static,
+    <G::ResponseBody as Body>::Error: Into<Box<dyn std::error::Error + Send + Sync + 'static>> + Send,
 {
     type Error = relentless::Error;
     async fn sign_contract(&self, service: G, destination: &http::Uri) -> Result<DynamicContract<D, S>, Self::Error> {
         let pool = match self {
-            Self::ProtoFiles { protos, includes: import_path } => Self::from_protos(protos, import_path)?,
+            Self::ProtoFiles { protos, includes } => Self::from_protos(protos, includes)?,
             Self::Bin(path) => Self::descriptor_from_file(path)?,
-            Self::Reflection => Self::from_reflection(service).await?,
+            Self::Reflection => Self::from_reflection(service, destination).await?,
         };
         Ok(DynamicContract { pool, phantom: PhantomData })
     }
@@ -63,8 +69,89 @@ impl GrpcDescriptor {
             .map_err(relentless::Error::boxed)?;
         DescriptorPool::decode(Bytes::from(descriptor_bytes)).map_err(relentless::Error::boxed)
     }
-    pub async fn from_reflection<G: GrpcService<tonic::body::Body>>(service: G) -> relentless::Result<DescriptorPool> {
-        todo!()
+    pub async fn from_reflection<G>(service: G, destination: &http::Uri) -> relentless::Result<DescriptorPool>
+    where
+        G: GrpcService<tonic::body::Body>,
+        G::ResponseBody: Body<Data = Bytes> + Send + 'static,
+        <G::ResponseBody as Body>::Error: Into<Box<dyn std::error::Error + Send + Sync + 'static>> + Send,
+    {
+        let mut client = ServerReflectionClient::new(service);
+        let services = Self::reflection_services(&mut client, destination).await?;
+        let pool = Self::reflection_file_descriptors(&mut client, destination, services).await?;
+        Ok(pool)
+    }
+    pub async fn reflection_services<G>(
+        client: &mut ServerReflectionClient<G>,
+        destination: &http::Uri,
+    ) -> relentless::Result<Vec<ServiceResponse>>
+    where
+        G: GrpcService<tonic::body::Body>,
+        G::ResponseBody: Body<Data = Bytes> + Send + 'static,
+        <G::ResponseBody as Body>::Error: Into<Box<dyn std::error::Error + Send + Sync + 'static>> + Send,
+    {
+        let host = destination.host().unwrap_or_else(|| todo!()).to_string();
+        let request_stream = futures::stream::once({
+            let host = host.clone();
+            async move {
+                ServerReflectionRequest {
+                    host,
+                    message_request: Some(MessageRequest::ListServices(Default::default())),
+                }
+            }
+        });
+        let streaming = client.server_reflection_info(request_stream).await.unwrap_or_else(|_| todo!()).into_inner();
+        let services = streaming
+            .try_fold(Vec::new(), |_, recv| async move {
+                match recv.message_response.unwrap_or_else(|| todo!()) {
+                    MessageResponse::ListServicesResponse(list) => Ok(list.service),
+                    _ => todo!(),
+                }
+            })
+            .await
+            .unwrap_or_else(|_| todo!());
+        Ok(services)
+    }
+    pub async fn reflection_file_descriptors<G>(
+        client: &mut ServerReflectionClient<G>,
+        destination: &http::Uri,
+        services: Vec<ServiceResponse>,
+    ) -> relentless::Result<DescriptorPool>
+    where
+        G: GrpcService<tonic::body::Body>,
+        G::ResponseBody: Body<Data = Bytes> + Send + 'static,
+        <G::ResponseBody as Body>::Error: Into<Box<dyn std::error::Error + Send + Sync + 'static>> + Send,
+    {
+        let buffer = services.len();
+        let host = destination.host().unwrap_or_else(|| todo!()).to_string();
+        let request_stream = futures::stream::iter(services)
+            .map(move |service| {
+                let host = host.clone();
+                async move {
+                    ServerReflectionRequest {
+                        host,
+                        message_request: Some(MessageRequest::FileContainingSymbol(service.name)),
+                    }
+                }
+            })
+            .buffer_unordered(buffer);
+        let streaming = client.server_reflection_info(request_stream).await.unwrap_or_else(|_| todo!()).into_inner();
+        let descriptors = streaming
+            .try_fold(DescriptorPool::new(), |mut pool, recv| async move {
+                match recv.message_response.unwrap_or_else(|| todo!()) {
+                    MessageResponse::FileDescriptorResponse(fd) => pool
+                        .add_file_descriptor_protos(
+                            fd.file_descriptor_proto
+                                .into_iter()
+                                .map(|raw| FileDescriptorProto::decode(&*raw).unwrap_or_else(|_| todo!())),
+                        )
+                        .unwrap_or_else(|e| todo!("{e}")),
+                    _ => todo!(),
+                };
+                Ok(pool)
+            })
+            .await
+            .unwrap_or_else(|_| todo!());
+        Ok(descriptors)
     }
 }
 
