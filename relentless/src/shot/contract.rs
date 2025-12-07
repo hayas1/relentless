@@ -9,6 +9,7 @@ use crate::shot::destinations::Destinations;
 
 #[trait_variant::make(Send)]
 pub trait Contract<T>: Sized {
+    type Sign;
     type ReqSource;
     type Request;
     type TransportReq;
@@ -17,7 +18,6 @@ pub trait Contract<T>: Sized {
     type ResSink;
 
     type SignError;
-    async fn new(service: T, req: &Self::ReqSource, res: &Self::ResSink) -> Result<Self, Self::SignError>;
 }
 pub type MakeError<M, T, C> = <M as MakeService<http::Uri, <C as Contract<T>>::TransportReq>>::MakeError;
 pub type TransportError<T, C> = <T as Service<<C as Contract<T>>::TransportReq>>::Error;
@@ -27,12 +27,10 @@ pub type ReqSourceError<T, C> = <<C as Contract<T>>::ReqSource as RequestSource<
 pub type ResSinkError<T, C> =
     <<C as Contract<T>>::ResSink as ResponseSink<Result<ServiceResponse<T, C>, ServiceError<T, C>>>>::Error;
 
-pub trait SignContract<T, Q, P, C, E>: AsyncFn(T, &Q, &P) -> Result<C, E> {
-    fn sign_contract(&self, service: T, req: &Q, res: &P) -> impl Future<Output = Result<C, E>> {
-        async { self(service, req, res).await }
-    }
+pub trait SignContract<T, C> {
+    type Error;
+    fn sign_contract(&self, service: T) -> impl Future<Output = Result<C, Self::Error>>;
 }
-impl<F, S, Q, P, C, E> SignContract<S, Q, P, C, E> for F where F: AsyncFn(S, &Q, &P) -> Result<C, E> {}
 
 #[trait_variant::make(Send)]
 pub trait RequestSource<De> {

@@ -33,34 +33,33 @@ pub struct CaseReport<'a, Q, P> {
 impl<Q, P> Testcase<Q, P> {
     pub async fn shot<T, S, C>(
         &self,
-        transports: &Destinations<T>,
-        sign_contract: &S,
+        services: &Destinations<C::Service>,
         job: &JobSpec,
-        suite: &Suite<Q, P>,
+        suite: &Suite<S, Q, P>,
     ) -> crate::Result<CaseReport<Q, P>>
     where
         T: Clone + Service<C::TransportReq, Response = C::TransportRes> + Send,
-        S: SignContract<T, Q, P, C, C::SignError>,
+        S: SignContract<T, C> + Default,
         C: Contract<T, ReqSource = Q, ResSink = P> + Layer<T>,
-        C::Service: Service<C::Request, Response = C::Response>,
+        C::Service: Clone + Service<C::Request, Response = C::Response>,
         Q: Clone + Semigroup + RequestSource<C::Request>,
         P: Clone + Semigroup + ResponseSink<Result<C::Response, ServiceError<T, C>>>,
     {
         let buffers =
             if Hierarchy::Testcase.contains(&job.sequential) { 1 } else { self.profile.repeat.times().max(1) };
         let profile = &self.profile.clone().semigroup(suite.profile.clone());
-        let services = futures::stream::iter(transports)
-            .map(|(name, service)| async move {
-                let layer = sign_contract
-                    .sign_contract(service.clone(), &profile.request, &profile.response)
-                    .await
-                    .map_err(ContractError::<T, C>::Sign)?;
-                Ok((name, layer.layer(service.clone())))
-            })
-            .buffer_unordered(transports.len().max(1))
-            .try_collect()
-            .await
-            .unwrap_or_else(|_: ContractError<T, C>| todo!());
+        // let services = futures::stream::iter(transports)
+        //     .map(|(name, service)| async move {
+        //         let layer = sign_contract
+        //             .sign_contract(service.clone(), &profile.request, &profile.response)
+        //             .await
+        //             .map_err(ContractError::<T, C>::Sign)?;
+        //         Ok((name, layer.layer(service.clone())))
+        //     })
+        //     .buffer_unordered(transports.len().max(1))
+        //     .try_collect()
+        //     .await
+        //     .unwrap_or_else(|_: ContractError<T, C>| todo!());
         let destinations = suite.destinations.iter().map(|(d, u)| (d, (**u).clone())).collect();
         let () = profile.shot::<T, C>(services, &destinations, &self.target).await.unwrap_or_else(|_| todo!());
         Ok(CaseReport { case: self, passed: 1 })

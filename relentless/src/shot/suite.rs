@@ -17,9 +17,9 @@ use crate::{
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
-pub struct SuiteCase<Q, P> {
+pub struct SuiteCase<C, Q, P> {
     #[serde(flatten)]
-    pub suite: Suite<Q, P>,
+    pub suite: Suite<C, Q, P>,
 
     #[serde(default)]
     pub testcases: Vec<Testcase<Q, P>>,
@@ -27,16 +27,15 @@ pub struct SuiteCase<Q, P> {
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
-pub struct Suite<Q, P> {
-    #[serde(default)]
-    pub name: Option<String>,
-    #[serde(default)]
+pub struct Suite<C, Q, P> {
+    pub name: String,
     pub destinations: Destinations<http_newtype_serde::Uri>,
     #[serde(default)]
     pub profile: Profile<Q, P>,
+    pub contract: Option<C>,
 }
 // impl<Q, P> Suite<Q, P> {
-//     pub async fn service<'a, M, S, C>(
+//     pub async fn transport<'a, M, S, C>(
 //         &'a self,
 //         make_service: M,
 //         job: &'a JobSpec,
@@ -90,8 +89,8 @@ pub struct Suite<Q, P> {
 //     }
 
 //     fn call(&mut self, case: Testcase<C::ReqSource, C::ResSink>) -> Self::Future {
-//         let (service, job, suite) = (self.services.clone(), self.job, self.suite);
-//         Box::pin(async { Ok(case.shot::<_, C>(service, job, suite).await.unwrap()) })
+//         let (transport, job, suite) = (self.services.clone(), self.job, self.suite);
+//         Box::pin(async { Ok(case.shot::<_, C>(transport, job, suite).await.unwrap()) })
 //     }
 // }
 // impl<'a, S, C> Service<Testcase<C::ReqSource, C::ResSink>> for &'a SuiteService<'a, S, C>
@@ -112,8 +111,8 @@ pub struct Suite<Q, P> {
 //     }
 
 //     fn call(&mut self, case: Testcase<C::ReqSource, C::ResSink>) -> Self::Future {
-//         let (service, job, suite) = (self.services.clone(), self.job, self.suite);
-//         Box::pin(async { Ok(case.shot::<_, C>(service, job, suite).await.unwrap()) })
+//         let (transport, job, suite) = (self.services.clone(), self.job, self.suite);
+//         Box::pin(async { Ok(case.shot::<_, C>(transport, job, suite).await.unwrap()) })
 //     }
 // }
 
@@ -121,30 +120,33 @@ pub struct Suite<Q, P> {
 pub struct SuiteReport<'a, Q, P> {
     cases: Vec<CaseReport<'a, Q, P>>,
 }
-impl<Q, P> SuiteCase<Q, P> {
-    pub async fn shot<M, T, S, C>(
-        &self,
-        make_service: M,
-        sign_contract: &S,
-        job: &JobSpec,
-    ) -> crate::Result<SuiteReport<Q, P>>
+impl<S, Q, P> SuiteCase<S, Q, P> {
+    pub async fn shot<M, T, C>(&self, make_service: M, job: &JobSpec) -> crate::Result<SuiteReport<Q, P>>
     where
         M: Clone + MakeService<http::Uri, C::TransportReq, Service = T>,
         T: Clone + Service<C::TransportReq, Response = C::TransportRes> + Send,
-        S: SignContract<T, Q, P, C, C::SignError>,
+        S: SignContract<T, C> + Default,
         C: Contract<T, ReqSource = Q, ResSink = P> + Layer<T>,
-        C::Service: Service<C::Request, Response = C::Response> + Send,
+        C::Service: Clone + Service<C::Request, Response = C::Response> + Send,
         Q: Clone + Semigroup + RequestSource<C::Request>,
         P: Clone + Semigroup + ResponseSink<Result<C::Response, ServiceError<T, C>>>,
     {
         let buffers = if Hierarchy::Suite.contains(&job.sequential) { 1 } else { self.testcases.len().max(1) };
         let mut services = Destinations::default();
         for (d, http_newtype_serde::Uri(dest)) in self.suite.destinations.iter() {
-            let service = make_service.clone().make_service(dest.clone()).await.unwrap_or_else(|_| todo!());
-            services.insert(d.to_string(), service);
+            let transport = make_service.clone().make_service(dest.clone()).await.unwrap_or_else(|_| todo!());
+            let contract = self
+                .suite
+                .contract
+                .as_ref()
+                .unwrap_or(&Default::default())
+                .sign_contract(transport.clone())
+                .await
+                .unwrap_or_else(|_| todo!());
+            services.insert(d.to_string(), contract.layer(transport));
         }
         let cases = futures::stream::iter(&self.testcases)
-            .map(|t| t.shot(&services, sign_contract, job, &self.suite))
+            .map(|t| t.shot(&services, job, &self.suite))
             .buffer_unordered(buffers)
             .try_collect()
             .await?;

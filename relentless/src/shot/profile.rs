@@ -47,24 +47,24 @@ impl Repeat {
 impl<Q, P> Profile<Q, P> {
     pub async fn shot<T, C>(
         &self,
-        services: Destinations<C::Service>,
+        services: &Destinations<C::Service>,
         destinations: &Destinations<http::Uri>,
         target: &str,
     ) -> Result<(), ContractError<T, C>>
     where
         T: Service<C::TransportReq, Response = C::TransportRes>,
         C: Contract<T, ReqSource = Q, ResSink = P> + Layer<T>,
-        C::Service: Service<C::Request, Response = C::Response>,
+        C::Service: Clone + Service<C::Request, Response = C::Response>,
         Q: RequestSource<C::Request>,
         P: ResponseSink<Result<C::Response, ServiceError<T, C>>>,
     {
         let buffers = services.len().max(1);
         let responses = futures::stream::iter(services)
             .map(|(name, service)| async move {
-                let destination = destinations.get(&name).unwrap_or_else(|| todo!());
+                let destination = destinations.get(name).unwrap_or_else(|| todo!());
                 let request =
                     self.request.produce(destination, target).await.map_err(ContractError::<T, C>::ReqSource)?;
-                let response = service.oneshot(request).await;
+                let response = service.clone().oneshot(request).await;
                 Ok((name, response))
             })
             .buffer_unordered(buffers)

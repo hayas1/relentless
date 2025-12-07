@@ -43,8 +43,9 @@ impl Cli {
         Ok((key.into(), value.into()))
     }
     #[cfg(feature = "cli")]
-    pub async fn job<Q, P>() -> crate::Result<(Job<Q, P>, JobSpec)>
+    pub async fn job<C, Q, P>() -> crate::Result<(Job<C, Q, P>, JobSpec)>
     where
+        C: for<'x> Deserialize<'x> + Default,
         Q: for<'x> Deserialize<'x> + Default,
         P: for<'x> Deserialize<'x> + Default,
     {
@@ -95,9 +96,10 @@ pub struct JobSpec {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Job<Q, P>(pub Vec<SuiteCase<Q, P>>);
-impl<Q, P> Job<Q, P>
+pub struct Job<C, Q, P>(pub Vec<SuiteCase<C, Q, P>>);
+impl<C, Q, P> Job<C, Q, P>
 where
+    C: for<'x> Deserialize<'x> + Default,
     Q: for<'x> Deserialize<'x> + Default,
     P: for<'x> Deserialize<'x> + Default,
 {
@@ -116,25 +118,20 @@ where
 pub struct JobReport<'a, Q, P> {
     suites: Vec<SuiteReport<'a, Q, P>>,
 }
-impl<Q, P> Job<Q, P> {
-    pub async fn shot<M, T, S, C>(
-        &self,
-        make_service: M,
-        sign_contract: S,
-        job: &JobSpec,
-    ) -> crate::Result<JobReport<Q, P>>
+impl<S, Q, P> Job<S, Q, P> {
+    pub async fn shot<M, T, C>(&self, make_service: M, job: &JobSpec) -> crate::Result<JobReport<Q, P>>
     where
         M: Clone + MakeService<http::Uri, C::TransportReq, Service = T>,
         T: Clone + Service<C::TransportReq, Response = C::TransportRes> + Send,
-        S: SignContract<T, Q, P, C, C::SignError>,
+        S: SignContract<T, C> + Default,
         C: Contract<T, ReqSource = Q, ResSink = P> + Layer<T>,
-        C::Service: Service<C::Request, Response = C::Response> + Send,
+        C::Service: Clone + Service<C::Request, Response = C::Response> + Send,
         Q: Clone + Semigroup + RequestSource<C::Request>,
         P: Clone + Semigroup + ResponseSink<Result<C::Response, ServiceError<T, C>>>,
     {
         let buffers = if Hierarchy::Job.contains(&job.sequential) { 1 } else { self.0.len().max(1) };
         let suites = futures::stream::iter(&self.0)
-            .map(|sc| sc.shot(make_service.clone(), &sign_contract, job))
+            .map(|sc| sc.shot(make_service.clone(), job))
             .buffer_unordered(buffers)
             .try_collect()
             .await?;
