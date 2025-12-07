@@ -41,7 +41,8 @@ pub enum GrpcDescriptor {
 }
 impl<G, D, S> SignContract<G, DynamicContract<D, S>> for GrpcDescriptor
 where
-    G: GrpcService<tonic::body::Body>,
+    G: Clone + GrpcService<tonic::body::Body> + Send + Sync + 'static,
+    G::Future: Send,
     G::ResponseBody: Body<Data = Bytes> + Send + 'static,
     <G::ResponseBody as Body>::Error: Into<Box<dyn std::error::Error + Send + Sync + 'static>> + Send,
 {
@@ -71,13 +72,14 @@ impl GrpcDescriptor {
     }
     pub async fn from_reflection<G>(service: G, destination: &http::Uri) -> relentless::Result<DescriptorPool>
     where
-        G: GrpcService<tonic::body::Body>,
+        G: Clone + GrpcService<tonic::body::Body> + Send + Sync + 'static,
+        G::Future: Send,
         G::ResponseBody: Body<Data = Bytes> + Send + 'static,
         <G::ResponseBody as Body>::Error: Into<Box<dyn std::error::Error + Send + Sync + 'static>> + Send,
     {
         let mut client = ServerReflectionClient::new(service);
         let services = Self::reflection_services(&mut client, destination).await?;
-        let pool = Self::reflection_file_descriptors(&mut client, destination, services).await?;
+        let pool = Self::reflection_file_descriptors(&mut client, destination, &services).await?;
         Ok(pool)
     }
     pub async fn reflection_services<G>(
@@ -85,7 +87,8 @@ impl GrpcDescriptor {
         destination: &http::Uri,
     ) -> relentless::Result<Vec<ServiceResponse>>
     where
-        G: GrpcService<tonic::body::Body>,
+        G: Clone + GrpcService<tonic::body::Body> + Send + Sync + 'static,
+        G::Future: Send,
         G::ResponseBody: Body<Data = Bytes> + Send + 'static,
         <G::ResponseBody as Body>::Error: Into<Box<dyn std::error::Error + Send + Sync + 'static>> + Send,
     {
@@ -114,44 +117,79 @@ impl GrpcDescriptor {
     pub async fn reflection_file_descriptors<G>(
         client: &mut ServerReflectionClient<G>,
         destination: &http::Uri,
-        services: Vec<ServiceResponse>,
+        services: &[ServiceResponse],
     ) -> relentless::Result<DescriptorPool>
     where
-        G: GrpcService<tonic::body::Body>,
+        G: Clone + GrpcService<tonic::body::Body> + Send + Sync + 'static,
+        G::Future: Send,
         G::ResponseBody: Body<Data = Bytes> + Send + 'static,
         <G::ResponseBody as Body>::Error: Into<Box<dyn std::error::Error + Send + Sync + 'static>> + Send,
     {
-        let buffer = services.len();
-        let host = destination.host().unwrap_or_else(|| todo!()).to_string();
-        let request_stream = futures::stream::iter(services)
-            .map(move |service| {
-                let host = host.clone();
-                async move {
-                    ServerReflectionRequest {
-                        host,
-                        message_request: Some(MessageRequest::FileContainingSymbol(service.name)),
-                    }
-                }
+        fn inner_recursive<G>(
+            mut client: ServerReflectionClient<G>,
+            pool: DescriptorPool,
+            destination: &http::Uri,
+            services: Vec<String>,
+        ) -> Pin<Box<dyn '_ + Future<Output = relentless::Result<DescriptorPool>> + Send>>
+        where
+            G: Clone + GrpcService<tonic::body::Body> + Send + Sync + 'static,
+            G::Future: Send,
+            G::ResponseBody: Body<Data = Bytes> + Send + 'static,
+            <G::ResponseBody as Body>::Error: Into<Box<dyn std::error::Error + Send + Sync + 'static>> + Send,
+        {
+            Box::pin(async move {
+                let buffer = services.len();
+                let host = destination.host().unwrap_or_else(|| todo!()).to_string();
+                let request_stream = futures::stream::iter(services)
+                    .map(move |service| {
+                        let host = host.clone();
+                        async move {
+                            ServerReflectionRequest {
+                                host,
+                                message_request: Some(MessageRequest::FileContainingSymbol(service)),
+                            }
+                        }
+                    })
+                    .buffer_unordered(buffer);
+                let streaming =
+                    client.server_reflection_info(request_stream).await.unwrap_or_else(|_| todo!()).into_inner();
+                let descriptors = streaming
+                    .try_fold(pool, move |mut p, recv| {
+                        let client = client.clone();
+                        async move {
+                            match recv.message_response.unwrap_or_else(|| todo!()) {
+                                MessageResponse::FileDescriptorResponse(fd_resp) => {
+                                    for raw in fd_resp.file_descriptor_proto {
+                                        let fd = FileDescriptorProto::decode(&*raw).unwrap_or_else(|_| todo!());
+                                        let dep = fd.dependency.clone();
+                                        match p.add_file_descriptor_proto(fd) {
+                                            Ok(_) => (),
+                                            Err(_) => {
+                                                p = inner_recursive(client.clone(), p.clone(), destination, dep)
+                                                    .await
+                                                    .unwrap_or_else(|_| todo!())
+                                            }
+                                        }
+                                    }
+                                }
+                                _ => todo!(),
+                            };
+                            Ok(p)
+                        }
+                    })
+                    .await
+                    .unwrap_or_else(|e| todo!("{e}"));
+                Ok(descriptors)
             })
-            .buffer_unordered(buffer);
-        let streaming = client.server_reflection_info(request_stream).await.unwrap_or_else(|_| todo!()).into_inner();
-        let descriptors = streaming
-            .try_fold(DescriptorPool::new(), |mut pool, recv| async move {
-                match recv.message_response.unwrap_or_else(|| todo!()) {
-                    MessageResponse::FileDescriptorResponse(fd) => pool
-                        .add_file_descriptor_protos(
-                            fd.file_descriptor_proto
-                                .into_iter()
-                                .map(|raw| FileDescriptorProto::decode(&*raw).unwrap_or_else(|_| todo!())),
-                        )
-                        .unwrap_or_else(|e| todo!("{e}")),
-                    _ => todo!(),
-                };
-                Ok(pool)
-            })
-            .await
-            .unwrap_or_else(|_| todo!());
-        Ok(descriptors)
+        }
+        let pool = inner_recursive(
+            client.clone(),
+            DescriptorPool::new(),
+            destination,
+            services.iter().map(|s| s.name.to_string()).collect(),
+        )
+        .await?;
+        Ok(pool)
     }
 }
 
