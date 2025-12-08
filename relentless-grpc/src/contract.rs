@@ -125,7 +125,7 @@ impl GrpcDescriptor {
         G::ResponseBody: Body<Data = Bytes> + Send + 'static,
         <G::ResponseBody as Body>::Error: Into<Box<dyn std::error::Error + Send + Sync + 'static>> + Send,
     {
-        let buffer = services.len();
+        let buffer = services.len().max(1);
         let host = destination.host().unwrap_or_else(|| todo!()).to_string();
         let request_stream = futures::stream::iter(services)
             .map(move |service| {

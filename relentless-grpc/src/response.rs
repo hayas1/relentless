@@ -46,6 +46,6 @@ pub enum GrpcResponseMessage {
 impl<Se: Send> ResponseSink<Result<tonic::Response<Se>, tonic::Status>> for GrpcResponse {
     type Error = Infallible;
     async fn consume(&self, res: Destinations<Result<tonic::Response<Se>, tonic::Status>>) -> Result<(), Self::Error> {
-        todo!()
+        Ok(())
     }
 }

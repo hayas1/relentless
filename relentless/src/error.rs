@@ -1,4 +1,7 @@
-use std::fmt::{Display, Formatter};
+use std::{
+    convert::Infallible,
+    fmt::{Display, Formatter},
+};
 
 pub type RelentlessResult<T> = Result<T, RelentlessError>;
 #[derive(Debug)]
@@ -23,6 +26,11 @@ impl Display for RelentlessError {
             Self::Box(e) => e.fmt(f),
             Self::Custom(e) => e.fmt(f),
         }
+    }
+}
+impl From<Infallible> for RelentlessError {
+    fn from(value: Infallible) -> Self {
+        match value {}
     }
 }
 impl RelentlessError {
