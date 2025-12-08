@@ -20,7 +20,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use tonic::{client::GrpcService, transport::Body, Status};
 use tonic_reflection::pb::v1::{
     server_reflection_client::ServerReflectionClient, server_reflection_request::MessageRequest,
-    server_reflection_response::MessageResponse, ServerReflectionRequest, ServiceResponse,
+    server_reflection_response::MessageResponse, FileDescriptorResponse, ServerReflectionRequest, ServiceResponse,
 };
 use tower::{Layer, Service};
 
@@ -79,7 +79,7 @@ impl GrpcDescriptor {
     {
         let mut client = ServerReflectionClient::new(service);
         let services = Self::reflection_services(&mut client, destination).await?;
-        let pool = Self::reflection_file_descriptors(&mut client, destination, &services).await?;
+        let pool = Self::reflection_file_descriptors(&mut client, destination, services).await?;
         Ok(pool)
     }
     pub async fn reflection_services<G>(
@@ -117,7 +117,7 @@ impl GrpcDescriptor {
     pub async fn reflection_file_descriptors<G>(
         client: &mut ServerReflectionClient<G>,
         destination: &http::Uri,
-        services: &[ServiceResponse],
+        services: Vec<ServiceResponse>,
     ) -> relentless::Result<DescriptorPool>
     where
         G: Clone + GrpcService<tonic::body::Body> + Send + Sync + 'static,
@@ -125,71 +125,93 @@ impl GrpcDescriptor {
         G::ResponseBody: Body<Data = Bytes> + Send + 'static,
         <G::ResponseBody as Body>::Error: Into<Box<dyn std::error::Error + Send + Sync + 'static>> + Send,
     {
-        fn inner_recursive<G>(
-            mut client: ServerReflectionClient<G>,
-            pool: DescriptorPool,
-            destination: &http::Uri,
-            services: Vec<String>,
-        ) -> Pin<Box<dyn '_ + Future<Output = relentless::Result<DescriptorPool>> + Send>>
-        where
-            G: Clone + GrpcService<tonic::body::Body> + Send + Sync + 'static,
-            G::Future: Send,
-            G::ResponseBody: Body<Data = Bytes> + Send + 'static,
-            <G::ResponseBody as Body>::Error: Into<Box<dyn std::error::Error + Send + Sync + 'static>> + Send,
-        {
-            Box::pin(async move {
-                let buffer = services.len();
-                let host = destination.host().unwrap_or_else(|| todo!()).to_string();
-                let request_stream = futures::stream::iter(services)
-                    .map(move |service| {
-                        let host = host.clone();
-                        async move {
-                            ServerReflectionRequest {
-                                host,
-                                message_request: Some(MessageRequest::FileContainingSymbol(service)),
-                            }
-                        }
-                    })
-                    .buffer_unordered(buffer);
-                let streaming =
-                    client.server_reflection_info(request_stream).await.unwrap_or_else(|_| todo!()).into_inner();
-                let descriptors = streaming
-                    .try_fold(pool, move |mut p, recv| {
-                        let client = client.clone();
-                        async move {
-                            match recv.message_response.unwrap_or_else(|| todo!()) {
-                                MessageResponse::FileDescriptorResponse(fd_resp) => {
-                                    for raw in fd_resp.file_descriptor_proto {
-                                        let fd = FileDescriptorProto::decode(&*raw).unwrap_or_else(|_| todo!());
-                                        let dep = fd.dependency.clone();
-                                        match p.add_file_descriptor_proto(fd) {
-                                            Ok(_) => (),
-                                            Err(_) => {
-                                                p = inner_recursive(client.clone(), p.clone(), destination, dep)
-                                                    .await
-                                                    .unwrap_or_else(|_| todo!())
-                                            }
-                                        }
-                                    }
-                                }
-                                _ => todo!(),
-                            };
-                            Ok(p)
-                        }
-                    })
-                    .await
-                    .unwrap_or_else(|e| todo!("{e}"));
-                Ok(descriptors)
+        let buffer = services.len();
+        let host = destination.host().unwrap_or_else(|| todo!()).to_string();
+        let request_stream = futures::stream::iter(services)
+            .map(move |service| {
+                let host = host.clone();
+                async move {
+                    ServerReflectionRequest {
+                        host,
+                        message_request: Some(MessageRequest::FileContainingSymbol(service.name)),
+                    }
+                }
             })
-        }
-        let pool = inner_recursive(
-            client.clone(),
-            DescriptorPool::new(),
-            destination,
-            services.iter().map(|s| s.name.to_string()).collect(),
-        )
-        .await?;
-        Ok(pool)
+            .buffer_unordered(buffer);
+        let streaming = client.server_reflection_info(request_stream).await.unwrap_or_else(|_| todo!()).into_inner();
+        let descriptors = streaming
+            .try_fold(DescriptorPool::new(), move |mut pool, recv| {
+                let client = client.clone();
+                async move {
+                    match recv.message_response.unwrap_or_else(|| todo!()) {
+                        MessageResponse::FileDescriptorResponse(fd_resp) => {
+                            Self::reflection_file_descriptors_recursive(client, destination, &mut pool, fd_resp)
+                                .await
+                                .unwrap_or_else(|e| todo!("{e}"));
+                        }
+                        _ => todo!(),
+                    };
+                    Ok(pool)
+                }
+            })
+            .await
+            .unwrap_or_else(|e| todo!("{e}"));
+        Ok(descriptors)
+    }
+    pub fn reflection_file_descriptors_recursive<'a, G>(
+        client: ServerReflectionClient<G>,
+        destination: &'a http::Uri,
+        pool: &'a mut DescriptorPool,
+        fd_resp: FileDescriptorResponse,
+    ) -> Pin<Box<dyn 'a + Future<Output = relentless::Result<&'a mut DescriptorPool>>>>
+    where
+        G: Clone + GrpcService<tonic::body::Body> + Send + Sync + 'static,
+        G::Future: Send,
+        G::ResponseBody: Body<Data = Bytes> + Send + 'static,
+        <G::ResponseBody as Body>::Error: Into<Box<dyn std::error::Error + Send + Sync + 'static>> + Send,
+    {
+        let host = destination.host().unwrap_or_else(|| todo!()).to_string();
+        Box::pin(async move {
+            let deps: Vec<_> = fd_resp
+                .file_descriptor_proto
+                .into_iter()
+                .flat_map(|raw| {
+                    let fd_proto = FileDescriptorProto::decode(&*raw).unwrap_or_else(|_| todo!());
+                    match pool.add_file_descriptor_proto(fd_proto.clone()) {
+                        Ok(()) => Vec::new(),
+                        Err(_) => fd_proto.dependency,
+                    }
+                })
+                .collect();
+            let buffer = deps.len().max(1);
+            let request_stream =
+                futures::stream::iter(deps.into_iter().map(move |dep| {
+                    let host = host.clone();
+                    async move {
+                        ServerReflectionRequest { host, message_request: Some(MessageRequest::FileByFilename(dep)) }
+                    }
+                }))
+                .buffer_unordered(buffer);
+            let streaming =
+                client.clone().server_reflection_info(request_stream).await.unwrap_or_else(|_| todo!()).into_inner();
+            let descriptors = streaming
+                .try_fold(pool, |pl, recv| {
+                    let client = client.clone();
+                    async move {
+                        match recv.message_response.unwrap_or_else(|| todo!()) {
+                            MessageResponse::FileDescriptorResponse(fd_resp) => {
+                                Self::reflection_file_descriptors_recursive(client.clone(), destination, pl, fd_resp)
+                                    .await
+                                    .unwrap_or_else(|_| todo!());
+                            }
+                            _ => todo!(),
+                        }
+                        Ok(pl)
+                    }
+                })
+                .await;
+            Ok(descriptors.unwrap_or_else(|_| todo!()))
+        })
     }
 }
 
