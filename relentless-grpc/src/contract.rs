@@ -280,3 +280,30 @@ where
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use relentless_grpc_dev_server::service::reflection_service;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_from_reflection() {
+        let destination = "127.0.0.1:50051".parse().unwrap();
+        let service = reflection_service();
+        let pool = GrpcDescriptor::from_reflection(service, &destination).await.unwrap();
+        let files: Vec<_> = pool.files().map(|f| f.name().to_string()).collect();
+        assert_eq!(
+            files,
+            vec![
+                "health.proto",
+                "reflection_v1.proto",
+                "greeter.proto",
+                "google/protobuf/wrappers.proto",
+                "google/protobuf/empty.proto",
+                "google/protobuf/any.proto",
+                "google/protobuf/struct.proto",
+            ]
+        );
+    }
+}
