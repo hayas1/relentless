@@ -23,7 +23,7 @@ pub enum ReportFormat {
     GithubMarkdown,
 }
 
-pub trait Report<R> {
+pub trait Reporter<R> {
     type Error;
     fn report(&self, report: R) -> Result<(), Self::Error> {
         let mut writer = ReportWriter::new(0, BufWriter::new(std::io::stdout()));
@@ -31,18 +31,18 @@ pub trait Report<R> {
     }
     fn write_report<W: std::io::Write>(&self, writer: &mut ReportWriter<W>, report: R) -> Result<(), Self::Error>;
 }
-impl<R, E> Report<R> for ReportFormat
+impl<R, E> Reporter<R> for ReportFormat
 where
-    null_device::NullDeviceReport: Report<R, Error = E>,
-    console::ConsoleReport: Report<R, Error = E>,
-    github_markdown::GithubMarkdownReport: Report<R, Error = E>,
+    null_device::NullDevice: Reporter<R, Error = E>,
+    console::Console: Reporter<R, Error = E>,
+    github_markdown::GithubMarkdown: Reporter<R, Error = E>,
 {
     type Error = E;
     fn write_report<W: std::io::Write>(&self, writer: &mut ReportWriter<W>, report: R) -> Result<(), Self::Error> {
         match self {
-            ReportFormat::NullDevice => null_device::NullDeviceReport.write_report(writer, report),
-            ReportFormat::Console => console::ConsoleReport.write_report(writer, report),
-            ReportFormat::GithubMarkdown => github_markdown::GithubMarkdownReport.write_report(writer, report),
+            ReportFormat::NullDevice => null_device::NullDevice.write_report(writer, report),
+            ReportFormat::Console => console::Console.write_report(writer, report),
+            ReportFormat::GithubMarkdown => github_markdown::GithubMarkdown.write_report(writer, report),
         }
     }
 }

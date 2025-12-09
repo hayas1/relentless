@@ -1,12 +1,12 @@
 use std::fmt::Write as _;
 
 use crate::{
-    report::{Report, ReportWriter},
+    report::{ReportWriter, Reporter},
     shot::{job::JobReport, suite::SuiteReport, testcase::CaseReport},
 };
 
-pub struct ConsoleReport;
-impl<Q, P> Report<&JobReport<'_, Q, P>> for ConsoleReport {
+pub struct Console;
+impl<Q, P> Reporter<&JobReport<'_, Q, P>> for Console {
     type Error = std::fmt::Error;
     fn write_report<W: std::io::Write>(
         &self,
@@ -17,7 +17,7 @@ impl<Q, P> Report<&JobReport<'_, Q, P>> for ConsoleReport {
         Ok(())
     }
 }
-impl<Q, P> Report<&SuiteReport<'_, Q, P>> for ConsoleReport {
+impl<Q, P> Reporter<&SuiteReport<'_, Q, P>> for Console {
     type Error = std::fmt::Error;
     fn write_report<W: std::io::Write>(
         &self,
@@ -27,7 +27,7 @@ impl<Q, P> Report<&SuiteReport<'_, Q, P>> for ConsoleReport {
         Ok(())
     }
 }
-impl<Q, P> Report<&CaseReport<'_, Q, P>> for ConsoleReport {
+impl<Q, P> Reporter<&CaseReport<'_, Q, P>> for Console {
     type Error = std::fmt::Error;
     fn write_report<W: std::io::Write>(
         &self,

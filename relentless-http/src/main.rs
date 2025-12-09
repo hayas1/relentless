@@ -3,7 +3,7 @@ use std::process::ExitCode;
 #[cfg(feature = "cli")]
 #[tokio::main]
 pub async fn main() -> Result<ExitCode, Box<dyn std::error::Error>> {
-    use relentless::{record::metric::MeasureLayer, report::Report, shot::job::Cli};
+    use relentless::{record::metric::MeasureLayer, report::Reporter, shot::job::Cli};
     use relentless_http::{contract::HttpContract, service::ReqwestClient};
     use reqwest::Body;
     use tower::ServiceBuilder;
