@@ -1,30 +1,48 @@
 use std::fmt::Write as _;
 
+use console::Emoji;
+
 use crate::{
     report::{ReportWriter, Reporter},
-    shot::{job::JobReport, suite::SuiteReport, testcase::CaseReport},
+    shot::{job::JobReport, profile::Repeat, suite::SuiteReport, testcase::CaseReport},
 };
 
 pub struct Console;
-impl<Q, P> Reporter<&JobReport<'_, Q, P>> for Console {
+impl Console {
+    pub const SUITE_NAME_EMOJI: Emoji<'_, '_> = Emoji("🚀", "");
+    pub const SUITE_DESTINATION_EMOJI: Emoji<'_, '_> = Emoji("🌐", ":");
+    pub const SUITE_COALESCE_DESTINATION_EMOJI: Emoji<'_, '_> = Emoji("👉", "->");
+
+    pub const CASE_PASS_EMOJI: Emoji<'_, '_> = Emoji("✅", "PASS");
+    pub const CASE_FAIL_EMOJI: Emoji<'_, '_> = Emoji("❌", "FAIL");
+    pub const CASE_REPEAT_EMOJI: Emoji<'_, '_> = Emoji("🔁", "");
+    pub const CASE_DESCRIPTION_EMOJI: Emoji<'_, '_> = Emoji("📝", "");
+    pub const CASE_ALLOW_EMOJI: Emoji<'_, '_> = Emoji("👀", "");
+    pub const CASE_MESSAGE_EMOJI: Emoji<'_, '_> = Emoji("💬", "");
+
+    pub const SUMMARY_EMOJI: Emoji<'_, '_> = Emoji("💥", "");
+}
+impl<C, Q, P> Reporter<&JobReport<'_, C, Q, P>> for Console {
     type Error = std::fmt::Error;
     fn write_report<W: std::io::Write>(
         &self,
         writer: &mut ReportWriter<W>,
-        report: &JobReport<Q, P>,
+        report: &JobReport<C, Q, P>,
     ) -> Result<(), Self::Error> {
-        writeln!(writer, "{}", report.pass())?;
+        report.suites.iter().try_fold((), |(), s| self.write_report(writer, s))?;
+        writeln!(writer, "job summary: {}", if report.pass() { "PASS" } else { "FAIL" })?;
         Ok(())
     }
 }
-impl<Q, P> Reporter<&SuiteReport<'_, Q, P>> for Console {
+impl<C, Q, P> Reporter<&SuiteReport<'_, C, Q, P>> for Console {
     type Error = std::fmt::Error;
     fn write_report<W: std::io::Write>(
         &self,
         writer: &mut ReportWriter<W>,
-        report: &SuiteReport<Q, P>,
+        report: &SuiteReport<C, Q, P>,
     ) -> Result<(), Self::Error> {
-        Ok(())
+        writeln!(writer, "{} {}", Self::SUITE_NAME_EMOJI, report.suite.name)?;
+        report.cases.iter().try_fold((), |(), c| self.write_report(writer, c))
     }
 }
 impl<Q, P> Reporter<&CaseReport<'_, Q, P>> for Console {
@@ -34,6 +52,18 @@ impl<Q, P> Reporter<&CaseReport<'_, Q, P>> for Console {
         writer: &mut ReportWriter<W>,
         report: &CaseReport<Q, P>,
     ) -> Result<(), Self::Error> {
+        let l1 = {
+            write!(writer, "{}", if report.passed > 0 { Self::CASE_PASS_EMOJI } else { Self::CASE_FAIL_EMOJI })?;
+            write!(writer, " {}", report.case.target)?;
+            if let Repeat(Some(ref repeat)) = report.case.profile.repeat {
+                write!(writer, " {}{}/{}", Self::CASE_REPEAT_EMOJI, report.passed, repeat)?;
+            }
+            if let Some(description) = &report.case.description {
+                write!(writer, " {} {description}", Self::CASE_DESCRIPTION_EMOJI)?;
+            }
+            writeln!(writer)
+        };
+        l1?;
         Ok(())
     }
 }

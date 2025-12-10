@@ -3,6 +3,7 @@ use std::io::BufWriter;
 use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "console-report")]
 pub mod console;
 pub mod github_markdown;
 pub mod null_device;
@@ -66,14 +67,14 @@ impl<W> ReportWriter<W> {
     pub fn decrement(&mut self) {
         self.indent -= 1;
     }
-    pub fn scope<F, R, E>(&mut self, f: F) -> Result<R, E>
+    pub fn scope<F, T>(&mut self, f: F) -> T
     where
-        F: FnOnce(&mut Self) -> Result<R, E>,
+        F: FnOnce(&mut Self) -> T,
     {
         self.increment();
-        let ret = f(self)?;
+        let ret = f(self);
         self.decrement();
-        Ok(ret)
+        ret
     }
 }
 impl<W: std::io::Write> std::fmt::Write for ReportWriter<W> {

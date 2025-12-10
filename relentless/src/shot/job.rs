@@ -115,11 +115,11 @@ where
     }
 }
 #[derive(Debug, Clone, PartialEq)]
-pub struct JobReport<'a, Q, P> {
-    suites: Vec<SuiteReport<'a, Q, P>>,
+pub struct JobReport<'a, C, Q, P> {
+    pub suites: Vec<SuiteReport<'a, C, Q, P>>,
 }
 impl<S, Q, P> Job<S, Q, P> {
-    pub async fn shot<M, T, C>(&self, make_service: M, job: &JobSpec) -> crate::Result<JobReport<Q, P>>
+    pub async fn shot<M, T, C>(&self, make_service: M, job: &JobSpec) -> crate::Result<JobReport<S, Q, P>>
     where
         M: Clone + MakeService<http::Uri, C::TransportReq, Service = T>,
         T: Clone + Service<C::TransportReq, Response = C::TransportRes> + Send,
@@ -138,7 +138,7 @@ impl<S, Q, P> Job<S, Q, P> {
         Ok(JobReport { suites })
     }
 }
-impl<Q, P> JobReport<'_, Q, P> {
+impl<C, Q, P> JobReport<'_, C, Q, P> {
     pub fn pass(&self) -> bool {
         true
     }

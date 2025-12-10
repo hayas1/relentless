@@ -117,11 +117,12 @@ pub struct Suite<C, Q, P> {
 // }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct SuiteReport<'a, Q, P> {
-    cases: Vec<CaseReport<'a, Q, P>>,
+pub struct SuiteReport<'a, C, Q, P> {
+    pub suite: &'a Suite<C, Q, P>,
+    pub cases: Vec<CaseReport<'a, Q, P>>,
 }
 impl<S, Q, P> SuiteCase<S, Q, P> {
-    pub async fn shot<M, T, C>(&self, make_service: M, job: &JobSpec) -> crate::Result<SuiteReport<Q, P>>
+    pub async fn shot<M, T, C>(&self, make_service: M, job: &JobSpec) -> crate::Result<SuiteReport<S, Q, P>>
     where
         M: Clone + MakeService<http::Uri, C::TransportReq, Service = T>,
         T: Clone + Service<C::TransportReq, Response = C::TransportRes> + Send,
@@ -150,6 +151,6 @@ impl<S, Q, P> SuiteCase<S, Q, P> {
             .buffer_unordered(buffers)
             .try_collect()
             .await?;
-        Ok(SuiteReport { cases })
+        Ok(SuiteReport { suite: &self.suite, cases })
     }
 }

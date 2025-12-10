@@ -4,13 +4,13 @@ use crate::{
 };
 
 pub struct GithubMarkdown;
-impl<Q, P> Reporter<&JobReport<'_, Q, P>> for GithubMarkdown {
+impl<C, Q, P> Reporter<&JobReport<'_, C, Q, P>> for GithubMarkdown {
     type Error = std::fmt::Error;
     fn write_report<W: std::io::Write>(
         &self,
         writer: &mut ReportWriter<W>,
-        report: &JobReport<Q, P>,
+        report: &JobReport<C, Q, P>,
     ) -> Result<(), Self::Error> {
-        Ok(())
+        todo!()
     }
 }

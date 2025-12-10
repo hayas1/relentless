@@ -24,8 +24,8 @@ pub struct Testcase<Q, P> {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct CaseReport<'a, Q, P> {
-    case: &'a Testcase<Q, P>,
-    passed: usize,
+    pub case: &'a Testcase<Q, P>,
+    pub passed: usize,
     // messages: Messages<T>,
     // aggregate: EvaluateAggregator,
 }
