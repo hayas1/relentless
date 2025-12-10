@@ -3,6 +3,7 @@ use std::fmt::Write as _;
 use console::Emoji;
 
 use crate::{
+    http_newtype_serde,
     report::{ReportWriter, Reporter},
     shot::{job::JobReport, profile::Repeat, suite::SuiteReport, testcase::CaseReport},
 };
@@ -42,6 +43,16 @@ impl<C, Q, P> Reporter<&SuiteReport<'_, C, Q, P>> for Console {
         report: &SuiteReport<C, Q, P>,
     ) -> Result<(), Self::Error> {
         writeln!(writer, "{} {}", Self::SUITE_NAME_EMOJI, report.suite.name)?;
+        writer.scope(|w| {
+            report.suite.destinations.iter().try_fold((), |(), (name, http_newtype_serde::Uri(dest))| {
+                write!(w, "{name}{} ", Self::SUITE_DESTINATION_EMOJI)?;
+                if true {
+                    writeln!(w, "{dest} {} {dest}", Self::SUITE_COALESCE_DESTINATION_EMOJI)
+                } else {
+                    writeln!(w, "{dest}")
+                }
+            })
+        })?;
         report.cases.iter().try_fold((), |(), c| self.write_report(writer, c))
     }
 }
