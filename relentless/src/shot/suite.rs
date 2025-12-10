@@ -1,5 +1,6 @@
 use futures::{StreamExt, TryStreamExt};
-use semigroup::Semigroup;
+use http::Uri;
+use semigroup::{Lazy, Semigroup};
 use serde::{Deserialize, Serialize};
 use tower::{Layer, MakeService, Service};
 
@@ -118,6 +119,7 @@ pub struct Suite<C, Q, P> {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct SuiteReport<'a, C, Q, P> {
+    pub destinations: Lazy<Destinations<Uri>>,
     pub suite: &'a Suite<C, Q, P>,
     pub cases: Vec<CaseReport<'a, Q, P>>,
 }
@@ -133,8 +135,9 @@ impl<S, Q, P> SuiteCase<S, Q, P> {
         P: Clone + Semigroup + ResponseSink<Result<C::Response, ServiceError<T, C>>>,
     {
         let buffers = if Hierarchy::Suite.contains(&job.sequential) { 1 } else { self.testcases.len().max(1) };
+        let destinations = job.destinations(&self.suite.destinations).unwrap_or_else(|e| todo!("{e}"));
         let mut services = Destinations::default();
-        for (d, http_newtype_serde::Uri(dest)) in self.suite.destinations.iter() {
+        for (d, dest) in destinations.combine_rev_clone().iter() {
             let transport = make_service.clone().make_service(dest.clone()).await.unwrap_or_else(|_| todo!());
             let contract = self
                 .suite
@@ -151,6 +154,6 @@ impl<S, Q, P> SuiteCase<S, Q, P> {
             .buffer_unordered(buffers)
             .try_collect()
             .await?;
-        Ok(SuiteReport { suite: &self.suite, cases })
+        Ok(SuiteReport { destinations, suite: &self.suite, cases })
     }
 }

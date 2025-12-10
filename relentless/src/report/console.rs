@@ -3,7 +3,6 @@ use std::fmt::Write as _;
 use console::Emoji;
 
 use crate::{
-    http_newtype_serde,
     report::{ReportWriter, Reporter},
     shot::{job::JobReport, profile::Repeat, suite::SuiteReport, testcase::CaseReport},
 };
@@ -12,7 +11,7 @@ pub struct Console;
 impl Console {
     pub const SUITE_NAME_EMOJI: Emoji<'_, '_> = Emoji("🚀", "");
     pub const SUITE_DESTINATION_EMOJI: Emoji<'_, '_> = Emoji("🌐", ":");
-    pub const SUITE_COALESCE_DESTINATION_EMOJI: Emoji<'_, '_> = Emoji("👉", "->");
+    pub const SUITE_OVERWRITE_DESTINATION_EMOJI: Emoji<'_, '_> = Emoji("👉", "->");
 
     pub const CASE_PASS_EMOJI: Emoji<'_, '_> = Emoji("✅", "PASS");
     pub const CASE_FAIL_EMOJI: Emoji<'_, '_> = Emoji("❌", "FAIL");
@@ -44,10 +43,11 @@ impl<C, Q, P> Reporter<&SuiteReport<'_, C, Q, P>> for Console {
     ) -> Result<(), Self::Error> {
         writeln!(writer, "{} {}", Self::SUITE_NAME_EMOJI, report.suite.name)?;
         writer.scope(|w| {
-            report.suite.destinations.iter().try_fold((), |(), (name, http_newtype_serde::Uri(dest))| {
+            let (first, last) = (report.destinations.first(), report.destinations.last());
+            report.destinations.combine_rev_clone().iter().try_fold((), |(), (name, dest)| {
                 write!(w, "{name}{} ", Self::SUITE_DESTINATION_EMOJI)?;
-                if true {
-                    writeln!(w, "{dest} {} {dest}", Self::SUITE_COALESCE_DESTINATION_EMOJI)
+                if let (Some(base), Some(overwrite)) = (first.get(name), last.get(name)) {
+                    writeln!(w, "{base} {} {overwrite}", Self::SUITE_OVERWRITE_DESTINATION_EMOJI)
                 } else {
                     writeln!(w, "{dest}")
                 }

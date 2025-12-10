@@ -3,11 +3,12 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
+use semigroup::Semigroup;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Semigroup)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
-pub struct Destinations<T>(HashMap<String, T>);
+pub struct Destinations<T>(#[semigroup(with = "semigroup::op::UnionMap")] HashMap<String, T>);
 impl<T> Default for Destinations<T> {
     fn default() -> Self {
         // derive(Default) do not implement Default when T are not implement Default

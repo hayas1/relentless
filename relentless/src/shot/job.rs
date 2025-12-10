@@ -1,13 +1,17 @@
+use std::str::FromStr;
 use std::{fs::File, path::PathBuf};
 
 #[cfg(feature = "cli")]
 use clap::{Args, Parser};
 use futures::{StreamExt, TryStreamExt};
-use semigroup::Semigroup;
+use http::Uri;
+use semigroup::op::UnionMap;
+use semigroup::{Lazy, Semigroup};
 use serde::{Deserialize, Serialize};
 use tower::Layer;
 use tower::{MakeService, Service};
 
+use crate::shot::destinations::{self, Destinations};
 use crate::{
     report::ReportFormat,
     shot::{
@@ -93,6 +97,17 @@ pub struct JobSpec {
     /// duration
     #[cfg_attr(feature = "cli", arg(env, long))]
     pub duration: Option<u64>, // TODO Duration
+}
+impl JobSpec {
+    pub fn destinations<U: Clone + Into<Uri>>(
+        &self,
+        destinations: &Destinations<U>,
+    ) -> Result<Lazy<Destinations<Uri>>, <Uri as FromStr>::Err> {
+        let overwrite: Result<Destinations<_>, _> =
+            self.destination.iter().map(|(d, u)| u.parse().map(|u| (d, u))).collect();
+        let base: Destinations<_> = destinations.iter().map(|(d, u)| (d, u.clone().into())).collect();
+        Ok(Lazy::from(base).semigroup(overwrite?.into()))
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
