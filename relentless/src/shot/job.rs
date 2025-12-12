@@ -5,17 +5,16 @@ use std::{fs::File, path::PathBuf};
 use clap::{Args, Parser};
 use futures::{StreamExt, TryStreamExt};
 use http::Uri;
-use semigroup::op::UnionMap;
 use semigroup::{Lazy, Semigroup};
 use serde::{Deserialize, Serialize};
 use tower::Layer;
 use tower::{MakeService, Service};
 
-use crate::shot::destinations::{self, Destinations};
 use crate::{
     report::ReportFormat,
     shot::{
         contract::{Contract, RequestSource, ResponseSink, ServiceError, SignContract},
+        destinations::Destinations,
         hierarchy::Hierarchy,
         suite::{SuiteCase, SuiteReport},
     },
@@ -24,7 +23,6 @@ use crate::{
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 #[cfg_attr(feature = "cli", derive(Parser))]
 #[cfg_attr(feature = "cli", command(version, about, arg_required_else_help = true))]
-
 pub struct Cli {
     /// config files of testsuites
     #[cfg_attr(feature = "cli", arg(num_args=0.., value_delimiter = ' '))]
