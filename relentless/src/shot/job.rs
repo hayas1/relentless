@@ -10,11 +10,10 @@ use serde::{Deserialize, Serialize};
 use tower::Layer;
 use tower::{MakeService, Service};
 
-use crate::shot::testcase::Evaluated;
 use crate::{
     report::ReportFormat,
     shot::{
-        contract::{Contract, RequestSource, ResponseSink, ServiceError, SignContract},
+        contract::{Contract, Evaluated, RequestSource, ResponseSink, ServiceError, SignContract},
         destinations::Destinations,
         hierarchy::Hierarchy,
         suite::{SuiteCase, SuiteReport},

@@ -4,12 +4,7 @@ use console::Emoji;
 
 use crate::{
     report::{ReportWriter, Reporter},
-    shot::{
-        job::JobReport,
-        profile::Repeat,
-        suite::SuiteReport,
-        testcase::{CaseReport, Evaluated},
-    },
+    shot::{contract::Evaluated, job::JobReport, profile::Repeat, suite::SuiteReport, testcase::CaseReport},
 };
 
 pub struct Console;

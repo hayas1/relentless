@@ -7,12 +7,12 @@ use tower::{Layer, MakeService, Service};
 use crate::{
     http_newtype_serde,
     shot::{
-        contract::{Contract, RequestSource, ResponseSink, ServiceError, SignContract},
+        contract::{Contract, Evaluated, RequestSource, ResponseSink, ServiceError, SignContract},
         destinations::Destinations,
         hierarchy::Hierarchy,
         job::JobSpec,
         profile::Profile,
-        testcase::{CaseReport, Evaluated, Testcase},
+        testcase::{CaseReport, Testcase},
     },
 };
 

@@ -3,6 +3,7 @@ use std::{
     future::Future,
 };
 
+use semigroup::Semigroup;
 use tower::{Layer, MakeService, Service};
 
 use crate::shot::destinations::Destinations;
@@ -42,6 +43,24 @@ pub trait RequestSource<De> {
 pub trait ResponseSink<Se> {
     type Error;
     async fn consume(&self, res: Destinations<Se>) -> Result<(), Self::Error>;
+}
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash, Semigroup)]
+#[semigroup(monoid, commutative, with = "semigroup::op::Sum")]
+pub struct Evaluated {
+    #[semigroup(with = "semigroup::op::All")]
+    pub pass: bool,
+    pub passed: usize,
+    #[semigroup(with = "semigroup::op::All")]
+    pub allow: bool,
+    pub allowed: usize,
+    pub times: usize,
+}
+impl Evaluated {
+    pub fn new<E>(evaluated: Result<(), E>, allow: Option<bool>) -> Self {
+        let pass = evaluated.is_ok();
+        let allow = pass || allow.unwrap_or_default();
+        Self { pass, passed: pass as usize, allow, allowed: allow as usize, times: 1 }
+    }
 }
 
 pub type ContractError<T, C> = ContractErrorWrap<

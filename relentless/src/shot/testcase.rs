@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use tower::{Layer, Service};
 
 use crate::shot::{
-    contract::{Contract, RequestSource, ResponseSink, ServiceError, SignContract},
+    contract::{Contract, Evaluated, RequestSource, ResponseSink, ServiceError, SignContract},
     destinations::Destinations,
     hierarchy::Hierarchy,
     job::JobSpec,
@@ -51,30 +51,13 @@ impl<Q, P> Testcase<Q, P> {
         let destinations = suite.destinations.iter().map(|(d, u)| (d, (**u).clone())).collect();
         let evaluated = futures::stream::iter(profile.repeat.range())
             .map(|_| async {
-                let e = profile.shot::<T, C>(services, &destinations, &self.target).await;
-                Evaluated::new(e.is_ok(), e.is_ok() || e.is_err() && profile.allow.unwrap_or_default())
+                let evaluated = profile.shot::<T, C>(services, &destinations, &self.target).await;
+                Evaluated::new(evaluated, profile.allow)
             })
             .buffer_unordered(buffers)
             .combine_monoid()
             .await;
         let () = profile.shot::<T, C>(services, &destinations, &self.target).await.unwrap_or_else(|_| todo!());
         Ok(CaseReport { case: self, evaluated })
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash, Semigroup)]
-#[semigroup(monoid, commutative, with = "semigroup::op::Sum")]
-pub struct Evaluated {
-    #[semigroup(with = "semigroup::op::All")]
-    pub pass: bool,
-    pub passed: usize,
-    #[semigroup(with = "semigroup::op::All")]
-    pub allow: bool,
-    pub allowed: usize,
-    pub times: usize,
-}
-impl Evaluated {
-    pub fn new(pass: bool, allow: bool) -> Self {
-        Self { pass, passed: pass as usize, allow, allowed: allow as usize, times: 1 }
     }
 }
