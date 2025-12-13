@@ -26,9 +26,8 @@ pub struct Testcase<Q, P> {
 #[derive(Debug, Clone, PartialEq)]
 pub struct CaseReport<'a, Q, P> {
     pub case: &'a Testcase<Q, P>,
-    pub aggregate: Aggregate,
+    pub evaluated: Evaluated,
     // messages: Messages<T>,
-    // aggregate: EvaluateAggregator,
 }
 
 impl<Q, P> Testcase<Q, P> {
@@ -50,22 +49,22 @@ impl<Q, P> Testcase<Q, P> {
         let buffers = if Hierarchy::Testcase.contains(&job.sequential) { 1 } else { profile.repeat.times().max(1) };
 
         let destinations = suite.destinations.iter().map(|(d, u)| (d, (**u).clone())).collect();
-        let aggregate = futures::stream::iter(profile.repeat.range())
+        let evaluated = futures::stream::iter(profile.repeat.range())
             .map(|_| async {
                 let e = profile.shot::<T, C>(services, &destinations, &self.target).await;
-                Aggregate::new(e.is_ok(), e.is_ok() || e.is_err() && profile.allow.unwrap_or_default())
+                Evaluated::new(e.is_ok(), e.is_ok() || e.is_err() && profile.allow.unwrap_or_default())
             })
             .buffer_unordered(buffers)
             .combine_monoid()
             .await;
         let () = profile.shot::<T, C>(services, &destinations, &self.target).await.unwrap_or_else(|_| todo!());
-        Ok(CaseReport { case: self, aggregate })
+        Ok(CaseReport { case: self, evaluated })
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash, Semigroup)]
 #[semigroup(monoid, commutative, with = "semigroup::op::Sum")]
-pub struct Aggregate {
+pub struct Evaluated {
     #[semigroup(with = "semigroup::op::All")]
     pub pass: bool,
     pub passed: usize,
@@ -74,7 +73,7 @@ pub struct Aggregate {
     pub allowed: usize,
     pub times: usize,
 }
-impl Aggregate {
+impl Evaluated {
     pub fn new(pass: bool, allow: bool) -> Self {
         Self { pass, passed: pass as usize, allow, allowed: allow as usize, times: 1 }
     }

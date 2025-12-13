@@ -8,7 +8,7 @@ use crate::{
         job::JobReport,
         profile::Repeat,
         suite::SuiteReport,
-        testcase::{Aggregate, CaseReport},
+        testcase::{CaseReport, Evaluated},
     },
 };
 
@@ -35,7 +35,7 @@ impl<C, Q, P> Reporter<&JobReport<'_, C, Q, P>> for Console {
         report: &JobReport<C, Q, P>,
     ) -> Result<(), Self::Error> {
         report.suites.iter().try_fold((), |(), s| self.write_report(writer, s))?;
-        writeln!(writer, "job summary: {}", if report.aggregate.pass { "PASS" } else { "FAIL" })?;
+        writeln!(writer, "job summary: {}", if report.evaluated.pass { "PASS" } else { "FAIL" })?;
         Ok(())
     }
 }
@@ -68,7 +68,7 @@ impl<Q, P> Reporter<&CaseReport<'_, Q, P>> for Console {
         writer: &mut ReportWriter<W>,
         report: &CaseReport<Q, P>,
     ) -> Result<(), Self::Error> {
-        let Aggregate { pass, passed, .. } = &report.aggregate;
+        let Evaluated { pass, passed, .. } = &report.evaluated;
         let l1 = {
             write!(writer, "{}", if *pass { Self::CASE_PASS_EMOJI } else { Self::CASE_FAIL_EMOJI })?;
             write!(writer, " {}", report.case.target)?;

@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use tower::Layer;
 use tower::{MakeService, Service};
 
-use crate::shot::testcase::Aggregate;
+use crate::shot::testcase::Evaluated;
 use crate::{
     report::ReportFormat,
     shot::{
@@ -131,7 +131,7 @@ where
 #[derive(Debug, Clone, PartialEq)]
 pub struct JobReport<'a, C, Q, P> {
     pub suites: Vec<SuiteReport<'a, C, Q, P>>,
-    pub aggregate: Aggregate,
+    pub evaluated: Evaluated,
 }
 impl<S, Q, P> Job<S, Q, P> {
     pub async fn shot<M, T, C>(&self, make_service: M, job: &JobSpec) -> crate::Result<JobReport<S, Q, P>>
@@ -150,7 +150,7 @@ impl<S, Q, P> Job<S, Q, P> {
             .buffer_unordered(buffers)
             .try_collect()
             .await?;
-        let aggregate = suites.iter().map(|s| s.aggregate.clone()).combine();
-        Ok(JobReport { suites, aggregate })
+        let evaluated = suites.iter().map(|s| s.evaluated.clone()).combine();
+        Ok(JobReport { suites, evaluated })
     }
 }

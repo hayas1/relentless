@@ -12,7 +12,7 @@ use crate::{
         hierarchy::Hierarchy,
         job::JobSpec,
         profile::Profile,
-        testcase::{Aggregate, CaseReport, Testcase},
+        testcase::{CaseReport, Evaluated, Testcase},
     },
 };
 
@@ -122,7 +122,7 @@ pub struct SuiteReport<'a, C, Q, P> {
     pub destinations: Lazy<Destinations<Uri>>,
     pub suite: &'a Suite<C, Q, P>,
     pub cases: Vec<CaseReport<'a, Q, P>>,
-    pub aggregate: Aggregate,
+    pub evaluated: Evaluated,
 }
 impl<S, Q, P> SuiteCase<S, Q, P> {
     pub async fn shot<M, T, C>(&self, make_service: M, job: &JobSpec) -> crate::Result<SuiteReport<S, Q, P>>
@@ -155,7 +155,7 @@ impl<S, Q, P> SuiteCase<S, Q, P> {
             .buffer_unordered(buffers)
             .try_collect()
             .await?;
-        let aggregate = cases.iter().map(|c| c.aggregate.clone()).combine();
-        Ok(SuiteReport { destinations, suite: &self.suite, cases, aggregate })
+        let evaluated = cases.iter().map(|c| c.evaluated.clone()).combine();
+        Ok(SuiteReport { destinations, suite: &self.suite, cases, evaluated })
     }
 }
