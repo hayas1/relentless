@@ -4,7 +4,12 @@ use console::Emoji;
 
 use crate::{
     report::{ReportWriter, Reporter},
-    shot::{job::JobReport, profile::Repeat, suite::SuiteReport, testcase::CaseReport},
+    shot::{
+        job::JobReport,
+        profile::Repeat,
+        suite::SuiteReport,
+        testcase::{Aggregate, CaseReport},
+    },
 };
 
 pub struct Console;
@@ -30,7 +35,7 @@ impl<C, Q, P> Reporter<&JobReport<'_, C, Q, P>> for Console {
         report: &JobReport<C, Q, P>,
     ) -> Result<(), Self::Error> {
         report.suites.iter().try_fold((), |(), s| self.write_report(writer, s))?;
-        writeln!(writer, "job summary: {}", if report.pass() { "PASS" } else { "FAIL" })?;
+        writeln!(writer, "job summary: {}", if report.aggregate.pass { "PASS" } else { "FAIL" })?;
         Ok(())
     }
 }
@@ -63,11 +68,12 @@ impl<Q, P> Reporter<&CaseReport<'_, Q, P>> for Console {
         writer: &mut ReportWriter<W>,
         report: &CaseReport<Q, P>,
     ) -> Result<(), Self::Error> {
+        let Aggregate { pass, passed, .. } = &report.aggregate;
         let l1 = {
-            write!(writer, "{}", if report.passed > 0 { Self::CASE_PASS_EMOJI } else { Self::CASE_FAIL_EMOJI })?;
+            write!(writer, "{}", if *pass { Self::CASE_PASS_EMOJI } else { Self::CASE_FAIL_EMOJI })?;
             write!(writer, " {}", report.case.target)?;
-            if let Repeat(Some(ref repeat)) = report.case.profile.repeat {
-                write!(writer, " {}{}/{}", Self::CASE_REPEAT_EMOJI, report.passed, repeat)?;
+            if let Repeat(Some(repeat)) = &report.case.profile.repeat {
+                write!(writer, " {}{passed}/{repeat}", Self::CASE_REPEAT_EMOJI)?;
             }
             if let Some(description) = &report.case.description {
                 write!(writer, " {} {description}", Self::CASE_DESCRIPTION_EMOJI)?;

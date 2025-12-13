@@ -5,11 +5,12 @@ use std::{fs::File, path::PathBuf};
 use clap::{Args, Parser};
 use futures::{StreamExt, TryStreamExt};
 use http::Uri;
-use semigroup::{Lazy, Semigroup};
+use semigroup::{CombineIterator, Lazy, Semigroup};
 use serde::{Deserialize, Serialize};
 use tower::Layer;
 use tower::{MakeService, Service};
 
+use crate::shot::testcase::Aggregate;
 use crate::{
     report::ReportFormat,
     shot::{
@@ -130,6 +131,7 @@ where
 #[derive(Debug, Clone, PartialEq)]
 pub struct JobReport<'a, C, Q, P> {
     pub suites: Vec<SuiteReport<'a, C, Q, P>>,
+    pub aggregate: Aggregate,
 }
 impl<S, Q, P> Job<S, Q, P> {
     pub async fn shot<M, T, C>(&self, make_service: M, job: &JobSpec) -> crate::Result<JobReport<S, Q, P>>
@@ -143,16 +145,12 @@ impl<S, Q, P> Job<S, Q, P> {
         P: Clone + Semigroup + ResponseSink<Result<C::Response, ServiceError<T, C>>>,
     {
         let buffers = if Hierarchy::Job.contains(&job.sequential) { 1 } else { self.0.len().max(1) };
-        let suites = futures::stream::iter(&self.0)
+        let suites: Vec<_> = futures::stream::iter(&self.0)
             .map(|sc| sc.shot(make_service.clone(), job))
             .buffer_unordered(buffers)
             .try_collect()
             .await?;
-        Ok(JobReport { suites })
-    }
-}
-impl<C, Q, P> JobReport<'_, C, Q, P> {
-    pub fn pass(&self) -> bool {
-        true
+        let aggregate = suites.iter().map(|s| s.aggregate.clone()).combine();
+        Ok(JobReport { suites, aggregate })
     }
 }

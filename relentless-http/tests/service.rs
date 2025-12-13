@@ -15,5 +15,5 @@ async fn test_example_yaml_config() {
     let make = axum::ServiceExt::<axum::extract::Request>::into_make_service(app);
     let report = job.shot::<_, _, HttpContract<Body, Body>>(make, &spec).await.unwrap();
 
-    assert!(report.pass());
+    assert!(report.aggregate.pass);
 }

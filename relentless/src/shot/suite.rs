@@ -1,6 +1,6 @@
 use futures::{StreamExt, TryStreamExt};
 use http::Uri;
-use semigroup::{Lazy, Semigroup};
+use semigroup::{CombineIterator, Lazy, Semigroup};
 use serde::{Deserialize, Serialize};
 use tower::{Layer, MakeService, Service};
 
@@ -12,7 +12,7 @@ use crate::{
         hierarchy::Hierarchy,
         job::JobSpec,
         profile::Profile,
-        testcase::{CaseReport, Testcase},
+        testcase::{Aggregate, CaseReport, Testcase},
     },
 };
 
@@ -122,6 +122,7 @@ pub struct SuiteReport<'a, C, Q, P> {
     pub destinations: Lazy<Destinations<Uri>>,
     pub suite: &'a Suite<C, Q, P>,
     pub cases: Vec<CaseReport<'a, Q, P>>,
+    pub aggregate: Aggregate,
 }
 impl<S, Q, P> SuiteCase<S, Q, P> {
     pub async fn shot<M, T, C>(&self, make_service: M, job: &JobSpec) -> crate::Result<SuiteReport<S, Q, P>>
@@ -149,11 +150,12 @@ impl<S, Q, P> SuiteCase<S, Q, P> {
                 .unwrap_or_else(|_| todo!());
             services.insert(d.to_string(), contract.layer(transport));
         }
-        let cases = futures::stream::iter(&self.testcases)
+        let cases: Vec<_> = futures::stream::iter(&self.testcases)
             .map(|t| t.shot(&services, job, &self.suite))
             .buffer_unordered(buffers)
             .try_collect()
             .await?;
-        Ok(SuiteReport { destinations, suite: &self.suite, cases })
+        let aggregate = cases.iter().map(|c| c.aggregate.clone()).combine();
+        Ok(SuiteReport { destinations, suite: &self.suite, cases, aggregate })
     }
 }

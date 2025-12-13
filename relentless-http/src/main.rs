@@ -15,7 +15,7 @@ pub async fn main() -> Result<ExitCode, Box<dyn std::error::Error>> {
     let report = job.shot::<_, _, HttpContract<Body, Body>>(tower::make::Shared::new(service), &spec).await?;
     spec.report_format.report(&report)?;
     dbg!(measure.aggregated().times());
-    Ok((!report.pass() as u8).into())
+    Ok((!report.aggregate.pass as u8).into())
 }
 
 #[cfg(not(feature = "cli"))]

@@ -1,4 +1,5 @@
-use semigroup::Semigroup;
+use futures::StreamExt;
+use semigroup::{CombineStream, Semigroup};
 use serde::{Deserialize, Serialize};
 use tower::{Layer, Service};
 
@@ -25,10 +26,11 @@ pub struct Testcase<Q, P> {
 #[derive(Debug, Clone, PartialEq)]
 pub struct CaseReport<'a, Q, P> {
     pub case: &'a Testcase<Q, P>,
-    pub passed: usize,
+    pub aggregate: Aggregate,
     // messages: Messages<T>,
     // aggregate: EvaluateAggregator,
 }
+
 impl<Q, P> Testcase<Q, P> {
     pub async fn shot<T, S, C>(
         &self,
@@ -44,11 +46,36 @@ impl<Q, P> Testcase<Q, P> {
         Q: Clone + Semigroup + RequestSource<C::Request>,
         P: Clone + Semigroup + ResponseSink<Result<C::Response, ServiceError<T, C>>>,
     {
-        let buffers =
-            if Hierarchy::Testcase.contains(&job.sequential) { 1 } else { self.profile.repeat.times().max(1) };
         let profile = &self.profile.clone().semigroup(suite.profile.clone());
+        let buffers = if Hierarchy::Testcase.contains(&job.sequential) { 1 } else { profile.repeat.times().max(1) };
+
         let destinations = suite.destinations.iter().map(|(d, u)| (d, (**u).clone())).collect();
+        let aggregate = futures::stream::iter(profile.repeat.range())
+            .map(|_| async {
+                let e = profile.shot::<T, C>(services, &destinations, &self.target).await;
+                Aggregate::new(e.is_ok(), e.is_ok() || e.is_err() && profile.allow.unwrap_or_default())
+            })
+            .buffer_unordered(buffers)
+            .combine_monoid()
+            .await;
         let () = profile.shot::<T, C>(services, &destinations, &self.target).await.unwrap_or_else(|_| todo!());
-        Ok(CaseReport { case: self, passed: 1 })
+        Ok(CaseReport { case: self, aggregate })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash, Semigroup)]
+#[semigroup(monoid, commutative, with = "semigroup::op::Sum")]
+pub struct Aggregate {
+    #[semigroup(with = "semigroup::op::All")]
+    pub pass: bool,
+    pub passed: usize,
+    #[semigroup(with = "semigroup::op::All")]
+    pub allow: bool,
+    pub allowed: usize,
+    pub times: usize,
+}
+impl Aggregate {
+    pub fn new(pass: bool, allow: bool) -> Self {
+        Self { pass, passed: pass as usize, allow, allowed: allow as usize, times: 1 }
     }
 }
