@@ -32,8 +32,12 @@ impl<ReqB: Body + Default + From<Bytes>> RequestSource<http::Request<ReqB>> for 
 
     async fn produce(&self, destination: &http::Uri, target: &str) -> Result<http::Request<ReqB>, Self::Error> {
         let b = self.body.as_ref().unwrap_or(&Default::default()).produce(destination, target).await?;
-        let request =
-            http::Request::builder().uri(destination).method(http::Method::GET).body(b).unwrap_or_else(|_| todo!());
+        let uri =
+            http::uri::Builder::from(destination.clone()).path_and_query(target).build().unwrap_or_else(|_| todo!());
+        let method = self.method.as_deref().unwrap_or(&Default::default()).clone();
+        let header = self.headers.as_deref().unwrap_or(&Default::default()).clone();
+        let mut request = http::Request::builder().uri(uri).method(method).body(b).unwrap_or_else(|_| todo!());
+        request.headers_mut().extend(header);
         Ok(request)
     }
 }
