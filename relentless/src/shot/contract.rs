@@ -61,6 +61,22 @@ impl Evaluated {
         let allow = pass || allow.unwrap_or_default();
         Self { pass, passed: pass as usize, allow, allowed: allow as usize, times: 1 }
     }
+    pub fn assess(&self) -> Assessment {
+        if self.pass {
+            Assessment::Good
+        } else if self.allow {
+            Assessment::Acceptable
+        } else {
+            Assessment::Bad
+        }
+    }
+}
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Assessment {
+    Good,
+    Acceptable,
+    Poor,
+    Bad,
 }
 
 pub type ContractError<T, C> = ContractErrorWrap<

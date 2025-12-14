@@ -1,10 +1,16 @@
 use std::fmt::Write as _;
 
-use console::Emoji;
+use console::{Emoji, Style, StyledObject};
 
 use crate::{
     report::{ReportWriter, Reporter},
-    shot::{contract::Evaluated, job::JobReport, profile::Repeat, suite::SuiteReport, testcase::CaseReport},
+    shot::{
+        contract::{Assessment, Evaluated},
+        job::JobReport,
+        profile::Repeat,
+        suite::SuiteReport,
+        testcase::CaseReport,
+    },
 };
 
 pub struct Console;
@@ -21,6 +27,18 @@ impl Console {
     pub const CASE_MESSAGE_EMOJI: Emoji<'_, '_> = Emoji("💬", "");
 
     pub const SUMMARY_EMOJI: Emoji<'_, '_> = Emoji("💥", "");
+
+    pub fn style(&self, assessment: &Assessment) -> Style {
+        match assessment {
+            Assessment::Good => Style::new().green(),
+            Assessment::Acceptable => Style::new().cyan(),
+            Assessment::Poor => Style::new().yellow(),
+            Assessment::Bad => Style::new().red(),
+        }
+    }
+    pub fn styled<T>(&self, value: T, assessment: &Assessment) -> StyledObject<T> {
+        self.style(assessment).apply_to(value)
+    }
 }
 impl<C, Q, P> Reporter<&JobReport<'_, C, Q, P>> for Console {
     type Error = std::fmt::Error;
@@ -63,10 +81,15 @@ impl<Q, P> Reporter<&CaseReport<'_, Q, P>> for Console {
         writer: &mut ReportWriter<W>,
         report: &CaseReport<Q, P>,
     ) -> Result<(), Self::Error> {
-        let Evaluated { pass, passed, .. } = &report.evaluated;
+        let assessment = report.evaluated.assess();
+        let Evaluated { pass, passed, allow, .. } = &report.evaluated;
         let l1 = {
-            write!(writer, "{}", if *pass { Self::CASE_PASS_EMOJI } else { Self::CASE_FAIL_EMOJI })?;
-            write!(writer, " {}", report.case.target)?;
+            let icon = match (pass, allow) {
+                (true, _) => Self::CASE_PASS_EMOJI,
+                (false, true) => Self::CASE_ALLOW_EMOJI,
+                (false, false) => Self::CASE_FAIL_EMOJI,
+            };
+            write!(writer, "{icon} {}", self.styled(&report.case.target, &assessment))?;
             if let Repeat(Some(repeat)) = &report.case.profile.repeat {
                 write!(writer, " {}{passed}/{repeat}", Self::CASE_REPEAT_EMOJI)?;
             }
