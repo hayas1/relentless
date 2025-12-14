@@ -3,7 +3,9 @@ destinations:
   test-api: http://localhost:50051
 contract:
   proto-files:
-    protos: [./dev/server/grpc/proto/greeter.proto]
+    protos:
+      - ./dev/server/grpc/proto/greeter.proto
+      - ./dev/server/grpc/proto/echo.proto
     includes: [./dev/server/grpc/proto]
 
 testcases:
@@ -13,3 +15,9 @@ testcases:
         message:
           json:
             name: John Doe
+  - target: echo.Echo/Echo
+    profile:
+      request:
+        message:
+          json: 100
+
