@@ -152,7 +152,7 @@ impl<S, Q, P> SuiteCase<S, Q, P> {
         }
         let cases: Vec<_> = futures::stream::iter(&self.testcases)
             .map(|t| t.shot(&services, job, &self.suite))
-            .buffer_unordered(buffers)
+            .buffered(buffers)
             .try_collect()
             .await?;
         let evaluated = cases.iter().map(|c| c.evaluated.clone()).combine();

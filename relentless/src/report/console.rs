@@ -47,8 +47,18 @@ impl<C, Q, P> Reporter<&JobReport<'_, C, Q, P>> for Console {
         writer: &mut ReportWriter<W>,
         report: &JobReport<C, Q, P>,
     ) -> Result<(), Self::Error> {
-        report.suites.iter().try_fold((), |(), s| self.write_report(writer, s))?;
-        writeln!(writer, "job summary: {}", if report.evaluated.pass { "PASS" } else { "FAIL" })?;
+        report.suites.iter().try_fold((), |(), s| {
+            self.write_report(writer, s)?;
+            writeln!(writer)
+        })?;
+        let job = if report.evaluated.pass {
+            "PASS"
+        } else if report.evaluated.allow {
+            "ALLOW"
+        } else {
+            "FAIL"
+        };
+        writeln!(writer, "job: {job}")?;
         Ok(())
     }
 }
@@ -85,9 +95,9 @@ impl<Q, P> Reporter<&CaseReport<'_, Q, P>> for Console {
         let Evaluated { pass, passed, allow, .. } = &report.evaluated;
         let l1 = {
             let icon = match (pass, allow) {
-                (true, _) => Self::CASE_PASS_EMOJI,
-                (false, true) => Self::CASE_ALLOW_EMOJI,
-                (false, false) => Self::CASE_FAIL_EMOJI,
+                (true, _) => self.styled(Self::CASE_PASS_EMOJI, &assessment),
+                (false, true) => self.styled(Self::CASE_ALLOW_EMOJI, &assessment),
+                (false, false) => self.styled(Self::CASE_FAIL_EMOJI, &assessment),
             };
             write!(writer, "{icon} {}", self.styled(&report.case.target, &assessment))?;
             if let Repeat(Some(repeat)) = &report.case.profile.repeat {
@@ -99,6 +109,18 @@ impl<Q, P> Reporter<&CaseReport<'_, Q, P>> for Console {
             writeln!(writer)
         };
         l1?;
+        writer.scope(|w| {
+            let messages: Vec<String> = Vec::new();
+            let l2 = {
+                if !messages.is_empty() {
+                    writeln!(w, "{} messages", Self::CASE_MESSAGE_EMOJI)?; // TODO usize scope indent
+                    messages.iter().try_fold((), |(), m| writeln!(w, "{m}"))?;
+                }
+                Ok(())
+            };
+            l2?;
+            Ok(())
+        })?;
         Ok(())
     }
 }
