@@ -45,6 +45,7 @@ impl Repeat {
 }
 
 impl<Q, P> Profile<Q, P> {
+    #[tracing::instrument(name = "profile", skip_all)]
     pub async fn shot<T, C>(
         &self,
         services: &Destinations<C::Service>,

@@ -125,6 +125,7 @@ pub struct SuiteReport<'a, C, Q, P> {
     pub evaluated: Evaluated,
 }
 impl<S, Q, P> SuiteCase<S, Q, P> {
+    #[tracing::instrument(name = "suite", skip_all)]
     pub async fn shot<M, T, C>(&self, make_service: M, job: &JobSpec) -> crate::Result<SuiteReport<S, Q, P>>
     where
         M: Clone + MakeService<http::Uri, C::TransportReq, Service = T>,

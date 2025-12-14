@@ -31,6 +31,7 @@ pub struct CaseReport<'a, Q, P> {
 }
 
 impl<Q, P> Testcase<Q, P> {
+    #[tracing::instrument(name = "testcase", skip_all)]
     pub async fn shot<T, S, C>(
         &self,
         services: &Destinations<C::Service>,

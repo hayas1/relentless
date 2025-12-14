@@ -116,10 +116,9 @@ impl<Q, P> Reporter<&CaseReport<'_, Q, P>> for Console {
                     writeln!(w, "{} messages", Self::CASE_MESSAGE_EMOJI)?; // TODO usize scope indent
                     messages.iter().try_fold((), |(), m| writeln!(w, "{m}"))?;
                 }
-                Ok(())
+                Ok::<_, std::fmt::Error>(())
             };
-            l2?;
-            Ok(())
+            l2
         })?;
         Ok(())
     }
