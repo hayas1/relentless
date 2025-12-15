@@ -11,10 +11,13 @@ use serde::{Deserialize, Serialize};
 #[semigroup(with = "semigroup::op::Coalesce")]
 pub struct HttpRequest {
     #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
+    #[serde(default)]
     pub method: Option<http_newtype_serde::Method>,
     #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
+    #[serde(default)]
     pub headers: Option<http_newtype_serde::HeaderMap>,
     #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
+    #[serde(default)]
     pub body: Option<HttpRequestBody>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]

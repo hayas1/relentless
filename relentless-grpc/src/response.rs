@@ -12,10 +12,13 @@ use serde::{Deserialize, Serialize};
 #[semigroup(with = "semigroup::op::Coalesce")]
 pub struct GrpcResponse {
     #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
+    #[serde(default)]
     pub status: Option<GrpcResponseStatus>,
     #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
+    #[serde(default)]
     pub metadata_map: Option<GrpcResponseMetadataMap>,
     #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
+    #[serde(default)]
     pub message: Option<GrpcResponseMessage>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
