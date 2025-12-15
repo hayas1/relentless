@@ -168,7 +168,7 @@ pub mod counter {
 }
 
 pub mod random {
-    use crate::route::random::DistRangeParam;
+    use crate::app::random::DistRangeParam;
 
     use super::*;
 

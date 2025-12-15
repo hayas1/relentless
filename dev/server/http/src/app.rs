@@ -6,7 +6,11 @@ pub mod random;
 pub mod root;
 pub mod wait;
 
-use std::{future::Future, pin::Pin};
+use std::{
+    future::Future,
+    pin::Pin,
+    sync::{Arc, RwLock},
+};
 
 use axum::{
     body::{Body, HttpBody},
@@ -21,8 +25,9 @@ use tower::ServiceBuilder;
 use tower_http::normalize_path::{NormalizePath, NormalizePathLayer};
 
 use crate::{
+    app::counter::CounterState,
     error::{kind::NotFound, AppErrorDetail, Logged},
-    state::AppState,
+    runner::RunCommand,
 };
 
 pub type PinResponseFuture<R> = Pin<Box<dyn Future<Output = R> + Send>>;
@@ -60,6 +65,11 @@ impl AppRouter {
         tracing::info!("{} {} {} {}", status, method, uri, bytes);
         res
     }
+}
+#[derive(Debug, Clone, Default)]
+pub struct AppState {
+    pub rc: Arc<RunCommand>,
+    pub counter: Arc<RwLock<CounterState>>,
 }
 
 #[cfg(test)]

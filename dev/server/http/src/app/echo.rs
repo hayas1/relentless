@@ -12,8 +12,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use crate::{
+    app::AppState,
     error::echo::{EchoError, JsonizeError},
-    state::AppState,
 };
 
 pub fn route_echo() -> Router<AppState> {
@@ -173,8 +173,8 @@ impl Jsonizer {
 
 #[cfg(test)]
 mod tests {
-    use crate::route::tests::{call_bytes, call_with_assert, call_with_assert_ne_body};
-    use crate::route::AppRouter;
+    use crate::app::tests::{call_bytes, call_with_assert, call_with_assert_ne_body};
+    use crate::app::AppRouter;
 
     use super::*;
     use axum::body::Body;

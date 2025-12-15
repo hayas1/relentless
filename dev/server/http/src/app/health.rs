@@ -7,8 +7,8 @@ use axum::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    app::AppState,
     error::{kind::Retriable, AppErrorDetail, Logged},
-    state::AppState,
 };
 
 pub fn route_health() -> Router<AppState> {
@@ -83,11 +83,11 @@ mod tests {
     use axum::{body::Body, http::Request};
 
     use crate::{
-        error::{kind::Kind, ErrorResponseInner},
-        route::{
+        app::{
             tests::{call_bytes, call_with_assert},
             AppRouter,
         },
+        error::{kind::Kind, ErrorResponseInner},
     };
 
     use super::*;

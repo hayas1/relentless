@@ -10,7 +10,7 @@ mod tests {
         http::{Request, StatusCode},
     };
 
-    use crate::route::{tests::call_bytes, AppRouter};
+    use crate::app::{tests::call_bytes, AppRouter};
 
     use super::*;
 

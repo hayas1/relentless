@@ -12,7 +12,7 @@ use rand_distr::{
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::{error::random::RandomError, state::AppState};
+use crate::{app::AppState, error::random::RandomError};
 
 use super::PinResponseFuture;
 
@@ -218,13 +218,13 @@ mod tests {
     };
 
     use crate::{
+        app::{
+            tests::{call_bytes, call_with_assert},
+            AppRouter,
+        },
         error::{
             kind::{BadRequest, Kind},
             ErrorResponseInner, APP_DEFAULT_ERROR_CODE,
-        },
-        route::{
-            tests::{call_bytes, call_with_assert},
-            AppRouter,
         },
     };
 

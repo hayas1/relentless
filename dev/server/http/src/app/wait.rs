@@ -4,7 +4,7 @@ use axum::{extract::Path, response::Result, routing::get, Json, Router};
 use serde::{Deserialize, Serialize};
 use tokio::time::sleep;
 
-use crate::state::AppState;
+use crate::app::AppState;
 
 use super::PinResponseFuture;
 
@@ -60,7 +60,7 @@ mod tests {
         http::{Request, StatusCode},
     };
 
-    use crate::route::{tests::call_with_assert, AppRouter};
+    use crate::app::{tests::call_with_assert, AppRouter};
 
     use super::*;
 

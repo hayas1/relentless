@@ -14,11 +14,11 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
 use crate::{
+    app::AppState,
     error::{
         kind::{BadRequest, Unreachable},
         AppError,
     },
-    state::AppState,
 };
 
 pub fn route_information() -> Router<AppState> {
@@ -130,7 +130,7 @@ mod tests {
     use mime::{APPLICATION_JSON, APPLICATION_WWW_FORM_URLENCODED};
     use serde_json::json;
 
-    use crate::route::{tests::call_with_assert, AppRouter};
+    use crate::app::{tests::call_with_assert, AppRouter};
 
     use super::*;
 

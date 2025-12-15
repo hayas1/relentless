@@ -10,12 +10,12 @@ use num::{BigInt, One, Zero};
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    app::AppState,
     error::{
         counter::CounterError,
         kind::{Retriable, Unreachable},
         AppError, Logged,
     },
-    state::AppState,
 };
 
 pub fn route_counter() -> Router<AppState> {
@@ -161,11 +161,11 @@ mod tests {
     };
 
     use crate::{
+        app::{tests::call_with_assert, AppRouter},
         error::{
             kind::{BadRequest, Kind},
             ErrorResponseInner, APP_DEFAULT_ERROR_CODE,
         },
-        route::{tests::call_with_assert, AppRouter},
     };
 
     use super::*;

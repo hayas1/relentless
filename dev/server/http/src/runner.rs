@@ -4,10 +4,7 @@ use axum::{extract::Request, ServiceExt};
 use clap::Parser;
 use tokio::net::TcpListener;
 
-use crate::{
-    route::{counter::CounterState, AppRouter},
-    state::AppState,
-};
+use crate::app::{counter::CounterState, AppRouter, AppState};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash, Parser)]
 pub struct RunCommand {
@@ -40,7 +37,7 @@ impl RunCommand {
         format!("{}:{}", self.listen, self.port)
     }
     pub fn app(&self) -> AppRouter {
-        let state = AppState { env: Arc::new(self.clone()), counter: Arc::new(RwLock::new(CounterState::default())) };
+        let state = AppState { rc: Arc::new(self.clone()), counter: Arc::new(RwLock::new(CounterState::default())) };
         AppRouter { state }
     }
 }
