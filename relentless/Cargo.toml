@@ -43,7 +43,13 @@ nom = "8.0.0"
 bytesize = "2.3.1"
 # average = "0.15.1" # Quantile (that use p2 algorithm) do not impl Extend
 hdrhistogram = "7.5.4"
-semigroup = { version = "0.4.3", features = ["derive", "monoid", "histogram"] }
+# semigroup = { version = "0.4.3", features = ["derive", "monoid", "histogram"] }
+semigroup = { git = "https://github.com/hayas1/semigroup.git", branch = "master", features = [
+    "derive",
+    "monoid",
+    "histogram",
+    "async",
+] }
 
 tracing = "0.1.43"
 tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }

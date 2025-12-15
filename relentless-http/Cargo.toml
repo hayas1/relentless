@@ -35,7 +35,13 @@ thiserror = "2.0.12"
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = { version = "1.0.140", optional = true }
 serde_yaml = { version = "0.9.34", optional = true }
-semigroup = { version = "0.4.3", features = ["derive"] }
+# semigroup = { version = "0.4.3", features = ["derive"] }
+semigroup = { git = "https://github.com/hayas1/semigroup.git", branch = "master", features = [
+    "derive",
+    "monoid",
+    "histogram",
+    "async",
+] }
 
 [dev-dependencies]
 relentless-http-dev-server = { path = "../dev/server/http" }
