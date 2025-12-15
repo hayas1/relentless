@@ -21,6 +21,7 @@ use axum::{
     routing::get,
     Router,
 };
+use axum_tracing_opentelemetry::middleware::{OtelAxumLayer, OtelInResponseLayer};
 use tower::ServiceBuilder;
 use tower_http::normalize_path::{NormalizePath, NormalizePathLayer};
 
@@ -38,7 +39,9 @@ pub struct AppRouter {
 }
 impl AppRouter {
     pub fn service(self) -> NormalizePath<Router<()>> {
-        ServiceBuilder::new().layer(NormalizePathLayer::trim_trailing_slash()).service(self.router())
+        ServiceBuilder::new()
+            .layer(NormalizePathLayer::trim_trailing_slash())
+            .service(self.router().layer(OtelInResponseLayer).layer(OtelAxumLayer::default()))
     }
     pub fn router(self) -> Router<()> {
         Router::new()
