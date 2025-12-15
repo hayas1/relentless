@@ -37,7 +37,7 @@ impl<Q, P> Testcase<Q, P> {
         services: &Destinations<C::Service>,
         job: &JobSpec,
         suite: &Suite<S, Q, P>,
-    ) -> crate::Result<CaseReport<Q, P>>
+    ) -> crate::Result<CaseReport<'_, Q, P>>
     where
         T: Clone + Service<C::TransportReq, Response = C::TransportRes> + Send,
         S: SignContract<T, C> + Default,

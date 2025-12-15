@@ -1,16 +1,11 @@
 use std::{
-    convert::Infallible,
     future::Future,
     marker::PhantomData,
     pin::Pin,
     task::{Context, Poll},
 };
 
-use relentless::shot::contract::{Contract, RequestSource, ResponseSink};
-use serde::{Deserialize, Serialize};
-use tower::{layer::util::Identity, Layer, Service};
-
-use crate::{request::HttpRequest, response::HttpResponse};
+use tower::Service;
 
 #[derive(Debug, Default)]
 pub struct ReqwestClient<ReqB, ResB> {

@@ -156,7 +156,7 @@ pub struct JobReport<'a, C, Q, P> {
 }
 impl<S, Q, P> Job<S, Q, P> {
     #[tracing::instrument(name = "job", skip_all)]
-    pub async fn shot<M, T, C>(&self, make_service: M, job: &JobSpec) -> crate::Result<JobReport<S, Q, P>>
+    pub async fn shot<M, T, C>(&self, make_service: M, job: &JobSpec) -> crate::Result<JobReport<'_, S, Q, P>>
     where
         M: Clone + MakeService<http::Uri, C::TransportReq, Service = T>,
         T: Clone + Service<C::TransportReq, Response = C::TransportRes> + Send,
