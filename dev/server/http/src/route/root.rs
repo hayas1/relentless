@@ -10,7 +10,7 @@ mod tests {
         http::{Request, StatusCode},
     };
 
-    use crate::route::{app_with, tests::call_bytes};
+    use crate::route::{tests::call_bytes, AppRouter};
 
     use super::*;
 
@@ -22,9 +22,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_root() {
-        let mut app = app_with(Default::default());
+        let mut service = AppRouter::default().service();
 
-        let (status, body) = call_bytes(&mut app, Request::builder().uri("/").body(Body::empty()).unwrap()).await;
+        let (status, body) = call_bytes(&mut service, Request::builder().uri("/").body(Body::empty()).unwrap()).await;
         assert_eq!(status, StatusCode::OK);
         assert_eq!(&body[..], b"Hello World");
     }

@@ -1,9 +1,9 @@
 use std::sync::{Arc, RwLock};
 
-use crate::{env::Env, route::counter::CounterState};
+use crate::{route::counter::CounterState, runner::RunCommand};
 
 #[derive(Debug, Clone, Default)]
 pub struct AppState {
-    pub env: Env,
+    pub env: Arc<RunCommand>,
     pub counter: Arc<RwLock<CounterState>>,
 }

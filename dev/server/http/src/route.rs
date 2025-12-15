@@ -6,64 +6,60 @@ pub mod random;
 pub mod root;
 pub mod wait;
 
-use std::{future::Future, net::SocketAddr, pin::Pin};
+use std::{future::Future, pin::Pin};
 
 use axum::{
     body::{Body, HttpBody},
-    extract::{connect_info::IntoMakeServiceWithConnectInfo, Request},
+    extract::Request,
     http::{StatusCode, Uri},
     middleware::{self, Next},
     response::{IntoResponse, Result},
     routing::get,
     Router,
 };
-use tower::Layer;
+use tower::ServiceBuilder;
 use tower_http::normalize_path::{NormalizePath, NormalizePathLayer};
 
 use crate::{
-    env::Env,
     error::{kind::NotFound, AppErrorDetail, Logged},
     state::AppState,
 };
 
 pub type PinResponseFuture<R> = Pin<Box<dyn Future<Output = R> + Send>>;
 
-pub fn app(env: Env) -> NormalizePath<Router<()>> {
-    let state = AppState { env, ..Default::default() };
-    app_with(state)
+#[derive(Debug, Clone, Default)]
+pub struct AppRouter {
+    pub state: AppState,
 }
-pub fn app_with(state: AppState) -> NormalizePath<Router<()>> {
-    NormalizePathLayer::trim_trailing_slash().layer(router(state))
-}
-pub fn router(state: AppState) -> Router<()> {
-    Router::new()
-        .route("/", get(root::root))
-        .nest("/health", health::route_health())
-        .route("/healthz", get(health::health))
-        .nest("/echo", echo::route_echo())
-        .nest("/information", information::route_information())
-        .nest("/counter", counter::route_counter())
-        .nest("/wait", wait::route_wait())
-        .nest("/random", random::route_random())
-        .fallback(not_found)
-        .layer(middleware::from_fn_with_state(state.clone(), logging))
-        .with_state(state)
-}
-pub fn router_with_connect_info(state: AppState) -> IntoMakeServiceWithConnectInfo<Router<()>, SocketAddr> {
-    // TODO how to use this with NormalizePathLayer ?
-    router(state).into_make_service_with_connect_info()
-}
+impl AppRouter {
+    pub fn service(self) -> NormalizePath<Router<()>> {
+        ServiceBuilder::new().layer(NormalizePathLayer::trim_trailing_slash()).service(self.router())
+    }
+    pub fn router(self) -> Router<()> {
+        Router::new()
+            .route("/", get(root::root))
+            .nest("/health", health::route_health())
+            .route("/healthz", get(health::health))
+            .nest("/echo", echo::route_echo())
+            .nest("/information", information::route_information())
+            .nest("/counter", counter::route_counter())
+            .nest("/wait", wait::route_wait())
+            .nest("/random", random::route_random())
+            .fallback(Self::not_found)
+            .layer(middleware::from_fn_with_state(self.state.clone(), Self::logging))
+            .with_state(self.state)
+    }
 
-pub async fn not_found(uri: Uri) -> Result<()> {
-    Err(AppErrorDetail::<NotFound, _>::new(StatusCode::NOT_FOUND, Logged(""), uri.to_string()))?
-}
-
-pub async fn logging(req: Request<Body>, next: Next) -> impl IntoResponse {
-    let (method, uri) = (req.method().clone(), req.uri().clone());
-    let res = next.run(req).await;
-    let (status, bytes) = (res.status(), res.size_hint().lower());
-    tracing::info!("{} {} {} {}", status, method, uri, bytes);
-    res
+    pub async fn not_found(uri: Uri) -> Result<()> {
+        Err(AppErrorDetail::<NotFound, _>::new(StatusCode::NOT_FOUND, Logged(""), uri.to_string()))?
+    }
+    pub async fn logging(req: Request<Body>, next: Next) -> impl IntoResponse {
+        let (method, uri) = (req.method().clone(), req.uri().clone());
+        let res = next.run(req).await;
+        let (status, bytes) = (res.status(), res.size_hint().lower());
+        tracing::info!("{} {} {} {}", status, method, uri, bytes);
+        res
+    }
 }
 
 #[cfg(test)]

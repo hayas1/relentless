@@ -173,8 +173,8 @@ impl Jsonizer {
 
 #[cfg(test)]
 mod tests {
-    use crate::route::app_with;
     use crate::route::tests::{call_bytes, call_with_assert, call_with_assert_ne_body};
+    use crate::route::AppRouter;
 
     use super::*;
     use axum::body::Body;
@@ -184,19 +184,20 @@ mod tests {
 
     #[tokio::test]
     async fn test_echo_empty() {
-        let mut app = app_with(Default::default());
+        let mut service = AppRouter::default().service();
 
-        let (status, body) = call_bytes(&mut app, Request::builder().uri("/echo/").body(Body::empty()).unwrap()).await;
+        let (status, body) =
+            call_bytes(&mut service, Request::builder().uri("/echo/").body(Body::empty()).unwrap()).await;
         assert_eq!(status, StatusCode::OK);
         assert_eq!(&body[..], b"");
     }
 
     #[tokio::test]
     async fn test_echo_body() {
-        let mut app = app_with(Default::default());
+        let mut service = AppRouter::default().service();
 
         let (status, body) = call_bytes(
-            &mut app,
+            &mut service,
             Request::builder().uri("/echo/body").method(Method::POST).body(Body::from("hello world")).unwrap(),
         )
         .await;
@@ -206,10 +207,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_echo_text() {
-        let mut app = app_with(Default::default());
+        let mut service = AppRouter::default().service();
 
         let (status, body) =
-            call_bytes(&mut app, Request::builder().uri("/echo/text/path?key=value").body(Body::empty()).unwrap())
+            call_bytes(&mut service, Request::builder().uri("/echo/text/path?key=value").body(Body::empty()).unwrap())
                 .await;
         assert_eq!(status, StatusCode::OK);
         assert_eq!(&body[..], b"/echo/text/path?key=value");
@@ -217,10 +218,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_echo_path() {
-        let mut app = app_with(Default::default());
+        let mut service = AppRouter::default().service();
 
         let (status, body) =
-            call_bytes(&mut app, Request::builder().uri("/echo/path/query?key=value").body(Body::empty()).unwrap())
+            call_bytes(&mut service, Request::builder().uri("/echo/path/query?key=value").body(Body::empty()).unwrap())
                 .await;
         assert_eq!(status, StatusCode::OK);
         assert_eq!(&body[..], b"query");
@@ -228,10 +229,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_echo_method() {
-        let mut app = app_with(Default::default());
+        let mut service = AppRouter::default().service();
 
         let (status, body) = call_bytes(
-            &mut app,
+            &mut service,
             Request::builder().uri("/echo/method").method(Method::OPTIONS).body(Body::empty()).unwrap(),
         )
         .await;
@@ -241,10 +242,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_echo_headers() {
-        let mut app = app_with(Default::default());
+        let mut service = AppRouter::default().service();
 
         call_with_assert(
-            &mut app,
+            &mut service,
             Request::builder()
                 .uri("/echo/headers")
                 .header("key1", "value1")
@@ -350,10 +351,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_echo_json() {
-        let mut app = app_with(Default::default());
+        let mut service = AppRouter::default().service();
 
         call_with_assert(
-            &mut app,
+            &mut service,
             Request::builder().uri("/echo/json").body(Body::empty()).unwrap(),
             StatusCode::OK,
             json!(null),
@@ -361,7 +362,7 @@ mod tests {
         .await;
 
         call_with_assert(
-            &mut app,
+            &mut service,
             Request::builder()
                 .uri("/echo/json?key=value&a.foo=null&a.bar=true&a.baz=2.0&a.qux=three&a.quux=4&d.5=five&d.0=zero")
                 .body(Body::empty())
@@ -376,7 +377,7 @@ mod tests {
         .await;
 
         call_with_assert_ne_body(
-            &mut app,
+            &mut service,
             Request::builder().uri("/echo/json?key=value&current.time=$now").body(Body::empty()).unwrap(),
             StatusCode::OK,
             json!({
@@ -388,10 +389,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_echo_json_post() {
-        let mut app = app_with(Default::default());
+        let mut service = AppRouter::default().service();
 
         call_with_assert(
-            &mut app,
+            &mut service,
             Request::builder()
                 .uri("/echo/json")
                 .method(Method::POST)

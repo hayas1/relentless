@@ -223,8 +223,8 @@ mod tests {
             ErrorResponseInner, APP_DEFAULT_ERROR_CODE,
         },
         route::{
-            app_with,
             tests::{call_bytes, call_with_assert},
+            AppRouter,
         },
     };
 
@@ -239,10 +239,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_random() {
-        let mut app = app_with(Default::default());
+        let mut service = AppRouter::default().service();
 
         let (status, body) =
-            call_bytes(&mut app, Request::builder().uri("/random/standard").body(Body::empty()).unwrap()).await;
+            call_bytes(&mut service, Request::builder().uri("/random/standard").body(Body::empty()).unwrap()).await;
         assert_eq!(status, StatusCode::OK);
         assert!(String::from_utf8_lossy(&body[..]).parse::<f64>().unwrap() >= 0.0);
         assert!(String::from_utf8_lossy(&body[..]).parse::<f64>().unwrap() <= 1.0);
@@ -250,30 +250,31 @@ mod tests {
 
     #[tokio::test]
     async fn test_random_string_length() {
-        let mut app = app_with(Default::default());
+        let mut service = AppRouter::default().service();
 
         let (status, body) =
-            call_bytes(&mut app, Request::builder().uri("/random/string").body(Body::empty()).unwrap()).await;
+            call_bytes(&mut service, Request::builder().uri("/random/string").body(Body::empty()).unwrap()).await;
         assert_eq!(status, StatusCode::OK);
         assert_eq!(body.len(), 32);
 
         let (status, body) =
-            call_bytes(&mut app, Request::builder().uri("/random/string?len=999").body(Body::empty()).unwrap()).await;
+            call_bytes(&mut service, Request::builder().uri("/random/string?len=999").body(Body::empty()).unwrap())
+                .await;
         assert_eq!(status, StatusCode::OK);
         assert_eq!(body.len(), 999);
     }
 
     #[tokio::test]
     async fn test_random_uniform() {
-        let mut app = app_with(Default::default());
+        let mut service = AppRouter::default().service();
 
         let (status, body) =
-            call_bytes(&mut app, Request::builder().uri("/random/uniform").body(Body::empty()).unwrap()).await;
+            call_bytes(&mut service, Request::builder().uri("/random/uniform").body(Body::empty()).unwrap()).await;
         assert_eq!(status, StatusCode::OK);
         assert!(String::from_utf8_lossy(&body[..]).parse::<usize>().is_ok());
 
         let (status, body) = call_bytes(
-            &mut app,
+            &mut service,
             Request::builder().uri("/random/uniform/float?low=0.0&high=1.0").body(Body::empty()).unwrap(),
         )
         .await;
@@ -282,7 +283,7 @@ mod tests {
         assert!(String::from_utf8_lossy(&body[..]).parse::<f64>().unwrap() < 1.0);
 
         let (status, body) = call_bytes(
-            &mut app,
+            &mut service,
             Request::builder().uri("/random/uniform?low=10&high=100").body(Body::empty()).unwrap(),
         )
         .await;
@@ -291,12 +292,13 @@ mod tests {
         assert!(String::from_utf8_lossy(&body[..]).parse::<usize>().unwrap() < 100);
 
         let (status, body) =
-            call_bytes(&mut app, Request::builder().uri("/random/uniform?high=1").body(Body::empty()).unwrap()).await;
+            call_bytes(&mut service, Request::builder().uri("/random/uniform?high=1").body(Body::empty()).unwrap())
+                .await;
         assert_eq!(status, StatusCode::OK);
         assert_eq!(String::from_utf8_lossy(&body[..]).parse::<usize>().unwrap(), 0);
 
         let (status, body) = call_bytes(
-            &mut app,
+            &mut service,
             Request::builder().uri("/random/uniform?high=0&inclusive=true").body(Body::empty()).unwrap(),
         )
         .await;
@@ -304,7 +306,7 @@ mod tests {
         assert_eq!(String::from_utf8_lossy(&body[..]).parse::<usize>().unwrap(), 0);
 
         call_with_assert(
-            &mut app,
+            &mut service,
             Request::builder().uri("/random/uniform?low=100&high=0").body(Body::empty()).unwrap(),
             APP_DEFAULT_ERROR_CODE,
             ErrorResponseInner {
@@ -321,10 +323,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_random_json() {
-        let mut app = app_with(Default::default());
+        let mut service = AppRouter::default().service();
 
         let (status, body) =
-            call_bytes(&mut app, Request::builder().uri("/random/json").body(Body::empty()).unwrap()).await;
+            call_bytes(&mut service, Request::builder().uri("/random/json").body(Body::empty()).unwrap()).await;
         assert_eq!(status, StatusCode::OK);
         assert!(serde_json::from_slice::<Value>(&body[..]).is_ok());
     }

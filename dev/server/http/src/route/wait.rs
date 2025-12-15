@@ -60,17 +60,17 @@ mod tests {
         http::{Request, StatusCode},
     };
 
-    use crate::route::{app_with, tests::call_with_assert};
+    use crate::route::{tests::call_with_assert, AppRouter};
 
     use super::*;
 
     #[tokio::test]
     async fn test() {
-        let mut app = app_with(Default::default());
+        let mut service = AppRouter::default().service();
 
         let now = Instant::now();
         call_with_assert(
-            &mut app,
+            &mut service,
             Request::builder().uri("/wait/500/ms").body(Body::empty()).unwrap(),
             StatusCode::OK,
             WaitResponse { duration: 500, unit: DurationUnit::Milliseconds },

@@ -165,14 +165,14 @@ mod tests {
             kind::{BadRequest, Kind},
             ErrorResponseInner, APP_DEFAULT_ERROR_CODE,
         },
-        route::{app_with, tests::call_with_assert},
+        route::{tests::call_with_assert, AppRouter},
     };
 
     use super::*;
 
     #[tokio::test]
     async fn test_counter() {
-        let mut app = app_with(Default::default());
+        let mut service = AppRouter::default().service();
 
         let scenario = [
             ("/counter", CounterResponse { count: 0 }),
@@ -184,7 +184,7 @@ mod tests {
         ];
         for (uri, exp) in scenario {
             let req = Request::builder().uri(uri).body(Body::empty()).unwrap();
-            call_with_assert(&mut app, req, StatusCode::OK, exp).await;
+            call_with_assert(&mut service, req, StatusCode::OK, exp).await;
         }
 
         let scenario2 = [
@@ -204,20 +204,20 @@ mod tests {
         ];
         for (uri, exp) in scenario2 {
             let req = Request::builder().uri(uri).body(Body::empty()).unwrap();
-            call_with_assert(&mut app, req, StatusCode::OK, exp).await;
+            call_with_assert(&mut service, req, StatusCode::OK, exp).await;
         }
     }
 
     #[tokio::test]
     async fn test_counter_overflow() {
-        let mut app = app_with(Default::default());
+        let mut service = AppRouter::default().service();
 
         let req = Request::builder().uri(format!("/counter/increment/{}", i64::MAX)).body(Body::empty()).unwrap();
-        call_with_assert(&mut app, req, StatusCode::OK, CounterResponse { count: i64::MAX }).await;
+        call_with_assert(&mut service, req, StatusCode::OK, CounterResponse { count: i64::MAX }).await;
 
         let req = Request::builder().uri("/counter/increment").body(Body::empty()).unwrap();
         call_with_assert(
-            &mut app,
+            &mut service,
             req,
             APP_DEFAULT_ERROR_CODE,
             ErrorResponseInner { msg: BadRequest::msg().to_string(), detail: CounterError::Overflow(()).to_string() },
@@ -225,16 +225,16 @@ mod tests {
         .await;
 
         let req = Request::builder().uri("/counter/decrement").body(Body::empty()).unwrap();
-        call_with_assert(&mut app, req, StatusCode::OK, CounterResponse { count: i64::MAX }).await;
+        call_with_assert(&mut service, req, StatusCode::OK, CounterResponse { count: i64::MAX }).await;
     }
 
     #[tokio::test]
     async fn test_counter_parse_error() {
-        let mut app = app_with(Default::default());
+        let mut service = AppRouter::default().service();
 
         let req = Request::builder().uri("/counter/increment/abc").body(Body::empty()).unwrap();
         call_with_assert(
-            &mut app,
+            &mut service,
             req,
             APP_DEFAULT_ERROR_CODE,
             ErrorResponseInner {
@@ -245,6 +245,6 @@ mod tests {
         .await;
 
         let req = Request::builder().uri("/counter/increment").body(Body::empty()).unwrap();
-        call_with_assert(&mut app, req, StatusCode::OK, CounterResponse { count: 1 }).await;
+        call_with_assert(&mut service, req, StatusCode::OK, CounterResponse { count: 1 }).await;
     }
 }

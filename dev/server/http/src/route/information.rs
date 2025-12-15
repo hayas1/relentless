@@ -130,17 +130,17 @@ mod tests {
     use mime::{APPLICATION_JSON, APPLICATION_WWW_FORM_URLENCODED};
     use serde_json::json;
 
-    use crate::route::{app_with, tests::call_with_assert};
+    use crate::route::{tests::call_with_assert, AppRouter};
 
     use super::*;
 
     #[tokio::test]
     async fn test_information_basic() {
-        let mut app = app_with(Default::default());
+        let mut service = AppRouter::default().service();
 
         let req = Request::builder().uri("http://localhost:3000/information").body(Body::empty()).unwrap();
         call_with_assert(
-            &mut app,
+            &mut service,
             req,
             StatusCode::OK,
             InformationResponse {
@@ -156,14 +156,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_information_get() {
-        let mut app = app_with(Default::default());
+        let mut service = AppRouter::default().service();
 
         let req = Request::builder()
             .uri("http://localhost:3000/information/path/to/query/?q=test&k=1&k=2&k=3")
             .body(Body::empty())
             .unwrap();
         call_with_assert(
-            &mut app,
+            &mut service,
             req,
             StatusCode::OK,
             InformationResponse {
@@ -179,7 +179,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_information_post() {
-        let mut app = app_with(Default::default());
+        let mut service = AppRouter::default().service();
 
         let req = Request::builder()
             .method(Method::POST)
@@ -188,7 +188,7 @@ mod tests {
             .body(Body::from("body=body"))
             .unwrap();
         call_with_assert(
-            &mut app,
+            &mut service,
             req,
             StatusCode::OK,
             InformationResponse {
@@ -215,7 +215,7 @@ mod tests {
             .body(Body::from(r#"{"name": "json", "key": [1, 2, 3]}"#))
             .unwrap();
         call_with_assert(
-            &mut app,
+            &mut service,
             req,
             StatusCode::OK,
             InformationResponse {
