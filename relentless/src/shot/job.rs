@@ -66,6 +66,7 @@ impl Cli {
         let otel = crate::otel::Otel;
         let provider = otel.provider()?;
         otel.init_tracing(&provider)?;
+        otel.set_global_propagator();
         let res = {
             let span = tracing::info_span!("run");
             let _enter = span.enter();

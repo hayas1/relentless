@@ -1,7 +1,7 @@
 use clap::Args;
 use opentelemetry::trace::TracerProvider;
 use opentelemetry_otlp::SpanExporter;
-use opentelemetry_sdk::{trace::SdkTracerProvider, Resource};
+use opentelemetry_sdk::{propagation::TraceContextPropagator, trace::SdkTracerProvider, Resource};
 use opentelemetry_semantic_conventions::resource::{SERVICE_NAME, SERVICE_VERSION};
 use serde::{Deserialize, Serialize};
 use tracing_subscriber::{layer::SubscriberExt, EnvFilter, Registry};
@@ -23,6 +23,9 @@ impl Otel {
             .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| "debug".into()))
             .with(telemetry);
         tracing::subscriber::set_global_default(subscriber).map_err(crate::Error::boxed)
+    }
+    pub fn set_global_propagator(&self) {
+        opentelemetry::global::set_text_map_propagator(TraceContextPropagator::new());
     }
 
     pub fn resource(&self) -> Resource {

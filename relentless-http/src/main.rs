@@ -8,14 +8,15 @@ pub async fn main() -> Result<ExitCode, Box<dyn std::error::Error>> {
         report::Reporter,
         shot::job::{Cli, Job},
     };
-    use relentless_http::{contract::HttpContract, service::ReqwestClient};
+    use relentless_http::{contract::HttpContract, otel::OtelInjectLayer, service::ReqwestClient};
     use reqwest::Body;
     use tower::ServiceBuilder;
 
     Cli::run(|job: Job<_, _, _>, spec| async move {
         let measure = MeasureLayer::new();
+        let inject = OtelInjectLayer;
         let client = ReqwestClient::new().await?;
-        let service = ServiceBuilder::new().layer(&measure).service(client);
+        let service = ServiceBuilder::new().layer(&measure).layer(inject).service(client);
         let report = job.shot::<_, _, HttpContract<Body, Body>>(tower::make::Shared::new(service), &spec).await?;
         spec.report_format.report(&report)?;
         dbg!(measure.aggregated().times());
