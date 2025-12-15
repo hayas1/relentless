@@ -55,6 +55,28 @@ impl Cli {
         let suites = Job::from_files(&cli.file)?;
         Ok((suites, cli.job))
     }
+    #[cfg(feature = "cli")]
+    pub async fn run<F, T, C, Q, P>(f: F) -> Result<T, Box<dyn std::error::Error>>
+    where
+        F: AsyncFnOnce(Job<C, Q, P>, JobSpec) -> Result<T, Box<dyn std::error::Error>>,
+        C: for<'x> Deserialize<'x> + Default,
+        Q: for<'x> Deserialize<'x> + Default,
+        P: for<'x> Deserialize<'x> + Default,
+    {
+        let otel = crate::otel::Otel;
+        let provider = otel.provider()?;
+        otel.init_tracing(&provider)?;
+        let res = {
+            let span = tracing::info_span!("run");
+            let _enter = span.enter();
+            let (suites, job) = Self::job::<C, Q, P>().await?;
+            f(suites, job).await?
+        };
+        provider.force_flush()?;
+        provider.shutdown()?;
+
+        Ok(res)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
