@@ -45,6 +45,13 @@ bytesize = "2.3.1"
 hdrhistogram = "7.5.4"
 semigroup = { version = "0.4.3", features = ["derive", "monoid", "histogram"] }
 
+tracing = "0.1.43"
+tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
+tracing-opentelemetry = "0.32.0"
+opentelemetry = "0.31.0"
+opentelemetry-otlp = { version = "0.31.0", features = ["grpc-tonic"] }
+opentelemetry_sdk = "0.31.0"
+opentelemetry-semantic-conventions = "0.31.0"
 
 [dev-dependencies]
 relentless-http-dev-server = { path = "../dev/server/http" }
