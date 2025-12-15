@@ -8,15 +8,9 @@ pub async fn main() -> Result<ExitCode, Box<dyn std::error::Error>> {
         report::Reporter,
         shot::job::{Cli, Job},
     };
-    use relentless_grpc::{
-        contract::{DynamicContract, GrpcDescriptor},
-        request::GrpcRequest,
-        response::GrpcResponse,
-        service::MakeChannel,
-        wip::JsonSerializer,
-    };
+    use relentless_grpc::{contract::DynamicContract, service::MakeChannel, wip::JsonSerializer};
 
-    Cli::run(|job: Job<GrpcDescriptor, GrpcRequest, GrpcResponse>, spec| async move {
+    Cli::run(|job: Job<_, _, _>, spec| async move {
         let measure = MeasureLayer::new();
         let make = MakeChannel(measure.clone());
         let report = job.shot::<_, _, DynamicContract<serde_json::Value, JsonSerializer>>(make, &spec).await?;
