@@ -58,7 +58,6 @@ impl<Q, P> Testcase<Q, P> {
             .buffer_unordered(buffers)
             .combine_monoid()
             .await;
-        let () = profile.shot::<T, C>(services, &destinations, &self.target).await.unwrap_or_else(|_| todo!());
         Ok(CaseReport { case: self, evaluated })
     }
 }
