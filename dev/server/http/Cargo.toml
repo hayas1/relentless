@@ -16,6 +16,7 @@ http-serde = "2.1.1"
 init-tracing-opentelemetry = { version = "0.34.0", features = [
     "tracing_subscriber_ext",
 ] }
+jiff = { version = "0.2.16", features = ["serde"] }
 num = { version = "0.4.3", features = ["serde"] }
 rand = "0.9.1"
 rand_distr = "0.5.1"
