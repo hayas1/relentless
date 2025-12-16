@@ -22,9 +22,9 @@ impl RunCommand {
     }
     pub async fn serve(self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let listener = TcpListener::bind(&self.bind()).await?;
-        let app = ServiceExt::<Request>::into_make_service(self.app().service());
+        let service = ServiceExt::<Request>::into_make_service(self.app().service());
         tracing::info!("start app on {}", listener.local_addr()?);
-        axum::serve(listener, app)
+        axum::serve(listener, service)
             .with_graceful_shutdown(async {
                 tokio::signal::ctrl_c().await.expect("failed to install Ctrl+C handler");
             })
