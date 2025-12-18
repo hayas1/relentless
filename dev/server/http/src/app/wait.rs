@@ -1,11 +1,11 @@
 use axum::{extract::Path, routing::get, Json, Router};
-use jiff::{SignedDuration, Span, SpanRelativeTo};
+use jiff::Span;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::{
     app::AppState,
-    error2::{AppResult, IntoAppResult},
+    error2::{AppResult, AsStatusCode, IntoAppResult},
 };
 
 pub fn route_wait() -> Router<AppState> {
@@ -20,9 +20,8 @@ pub struct WaitResponse {
 #[tracing::instrument]
 pub async fn wait(Path(time): Path<String>) -> AppResult<Json<WaitResponse>> {
     let span: Span = time.parse().response(WaitError::InvalidTime(time))?;
-    let duration = span.to_duration(SpanRelativeTo::days_are_24_hours()).response(WaitError::InvalidDuration(span))?;
-    let sleep = duration.try_into().response(WaitError::CannotWait(duration))?;
-    tokio::time::sleep(sleep).await;
+    let duration = span.try_into().response(WaitError::CannotWait(span))?;
+    tokio::time::sleep(duration).await;
     let wait = format!("{span:#}");
     Ok(Json(WaitResponse { wait }))
 }
@@ -32,12 +31,10 @@ pub enum WaitError {
     #[error("invalid time: {0}")]
     InvalidTime(String),
 
-    #[error("invalid duration: {0}")]
-    InvalidDuration(Span),
-
-    #[error("cannot wait: {0}")]
-    CannotWait(SignedDuration),
+    #[error("cannot wait: {0:#}")]
+    CannotWait(Span),
 }
+impl AsStatusCode for WaitError {}
 
 #[cfg(test)]
 mod tests {
@@ -48,7 +45,7 @@ mod tests {
         http::{Request, StatusCode},
     };
 
-    use crate::app::{tests::call_with_assert, AppRouter};
+    use crate::app::{tests::call2, AppRouter};
 
     use super::*;
 
@@ -56,14 +53,11 @@ mod tests {
     async fn test_wait() {
         let mut service = AppRouter::default().service();
 
+        let req = Request::builder().uri("/wait/500ms").body(Body::empty()).unwrap();
         let now = Instant::now();
-        call_with_assert(
-            &mut service,
-            Request::builder().uri("/wait/500ms").body(Body::empty()).unwrap(),
-            StatusCode::OK,
-            WaitResponse { wait: "500ms".to_string() },
-        )
-        .await;
+        let res = call2(&mut service, req).await.unwrap();
         assert!(now.elapsed() >= Duration::from_millis(500));
+        assert_eq!(StatusCode::OK, res.status());
+        assert_eq!(&WaitResponse { wait: "500ms".to_string() }, res.body());
     }
 }

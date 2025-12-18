@@ -64,18 +64,49 @@ pub struct AppState {
     pub counter: Arc<RwLock<CounterState>>,
 }
 
-#[cfg(test)]
-mod tests {
+#[cfg(test)] // TODO do not pub(crate), use feature
+pub(crate) mod tests {
 
     use std::fmt::Debug;
 
     use axum::{
-        body::{self, Body, Bytes, HttpBody},
+        body::{Body, Bytes, HttpBody},
         http::{Request, StatusCode},
         response::Response,
     };
     use serde::de::DeserializeOwned;
-    use tower::Service;
+    use tower::{Service, ServiceExt};
+
+    pub async fn body_bytes(body: Body) -> Result<Bytes, axum::Error> {
+        let limit = body.size_hint().upper().unwrap_or(usize::MAX as u64);
+        axum::body::to_bytes(body, limit as usize).await
+    }
+    pub async fn body_bytes_response(res: Response<Body>) -> Result<Response<Bytes>, axum::Error> {
+        let (parts, body) = res.into_parts();
+        let bytes = body_bytes(body).await?;
+        Ok(Response::from_parts(parts, bytes))
+    }
+    pub async fn call_bytes2<S>(
+        service: &mut S,
+        req: Request<Body>,
+    ) -> Result<Response<Bytes>, Box<dyn std::error::Error>>
+    where
+        S: Service<Request<Body>, Response = Response<Body>>,
+        Box<dyn std::error::Error>: From<S::Error>,
+    {
+        let res = service.ready().await?.call(req).await?;
+        Ok(body_bytes_response(res).await?)
+    }
+    pub async fn call2<S, T>(service: &mut S, req: Request<Body>) -> Result<Response<T>, Box<dyn std::error::Error>>
+    where
+        S: Service<Request<Body>, Response = Response<Body>>,
+        Box<dyn std::error::Error>: From<S::Error>,
+        T: DeserializeOwned,
+    {
+        let res = call_bytes2(service, req).await?;
+        let des = serde_json::from_slice::<T>(res.body())?;
+        Ok(res.map(|_| des))
+    }
 
     pub async fn call_bytes<S>(service: &mut S, req: Request<Body>) -> (StatusCode, Bytes)
     where
@@ -83,10 +114,9 @@ mod tests {
         S::Error: Debug,
         Box<dyn std::error::Error + Send + Sync + 'static>: From<S::Error>,
     {
-        let res = service.call(req).await.unwrap();
+        let res = service.ready().await.unwrap().call(req).await.unwrap();
         let status = res.status();
-        let size = res.size_hint().upper().unwrap_or(res.size_hint().lower()) as usize;
-        let body = body::to_bytes(res.into_body(), size).await.unwrap();
+        let body = body_bytes(res.into_body()).await.unwrap();
         (status, body)
     }
 
