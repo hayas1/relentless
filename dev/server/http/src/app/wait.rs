@@ -60,7 +60,7 @@ mod tests {
         let now = Instant::now();
         let res = call2(&mut service, req).await.unwrap();
         assert!(now.elapsed() >= Duration::from_millis(500));
-        assert_eq!(StatusCode::OK, res.status());
+        assert_eq!(res.status(), StatusCode::OK);
         assert_eq!(&WaitResponse { wait: "500ms".to_string() }, res.body());
     }
 
@@ -70,9 +70,10 @@ mod tests {
 
         let req = Request::builder().uri("/wait/-500ms").body(Body::empty()).unwrap();
         let res = call2(&mut service, req).await.unwrap();
-        assert_eq!(StatusCode::BAD_REQUEST, res.status());
-        assert!(
-            matches!(res.body(), &ErrorResponse { error: WaitError::CannotWait(s) } if s == Span::try_from(Duration::from_millis(500)).unwrap().fieldwise())
-        );
+        assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+        assert!(matches!(
+            res.body(),
+            &ErrorResponse { error: WaitError::CannotWait(s) } if s == Span::try_from(Duration::from_millis(500)).unwrap().fieldwise()
+        ));
     }
 }

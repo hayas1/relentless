@@ -36,10 +36,14 @@ impl<E: Display + Serialize> IntoResponse for AppError<E> {
 pub trait IntoAppResult<T, R> {
     fn response(self, response: R) -> AppResult<T, R>;
 }
-impl<T, E: std::error::Error + 'static, R: Serialize + AsStatusCode> IntoAppResult<T, R> for Result<T, E> {
+impl<T, E, R> IntoAppResult<T, R> for Result<T, E>
+where
+    E: Into<Box<dyn std::error::Error + 'static>>,
+    R: Serialize + AsStatusCode,
+{
     fn response(self, response: R) -> AppResult<T, R> {
         self.map_err(|e| AppError {
-            source: Box::new(e),
+            source: e.into(),
             status: response.status_code(),
             response: ErrorResponse { error: response },
         })

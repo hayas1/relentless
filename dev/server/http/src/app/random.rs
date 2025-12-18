@@ -3,7 +3,7 @@ use std::{
     ops::{Bound, RangeBounds},
 };
 
-use axum::{extract::Query, response::Result, routing::get, Json, Router};
+use axum::{extract::Query, routing::get, Json, Router};
 use num::Bounded;
 use rand::{distr::SampleString, Rng};
 use rand_distr::{
@@ -11,22 +11,24 @@ use rand_distr::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use thiserror::Error;
 
-use crate::{app::AppState, error::random::RandomError};
+use crate::{
+    app::AppState,
+    error2::{AppResult, AsStatusCode, IntoAppResult},
+};
 
-use super::PinResponseFuture;
+use super::DynFuture;
 
 pub fn route_random() -> Router<AppState> {
     Router::new()
         .route("/", get(random_handler::<f64, _>(StandardUniform)))
         .route("/string", get(RandomString::handler(Alphanumeric)))
-        .route("/response", get(RandomResponse::handler(StandardUniform, StandardUniform, Alphanumeric)))
         .route("/json", get(randjson))
         .route("/standard", get(random_handler::<f64, _>(StandardUniform)))
         .route("/standard/int", get(random_handler::<i64, _>(StandardUniform)))
         .route("/standard/float", get(random_handler::<f64, _>(StandardUniform)))
         .route("/standard/string", get(RandomString::handler(StandardUniform)))
-        .route("/standard/response", get(RandomResponse::handler(StandardUniform, StandardUniform, StandardUniform)))
         .route("/alphanumeric", get(RandomString::handler(Alphanumeric)))
         .route("/normal", get(random_handler::<f64, _>(StandardNormal)))
         .route("/normal/float", get(random_handler::<f64, _>(StandardNormal)))
@@ -38,7 +40,7 @@ pub fn route_random() -> Router<AppState> {
     // .fallback() // TODO
 }
 
-pub fn random_handler<T, D>(distribution: D) -> impl FnOnce() -> PinResponseFuture<Result<String>> + Clone
+pub fn random_handler<T, D>(distribution: D) -> impl FnOnce() -> DynFuture<AppResult<String>> + Clone
 where
     T: Display + Clone + Send + 'static,
     D: Distribution<T> + Clone + Send + 'static,
@@ -57,7 +59,7 @@ pub struct RandomString {
     pub len: Option<usize>,
 }
 impl RandomString {
-    pub fn handler<D>(distribution: D) -> impl FnOnce(Query<RandomString>) -> PinResponseFuture<Result<String>> + Clone
+    pub fn handler<D>(distribution: D) -> impl FnOnce(Query<RandomString>) -> DynFuture<AppResult<String>> + Clone
     where
         D: SampleString + Clone + Send + 'static,
     {
@@ -71,35 +73,6 @@ impl RandomString {
 
     pub fn length(&self) -> usize {
         self.len.unwrap_or(32)
-    }
-}
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct RandomResponse {
-    pub int: i64,
-    pub float: f64,
-    pub string: String,
-}
-impl RandomResponse {
-    pub fn handler<DI, DF, DS>(
-        int_distribution: DI,
-        float_distribution: DF,
-        distribution_string: DS,
-    ) -> impl FnOnce(Query<RandomString>) -> PinResponseFuture<Result<Json<Self>>> + Clone
-    where
-        DI: Distribution<i64> + Clone + Send + 'static,
-        DF: Distribution<f64> + Clone + Send + 'static,
-        DS: SampleString + Clone + Send + 'static,
-    {
-        move |Query(rs): Query<RandomString>| {
-            Box::pin(async move {
-                let mut rng = rand::rng();
-                Ok(Json(RandomResponse {
-                    int: int_distribution.sample(&mut rng),
-                    float: float_distribution.sample(&mut rng),
-                    string: distribution_string.sample_string(&mut rng, rs.length()),
-                }))
-            })
-        }
     }
 }
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -143,17 +116,17 @@ pub trait DistRange<T>: Distribution<T> {
         R: RangeBounds<T>,
         Self: Sized;
 
-    fn handler() -> impl FnOnce(Query<DistRangeParam<T>>) -> PinResponseFuture<Result<String>> + Clone
+    fn handler() -> impl FnOnce(Query<DistRangeParam<T>>) -> DynFuture<AppResult<String, RandomError<T>>> + Clone
     where
         Self: DistRange<T> + Sized,
-        Self::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
-        T: Display + Debug + Clone + Send + Sync + 'static,
+        Self::Error: Into<Box<dyn std::error::Error + 'static>>,
+        T: Display + Default + Clone + Serialize + Send + Sync + 'static,
     {
         move |Query(r): Query<DistRangeParam<T>>| {
             Box::pin(async move {
                 let mut rng = rand::rng();
-                let dist = Self::new(&r).map_err(|e| RandomError::InvalidRange(r, e.into()))?;
-                Ok(dist.sample(&mut rng).to_string())
+                let dist = Self::new(&r).response(RandomError::InvalidRange(r));
+                dist.map(|d| d.sample(&mut rng).to_string())
             })
         }
     }
@@ -178,7 +151,7 @@ where
 }
 
 #[tracing::instrument]
-pub async fn randjson() -> Result<Json<Value>> {
+pub async fn randjson() -> Json<Value> {
     let (max_size, max_depth) = (10, 3);
     fn recursive_json(max_size: usize, max_depth: i32) -> Value {
         let mut rng = rand::rng();
@@ -207,8 +180,15 @@ pub async fn randjson() -> Result<Json<Value>> {
             }
         }
     }
-    Ok(Json(recursive_json(max_size, max_depth)))
+    Json(recursive_json(max_size, max_depth))
 }
+
+#[derive(Debug, Error, Serialize, Deserialize)]
+pub enum RandomError<T: Display + Default> {
+    #[error("{0}")]
+    InvalidRange(DistRangeParam<T>),
+}
+impl<T: Display + Default> AsStatusCode for RandomError<T> {}
 
 #[cfg(test)]
 mod tests {
@@ -219,13 +199,10 @@ mod tests {
 
     use crate::{
         app::{
-            tests::{call_bytes, call_with_assert},
+            tests::{call2, call_bytes2},
             AppRouter,
         },
-        error::{
-            kind::{BadRequest, Kind},
-            ErrorResponseInner, APP_DEFAULT_ERROR_CODE,
-        },
+        error2::ErrorResponse,
     };
 
     use super::*;
@@ -241,93 +218,82 @@ mod tests {
     async fn test_random() {
         let mut service = AppRouter::default().service();
 
-        let (status, body) =
-            call_bytes(&mut service, Request::builder().uri("/random/standard").body(Body::empty()).unwrap()).await;
-        assert_eq!(status, StatusCode::OK);
-        assert!(String::from_utf8_lossy(&body[..]).parse::<f64>().unwrap() >= 0.0);
-        assert!(String::from_utf8_lossy(&body[..]).parse::<f64>().unwrap() <= 1.0);
+        let req = Request::builder().uri("/random/standard").body(Body::empty()).unwrap();
+        let res = call_bytes2(&mut service, req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        assert!(String::from_utf8_lossy(res.body()).parse::<f64>().unwrap() >= 0.0);
+        assert!(String::from_utf8_lossy(res.body()).parse::<f64>().unwrap() <= 1.0);
     }
 
     #[tokio::test]
     async fn test_random_string_length() {
         let mut service = AppRouter::default().service();
 
-        let (status, body) =
-            call_bytes(&mut service, Request::builder().uri("/random/string").body(Body::empty()).unwrap()).await;
-        assert_eq!(status, StatusCode::OK);
-        assert_eq!(body.len(), 32);
+        let req = Request::builder().uri("/random/string").body(Body::empty()).unwrap();
+        let res = call_bytes2(&mut service, req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        assert_eq!(res.body().len(), 32);
 
-        let (status, body) =
-            call_bytes(&mut service, Request::builder().uri("/random/string?len=999").body(Body::empty()).unwrap())
-                .await;
-        assert_eq!(status, StatusCode::OK);
-        assert_eq!(body.len(), 999);
+        let req = Request::builder().uri("/random/string?len=999").body(Body::empty()).unwrap();
+        let res = call_bytes2(&mut service, req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        assert_eq!(res.body().len(), 999);
     }
 
     #[tokio::test]
     async fn test_random_uniform() {
         let mut service = AppRouter::default().service();
 
-        let (status, body) =
-            call_bytes(&mut service, Request::builder().uri("/random/uniform").body(Body::empty()).unwrap()).await;
-        assert_eq!(status, StatusCode::OK);
-        assert!(String::from_utf8_lossy(&body[..]).parse::<usize>().is_ok());
+        let req = Request::builder().uri("/random/uniform").body(Body::empty()).unwrap();
+        let res = call_bytes2(&mut service, req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        assert!(String::from_utf8_lossy(res.body()).parse::<usize>().is_ok());
 
-        let (status, body) = call_bytes(
-            &mut service,
-            Request::builder().uri("/random/uniform/float?low=0.0&high=1.0").body(Body::empty()).unwrap(),
-        )
-        .await;
-        assert_eq!(status, StatusCode::OK);
-        assert!(String::from_utf8_lossy(&body[..]).parse::<f64>().unwrap() >= 0.0);
-        assert!(String::from_utf8_lossy(&body[..]).parse::<f64>().unwrap() < 1.0);
+        let req = Request::builder().uri("/random/uniform/float?low=0.0&high=1.0").body(Body::empty()).unwrap();
+        let res = call_bytes2(&mut service, req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        assert!(String::from_utf8_lossy(res.body()).parse::<f64>().unwrap() >= 0.0);
+        assert!(String::from_utf8_lossy(res.body()).parse::<f64>().unwrap() < 1.0);
 
-        let (status, body) = call_bytes(
-            &mut service,
-            Request::builder().uri("/random/uniform?low=10&high=100").body(Body::empty()).unwrap(),
-        )
-        .await;
-        assert_eq!(status, StatusCode::OK);
-        assert!(String::from_utf8_lossy(&body[..]).parse::<usize>().unwrap() >= 10);
-        assert!(String::from_utf8_lossy(&body[..]).parse::<usize>().unwrap() < 100);
+        let req = Request::builder().uri("/random/uniform?low=10&high=100").body(Body::empty()).unwrap();
+        let res = call_bytes2(&mut service, req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        assert!(String::from_utf8_lossy(res.body()).parse::<usize>().unwrap() >= 10);
+        assert!(String::from_utf8_lossy(res.body()).parse::<usize>().unwrap() < 100);
 
-        let (status, body) =
-            call_bytes(&mut service, Request::builder().uri("/random/uniform?high=1").body(Body::empty()).unwrap())
-                .await;
-        assert_eq!(status, StatusCode::OK);
-        assert_eq!(String::from_utf8_lossy(&body[..]).parse::<usize>().unwrap(), 0);
+        let req = Request::builder().uri("/random/uniform?high=1").body(Body::empty()).unwrap();
+        let res = call_bytes2(&mut service, req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        assert_eq!(String::from_utf8_lossy(res.body()).parse::<usize>().unwrap(), 0);
 
-        let (status, body) = call_bytes(
-            &mut service,
-            Request::builder().uri("/random/uniform?high=0&inclusive=true").body(Body::empty()).unwrap(),
-        )
-        .await;
-        assert_eq!(status, StatusCode::OK);
-        assert_eq!(String::from_utf8_lossy(&body[..]).parse::<usize>().unwrap(), 0);
+        let req = Request::builder().uri("/random/uniform?high=0&inclusive=true").body(Body::empty()).unwrap();
+        let res = call_bytes2(&mut service, req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        assert_eq!(String::from_utf8_lossy(res.body()).parse::<usize>().unwrap(), 0);
+    }
 
-        call_with_assert(
-            &mut service,
-            Request::builder().uri("/random/uniform?low=100&high=0").body(Body::empty()).unwrap(),
-            APP_DEFAULT_ERROR_CODE,
-            ErrorResponseInner {
-                msg: BadRequest::msg().to_string(),
-                detail: RandomError::InvalidRange(
-                    DistRangeParam { low: Some(100), high: Some(0), inclusive: false },
-                    Box::new(rand::distr::uniform::Error::EmptyRange),
-                )
-                .to_string(),
-            },
-        )
-        .await;
+    #[tokio::test]
+    async fn test_random_uniform_invalid() {
+        let mut service = AppRouter::default().service();
+
+        let req = Request::builder().uri("/random/uniform?low=100&high=0").body(Body::empty()).unwrap();
+        let res = call2(&mut service, req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+        assert!(matches!(
+            res.body(),
+            &ErrorResponse {
+                error: RandomError::InvalidRange(DistRangeParam { low: Some(100), high: Some(0), inclusive: false })
+            }
+        ));
     }
 
     #[tokio::test]
     async fn test_random_json() {
         let mut service = AppRouter::default().service();
 
-        let (status, body) =
-            call_bytes(&mut service, Request::builder().uri("/random/json").body(Body::empty()).unwrap()).await;
-        assert_eq!(status, StatusCode::OK);
-        assert!(serde_json::from_slice::<Value>(&body[..]).is_ok());
+        let req = Request::builder().uri("/random/json").body(Body::empty()).unwrap();
+        let res = call_bytes2(&mut service, req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        assert!(serde_json::from_slice::<Value>(res.body()).is_ok());
     }
 }

@@ -167,24 +167,6 @@ pub mod counter {
     }
 }
 
-pub mod random {
-    use crate::app::random::DistRangeParam;
-
-    use super::*;
-
-    #[derive(Error, Debug)]
-    pub enum RandomError<T: Display> {
-        #[error("`{0}`: {1}")]
-        InvalidRange(DistRangeParam<T>, Box<dyn std::error::Error + Send + Sync>),
-    }
-
-    impl<T: Display + Debug + Send + Sync + 'static> IntoResponse for RandomError<T> {
-        fn into_response(self) -> Response {
-            AppErrorDetail::<kind::BadRequest, _>::detail_display(self).into_response()
-        }
-    }
-}
-
 pub mod echo {
     use serde_json::Value;
 

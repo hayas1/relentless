@@ -28,7 +28,7 @@ use crate::{
     runner::RunCommand,
 };
 
-pub type PinResponseFuture<R> = Pin<Box<dyn Future<Output = R> + Send>>;
+pub type DynFuture<R> = Pin<Box<dyn Future<Output = R> + Send>>;
 
 #[derive(Debug, Clone, Default)]
 pub struct AppRouter {
