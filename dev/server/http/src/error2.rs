@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
@@ -8,7 +10,7 @@ use thiserror::Error;
 
 pub const APP_DEFAULT_ERROR_CODE: StatusCode = StatusCode::BAD_REQUEST;
 
-pub type AppResult<T, E = String> = Result<T, AppError<ErrorResponse<E>>>;
+pub type AppResult<T, E = String> = Result<T, AppError<E>>;
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash, Serialize, Deserialize, Error)]
 #[error("{error}")]
 pub struct ErrorResponse<E = String> {
@@ -16,13 +18,13 @@ pub struct ErrorResponse<E = String> {
 }
 
 #[derive(Error, Debug)]
-pub struct AppError<R = ErrorResponse> {
+pub struct AppError<E> {
     #[source]
     source: Box<dyn std::error::Error>,
     status: StatusCode,
-    response: R,
+    response: ErrorResponse<E>,
 }
-impl<R: std::error::Error + Serialize> IntoResponse for AppError<R> {
+impl<E: Display + Serialize> IntoResponse for AppError<E> {
     fn into_response(self) -> Response {
         tracing::error!(
             source = %self.source,
@@ -53,8 +55,6 @@ impl<T: Into<String>> AsStatusCode for T {}
 
 #[cfg(test)]
 mod tests {
-    use axum::body::Bytes;
-
     use crate::app::tests::body_bytes;
 
     use super::*;
@@ -62,19 +62,19 @@ mod tests {
     #[derive(Error, Debug)]
     enum Internal {
         #[error("error for server")]
-        SomethingWentWrong,
+        InternalError,
     }
     #[derive(Error, Debug, Serialize, Deserialize)]
     enum External {
         #[error("error for client")]
-        SomethingWentWrong,
+        ErrorResponse,
     }
     impl AsStatusCode for External {}
 
     #[tokio::test]
     async fn test_error_response() {
-        let internal = Err::<(), _>(Internal::SomethingWentWrong);
-        let external = internal.response(External::SomethingWentWrong);
+        let internal = Err::<(), _>(Internal::InternalError);
+        let external = internal.response(External::ErrorResponse);
 
         let external_err = external.unwrap_err();
         assert_eq!(external_err.source.to_string(), "error for server");
@@ -82,14 +82,14 @@ mod tests {
         assert_eq!(external_err.status, APP_DEFAULT_ERROR_CODE);
 
         assert_eq!(
-            Bytes::from_static(br#"{"error":"SomethingWentWrong"}"#),
-            body_bytes(external_err.into_response().into_body()).await.unwrap(),
+            br#"{"error":"ErrorResponse"}"#,
+            &*body_bytes(external_err.into_response().into_body()).await.unwrap(),
         );
     }
 
     #[tokio::test]
     async fn test_error_message_response() {
-        let internal = Err::<(), _>(Internal::SomethingWentWrong);
+        let internal = Err::<(), _>(Internal::InternalError);
         let external = internal.response("error for client");
 
         let external_err = external.unwrap_err();
@@ -98,8 +98,8 @@ mod tests {
         assert_eq!(external_err.status, APP_DEFAULT_ERROR_CODE);
 
         assert_eq!(
-            Bytes::from_static(br#"{"error":"error for client"}"#),
-            body_bytes(external_err.into_response().into_body()).await.unwrap(),
+            br#"{"error":"error for client"}"#,
+            &*body_bytes(external_err.into_response().into_body()).await.unwrap(),
         );
     }
 }
