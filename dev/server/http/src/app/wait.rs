@@ -18,7 +18,7 @@ pub struct WaitResponse {
 }
 
 #[tracing::instrument]
-pub async fn wait(Path(time): Path<String>) -> AppResult<Json<WaitResponse>> {
+pub async fn wait(Path(time): Path<String>) -> AppResult<Json<WaitResponse>, WaitError> {
     let span: Span = time.parse().response(WaitError::InvalidTime(time))?;
     let duration = span.try_into().response(WaitError::CannotWait(span))?;
     tokio::time::sleep(duration).await;

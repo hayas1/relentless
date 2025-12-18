@@ -1,5 +1,3 @@
-use std::fmt::Display;
-
 use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
@@ -10,11 +8,11 @@ use thiserror::Error;
 
 pub const APP_DEFAULT_ERROR_CODE: StatusCode = StatusCode::BAD_REQUEST;
 
-pub type AppResult<T, E = ErrorResponse> = Result<T, AppError<E>>;
+pub type AppResult<T, E = String> = Result<T, AppError<ErrorResponse<E>>>;
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash, Serialize, Deserialize, Error)]
 #[error("{error}")]
-pub struct ErrorResponse {
-    pub error: String,
+pub struct ErrorResponse<E = String> {
+    pub error: E,
 }
 
 #[derive(Error, Debug)]
@@ -33,15 +31,15 @@ impl<R: std::error::Error + Serialize> IntoResponse for AppError<R> {
         (self.status, Json(self.response)).into_response()
     }
 }
-pub trait IntoAppResult<T, E, R> {
-    fn response(self, response: R) -> AppResult<T, E>;
+pub trait IntoAppResult<T, R> {
+    fn response(self, response: R) -> AppResult<T, R>;
 }
-impl<T, E: std::error::Error + 'static, R: Display + AsStatusCode> IntoAppResult<T, ErrorResponse, R> for Result<T, E> {
-    fn response(self, response: R) -> AppResult<T, ErrorResponse> {
+impl<T, E: std::error::Error + 'static, R: Serialize + AsStatusCode> IntoAppResult<T, R> for Result<T, E> {
+    fn response(self, response: R) -> AppResult<T, R> {
         self.map_err(|e| AppError {
             source: Box::new(e),
             status: response.status_code(),
-            response: ErrorResponse { error: response.to_string() },
+            response: ErrorResponse { error: response },
         })
     }
 }
@@ -51,26 +49,30 @@ pub trait AsStatusCode {
         APP_DEFAULT_ERROR_CODE
     }
 }
+impl<T: Into<String>> AsStatusCode for T {}
 
 #[cfg(test)]
 mod tests {
+    use axum::body::Bytes;
+
     use crate::app::tests::body_bytes;
 
     use super::*;
 
+    #[derive(Error, Debug)]
+    enum Internal {
+        #[error("error for server")]
+        SomethingWentWrong,
+    }
+    #[derive(Error, Debug, Serialize, Deserialize)]
+    enum External {
+        #[error("error for client")]
+        SomethingWentWrong,
+    }
+    impl AsStatusCode for External {}
+
     #[tokio::test]
     async fn test_error_response() {
-        #[derive(Error, Debug)]
-        enum Internal {
-            #[error("error for server")]
-            SomethingWentWrong,
-        }
-        #[derive(Error, Debug)]
-        enum External {
-            #[error("error for client")]
-            SomethingWentWrong,
-        }
-        impl AsStatusCode for External {}
         let internal = Err::<(), _>(Internal::SomethingWentWrong);
         let external = internal.response(External::SomethingWentWrong);
 
@@ -79,9 +81,24 @@ mod tests {
         assert_eq!(external_err.response.to_string(), "error for client");
         assert_eq!(external_err.status, APP_DEFAULT_ERROR_CODE);
 
-        let expect = ErrorResponse { error: External::SomethingWentWrong.to_string() };
         assert_eq!(
-            body_bytes(Json(expect).into_response().into_body()).await.unwrap(),
+            Bytes::from_static(br#"{"error":"SomethingWentWrong"}"#),
+            body_bytes(external_err.into_response().into_body()).await.unwrap(),
+        );
+    }
+
+    #[tokio::test]
+    async fn test_error_message_response() {
+        let internal = Err::<(), _>(Internal::SomethingWentWrong);
+        let external = internal.response("error for client");
+
+        let external_err = external.unwrap_err();
+        assert_eq!(external_err.source.to_string(), "error for server");
+        assert_eq!(external_err.response.to_string(), "error for client");
+        assert_eq!(external_err.status, APP_DEFAULT_ERROR_CODE);
+
+        assert_eq!(
+            Bytes::from_static(br#"{"error":"error for client"}"#),
             body_bytes(external_err.into_response().into_body()).await.unwrap(),
         );
     }
