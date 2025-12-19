@@ -20,25 +20,23 @@ use crate::{
     error2::{AppResult, AsStatusCode, IntoAppResult},
 };
 
-use super::DynFuture;
-
 pub fn route_random() -> Router<AppState> {
     Router::new()
         .route("/", get(random_display::<(), f64, StandardUniform>))
-        .route("/string", get(RandomString::handler(Alphanumeric)))
+        .route("/string", get(random_string::<(), String, Alphanumeric>))
         .route("/json", get(randjson))
         .route("/standard", get(random_display::<(), f64, StandardUniform>))
         .route("/standard/int", get(random_display::<(), i64, StandardUniform>))
         .route("/standard/float", get(random_display::<(), f64, StandardUniform>))
-        .route("/standard/string", get(RandomString::handler(StandardUniform)))
-        .route("/alphanumeric", get(RandomString::handler(Alphanumeric)))
+        .route("/standard/string", get(random_string::<(), String, StandardUniform>))
+        .route("/alphanumeric", get(random_string::<(), String, Alphanumeric>))
         .route("/normal", get(random_display::<(), f64, StandardNormal>))
         .route("/normal/float", get(random_display::<(), f64, StandardNormal>))
         .route("/binomial", get(random_display::<Query<BinomialParameter>, _, Binomial>))
         .route("/binomial/int", get(random_display::<Query<BinomialParameter>, _, Binomial>))
-        .route("/uniform", get(Uniform::<usize>::handler()))
-        .route("/uniform/int", get(Uniform::<i64>::handler()))
-        .route("/uniform/float", get(Uniform::<f64>::handler()))
+        .route("/uniform", get(random_range::<Query<DistRangeParam<_>>, usize, Uniform<_>>))
+        .route("/uniform/int", get(random_range::<Query<DistRangeParam<_>>, i64, Uniform<_>>))
+        .route("/uniform/float", get(random_range::<Query<DistRangeParam<_>>, f64, Uniform<_>>))
 }
 
 pub trait DistributionParameter<D> {
@@ -55,6 +53,12 @@ impl DistributionParameter<StandardNormal> for () {
     type Error = Infallible;
     fn distribution(&self) -> Result<StandardNormal, Self::Error> {
         Ok(StandardNormal)
+    }
+}
+impl DistributionParameter<Alphanumeric> for () {
+    type Error = Infallible;
+    fn distribution(&self) -> Result<Alphanumeric, Self::Error> {
+        Ok(Alphanumeric)
     }
 }
 
@@ -85,33 +89,35 @@ where
     D: Distribution<T>,
 {
     let mut rng = rand::rng();
-    let dist = param.distribution().response(RandomError::InvalidDistributionParameter)?;
-    Ok(dist.sample(&mut rng).to_string())
+    let distribution = param.distribution().response(RandomError::InvalidDistributionParameter)?;
+    Ok(distribution.sample(&mut rng).to_string())
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(default)]
 pub struct RandomString {
-    #[serde(default)]
-    pub len: Option<usize>,
+    pub len: usize,
 }
-impl RandomString {
-    pub fn handler<D>(distribution: D) -> impl FnOnce(Query<RandomString>) -> DynFuture<AppResult<String>> + Clone
-    where
-        D: SampleString + Clone + Send + 'static,
-    {
-        move |Query(rs): Query<RandomString>| {
-            Box::pin(async move {
-                let mut rng = rand::rng();
-                Ok(distribution.sample_string(&mut rng, rs.length()))
-            })
-        }
+impl Default for RandomString {
+    fn default() -> Self {
+        Self { len: 32 }
     }
+}
+#[tracing::instrument]
+pub async fn random_string<P, T, D>(param: P, rs: Query<RandomString>) -> AppResult<String, RandomError>
+where
+    P: DistributionParameter<D> + Debug,
+    P::Error: Into<Box<dyn std::error::Error>>,
+    T: Display,
+    D: SampleString,
+{
+    let mut rng = rand::rng();
+    let distribution = param.distribution().response(RandomError::InvalidDistributionParameter)?;
+    Ok(distribution.sample_string(&mut rng, rs.len))
+}
 
-    pub fn length(&self) -> usize {
-        self.len.unwrap_or(32)
-    }
-}
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash, Serialize, Deserialize)]
+#[serde(default)]
 pub struct DistRangeParam<T> {
     #[serde(default)]
     pub low: Option<T>,
@@ -119,6 +125,21 @@ pub struct DistRangeParam<T> {
     pub high: Option<T>,
     #[serde(default)]
     pub inclusive: bool,
+}
+impl<T: SampleUniform + PartialOrd + Bounded> DistributionParameter<Uniform<T>> for Query<DistRangeParam<T>> {
+    type Error = rand::distr::uniform::Error;
+    fn distribution(&self) -> Result<Uniform<T>, Self::Error> {
+        let start = match self.start_bound() {
+            Bound::Included(s) => s,
+            Bound::Excluded(s) => s, // TODO? &(*s + 1), but how to implement for float ?
+            Bound::Unbounded => &T::min_value(),
+        };
+        match self.end_bound() {
+            Bound::Included(end) => Uniform::new_inclusive(start, end),
+            Bound::Excluded(end) => Uniform::new(start, end),
+            Bound::Unbounded => Uniform::new_inclusive(start, T::max_value()),
+        }
+    }
 }
 impl<T> RangeBounds<T> for DistRangeParam<T> {
     fn start_bound(&self) -> Bound<&T> {
@@ -144,46 +165,17 @@ impl<T: Display> Display for DistRangeParam<T> {
         )
     }
 }
-pub trait DistRange<T>: Distribution<T> {
-    type Error;
-
-    fn new<R>(range: &R) -> Result<Self, Self::Error>
-    where
-        R: RangeBounds<T>,
-        Self: Sized;
-
-    fn handler() -> impl FnOnce(Query<DistRangeParam<T>>) -> DynFuture<AppResult<String, RandomError>> + Clone
-    where
-        Self: DistRange<T> + Sized,
-        Self::Error: Into<Box<dyn std::error::Error + 'static>>,
-        T: Display + Default + Clone + Serialize + Send + Sync + 'static,
-    {
-        move |Query(r): Query<DistRangeParam<T>>| {
-            Box::pin(async move {
-                let mut rng = rand::rng();
-                let dist = Self::new(&r).response(RandomError::InvalidRange);
-                dist.map(|d| d.sample(&mut rng).to_string())
-            })
-        }
-    }
-}
-impl<T> DistRange<T> for Uniform<T>
+#[tracing::instrument]
+pub async fn random_range<P, T, D>(param: P, range: Query<DistRangeParam<T>>) -> AppResult<String, RandomError>
 where
-    T: SampleUniform + PartialOrd + Bounded,
+    P: DistributionParameter<D> + Debug,
+    P::Error: Into<Box<dyn std::error::Error>>,
+    T: Display + Debug,
+    D: Distribution<T>,
 {
-    type Error = rand::distr::uniform::Error;
-    fn new<R: RangeBounds<T>>(range: &R) -> Result<Self, Self::Error> {
-        let start = match range.start_bound() {
-            Bound::Included(s) => s,
-            Bound::Excluded(s) => s, // TODO? &(*s + 1),
-            Bound::Unbounded => &T::min_value(),
-        };
-        match range.end_bound() {
-            Bound::Included(end) => Uniform::new_inclusive(start, end),
-            Bound::Excluded(end) => Uniform::new(start, end),
-            Bound::Unbounded => Uniform::new_inclusive(start, T::max_value()),
-        }
-    }
+    let mut rng = rand::rng();
+    let distribution = param.distribution().response(RandomError::InvalidDistributionParameter)?;
+    Ok(distribution.sample(&mut rng).to_string())
 }
 
 #[tracing::instrument]
@@ -223,9 +215,6 @@ pub async fn randjson() -> Json<Value> {
 pub enum RandomError {
     #[error("invalid distribution parameter")]
     InvalidDistributionParameter,
-
-    #[error("invalid range")]
-    InvalidRange,
 }
 impl AsStatusCode for RandomError {}
 
@@ -317,12 +306,7 @@ mod tests {
         let req = Request::builder().uri("/random/uniform?low=100&high=0").body(Body::empty()).unwrap();
         let res = call2(&mut service, req).await.unwrap();
         assert_eq!(res.status(), StatusCode::BAD_REQUEST);
-        assert!(matches!(
-            res.body(),
-            &ErrorResponse {
-                error: RandomError::InvalidRange // TODO (DistRangeParam { low: Some(100), high: Some(0), inclusive: false })
-            }
-        ));
+        assert!(matches!(res.body(), &ErrorResponse { error: RandomError::InvalidDistributionParameter }));
     }
 
     #[tokio::test]

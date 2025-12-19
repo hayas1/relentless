@@ -6,11 +6,7 @@ pub mod random;
 pub mod root;
 pub mod wait;
 
-use std::{
-    future::Future,
-    pin::Pin,
-    sync::{Arc, RwLock},
-};
+use std::sync::{Arc, RwLock};
 
 use axum::{
     http::{StatusCode, Uri},
@@ -27,8 +23,6 @@ use crate::{
     error::{kind::NotFound, AppErrorDetail, Logged},
     runner::RunCommand,
 };
-
-pub type DynFuture<R> = Pin<Box<dyn Future<Output = R> + Send>>;
 
 #[derive(Debug, Clone, Default)]
 pub struct AppRouter {
