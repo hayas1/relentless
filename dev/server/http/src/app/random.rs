@@ -127,7 +127,7 @@ pub struct DistRangeParam<T> {
     pub inclusive: bool,
 }
 impl<T: SampleUniform + PartialOrd + Bounded> DistributionParameter<Uniform<T>> for Query<DistRangeParam<T>> {
-    type Error = rand::distr::uniform::Error;
+    type Error = rand_distr::uniform::Error;
     fn distribution(&self) -> Result<Uniform<T>, Self::Error> {
         let start = match self.start_bound() {
             Bound::Included(s) => s,
@@ -193,13 +193,13 @@ pub async fn randjson() -> Json<Value> {
                 _ => unreachable!(),
             }
         } else {
-            match rng.random_range(0..6) {
+            match rng.random_range(0..10) {
                 0 => Value::Null,
                 1 => Value::Number(rng.random::<i64>().into()),
                 2 => Value::Bool(rng.random::<bool>()),
                 3 => Value::String(Alphanumeric.sample_string(&mut rng, size)),
-                4 => Value::Array((0..size).map(|_| recursive_json(max_size, max_depth - 1)).collect()),
-                5 => Value::Object(
+                4..7 => Value::Array((0..size).map(|_| recursive_json(max_size, max_depth - 1)).collect()),
+                7..10 => Value::Object(
                     (0..size)
                         .map(|_| (Alphanumeric.sample_string(&mut rng, size), recursive_json(max_size, max_depth - 1)))
                         .collect(),
