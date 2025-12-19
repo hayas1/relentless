@@ -73,8 +73,8 @@ mod tests {
         assert_eq!(res.status(), StatusCode::BAD_REQUEST);
         assert!(matches!(
             res.body(),
-            &ErrorResponse { ref display, error: Some(WaitError::CannotWait(s)) }
-            if display == "cannot wait: 500ms ago"
+            &ErrorResponse { ref error, serde: Some(WaitError::CannotWait(s)) }
+            if error == "cannot wait: 500ms ago"
                && s == Span::try_from(Duration::from_millis(500)).unwrap().fieldwise()
         ));
     }

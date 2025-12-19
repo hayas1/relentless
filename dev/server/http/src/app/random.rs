@@ -308,8 +308,8 @@ mod tests {
         assert_eq!(res.status(), StatusCode::BAD_REQUEST);
         assert!(matches!(
             res.body(),
-            &ErrorResponse { ref display, error: Some(RandomError::InvalidDistributionParameter) }
-            if display == "invalid distribution parameter"
+            &ErrorResponse { ref error, serde: Some(RandomError::InvalidDistributionParameter) }
+            if error == "invalid distribution parameter"
         ));
     }
 

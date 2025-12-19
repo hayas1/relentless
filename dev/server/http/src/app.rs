@@ -59,7 +59,7 @@ impl AppRouter {
     pub async fn handle_error(err: impl 'static + std::error::Error) -> AppError<String> {
         // TODO this method may not be called ?
         let response = err.to_string();
-        Err::<Infallible, _>(err).response(response).unwrap_err()
+        Err::<Infallible, _>(err).response_message(response).unwrap_err()
     }
 
     pub async fn not_found(uri: Uri) -> AppResult<(), NotFound> {

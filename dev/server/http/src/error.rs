@@ -14,17 +14,18 @@ pub type AppResult<T, E = String> = Result<T, AppError<E>>;
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash, Serialize, Deserialize, Error)]
 #[error("{error}")]
 pub struct ErrorResponse<E = String> {
-    pub display: String,
-    pub error: Option<E>,
+    pub error: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub serde: Option<E>,
 }
 impl<E: Display> From<E> for ErrorResponse<E> {
     fn from(error: E) -> Self {
-        Self { display: error.to_string(), error: Some(error) }
+        Self { error: error.to_string(), serde: Some(error) }
     }
 }
 impl ErrorResponse {
     pub fn new<S: Into<String>>(s: S) -> Self {
-        Self { display: s.into(), error: None }
+        Self { error: s.into(), serde: None }
     }
 }
 
@@ -52,28 +53,35 @@ impl<E: Debug + Serialize> IntoResponse for AppError<E> {
     fn into_response(self) -> Response {
         tracing::error!(
             source = ?self.source,
-            message = %self.response.display,
+            message = %self.response.error,
             response = ?self.response,
         );
         (self.status, Json(self.response)).into_response()
     }
 }
-pub trait IntoAppResult<T, E, R> {
-    fn response(self, error: R) -> AppResult<T, R>;
-    fn response_map(self, f: impl FnOnce(&E) -> R) -> AppResult<T, R>;
+pub trait IntoAppResult<T, E> {
+    fn response<R: Display + Serialize + AsStatusCode>(self, error: R) -> AppResult<T, R>;
+    fn response_map<R: Display + Serialize + AsStatusCode>(self, f: impl FnOnce(&E) -> R) -> AppResult<T, R>;
+    fn response_message<S: Into<String>>(self, message: S) -> AppResult<T>;
 }
-impl<T, E, R> IntoAppResult<T, E, R> for Result<T, E>
+impl<T, E> IntoAppResult<T, E> for Result<T, E>
 where
     E: Into<Box<dyn std::error::Error + 'static>>,
-    R: Display + Serialize + AsStatusCode,
 {
-    fn response(self, error: R) -> AppResult<T, R> {
+    fn response<R: Display + Serialize + AsStatusCode>(self, error: R) -> AppResult<T, R> {
         self.map_err(|e| AppError { source: Some(e.into()), status: error.status_code(), response: error.into() })
     }
-    fn response_map(self, f: impl FnOnce(&E) -> R) -> AppResult<T, R> {
+    fn response_map<R: Display + Serialize + AsStatusCode>(self, f: impl FnOnce(&E) -> R) -> AppResult<T, R> {
         self.map_err(|e| {
             let error = f(&e);
             AppError { source: Some(e.into()), status: error.status_code(), response: error.into() }
+        })
+    }
+    fn response_message<S: Into<String>>(self, message: S) -> AppResult<T> {
+        self.map_err(|e| AppError {
+            source: Some(e.into()),
+            status: APP_DEFAULT_ERROR_CODE,
+            response: ErrorResponse::new(message),
         })
     }
 }
@@ -83,7 +91,6 @@ pub trait AsStatusCode {
         APP_DEFAULT_ERROR_CODE
     }
 }
-impl<T: Into<String>> AsStatusCode for T {}
 
 #[derive(Debug, Error, Serialize, Deserialize)]
 #[error("not found: {uri}")]
@@ -135,11 +142,11 @@ mod tests {
 
         let external_err = external.unwrap_err();
         assert_eq!(external_err.source.as_ref().unwrap().to_string(), "error for server");
-        assert_eq!(external_err.response.display, "error for client");
+        assert_eq!(external_err.response.error, "error for client");
         assert_eq!(external_err.status, APP_DEFAULT_ERROR_CODE);
 
         assert_eq!(
-            br#"{"display":"error for client","error":"ErrorResponse"}"#,
+            br#"{"error":"error for client","serde":"ErrorResponse"}"#,
             &*body_bytes(external_err.into_response().into_body()).await.unwrap(),
         );
     }
@@ -147,15 +154,15 @@ mod tests {
     #[tokio::test]
     async fn test_error_message_response() {
         let internal = Err::<(), _>(Internal::InternalError);
-        let external = internal.response("error for client");
+        let external = internal.response_message("error for client");
 
         let external_err = external.unwrap_err();
         assert_eq!(external_err.source.as_ref().unwrap().to_string(), "error for server");
-        assert_eq!(external_err.response.display, "error for client");
+        assert_eq!(external_err.response.error, "error for client");
         assert_eq!(external_err.status, APP_DEFAULT_ERROR_CODE);
 
         assert_eq!(
-            br#"{"display":"error for client","error":"error for client"}"#,
+            br#"{"error":"error for client"}"#,
             &*body_bytes(external_err.into_response().into_body()).await.unwrap(),
         );
     }

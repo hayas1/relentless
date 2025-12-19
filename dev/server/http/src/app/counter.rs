@@ -245,8 +245,8 @@ mod tests {
         assert_eq!(res.status(), StatusCode::INTERNAL_SERVER_ERROR);
         assert!(matches!(
             res.body(),
-            &ErrorResponse { ref display, error: Some(CounterError::Overflow) }
-            if display == "overflow counter"
+            &ErrorResponse { ref error, serde: Some(CounterError::Overflow) }
+            if error == "overflow counter"
         ));
 
         let req = Request::builder().uri("/counter/decrement").body(Body::empty()).unwrap();
@@ -264,8 +264,8 @@ mod tests {
         assert_eq!(res.status(), APP_DEFAULT_ERROR_CODE);
         assert!(matches!(
             res.body(),
-            &ErrorResponse { ref display, error: Some(CounterError::CannotParse(ref v)) }
-            if display == "cannot parse value as integer: abc" && v == "abc"
+            &ErrorResponse { ref error, serde: Some(CounterError::CannotParse(ref v)) }
+            if error == "cannot parse value as integer: abc" && v == "abc"
         ));
 
         let req = Request::builder().uri("/counter/increment").body(Body::empty()).unwrap();
