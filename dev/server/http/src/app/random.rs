@@ -1,4 +1,5 @@
 use std::{
+    convert::Infallible,
     fmt::{Debug, Display},
     ops::{Bound, RangeBounds},
 };
@@ -7,7 +8,8 @@ use axum::{extract::Query, routing::get, Json, Router};
 use num::Bounded;
 use rand::{distr::SampleString, Rng};
 use rand_distr::{
-    uniform::SampleUniform, Alphanumeric, Binomial, Distribution, StandardNormal, StandardUniform, Uniform,
+    uniform::SampleUniform, Alphanumeric, Binomial, BinomialError, Distribution, StandardNormal, StandardUniform,
+    Uniform,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -40,16 +42,19 @@ pub fn route_random() -> Router<AppState> {
 }
 
 pub trait DistributionParameter<D> {
-    fn distribution(&self) -> D;
+    type Error;
+    fn distribution(&self) -> Result<D, Self::Error>;
 }
 impl DistributionParameter<StandardUniform> for () {
-    fn distribution(&self) -> StandardUniform {
-        StandardUniform
+    type Error = Infallible;
+    fn distribution(&self) -> Result<StandardUniform, Self::Error> {
+        Ok(StandardUniform)
     }
 }
 impl DistributionParameter<StandardNormal> for () {
-    fn distribution(&self) -> StandardNormal {
-        StandardNormal
+    type Error = Infallible;
+    fn distribution(&self) -> Result<StandardNormal, Self::Error> {
+        Ok(StandardNormal)
     }
 }
 
@@ -65,21 +70,23 @@ impl Default for BinomialParameter {
     }
 }
 impl DistributionParameter<Binomial> for Query<BinomialParameter> {
-    fn distribution(&self) -> Binomial {
-        Binomial::new(self.n, self.p).unwrap_or_else(|_| todo!())
+    type Error = BinomialError;
+    fn distribution(&self) -> Result<Binomial, Self::Error> {
+        Binomial::new(self.n, self.p)
     }
 }
 
 #[tracing::instrument]
-pub async fn random_display<P, T, D>(pram: P) -> String
+pub async fn random_display<P, T, D>(param: P) -> AppResult<String, RandomError>
 where
     P: DistributionParameter<D> + Debug,
+    P::Error: Into<Box<dyn std::error::Error>>,
     T: Display,
     D: Distribution<T>,
 {
     let mut rng = rand::rng();
-    let dist = pram.distribution();
-    dist.sample(&mut rng).to_string()
+    let dist = param.distribution().response(RandomError::InvalidDistributionParameter)?;
+    Ok(dist.sample(&mut rng).to_string())
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -145,7 +152,7 @@ pub trait DistRange<T>: Distribution<T> {
         R: RangeBounds<T>,
         Self: Sized;
 
-    fn handler() -> impl FnOnce(Query<DistRangeParam<T>>) -> DynFuture<AppResult<String, RandomError<T>>> + Clone
+    fn handler() -> impl FnOnce(Query<DistRangeParam<T>>) -> DynFuture<AppResult<String, RandomError>> + Clone
     where
         Self: DistRange<T> + Sized,
         Self::Error: Into<Box<dyn std::error::Error + 'static>>,
@@ -154,7 +161,7 @@ pub trait DistRange<T>: Distribution<T> {
         move |Query(r): Query<DistRangeParam<T>>| {
             Box::pin(async move {
                 let mut rng = rand::rng();
-                let dist = Self::new(&r).response(RandomError::InvalidRange(r));
+                let dist = Self::new(&r).response(RandomError::InvalidRange);
                 dist.map(|d| d.sample(&mut rng).to_string())
             })
         }
@@ -213,11 +220,14 @@ pub async fn randjson() -> Json<Value> {
 }
 
 #[derive(Debug, Error, Serialize, Deserialize)]
-pub enum RandomError<T: Display + Default> {
-    #[error("{0}")]
-    InvalidRange(DistRangeParam<T>),
+pub enum RandomError {
+    #[error("invalid distribution parameter")]
+    InvalidDistributionParameter,
+
+    #[error("invalid range")]
+    InvalidRange,
 }
-impl<T: Display + Default> AsStatusCode for RandomError<T> {}
+impl AsStatusCode for RandomError {}
 
 #[cfg(test)]
 mod tests {
@@ -238,8 +248,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_random_display() {
-        let int = random_display::<(), i64, StandardUniform>(()).await;
-
+        let int = random_display::<(), i64, StandardUniform>(()).await.unwrap();
         assert!(int.parse::<i64>().is_ok());
     }
 
@@ -311,7 +320,7 @@ mod tests {
         assert!(matches!(
             res.body(),
             &ErrorResponse {
-                error: RandomError::InvalidRange(DistRangeParam { low: Some(100), high: Some(0), inclusive: false })
+                error: RandomError::InvalidRange // TODO (DistRangeParam { low: Some(100), high: Some(0), inclusive: false })
             }
         ));
     }
