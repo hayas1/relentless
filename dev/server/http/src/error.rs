@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::fmt::{Debug, Display};
 
 use axum::{
     http::{StatusCode, Uri},
@@ -14,7 +14,18 @@ pub type AppResult<T, E = String> = Result<T, AppError<E>>;
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash, Serialize, Deserialize, Error)]
 #[error("{error}")]
 pub struct ErrorResponse<E = String> {
-    pub error: E,
+    pub display: String,
+    pub error: Option<E>,
+}
+impl<E: Display> From<E> for ErrorResponse<E> {
+    fn from(error: E) -> Self {
+        Self { display: error.to_string(), error: Some(error) }
+    }
+}
+impl ErrorResponse {
+    pub fn new<S: Into<String>>(s: S) -> Self {
+        Self { display: s.into(), error: None }
+    }
 }
 
 #[derive(Error, Debug)]
@@ -27,21 +38,22 @@ pub struct AppError<E> {
 impl<E> AppError<E> {
     pub fn new(response: E) -> Self
     where
-        E: AsStatusCode,
+        E: AsStatusCode + Display,
     {
         let status = response.status_code();
-        Self { source: None, status, response: ErrorResponse { error: response } }
+        Self { source: None, status, response: response.into() }
     }
-    pub fn response_into<F: From<E>>(self) -> AppError<F> {
-        let response = ErrorResponse { error: self.response.error.into() };
-        AppError { source: self.source, status: self.status, response }
-    }
+    // pub fn response_into<F: From<E>>(self) -> AppError<F> {
+    //     let response = ErrorResponse { error: self.response.error.into() };
+    //     AppError { source: self.source, status: self.status, response }
+    // }
 }
-impl<E: Display + Serialize> IntoResponse for AppError<E> {
+impl<E: Debug + Serialize> IntoResponse for AppError<E> {
     fn into_response(self) -> Response {
         tracing::error!(
             source = ?self.source,
-            response = %self.response,
+            message = %self.response.display,
+            response = ?self.response,
         );
         (self.status, Json(self.response)).into_response()
     }
@@ -53,19 +65,15 @@ pub trait IntoAppResult<T, E, R> {
 impl<T, E, R> IntoAppResult<T, E, R> for Result<T, E>
 where
     E: Into<Box<dyn std::error::Error + 'static>>,
-    R: Serialize + AsStatusCode,
+    R: Display + Serialize + AsStatusCode,
 {
     fn response(self, error: R) -> AppResult<T, R> {
-        self.map_err(|e| AppError {
-            source: Some(e.into()),
-            status: error.status_code(),
-            response: ErrorResponse { error },
-        })
+        self.map_err(|e| AppError { source: Some(e.into()), status: error.status_code(), response: error.into() })
     }
     fn response_map(self, f: impl FnOnce(&E) -> R) -> AppResult<T, R> {
         self.map_err(|e| {
             let error = f(&e);
-            AppError { source: Some(e.into()), status: error.status_code(), response: ErrorResponse { error } }
+            AppError { source: Some(e.into()), status: error.status_code(), response: error.into() }
         })
     }
 }
@@ -127,11 +135,11 @@ mod tests {
 
         let external_err = external.unwrap_err();
         assert_eq!(external_err.source.as_ref().unwrap().to_string(), "error for server");
-        assert_eq!(external_err.response.to_string(), "error for client");
+        assert_eq!(external_err.response.display, "error for client");
         assert_eq!(external_err.status, APP_DEFAULT_ERROR_CODE);
 
         assert_eq!(
-            br#"{"error":"ErrorResponse"}"#,
+            br#"{"display":"error for client","error":"ErrorResponse"}"#,
             &*body_bytes(external_err.into_response().into_body()).await.unwrap(),
         );
     }
@@ -143,11 +151,11 @@ mod tests {
 
         let external_err = external.unwrap_err();
         assert_eq!(external_err.source.as_ref().unwrap().to_string(), "error for server");
-        assert_eq!(external_err.response.to_string(), "error for client");
+        assert_eq!(external_err.response.display, "error for client");
         assert_eq!(external_err.status, APP_DEFAULT_ERROR_CODE);
 
         assert_eq!(
-            br#"{"error":"error for client"}"#,
+            br#"{"display":"error for client","error":"error for client"}"#,
             &*body_bytes(external_err.into_response().into_body()).await.unwrap(),
         );
     }

@@ -243,7 +243,11 @@ mod tests {
         let req = Request::builder().uri("/counter/increment").body(Body::empty()).unwrap();
         let res = call(&mut service, req).await.unwrap();
         assert_eq!(res.status(), StatusCode::INTERNAL_SERVER_ERROR);
-        assert!(matches!(res.body(), &ErrorResponse { error: CounterError::Overflow }));
+        assert!(matches!(
+            res.body(),
+            &ErrorResponse { ref display, error: Some(CounterError::Overflow) }
+            if display == "overflow counter"
+        ));
 
         let req = Request::builder().uri("/counter/decrement").body(Body::empty()).unwrap();
         let res = call(&mut service, req).await.unwrap();
@@ -258,7 +262,11 @@ mod tests {
         let req = Request::builder().uri("/counter/increment/abc").body(Body::empty()).unwrap();
         let res = call(&mut service, req).await.unwrap();
         assert_eq!(res.status(), APP_DEFAULT_ERROR_CODE);
-        assert!(matches!(res.body(), &ErrorResponse { error: CounterError::CannotParse(ref v) } if v == "abc"));
+        assert!(matches!(
+            res.body(),
+            &ErrorResponse { ref display, error: Some(CounterError::CannotParse(ref v)) }
+            if display == "cannot parse value as integer: abc" && v == "abc"
+        ));
 
         let req = Request::builder().uri("/counter/increment").body(Body::empty()).unwrap();
         let res = call(&mut service, req).await.unwrap();

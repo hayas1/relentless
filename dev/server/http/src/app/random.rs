@@ -306,7 +306,11 @@ mod tests {
         let req = Request::builder().uri("/random/uniform?low=100&high=0").body(Body::empty()).unwrap();
         let res = call(&mut service, req).await.unwrap();
         assert_eq!(res.status(), StatusCode::BAD_REQUEST);
-        assert!(matches!(res.body(), &ErrorResponse { error: RandomError::InvalidDistributionParameter }));
+        assert!(matches!(
+            res.body(),
+            &ErrorResponse { ref display, error: Some(RandomError::InvalidDistributionParameter) }
+            if display == "invalid distribution parameter"
+        ));
     }
 
     #[tokio::test]
