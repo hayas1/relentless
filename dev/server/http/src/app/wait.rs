@@ -5,7 +5,7 @@ use thiserror::Error;
 
 use crate::{
     app::AppState,
-    error2::{AppResult, AsStatusCode, IntoAppResult},
+    error::{AppResult, AsStatusCode, IntoAppResult},
 };
 
 pub fn route_wait() -> Router<AppState> {
@@ -46,8 +46,8 @@ mod tests {
     };
 
     use crate::{
-        app::{tests::call2, AppRouter},
-        error2::ErrorResponse,
+        app::{tests::call, AppRouter},
+        error::ErrorResponse,
     };
 
     use super::*;
@@ -58,7 +58,7 @@ mod tests {
 
         let req = Request::builder().uri("/wait/500ms").body(Body::empty()).unwrap();
         let now = Instant::now();
-        let res = call2(&mut service, req).await.unwrap();
+        let res = call(&mut service, req).await.unwrap();
         assert!(now.elapsed() >= Duration::from_millis(500));
         assert_eq!(res.status(), StatusCode::OK);
         assert_eq!(&WaitResponse { wait: "500ms".to_string() }, res.body());
@@ -69,7 +69,7 @@ mod tests {
         let mut service = AppRouter::default().service();
 
         let req = Request::builder().uri("/wait/-500ms").body(Body::empty()).unwrap();
-        let res = call2(&mut service, req).await.unwrap();
+        let res = call(&mut service, req).await.unwrap();
         assert_eq!(res.status(), StatusCode::BAD_REQUEST);
         assert!(matches!(
             res.body(),

@@ -17,7 +17,7 @@ use thiserror::Error;
 
 use crate::{
     app::AppState,
-    error2::{AppResult, AsStatusCode, IntoAppResult},
+    error::{AppResult, AsStatusCode, IntoAppResult},
 };
 
 pub fn route_random() -> Router<AppState> {
@@ -227,10 +227,10 @@ mod tests {
 
     use crate::{
         app::{
-            tests::{call2, call_bytes2},
+            tests::{call, call_bytes},
             AppRouter,
         },
-        error2::ErrorResponse,
+        error::ErrorResponse,
     };
 
     use super::*;
@@ -246,7 +246,7 @@ mod tests {
         let mut service = AppRouter::default().service();
 
         let req = Request::builder().uri("/random/standard").body(Body::empty()).unwrap();
-        let res = call_bytes2(&mut service, req).await.unwrap();
+        let res = call_bytes(&mut service, req).await.unwrap();
         assert_eq!(res.status(), StatusCode::OK);
         assert!(String::from_utf8_lossy(res.body()).parse::<f64>().unwrap() >= 0.0);
         assert!(String::from_utf8_lossy(res.body()).parse::<f64>().unwrap() <= 1.0);
@@ -257,12 +257,12 @@ mod tests {
         let mut service = AppRouter::default().service();
 
         let req = Request::builder().uri("/random/string").body(Body::empty()).unwrap();
-        let res = call_bytes2(&mut service, req).await.unwrap();
+        let res = call_bytes(&mut service, req).await.unwrap();
         assert_eq!(res.status(), StatusCode::OK);
         assert_eq!(res.body().len(), 32);
 
         let req = Request::builder().uri("/random/string?len=999").body(Body::empty()).unwrap();
-        let res = call_bytes2(&mut service, req).await.unwrap();
+        let res = call_bytes(&mut service, req).await.unwrap();
         assert_eq!(res.status(), StatusCode::OK);
         assert_eq!(res.body().len(), 999);
     }
@@ -272,29 +272,29 @@ mod tests {
         let mut service = AppRouter::default().service();
 
         let req = Request::builder().uri("/random/uniform").body(Body::empty()).unwrap();
-        let res = call_bytes2(&mut service, req).await.unwrap();
+        let res = call_bytes(&mut service, req).await.unwrap();
         assert_eq!(res.status(), StatusCode::OK);
         assert!(String::from_utf8_lossy(res.body()).parse::<usize>().is_ok());
 
         let req = Request::builder().uri("/random/uniform/float?low=0.0&high=1.0").body(Body::empty()).unwrap();
-        let res = call_bytes2(&mut service, req).await.unwrap();
+        let res = call_bytes(&mut service, req).await.unwrap();
         assert_eq!(res.status(), StatusCode::OK);
         assert!(String::from_utf8_lossy(res.body()).parse::<f64>().unwrap() >= 0.0);
         assert!(String::from_utf8_lossy(res.body()).parse::<f64>().unwrap() < 1.0);
 
         let req = Request::builder().uri("/random/uniform?low=10&high=100").body(Body::empty()).unwrap();
-        let res = call_bytes2(&mut service, req).await.unwrap();
+        let res = call_bytes(&mut service, req).await.unwrap();
         assert_eq!(res.status(), StatusCode::OK);
         assert!(String::from_utf8_lossy(res.body()).parse::<usize>().unwrap() >= 10);
         assert!(String::from_utf8_lossy(res.body()).parse::<usize>().unwrap() < 100);
 
         let req = Request::builder().uri("/random/uniform?high=1").body(Body::empty()).unwrap();
-        let res = call_bytes2(&mut service, req).await.unwrap();
+        let res = call_bytes(&mut service, req).await.unwrap();
         assert_eq!(res.status(), StatusCode::OK);
         assert_eq!(String::from_utf8_lossy(res.body()).parse::<usize>().unwrap(), 0);
 
         let req = Request::builder().uri("/random/uniform?high=0&inclusive=true").body(Body::empty()).unwrap();
-        let res = call_bytes2(&mut service, req).await.unwrap();
+        let res = call_bytes(&mut service, req).await.unwrap();
         assert_eq!(res.status(), StatusCode::OK);
         assert_eq!(String::from_utf8_lossy(res.body()).parse::<usize>().unwrap(), 0);
     }
@@ -304,7 +304,7 @@ mod tests {
         let mut service = AppRouter::default().service();
 
         let req = Request::builder().uri("/random/uniform?low=100&high=0").body(Body::empty()).unwrap();
-        let res = call2(&mut service, req).await.unwrap();
+        let res = call(&mut service, req).await.unwrap();
         assert_eq!(res.status(), StatusCode::BAD_REQUEST);
         assert!(matches!(res.body(), &ErrorResponse { error: RandomError::InvalidDistributionParameter }));
     }
@@ -314,7 +314,7 @@ mod tests {
         let mut service = AppRouter::default().service();
 
         let req = Request::builder().uri("/random/json").body(Body::empty()).unwrap();
-        let res = call_bytes2(&mut service, req).await.unwrap();
+        let res = call_bytes(&mut service, req).await.unwrap();
         assert_eq!(res.status(), StatusCode::OK);
         assert!(serde_json::from_slice::<Value>(res.body()).is_ok());
     }

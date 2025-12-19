@@ -76,7 +76,7 @@ mod tests {
     use axum::{body::Body, http::Request};
 
     use crate::app::{
-        tests::{call2, call_bytes2},
+        tests::{call, call_bytes},
         AppRouter,
     };
 
@@ -87,7 +87,7 @@ mod tests {
         let mut service = AppRouter::default().service();
 
         let req = Request::builder().uri("/health").body(Body::empty()).unwrap();
-        let res = call_bytes2(&mut service, req).await.unwrap();
+        let res = call_bytes(&mut service, req).await.unwrap();
         assert_eq!(res.status(), StatusCode::OK);
         assert_eq!(&**res.body(), b"ok");
     }
@@ -97,7 +97,7 @@ mod tests {
         let mut service = AppRouter::default().service();
 
         let req = Request::builder().uri("/healthz").body(Body::empty()).unwrap();
-        let res = call_bytes2(&mut service, req).await.unwrap();
+        let res = call_bytes(&mut service, req).await.unwrap();
         assert_eq!(res.status(), StatusCode::OK);
         assert_eq!(&**res.body(), b"ok");
     }
@@ -107,7 +107,7 @@ mod tests {
         let mut service = AppRouter::default().service();
 
         let req = Request::builder().uri("/health/rich").body(Body::empty()).unwrap();
-        let res = call2(&mut service, req).await.unwrap();
+        let res = call(&mut service, req).await.unwrap();
         assert_eq!(res.status(), StatusCode::OK);
         assert_eq!(&Health { status: StatusCode::OK }, res.body());
     }
@@ -117,7 +117,7 @@ mod tests {
         let mut service = AppRouter::default().service();
 
         let req = Request::builder().uri("/health/heavy").body(Body::empty()).unwrap();
-        let res = call2(&mut service, req).await.unwrap();
+        let res = call(&mut service, req).await.unwrap();
         assert_eq!(res.status(), StatusCode::TOO_MANY_REQUESTS);
         assert_eq!(&Health { status: StatusCode::TOO_MANY_REQUESTS }, res.body());
     }
@@ -127,7 +127,7 @@ mod tests {
         let mut service = AppRouter::default().service();
 
         let req = Request::builder().uri("/health/disabled").body(Body::empty()).unwrap();
-        let res = call2(&mut service, req).await.unwrap();
+        let res = call(&mut service, req).await.unwrap();
         assert_eq!(res.status(), StatusCode::SERVICE_UNAVAILABLE);
         assert_eq!(&Health { status: StatusCode::SERVICE_UNAVAILABLE }, res.body());
     }

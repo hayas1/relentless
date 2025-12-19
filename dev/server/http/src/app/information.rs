@@ -15,7 +15,7 @@ use thiserror::Error;
 
 use crate::{
     app::AppState,
-    error2::{AppResult, AsStatusCode, IntoAppResult},
+    error::{AppResult, AsStatusCode, IntoAppResult},
 };
 
 pub fn route_information() -> Router<AppState> {
@@ -137,7 +137,7 @@ mod tests {
     use mime::{APPLICATION_JSON, APPLICATION_WWW_FORM_URLENCODED};
     use serde_json::json;
 
-    use crate::app::{tests::call2, AppRouter};
+    use crate::app::{tests::call, AppRouter};
 
     use super::*;
 
@@ -146,7 +146,7 @@ mod tests {
         let mut service = AppRouter::default().service();
 
         let req = Request::builder().uri("http://localhost:3000/information").body(Body::empty()).unwrap();
-        let res = call2(&mut service, req).await.unwrap();
+        let res = call(&mut service, req).await.unwrap();
         assert_eq!(res.status(), StatusCode::OK);
         assert_eq!(
             &InformationResponse {
@@ -168,7 +168,7 @@ mod tests {
             .uri("http://localhost:3000/information/path/to/query/?q=test&k=1&k=2&k=3")
             .body(Body::empty())
             .unwrap();
-        let res = call2(&mut service, req).await.unwrap();
+        let res = call(&mut service, req).await.unwrap();
         assert_eq!(res.status(), StatusCode::OK);
         assert_eq!(
             &InformationResponse {
@@ -192,7 +192,7 @@ mod tests {
             .header(CONTENT_TYPE, APPLICATION_WWW_FORM_URLENCODED.as_ref())
             .body(Body::from("body=body"))
             .unwrap();
-        let res = call2(&mut service, req).await.unwrap();
+        let res = call(&mut service, req).await.unwrap();
         assert_eq!(res.status(), StatusCode::OK);
         assert_eq!(
             &InformationResponse {
@@ -218,7 +218,7 @@ mod tests {
             .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
             .body(Body::from(r#"{"name": "json", "key": [1, 2, 3]}"#))
             .unwrap();
-        let res = call2(&mut service, req).await.unwrap();
+        let res = call(&mut service, req).await.unwrap();
         assert_eq!(res.status(), StatusCode::OK);
         assert_eq!(
             &InformationResponse {

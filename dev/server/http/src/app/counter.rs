@@ -11,7 +11,7 @@ use thiserror::Error;
 
 use crate::{
     app::AppState,
-    error2::{AppResult, AsStatusCode, IntoAppResult},
+    error::{AppResult, AsStatusCode, IntoAppResult},
 };
 
 pub fn route_counter() -> Router<AppState> {
@@ -177,8 +177,8 @@ mod tests {
     };
 
     use crate::{
-        app::{tests::call2, AppRouter},
-        error2::{ErrorResponse, APP_DEFAULT_ERROR_CODE},
+        app::{tests::call, AppRouter},
+        error::{ErrorResponse, APP_DEFAULT_ERROR_CODE},
     };
 
     use super::*;
@@ -197,7 +197,7 @@ mod tests {
         ];
         for (uri, exp) in scenario {
             let req = Request::builder().uri(uri).body(Body::empty()).unwrap();
-            let res = call2(&mut service, req).await.unwrap();
+            let res = call(&mut service, req).await.unwrap();
             assert_eq!(res.status(), StatusCode::OK);
             assert_eq!(&exp, res.body());
         }
@@ -219,7 +219,7 @@ mod tests {
         ];
         for (uri, exp) in scenario2 {
             let req = Request::builder().uri(uri).body(Body::empty()).unwrap();
-            let res = call2(&mut service, req).await.unwrap();
+            let res = call(&mut service, req).await.unwrap();
             assert_eq!(res.status(), StatusCode::OK);
             assert_eq!(&exp, res.body());
         }
@@ -230,17 +230,17 @@ mod tests {
         let mut service = AppRouter::default().service();
 
         let req = Request::builder().uri(format!("/counter/increment/{}", i64::MAX)).body(Body::empty()).unwrap();
-        let res = call2(&mut service, req).await.unwrap();
+        let res = call(&mut service, req).await.unwrap();
         assert_eq!(res.status(), StatusCode::OK);
         assert_eq!(&CounterResponse { count: i64::MAX }, res.body());
 
         let req = Request::builder().uri("/counter/increment").body(Body::empty()).unwrap();
-        let res = call2(&mut service, req).await.unwrap();
+        let res = call(&mut service, req).await.unwrap();
         assert_eq!(res.status(), APP_DEFAULT_ERROR_CODE);
         assert_eq!(&ErrorResponse { error: CounterError::Overflow }, res.body());
 
         let req = Request::builder().uri("/counter/decrement").body(Body::empty()).unwrap();
-        let res = call2(&mut service, req).await.unwrap();
+        let res = call(&mut service, req).await.unwrap();
         assert_eq!(res.status(), StatusCode::OK);
         assert_eq!(&CounterResponse { count: i64::MAX }, res.body());
     }
@@ -250,12 +250,12 @@ mod tests {
         let mut service = AppRouter::default().service();
 
         let req = Request::builder().uri("/counter/increment/abc").body(Body::empty()).unwrap();
-        let res = call2(&mut service, req).await.unwrap();
+        let res = call(&mut service, req).await.unwrap();
         assert_eq!(res.status(), APP_DEFAULT_ERROR_CODE);
         assert_eq!(&ErrorResponse { error: CounterError::CannotParse("abc".to_string()) }, res.body());
 
         let req = Request::builder().uri("/counter/increment").body(Body::empty()).unwrap();
-        let res = call2(&mut service, req).await.unwrap();
+        let res = call(&mut service, req).await.unwrap();
         assert_eq!(res.status(), StatusCode::OK);
         assert_eq!(&CounterResponse { count: 1 }, res.body());
     }

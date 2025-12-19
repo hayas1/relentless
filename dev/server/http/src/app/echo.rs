@@ -14,7 +14,7 @@ use thiserror::Error;
 
 use crate::{
     app::AppState,
-    error2::{AppResult, AsStatusCode, IntoAppResult},
+    error::{AppResult, AsStatusCode, IntoAppResult},
 };
 
 pub fn route_echo() -> Router<AppState> {
@@ -193,7 +193,7 @@ pub enum JsonizeError {
 
 #[cfg(test)]
 mod tests {
-    use crate::app::tests::{call2, call_bytes2};
+    use crate::app::tests::{call, call_bytes};
     use crate::app::AppRouter;
 
     use super::*;
@@ -207,7 +207,7 @@ mod tests {
         let mut service = AppRouter::default().service();
 
         let req = Request::builder().uri("/echo/").body(Body::empty()).unwrap();
-        let res = call_bytes2(&mut service, req).await.unwrap();
+        let res = call_bytes(&mut service, req).await.unwrap();
         assert_eq!(res.status(), StatusCode::OK);
         assert_eq!(&**res.body(), b"");
     }
@@ -217,7 +217,7 @@ mod tests {
         let mut service = AppRouter::default().service();
 
         let req = Request::builder().uri("/echo/body").method(Method::POST).body(Body::from("hello world")).unwrap();
-        let res = call_bytes2(&mut service, req).await.unwrap();
+        let res = call_bytes(&mut service, req).await.unwrap();
         assert_eq!(res.status(), StatusCode::OK);
         assert_eq!(&**res.body(), b"hello world");
     }
@@ -227,7 +227,7 @@ mod tests {
         let mut service = AppRouter::default().service();
 
         let req = Request::builder().uri("/echo/text/path?key=value").body(Body::empty()).unwrap();
-        let res = call_bytes2(&mut service, req).await.unwrap();
+        let res = call_bytes(&mut service, req).await.unwrap();
         assert_eq!(res.status(), StatusCode::OK);
         assert_eq!(&**res.body(), b"/echo/text/path?key=value");
     }
@@ -237,7 +237,7 @@ mod tests {
         let mut service = AppRouter::default().service();
 
         let req = Request::builder().uri("/echo/path/query?key=value").body(Body::empty()).unwrap();
-        let res = call_bytes2(&mut service, req).await.unwrap();
+        let res = call_bytes(&mut service, req).await.unwrap();
         assert_eq!(res.status(), StatusCode::OK);
         assert_eq!(&**res.body(), b"query");
     }
@@ -247,7 +247,7 @@ mod tests {
         let mut service = AppRouter::default().service();
 
         let req = Request::builder().uri("/echo/method").method(Method::OPTIONS).body(Body::empty()).unwrap();
-        let res = call_bytes2(&mut service, req).await.unwrap();
+        let res = call_bytes(&mut service, req).await.unwrap();
         assert_eq!(res.status(), StatusCode::OK);
         assert_eq!(&**res.body(), b"OPTIONS");
     }
@@ -262,7 +262,7 @@ mod tests {
             .header("key2", "value2")
             .body(Body::empty())
             .unwrap();
-        let res: Response<serde_json::Value> = call2(&mut service, req).await.unwrap();
+        let res: Response<serde_json::Value> = call(&mut service, req).await.unwrap();
         assert_eq!(res.status(), StatusCode::OK);
         assert_eq!(res.body(), &json!([{ "key1": "value1" }, { "key2": "value2" }]));
     }
@@ -360,7 +360,7 @@ mod tests {
         let mut service = AppRouter::default().service();
 
         let req = Request::builder().uri("/echo/json").body(Body::empty()).unwrap();
-        let res: Response<serde_json::Value> = call2(&mut service, req).await.unwrap();
+        let res: Response<serde_json::Value> = call(&mut service, req).await.unwrap();
         assert_eq!(res.status(), StatusCode::OK);
         assert_eq!(&json!(null), res.body());
 
@@ -368,7 +368,7 @@ mod tests {
             .uri("/echo/json?key=value&a.foo=null&a.bar=true&a.baz=2.0&a.qux=three&a.quux=4&d.5=five&d.0=zero")
             .body(Body::empty())
             .unwrap();
-        let res: Response<serde_json::Value> = call2(&mut service, req).await.unwrap();
+        let res: Response<serde_json::Value> = call(&mut service, req).await.unwrap();
         assert_eq!(res.status(), StatusCode::OK);
         assert_eq!(
             &json!({
@@ -380,7 +380,7 @@ mod tests {
         );
 
         let req = Request::builder().uri("/echo/json?key=value&current.time=$now").body(Body::empty()).unwrap();
-        let res: Response<serde_json::Value> = call2(&mut service, req).await.unwrap();
+        let res: Response<serde_json::Value> = call(&mut service, req).await.unwrap();
         assert_eq!(res.status(), StatusCode::OK);
         assert_ne!(&json!({ "key": "value", "current.time": "2024-10-10T00:00:00-09:00" }), res.body());
     }
@@ -395,7 +395,7 @@ mod tests {
             .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
             .body(Body::from(r#"{"key": "value"}"#))
             .unwrap();
-        let res: Response<serde_json::Value> = call2(&mut service, req).await.unwrap();
+        let res: Response<serde_json::Value> = call(&mut service, req).await.unwrap();
         assert_eq!(res.status(), StatusCode::OK);
         assert_eq!(&json!({ "key": "value" }), res.body());
     }

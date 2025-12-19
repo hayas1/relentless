@@ -10,7 +10,7 @@ mod tests {
         http::{Request, StatusCode},
     };
 
-    use crate::app::{tests::call_bytes2, AppRouter};
+    use crate::app::{tests::call_bytes, AppRouter};
 
     use super::*;
 
@@ -25,7 +25,7 @@ mod tests {
         let mut service = AppRouter::default().service();
 
         let req = Request::builder().uri("/").body(Body::empty()).unwrap();
-        let res = call_bytes2(&mut service, req).await.unwrap();
+        let res = call_bytes(&mut service, req).await.unwrap();
         assert_eq!(res.status(), StatusCode::OK);
         assert_eq!(&res.body()[..], b"Hello World");
     }

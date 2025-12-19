@@ -23,7 +23,7 @@ use tower_http::{
 
 use crate::{
     app::counter::CounterState,
-    error2::{AppError, AppResult, APP_DEFAULT_ERROR_CODE},
+    error::{AppError, AppResult, APP_DEFAULT_ERROR_CODE},
     runner::RunCommand,
 };
 
@@ -92,7 +92,7 @@ pub(crate) mod tests {
         let bytes = body_bytes(body).await?;
         Ok(Response::from_parts(parts, bytes))
     }
-    pub async fn call_bytes2<S>(
+    pub async fn call_bytes<S>(
         service: &mut S,
         req: Request<Body>,
     ) -> Result<Response<Bytes>, Box<dyn std::error::Error>>
@@ -103,13 +103,13 @@ pub(crate) mod tests {
         let res = service.ready().await?.call(req).await?;
         Ok(body_bytes_response(res).await?)
     }
-    pub async fn call2<S, T>(service: &mut S, req: Request<Body>) -> Result<Response<T>, Box<dyn std::error::Error>>
+    pub async fn call<S, T>(service: &mut S, req: Request<Body>) -> Result<Response<T>, Box<dyn std::error::Error>>
     where
         S: Service<Request<Body>, Response = Response<Body>>,
         Box<dyn std::error::Error>: From<S::Error>,
         T: DeserializeOwned,
     {
-        let res = call_bytes2(service, req).await?;
+        let res = call_bytes(service, req).await?;
         let des = serde_json::from_slice::<T>(res.body())?;
         Ok(res.map(|_| des))
     }
