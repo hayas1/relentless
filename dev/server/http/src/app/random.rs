@@ -22,35 +22,64 @@ use super::DynFuture;
 
 pub fn route_random() -> Router<AppState> {
     Router::new()
-        .route("/", get(random_handler::<f64, _>(StandardUniform)))
+        .route("/", get(random_display::<(), f64, StandardUniform>))
         .route("/string", get(RandomString::handler(Alphanumeric)))
         .route("/json", get(randjson))
-        .route("/standard", get(random_handler::<f64, _>(StandardUniform)))
-        .route("/standard/int", get(random_handler::<i64, _>(StandardUniform)))
-        .route("/standard/float", get(random_handler::<f64, _>(StandardUniform)))
+        .route("/standard", get(random_display::<(), f64, StandardUniform>))
+        .route("/standard/int", get(random_display::<(), i64, StandardUniform>))
+        .route("/standard/float", get(random_display::<(), f64, StandardUniform>))
         .route("/standard/string", get(RandomString::handler(StandardUniform)))
         .route("/alphanumeric", get(RandomString::handler(Alphanumeric)))
-        .route("/normal", get(random_handler::<f64, _>(StandardNormal)))
-        .route("/normal/float", get(random_handler::<f64, _>(StandardNormal)))
-        .route("/binomial", get(random_handler(Binomial::new(10, 0.5).unwrap_or_else(|_| unreachable!()))))
-        .route("/binomial/int", get(random_handler(Binomial::new(10, 0.5).unwrap_or_else(|_| unreachable!()))))
+        .route("/normal", get(random_display::<(), f64, StandardNormal>))
+        .route("/normal/float", get(random_display::<(), f64, StandardNormal>))
+        .route("/binomial", get(random_display::<Query<BinomialParameter>, _, Binomial>))
+        .route("/binomial/int", get(random_display::<Query<BinomialParameter>, _, Binomial>))
         .route("/uniform", get(Uniform::<usize>::handler()))
         .route("/uniform/int", get(Uniform::<i64>::handler()))
         .route("/uniform/float", get(Uniform::<f64>::handler()))
-    // .fallback() // TODO
 }
 
-pub fn random_handler<T, D>(distribution: D) -> impl FnOnce() -> DynFuture<AppResult<String>> + Clone
-where
-    T: Display + Clone + Send + 'static,
-    D: Distribution<T> + Clone + Send + 'static,
-{
-    move || {
-        Box::pin(async move {
-            let mut rng = rand::rng();
-            Ok(distribution.sample(&mut rng).to_string())
-        })
+pub trait DistributionParameter<D> {
+    fn distribution(&self) -> D;
+}
+impl DistributionParameter<StandardUniform> for () {
+    fn distribution(&self) -> StandardUniform {
+        StandardUniform
     }
+}
+impl DistributionParameter<StandardNormal> for () {
+    fn distribution(&self) -> StandardNormal {
+        StandardNormal
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct BinomialParameter {
+    pub n: u64,
+    pub p: f64,
+}
+impl Default for BinomialParameter {
+    fn default() -> Self {
+        Self { n: 10, p: 0.5 }
+    }
+}
+impl DistributionParameter<Binomial> for Query<BinomialParameter> {
+    fn distribution(&self) -> Binomial {
+        Binomial::new(self.n, self.p).unwrap_or_else(|_| todo!())
+    }
+}
+
+#[tracing::instrument]
+pub async fn random_display<P, T, D>(pram: P) -> String
+where
+    P: DistributionParameter<D> + Debug,
+    T: Display,
+    D: Distribution<T>,
+{
+    let mut rng = rand::rng();
+    let dist = pram.distribution();
+    dist.sample(&mut rng).to_string()
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -208,8 +237,8 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_random_handler() {
-        let int = random_handler::<i64, _>(StandardUniform)().await.unwrap();
+    async fn test_random_display() {
+        let int = random_display::<(), i64, StandardUniform>(()).await;
 
         assert!(int.parse::<i64>().is_ok());
     }
