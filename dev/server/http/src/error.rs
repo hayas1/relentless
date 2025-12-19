@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use axum::{
-    http::StatusCode,
+    http::{StatusCode, Uri},
     response::{IntoResponse, Response},
     Json,
 };
@@ -25,11 +25,12 @@ pub struct AppError<E> {
     response: ErrorResponse<E>,
 }
 impl<E> AppError<E> {
-    pub fn new(status: StatusCode, response: E) -> Self {
+    pub fn new(response: E) -> Self
+    where
+        E: AsStatusCode,
+    {
+        let status = response.status_code();
         Self { source: None, status, response: ErrorResponse { error: response } }
-    }
-    pub fn from_source<S: Into<Box<dyn std::error::Error>>>(source: S, status: StatusCode, response: E) -> Self {
-        Self { source: Some(source.into()), status, response: ErrorResponse { error: response } }
     }
     pub fn response_into<F: From<E>>(self) -> AppError<F> {
         let response = ErrorResponse { error: self.response.error.into() };
@@ -45,19 +46,26 @@ impl<E: Display + Serialize> IntoResponse for AppError<E> {
         (self.status, Json(self.response)).into_response()
     }
 }
-pub trait IntoAppResult<T, R> {
-    fn response(self, response: R) -> AppResult<T, R>;
+pub trait IntoAppResult<T, E, R> {
+    fn response(self, error: R) -> AppResult<T, R>;
+    fn response_map(self, f: impl FnOnce(&E) -> R) -> AppResult<T, R>;
 }
-impl<T, E, R> IntoAppResult<T, R> for Result<T, E>
+impl<T, E, R> IntoAppResult<T, E, R> for Result<T, E>
 where
     E: Into<Box<dyn std::error::Error + 'static>>,
     R: Serialize + AsStatusCode,
 {
-    fn response(self, response: R) -> AppResult<T, R> {
+    fn response(self, error: R) -> AppResult<T, R> {
         self.map_err(|e| AppError {
             source: Some(e.into()),
-            status: response.status_code(),
-            response: ErrorResponse { error: response },
+            status: error.status_code(),
+            response: ErrorResponse { error },
+        })
+    }
+    fn response_map(self, f: impl FnOnce(&E) -> R) -> AppResult<T, R> {
+        self.map_err(|e| {
+            let error = f(&e);
+            AppError { source: Some(e.into()), status: error.status_code(), response: ErrorResponse { error } }
         })
     }
 }
@@ -68,6 +76,31 @@ pub trait AsStatusCode {
     }
 }
 impl<T: Into<String>> AsStatusCode for T {}
+
+#[derive(Debug, Error, Serialize, Deserialize)]
+#[error("not found: {uri}")]
+pub struct NotFound {
+    uri: String,
+}
+impl NotFound {
+    pub fn new(uri: Uri) -> Self {
+        Self { uri: uri.to_string() }
+    }
+}
+impl AsStatusCode for NotFound {
+    fn status_code(&self) -> StatusCode {
+        StatusCode::NOT_FOUND
+    }
+}
+
+#[derive(Debug, Error, Serialize, Deserialize)]
+#[error("please try again later")]
+pub struct Retriable;
+impl AsStatusCode for Retriable {
+    fn status_code(&self) -> StatusCode {
+        StatusCode::SERVICE_UNAVAILABLE
+    }
+}
 
 #[cfg(test)]
 mod tests {

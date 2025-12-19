@@ -168,14 +168,14 @@ impl Jsonizer {
     pub async fn handler<const RICH: bool>(
         Query(v): Query<Vec<(String, String)>>,
     ) -> AppResult<Json<Value>, EchoError> {
-        Ok(Json(Self(v).jsonize::<RICH>().response(EchoError::JsonizeError)?)) // TODO more detail error
+        Ok(Json(Self(v).jsonize::<RICH>().response_map(|e| EchoError::JsonizeError(e.to_string()))?))
     }
 }
 
 #[derive(Error, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum EchoError {
     #[error("fail to jsonize")]
-    JsonizeError,
+    JsonizeError(String),
 }
 impl AsStatusCode for EchoError {}
 

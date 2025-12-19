@@ -2,6 +2,7 @@ use std::{fmt::Display, ops::Mul};
 
 use axum::{
     extract::{Path, State},
+    http::StatusCode,
     routing::get,
     Json, Router,
 };
@@ -11,7 +12,7 @@ use thiserror::Error;
 
 use crate::{
     app::AppState,
-    error::{AppResult, AsStatusCode, IntoAppResult},
+    error::{AppResult, AsStatusCode, IntoAppResult, Retriable},
 };
 
 pub fn route_counter() -> Router<AppState> {
@@ -88,7 +89,7 @@ where
     T: TryFrom<BigInt> + One + Display,
     T::Error: std::error::Error + Send + Sync + 'static,
 {
-    let read = counter.read().map_err(|e| e.to_string()).response(CounterError::Retriable)?;
+    let read = counter.read().map_err(|e| e.to_string()).response(Retriable.into())?;
     let count = read.clone().count.try_into().response(CounterError::Overflow)?;
     Ok(Json(CounterResponse { count }))
 }
@@ -110,7 +111,7 @@ where
     T: TryFrom<BigInt>,
     T::Error: std::error::Error + Send + Sync + 'static,
 {
-    let mut write = counter.write().map_err(|e| e.to_string()).response(CounterError::Retriable)?;
+    let mut write = counter.write().map_err(|e| e.to_string()).response(Retriable.into())?;
     write.count += &value.parse().response(CounterError::CannotParse(value))?;
     let count = write.clone().count.try_into().response(CounterError::Overflow)?;
     Ok(Json(CounterResponse { count }))
@@ -133,7 +134,7 @@ where
     T: TryFrom<BigInt>,
     T::Error: std::error::Error + Send + Sync + 'static,
 {
-    let mut write = counter.write().map_err(|e| e.to_string()).response(CounterError::Retriable)?;
+    let mut write = counter.write().map_err(|e| e.to_string()).response(Retriable.into())?;
     write.count -= &value.parse().response(CounterError::CannotParse(value))?;
     let count = write.clone().count.try_into().response(CounterError::Overflow)?;
     Ok(Json(CounterResponse { count }))
@@ -147,19 +148,16 @@ where
     T: TryFrom<BigInt> + One + Display,
     T::Error: std::error::Error + Send + Sync + 'static,
 {
-    let mut write = counter.write().map_err(|e| e.to_string()).response(CounterError::Retriable)?;
+    let mut write = counter.write().map_err(|e| e.to_string()).response(Retriable.into())?;
     write.count = BigInt::zero();
-    let count = write.clone().count.try_into().response(CounterError::Infallible)?;
+    let count = write.clone().count.try_into().unwrap_or_else(|_| unreachable!());
     Ok(Json(CounterResponse { count }))
 }
 
-#[derive(Error, Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Error, Debug, Serialize, Deserialize)]
 pub enum CounterError {
-    #[error("infallible")]
-    Infallible, // TODO standardize
-
-    #[error("please try again later")]
-    Retriable, // TODO standardize
+    #[error(transparent)]
+    Retriable(#[from] Retriable),
 
     #[error("overflow counter")]
     Overflow,
@@ -167,7 +165,15 @@ pub enum CounterError {
     #[error("cannot parse value as integer: {0}")]
     CannotParse(String),
 }
-impl AsStatusCode for CounterError {}
+impl AsStatusCode for CounterError {
+    fn status_code(&self) -> StatusCode {
+        match self {
+            Self::Retriable(r) => r.status_code(),
+            Self::Overflow => StatusCode::INTERNAL_SERVER_ERROR,
+            Self::CannotParse(_) => StatusCode::BAD_REQUEST,
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -236,8 +242,8 @@ mod tests {
 
         let req = Request::builder().uri("/counter/increment").body(Body::empty()).unwrap();
         let res = call(&mut service, req).await.unwrap();
-        assert_eq!(res.status(), APP_DEFAULT_ERROR_CODE);
-        assert_eq!(&ErrorResponse { error: CounterError::Overflow }, res.body());
+        assert_eq!(res.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        assert!(matches!(res.body(), &ErrorResponse { error: CounterError::Overflow }));
 
         let req = Request::builder().uri("/counter/decrement").body(Body::empty()).unwrap();
         let res = call(&mut service, req).await.unwrap();
@@ -252,7 +258,7 @@ mod tests {
         let req = Request::builder().uri("/counter/increment/abc").body(Body::empty()).unwrap();
         let res = call(&mut service, req).await.unwrap();
         assert_eq!(res.status(), APP_DEFAULT_ERROR_CODE);
-        assert_eq!(&ErrorResponse { error: CounterError::CannotParse("abc".to_string()) }, res.body());
+        assert!(matches!(res.body(), &ErrorResponse { error: CounterError::CannotParse(ref v) } if v == "abc"));
 
         let req = Request::builder().uri("/counter/increment").body(Body::empty()).unwrap();
         let res = call(&mut service, req).await.unwrap();

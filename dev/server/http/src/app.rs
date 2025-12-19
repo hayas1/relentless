@@ -6,14 +6,12 @@ pub mod random;
 pub mod root;
 pub mod wait;
 
-use std::sync::{Arc, RwLock};
-
-use axum::{
-    error_handling::HandleErrorLayer,
-    http::{StatusCode, Uri},
-    routing::get,
-    Router,
+use std::{
+    convert::Infallible,
+    sync::{Arc, RwLock},
 };
+
+use axum::{error_handling::HandleErrorLayer, http::Uri, routing::get, Router};
 use axum_tracing_opentelemetry::middleware::{OtelAxumLayer, OtelInResponseLayer};
 use tower::ServiceBuilder;
 use tower_http::{
@@ -23,7 +21,7 @@ use tower_http::{
 
 use crate::{
     app::counter::CounterState,
-    error::{AppError, AppResult, APP_DEFAULT_ERROR_CODE},
+    error::{AppError, AppResult, IntoAppResult, NotFound},
     runner::RunCommand,
 };
 
@@ -61,11 +59,11 @@ impl AppRouter {
     pub async fn handle_error(err: impl 'static + std::error::Error) -> AppError<String> {
         // TODO this method may not be called ?
         let response = err.to_string();
-        AppError::from_source(err, APP_DEFAULT_ERROR_CODE, response)
+        Err::<Infallible, _>(err).response(response).unwrap_err()
     }
 
-    pub async fn not_found(uri: Uri) -> AppResult<()> {
-        Err(AppError::new(StatusCode::NOT_FOUND, format!("not found {uri}")))
+    pub async fn not_found(uri: Uri) -> AppResult<(), NotFound> {
+        Err(AppError::new(NotFound::new(uri)))
     }
 }
 #[derive(Debug, Clone, Default)]
