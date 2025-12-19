@@ -1,10 +1,9 @@
 use std::collections::HashMap;
 
 use axum::{
-    body::{to_bytes, Body, HttpBody},
+    body::{Body, HttpBody},
     extract::{OriginalUri, Request},
     http::{request::Parts, uri::Scheme, HeaderMap, Method, Uri, Version},
-    response::Result,
     routing::any,
     Json, Router,
 };
@@ -12,13 +11,11 @@ use axum_extra::extract::Host;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
+use thiserror::Error;
 
 use crate::{
     app::AppState,
-    error::{
-        kind::{BadRequest, Unreachable},
-        AppError,
-    },
+    error2::{AppResult, AsStatusCode, IntoAppResult},
 };
 
 pub fn route_information() -> Router<AppState> {
@@ -77,7 +74,7 @@ pub async fn information(
     Host(hostname): Host,
     OriginalUri(uri): OriginalUri,
     request: Request,
-) -> Result<Json<InformationResponse>> {
+) -> AppResult<Json<InformationResponse>, InformationError> {
     let datetime = if !cfg!(test) { Some(Utc::now()) } else { None }; // TODO should not use cfg! ?
     let scheme = None; // TODO cannot get scheme in axum handler now https://github.com/tokio-rs/axum/pull/2507
     let (Parts { method, version, headers, .. }, b) = request.into_parts();
@@ -87,11 +84,11 @@ pub async fn information(
     Ok(Json(InformationResponse { datetime, scheme, hostname, method, uri, path, query, version, headers, body }))
 }
 
-pub fn parse_query(query: &str) -> Result<Map<String, Value>> {
+pub fn parse_query(query: &str) -> AppResult<Map<String, Value>, InformationError> {
     // TODO want to use serde_qs but it has the issue https://github.com/samscott89/serde_qs/issues/77
     //      serde_qs maybe can parse as HashMap or Struct only, so cannot parse as Value or Vec<(String, Value)>
     //      and serde_qs do not allow multiple values for the same key even if use multi map https://github.com/samscott89/serde_qs/blob/b7278b73c637f7c427be762082fee5938ba0c023/src/de/parse.rs#L38
-    let tuples: Vec<(_, Value)> = serde_urlencoded::from_str(query).map_err(AppError::<Unreachable>::wrap)?;
+    let tuples: Vec<(_, Value)> = serde_urlencoded::from_str(query).response(InformationError::FailToParseQuery)?;
     let mut map = HashMap::new();
     for (q, s) in tuples {
         map.entry(q).or_insert(Vec::new()).push(s);
@@ -99,9 +96,9 @@ pub fn parse_query(query: &str) -> Result<Map<String, Value>> {
     Ok(map.into_iter().map(|(k, v)| if let [ref x] = v[..] { (k, x.clone()) } else { (k, Value::Array(v)) }).collect())
 }
 
-pub async fn parse_body(b: Body) -> Result<Value> {
-    let size = b.size_hint().upper().unwrap_or(b.size_hint().lower()) as usize;
-    let bytes = to_bytes(b, size).await.map_err(AppError::<BadRequest>::wrap)?;
+pub async fn parse_body(body: Body) -> AppResult<Value, InformationError> {
+    let limit = body.size_hint().upper().unwrap_or(usize::MAX as u64);
+    let bytes = axum::body::to_bytes(body, limit as usize).await.response(InformationError::FailToCollectBody)?;
     let string = String::from_utf8_lossy(&bytes);
 
     // TODO content-type based parsing
@@ -120,6 +117,16 @@ pub async fn parse_body(b: Body) -> Result<Value> {
         }
     }
 }
+
+#[derive(Debug, Error, Serialize, Deserialize)]
+pub enum InformationError {
+    #[error("fail to collect body")]
+    FailToCollectBody,
+
+    #[error("fail to parse query")]
+    FailToParseQuery,
+}
+impl AsStatusCode for InformationError {}
 
 #[cfg(test)]
 mod tests {

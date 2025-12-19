@@ -2,7 +2,6 @@ use std::{fmt::Display, ops::Mul};
 
 use axum::{
     extract::{Path, State},
-    response::Result,
     routing::get,
     Json, Router,
 };
@@ -179,8 +178,7 @@ mod tests {
 
     use crate::{
         app::{tests::call2, AppRouter},
-        error::APP_DEFAULT_ERROR_CODE,
-        error2::ErrorResponse,
+        error2::{ErrorResponse, APP_DEFAULT_ERROR_CODE},
     };
 
     use super::*;

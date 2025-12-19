@@ -11,7 +11,6 @@ use std::sync::{Arc, RwLock};
 use axum::{
     error_handling::HandleErrorLayer,
     http::{StatusCode, Uri},
-    response::Result,
     routing::get,
     Router,
 };
@@ -24,8 +23,7 @@ use tower_http::{
 
 use crate::{
     app::counter::CounterState,
-    error::{kind::NotFound, AppErrorDetail, Logged},
-    error2::{AppError, APP_DEFAULT_ERROR_CODE},
+    error2::{AppError, AppResult, APP_DEFAULT_ERROR_CODE},
     runner::RunCommand,
 };
 
@@ -63,11 +61,11 @@ impl AppRouter {
     pub async fn handle_error(err: impl 'static + std::error::Error) -> AppError<String> {
         // TODO this method may not be called ?
         let response = err.to_string();
-        AppError::new(err, APP_DEFAULT_ERROR_CODE, response)
+        AppError::from_source(err, APP_DEFAULT_ERROR_CODE, response)
     }
 
-    pub async fn not_found(uri: Uri) -> Result<()> {
-        Err(AppErrorDetail::<NotFound, _>::new(StatusCode::NOT_FOUND, Logged(""), uri.to_string()))?
+    pub async fn not_found(uri: Uri) -> AppResult<()> {
+        Err(AppError::new(StatusCode::NOT_FOUND, format!("not found {uri}")))
     }
 }
 #[derive(Debug, Clone, Default)]

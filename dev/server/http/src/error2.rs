@@ -20,19 +20,26 @@ pub struct ErrorResponse<E = String> {
 #[derive(Error, Debug)]
 pub struct AppError<E> {
     #[source]
-    source: Box<dyn std::error::Error>,
+    source: Option<Box<dyn std::error::Error>>,
     status: StatusCode,
     response: ErrorResponse<E>,
 }
 impl<E> AppError<E> {
-    pub fn new<S: Into<Box<dyn std::error::Error>>>(source: S, status: StatusCode, response: E) -> Self {
-        Self { source: source.into(), status, response: ErrorResponse { error: response } }
+    pub fn new(status: StatusCode, response: E) -> Self {
+        Self { source: None, status, response: ErrorResponse { error: response } }
+    }
+    pub fn from_source<S: Into<Box<dyn std::error::Error>>>(source: S, status: StatusCode, response: E) -> Self {
+        Self { source: Some(source.into()), status, response: ErrorResponse { error: response } }
+    }
+    pub fn response_into<F: From<E>>(self) -> AppError<F> {
+        let response = ErrorResponse { error: self.response.error.into() };
+        AppError { source: self.source, status: self.status, response }
     }
 }
 impl<E: Display + Serialize> IntoResponse for AppError<E> {
     fn into_response(self) -> Response {
         tracing::error!(
-            source = %self.source,
+            source = ?self.source,
             response = %self.response,
         );
         (self.status, Json(self.response)).into_response()
@@ -48,7 +55,7 @@ where
 {
     fn response(self, response: R) -> AppResult<T, R> {
         self.map_err(|e| AppError {
-            source: e.into(),
+            source: Some(e.into()),
             status: response.status_code(),
             response: ErrorResponse { error: response },
         })
@@ -86,7 +93,7 @@ mod tests {
         let external = internal.response(External::ErrorResponse);
 
         let external_err = external.unwrap_err();
-        assert_eq!(external_err.source.to_string(), "error for server");
+        assert_eq!(external_err.source.as_ref().unwrap().to_string(), "error for server");
         assert_eq!(external_err.response.to_string(), "error for client");
         assert_eq!(external_err.status, APP_DEFAULT_ERROR_CODE);
 
@@ -102,7 +109,7 @@ mod tests {
         let external = internal.response("error for client");
 
         let external_err = external.unwrap_err();
-        assert_eq!(external_err.source.to_string(), "error for server");
+        assert_eq!(external_err.source.as_ref().unwrap().to_string(), "error for server");
         assert_eq!(external_err.response.to_string(), "error for client");
         assert_eq!(external_err.status, APP_DEFAULT_ERROR_CODE);
 

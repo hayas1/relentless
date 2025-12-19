@@ -10,10 +10,11 @@ use rand::distr::SampleString;
 use rand_distr::Alphanumeric;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use thiserror::Error;
 
 use crate::{
     app::AppState,
-    error::echo::{EchoError, JsonizeError},
+    error2::{AppResult, AsStatusCode, IntoAppResult},
 };
 
 pub fn route_echo() -> Router<AppState> {
@@ -24,8 +25,8 @@ pub fn route_echo() -> Router<AppState> {
         .route("/path/{*rest}", any(path))
         .route("/method", any(method))
         .route("/headers", any(headers))
-        .route("/json", get(Jsonizer::dot_splitted_handler::<false>).post(json_body))
-        .route("/json/rich", get(Jsonizer::dot_splitted_handler::<true>))
+        .route("/json", get(Jsonizer::handler::<false>).post(json_body))
+        .route("/json/rich", get(Jsonizer::handler::<true>))
 }
 
 #[tracing::instrument]
@@ -155,7 +156,7 @@ impl Jsonizer {
             None => Ok(json!(v)),
         }
     }
-    pub fn dot_splitted<const RICH: bool>(&self) -> Result<Value, JsonizeError> {
+    pub fn jsonize<const RICH: bool>(&self) -> Result<Value, JsonizeError> {
         let mut value = Value::Null;
         for (k, v) in &self.0 {
             Self::put(Self::entry(&mut value, k.split('.'))?, Self::parse::<RICH>(v)?);
@@ -164,11 +165,30 @@ impl Jsonizer {
     }
 
     #[tracing::instrument]
-    pub async fn dot_splitted_handler<const RICH: bool>(
+    pub async fn handler<const RICH: bool>(
         Query(v): Query<Vec<(String, String)>>,
-    ) -> Result<Json<Value>, EchoError> {
-        Ok(Json(Self(v).dot_splitted::<RICH>()?))
+    ) -> AppResult<Json<Value>, EchoError> {
+        Ok(Json(Self(v).jsonize::<RICH>().response(EchoError::JsonizeError)?)) // TODO more detail error
     }
+}
+
+#[derive(Error, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum EchoError {
+    #[error("fail to jsonize")]
+    JsonizeError,
+}
+impl AsStatusCode for EchoError {}
+
+#[derive(Error, Debug, Clone, PartialEq, Eq)]
+pub enum JsonizeError {
+    #[error("conflict in {0:?}, already {1} but want {2}")]
+    Conflict(String, Value, Value),
+    #[error(transparent)]
+    CannotParseInt(#[from] std::num::ParseIntError),
+    #[error(transparent)]
+    CannotParseFloat(#[from] std::num::ParseFloatError),
+    #[error("unknown function: {0}")]
+    UnknownFunction(String),
 }
 
 #[cfg(test)]
@@ -196,7 +216,7 @@ mod tests {
     async fn test_echo_body() {
         let mut service = AppRouter::default().service();
 
-        let req = Request::builder().uri("/echo/body").body(Body::from("hello world")).unwrap();
+        let req = Request::builder().uri("/echo/body").method(Method::POST).body(Body::from("hello world")).unwrap();
         let res = call_bytes2(&mut service, req).await.unwrap();
         assert_eq!(res.status(), StatusCode::OK);
         assert_eq!(&**res.body(), b"hello world");
@@ -226,7 +246,7 @@ mod tests {
     async fn test_echo_method() {
         let mut service = AppRouter::default().service();
 
-        let req = Request::builder().uri("/echo/method").body(Body::empty()).unwrap();
+        let req = Request::builder().uri("/echo/method").method(Method::OPTIONS).body(Body::empty()).unwrap();
         let res = call_bytes2(&mut service, req).await.unwrap();
         assert_eq!(res.status(), StatusCode::OK);
         assert_eq!(&**res.body(), b"OPTIONS");
@@ -244,41 +264,41 @@ mod tests {
             .unwrap();
         let res: Response<serde_json::Value> = call2(&mut service, req).await.unwrap();
         assert_eq!(res.status(), StatusCode::OK);
-        assert_ne!(&json!([{ "key1": "value1" }, { "key2": "value2" }]), res.body());
+        assert_eq!(res.body(), &json!([{ "key1": "value1" }, { "key2": "value2" }]));
     }
 
     #[tokio::test]
     async fn test_jsonizer() {
         let j = Jsonizer(vec![]);
-        assert_eq!(j.dot_splitted::<false>().unwrap(), Value::Null);
+        assert_eq!(j.jsonize::<false>().unwrap(), Value::Null);
 
         let j = Jsonizer(vec![(String::from("key"), String::from("value"))]);
-        assert_eq!(j.dot_splitted::<false>().unwrap(), json!({ "key": "value" }));
+        assert_eq!(j.jsonize::<false>().unwrap(), json!({ "key": "value" }));
 
         let j = Jsonizer(vec![
             (String::from("key"), String::from("value1")),
             (String::from("key"), String::from("value2")),
         ]);
-        assert_eq!(j.dot_splitted::<false>().unwrap(), json!({ "key": ["value1", "value2"] }));
+        assert_eq!(j.jsonize::<false>().unwrap(), json!({ "key": ["value1", "value2"] }));
 
         let j = Jsonizer(vec![(String::from("foo.bar.baz"), String::from("value"))]);
-        assert_eq!(j.dot_splitted::<false>().unwrap(), json!({ "foo": { "bar": { "baz": "value" } } }));
+        assert_eq!(j.jsonize::<false>().unwrap(), json!({ "foo": { "bar": { "baz": "value" } } }));
 
         let j = Jsonizer(vec![
             (String::from("foo.bar.baz"), String::from("value1")),
             (String::from("foo.bar.baz"), String::from("value2")),
         ]);
-        assert_eq!(j.dot_splitted::<false>().unwrap(), json!({ "foo": { "bar": { "baz": ["value1", "value2"] } } }));
+        assert_eq!(j.jsonize::<false>().unwrap(), json!({ "foo": { "bar": { "baz": ["value1", "value2"] } } }));
 
         let j = Jsonizer(vec![(String::from("number.3.value"), String::from("three"))]);
-        assert_eq!(j.dot_splitted::<false>().unwrap(), json!({ "number": [null, null, null, { "value": "three" }] }));
+        assert_eq!(j.jsonize::<false>().unwrap(), json!({ "number": [null, null, null, { "value": "three" }] }));
 
         let j = Jsonizer(vec![
             (String::from("number.3.value"), String::from("three")),
             (String::from("number.1.value"), String::from("one")),
         ]);
         assert_eq!(
-            j.dot_splitted::<false>().unwrap(),
+            j.jsonize::<false>().unwrap(),
             json!({ "number": [null, { "value": "one" }, null, { "value": "three" }] })
         );
 
@@ -286,56 +306,53 @@ mod tests {
             (String::from("hoge.fuga"), String::from("hogera")),
             (String::from("hoge.fuga.piyo"), String::from("hogehoge")),
         ]);
-        assert!(j.dot_splitted::<false>().is_err()); // hoge.fuga will be [hogera, {piyo: hogehoge}], but in this case that is not hoge.fuga.piyo but hoge.fuga.1.piyo
+        assert!(j.jsonize::<false>().is_err()); // hoge.fuga will be [hogera, {piyo: hogehoge}], but in this case that is not hoge.fuga.piyo but hoge.fuga.1.piyo
 
         let j = Jsonizer(vec![
             (String::from("hoge.fuga"), String::from("hogera")),
             (String::from("hoge.fuga.1.piyo"), String::from("hogehoge")),
         ]);
-        assert_eq!(
-            j.dot_splitted::<false>().unwrap(),
-            json!({ "hoge": { "fuga": ["hogera", { "piyo": "hogehoge" }] } })
-        );
+        assert_eq!(j.jsonize::<false>().unwrap(), json!({ "hoge": { "fuga": ["hogera", { "piyo": "hogehoge" }] } }));
     }
 
     #[tokio::test]
     async fn test_jsonizer_rich() {
         let j1 = Jsonizer(vec![(String::from("key"), String::from("value"))]);
         let j2 = Jsonizer(vec![(String::from("key"), String::from("value"))]);
-        assert_eq!(j1.dot_splitted::<true>().unwrap(), j2.dot_splitted::<true>().unwrap());
+        assert_eq!(j1.jsonize::<true>().unwrap(), j2.jsonize::<true>().unwrap());
 
         let j1 = Jsonizer(vec![(String::from("now"), String::from("$now"))]);
         let j2 = Jsonizer(vec![(String::from("now"), String::from("$now"))]);
-        assert_ne!(j1.dot_splitted::<true>().unwrap(), j2.dot_splitted::<true>().unwrap());
+        assert_ne!(j1.jsonize::<true>().unwrap(), j2.jsonize::<true>().unwrap());
         let j1 = Jsonizer(vec![(String::from("now"), String::from("now"))]);
         let j2 = Jsonizer(vec![(String::from("now"), String::from("now"))]);
-        assert_eq!(j1.dot_splitted::<true>().unwrap(), j2.dot_splitted::<true>().unwrap());
+        assert_eq!(j1.jsonize::<true>().unwrap(), j2.jsonize::<true>().unwrap());
 
         let j1 = Jsonizer(vec![(String::from("randint"), String::from("$randint"))]);
         let j2 = Jsonizer(vec![(String::from("randint"), String::from("$randint"))]);
-        assert_ne!(j1.dot_splitted::<true>().unwrap(), j2.dot_splitted::<true>().unwrap());
+        assert_ne!(j1.jsonize::<true>().unwrap(), j2.jsonize::<true>().unwrap());
         let j1 = Jsonizer(vec![(String::from("randint"), String::from("randint"))]);
         let j2 = Jsonizer(vec![(String::from("randint"), String::from("randint"))]);
-        assert_eq!(j1.dot_splitted::<true>().unwrap(), j2.dot_splitted::<true>().unwrap());
+        assert_eq!(j1.jsonize::<true>().unwrap(), j2.jsonize::<true>().unwrap());
 
         let j1 = Jsonizer(vec![(String::from("rand"), String::from("$rand"))]);
         let j2 = Jsonizer(vec![(String::from("rand"), String::from("$rand"))]);
-        assert_ne!(j1.dot_splitted::<true>().unwrap(), j2.dot_splitted::<true>().unwrap());
+        assert_ne!(j1.jsonize::<true>().unwrap(), j2.jsonize::<true>().unwrap());
         let j1 = Jsonizer(vec![(String::from("rand"), String::from("rand"))]);
         let j2 = Jsonizer(vec![(String::from("rand"), String::from("rand"))]);
-        assert_eq!(j1.dot_splitted::<true>().unwrap(), j2.dot_splitted::<true>().unwrap());
+        assert_eq!(j1.jsonize::<true>().unwrap(), j2.jsonize::<true>().unwrap());
 
         let j1 = Jsonizer(vec![(String::from("rands"), String::from("$rands"))]);
         let j2 = Jsonizer(vec![(String::from("rands"), String::from("$rands"))]);
-        assert_ne!(j1.dot_splitted::<true>().unwrap(), j2.dot_splitted::<true>().unwrap());
+        assert_ne!(j1.jsonize::<true>().unwrap(), j2.jsonize::<true>().unwrap());
         let j1 = Jsonizer(vec![(String::from("rands"), String::from("rands"))]);
         let j2 = Jsonizer(vec![(String::from("rands"), String::from("rands"))]);
-        assert_eq!(j1.dot_splitted::<true>().unwrap(), j2.dot_splitted::<true>().unwrap());
+        assert_eq!(j1.jsonize::<true>().unwrap(), j2.jsonize::<true>().unwrap());
 
         let j = Jsonizer(vec![(String::from("unknown"), String::from("$unknown"))]);
-        assert_eq!(j.dot_splitted::<true>().unwrap_err(), JsonizeError::UnknownFunction(String::from("$unknown")));
+        assert_eq!(j.jsonize::<true>().unwrap_err(), JsonizeError::UnknownFunction(String::from("$unknown")));
         let j = Jsonizer(vec![(String::from("escape"), String::from("$$escape"))]);
-        assert_eq!(j.dot_splitted::<true>().unwrap(), json!({ "escape": "$escape" }));
+        assert_eq!(j.jsonize::<true>().unwrap(), json!({ "escape": "$escape" }));
     }
 
     #[tokio::test]
