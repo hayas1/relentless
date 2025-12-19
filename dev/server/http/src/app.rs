@@ -9,6 +9,7 @@ pub mod wait;
 use std::sync::{Arc, RwLock};
 
 use axum::{
+    error_handling::HandleErrorLayer,
     http::{StatusCode, Uri},
     response::Result,
     routing::get,
@@ -16,11 +17,15 @@ use axum::{
 };
 use axum_tracing_opentelemetry::middleware::{OtelAxumLayer, OtelInResponseLayer};
 use tower::ServiceBuilder;
-use tower_http::normalize_path::{NormalizePath, NormalizePathLayer};
+use tower_http::{
+    normalize_path::{NormalizePath, NormalizePathLayer},
+    trace::TraceLayer,
+};
 
 use crate::{
     app::counter::CounterState,
     error::{kind::NotFound, AppErrorDetail, Logged},
+    error2::{AppError, APP_DEFAULT_ERROR_CODE},
     runner::RunCommand,
 };
 
@@ -29,12 +34,19 @@ pub struct AppRouter {
     pub state: AppState,
 }
 impl AppRouter {
-    pub fn service(self) -> NormalizePath<Router<()>> {
-        ServiceBuilder::new()
-            .layer(NormalizePathLayer::trim_trailing_slash())
-            .service(self.router().layer(OtelInResponseLayer).layer(OtelAxumLayer::default()))
+    pub fn service(self) -> NormalizePath<Router> {
+        ServiceBuilder::new().layer(NormalizePathLayer::trim_trailing_slash()).service(
+            self.router()
+                .layer(
+                    ServiceBuilder::new()
+                        .layer(TraceLayer::new_for_http())
+                        .layer(HandleErrorLayer::new(Self::handle_error)),
+                )
+                .layer(OtelInResponseLayer)
+                .layer(OtelAxumLayer::default()),
+        )
     }
-    pub fn router(self) -> Router<()> {
+    pub fn router(self) -> Router {
         Router::new()
             .route("/", get(root::root))
             .nest("/health", health::route_health())
@@ -46,6 +58,12 @@ impl AppRouter {
             .nest("/random", random::route_random())
             .fallback(Self::not_found)
             .with_state(self.state)
+    }
+
+    pub async fn handle_error(err: impl 'static + std::error::Error) -> AppError<String> {
+        // TODO this method may not be called ?
+        let response = err.to_string();
+        AppError::new(err, APP_DEFAULT_ERROR_CODE, response)
     }
 
     pub async fn not_found(uri: Uri) -> Result<()> {

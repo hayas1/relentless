@@ -24,6 +24,11 @@ pub struct AppError<E> {
     status: StatusCode,
     response: ErrorResponse<E>,
 }
+impl<E> AppError<E> {
+    pub fn new<S: Into<Box<dyn std::error::Error>>>(source: S, status: StatusCode, response: E) -> Self {
+        Self { source: source.into(), status, response: ErrorResponse { error: response } }
+    }
+}
 impl<E: Display + Serialize> IntoResponse for AppError<E> {
     fn into_response(self) -> Response {
         tracing::error!(
