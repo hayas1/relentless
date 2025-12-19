@@ -66,13 +66,9 @@ pub struct AppState {
 
 #[cfg(test)] // TODO do not pub(crate), use feature
 pub(crate) mod tests {
-
-    use std::fmt::Debug;
-
     use axum::{
         body::{Body, Bytes, HttpBody},
-        http::{Request, StatusCode},
-        response::Response,
+        http::{Request, Response},
     };
     use serde::de::DeserializeOwned;
     use tower::{Service, ServiceExt};
@@ -106,61 +102,5 @@ pub(crate) mod tests {
         let res = call_bytes2(service, req).await?;
         let des = serde_json::from_slice::<T>(res.body())?;
         Ok(res.map(|_| des))
-    }
-
-    pub async fn call_bytes<S>(service: &mut S, req: Request<Body>) -> (StatusCode, Bytes)
-    where
-        S: Service<Request<Body>, Response = Response<Body>>,
-        S::Error: Debug,
-        Box<dyn std::error::Error + Send + Sync + 'static>: From<S::Error>,
-    {
-        let res = service.ready().await.unwrap().call(req).await.unwrap();
-        let status = res.status();
-        let body = body_bytes(res.into_body()).await.unwrap();
-        (status, body)
-    }
-
-    pub async fn call<S, T>(service: &mut S, req: Request<Body>) -> (StatusCode, T)
-    where
-        S: Service<Request<Body>, Response = Response<Body>>,
-        S::Error: Debug,
-        Box<dyn std::error::Error + Send + Sync + 'static>: From<S::Error>,
-        T: DeserializeOwned,
-    {
-        let (status, body) = call_bytes(service, req).await;
-        let des = serde_json::from_slice::<T>(&body).unwrap();
-        (status, des)
-    }
-
-    pub async fn call_with_assert<S, T>(
-        service: &mut S,
-        req: Request<Body>,
-        expected_status: StatusCode,
-        expected_body: T,
-    ) where
-        S: Service<Request<Body>, Response = Response<Body>>,
-        S::Error: Debug,
-        Box<dyn std::error::Error + Send + Sync + 'static>: From<S::Error>,
-        T: DeserializeOwned + Eq + std::fmt::Debug,
-    {
-        let (actual_status, actual_body): (_, T) = call(service, req).await;
-        assert_eq!(actual_status, expected_status);
-        assert_eq!(actual_body, expected_body);
-    }
-
-    pub async fn call_with_assert_ne_body<S, T>(
-        service: &mut S,
-        req: Request<Body>,
-        expected_status: StatusCode,
-        expected_body: T,
-    ) where
-        S: Service<Request<Body>, Response = Response<Body>>,
-        S::Error: Debug,
-        Box<dyn std::error::Error + Send + Sync + 'static>: From<S::Error>,
-        T: DeserializeOwned + Eq + std::fmt::Debug,
-    {
-        let (actual_status, actual_body): (_, T) = call(service, req).await;
-        assert_eq!(actual_status, expected_status);
-        assert_ne!(actual_body, expected_body);
     }
 }

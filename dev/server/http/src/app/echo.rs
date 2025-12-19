@@ -173,89 +173,78 @@ impl Jsonizer {
 
 #[cfg(test)]
 mod tests {
-    use crate::app::tests::{call_bytes, call_with_assert, call_with_assert_ne_body};
+    use crate::app::tests::{call2, call_bytes2};
     use crate::app::AppRouter;
 
     use super::*;
     use axum::body::Body;
     use axum::http::header::CONTENT_TYPE;
-    use axum::http::{Method, Request, StatusCode};
+    use axum::http::{Method, Request, Response, StatusCode};
     use mime::APPLICATION_JSON;
 
     #[tokio::test]
     async fn test_echo_empty() {
         let mut service = AppRouter::default().service();
 
-        let (status, body) =
-            call_bytes(&mut service, Request::builder().uri("/echo/").body(Body::empty()).unwrap()).await;
-        assert_eq!(status, StatusCode::OK);
-        assert_eq!(&body[..], b"");
+        let req = Request::builder().uri("/echo/").body(Body::empty()).unwrap();
+        let res = call_bytes2(&mut service, req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        assert_eq!(&**res.body(), b"");
     }
 
     #[tokio::test]
     async fn test_echo_body() {
         let mut service = AppRouter::default().service();
 
-        let (status, body) = call_bytes(
-            &mut service,
-            Request::builder().uri("/echo/body").method(Method::POST).body(Body::from("hello world")).unwrap(),
-        )
-        .await;
-        assert_eq!(status, StatusCode::OK);
-        assert_eq!(&body[..], b"hello world");
+        let req = Request::builder().uri("/echo/body").body(Body::from("hello world")).unwrap();
+        let res = call_bytes2(&mut service, req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        assert_eq!(&**res.body(), b"hello world");
     }
 
     #[tokio::test]
     async fn test_echo_text() {
         let mut service = AppRouter::default().service();
 
-        let (status, body) =
-            call_bytes(&mut service, Request::builder().uri("/echo/text/path?key=value").body(Body::empty()).unwrap())
-                .await;
-        assert_eq!(status, StatusCode::OK);
-        assert_eq!(&body[..], b"/echo/text/path?key=value");
+        let req = Request::builder().uri("/echo/text/path?key=value").body(Body::empty()).unwrap();
+        let res = call_bytes2(&mut service, req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        assert_eq!(&**res.body(), b"/echo/text/path?key=value");
     }
 
     #[tokio::test]
     async fn test_echo_path() {
         let mut service = AppRouter::default().service();
 
-        let (status, body) =
-            call_bytes(&mut service, Request::builder().uri("/echo/path/query?key=value").body(Body::empty()).unwrap())
-                .await;
-        assert_eq!(status, StatusCode::OK);
-        assert_eq!(&body[..], b"query");
+        let req = Request::builder().uri("/echo/path/query?key=value").body(Body::empty()).unwrap();
+        let res = call_bytes2(&mut service, req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        assert_eq!(&**res.body(), b"query");
     }
 
     #[tokio::test]
     async fn test_echo_method() {
         let mut service = AppRouter::default().service();
 
-        let (status, body) = call_bytes(
-            &mut service,
-            Request::builder().uri("/echo/method").method(Method::OPTIONS).body(Body::empty()).unwrap(),
-        )
-        .await;
-        assert_eq!(status, StatusCode::OK);
-        assert_eq!(&body[..], b"OPTIONS");
+        let req = Request::builder().uri("/echo/method").body(Body::empty()).unwrap();
+        let res = call_bytes2(&mut service, req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        assert_eq!(&**res.body(), b"OPTIONS");
     }
 
     #[tokio::test]
     async fn test_echo_headers() {
         let mut service = AppRouter::default().service();
 
-        call_with_assert(
-            &mut service,
-            Request::builder()
-                .uri("/echo/headers")
-                .header("key1", "value1")
-                .header("key2", "value2")
-                .body(Body::empty())
-                .unwrap(),
-            StatusCode::OK,
-            json!([{ "key1": "value1" }, { "key2": "value2" }]),
-        )
-        .await;
+        let req = Request::builder()
+            .uri("/echo/headers")
+            .header("key1", "value1")
+            .header("key2", "value2")
+            .body(Body::empty())
+            .unwrap();
+        let res: Response<serde_json::Value> = call2(&mut service, req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        assert_ne!(&json!([{ "key1": "value1" }, { "key2": "value2" }]), res.body());
     }
 
     #[tokio::test]
@@ -353,55 +342,44 @@ mod tests {
     async fn test_echo_json() {
         let mut service = AppRouter::default().service();
 
-        call_with_assert(
-            &mut service,
-            Request::builder().uri("/echo/json").body(Body::empty()).unwrap(),
-            StatusCode::OK,
-            json!(null),
-        )
-        .await;
+        let req = Request::builder().uri("/echo/json").body(Body::empty()).unwrap();
+        let res: Response<serde_json::Value> = call2(&mut service, req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        assert_eq!(&json!(null), res.body());
 
-        call_with_assert(
-            &mut service,
-            Request::builder()
-                .uri("/echo/json?key=value&a.foo=null&a.bar=true&a.baz=2.0&a.qux=three&a.quux=4&d.5=five&d.0=zero")
-                .body(Body::empty())
-                .unwrap(),
-            StatusCode::OK,
-            json!({
+        let req = Request::builder()
+            .uri("/echo/json?key=value&a.foo=null&a.bar=true&a.baz=2.0&a.qux=three&a.quux=4&d.5=five&d.0=zero")
+            .body(Body::empty())
+            .unwrap();
+        let res: Response<serde_json::Value> = call2(&mut service, req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        assert_eq!(
+            &json!({
                 "key": "value",
                 "a": { "foo": null, "bar": true, "baz": 2.0, "qux": "three", "quux": 4 },
                 "d": [ "zero", null, null, null, null, "five" ],
             }),
-        )
-        .await;
+            res.body()
+        );
 
-        call_with_assert_ne_body(
-            &mut service,
-            Request::builder().uri("/echo/json?key=value&current.time=$now").body(Body::empty()).unwrap(),
-            StatusCode::OK,
-            json!({
-                "key": "value",
-                "current.time": "2024-10-10T00:00:00-09:00",}),
-        )
-        .await;
+        let req = Request::builder().uri("/echo/json?key=value&current.time=$now").body(Body::empty()).unwrap();
+        let res: Response<serde_json::Value> = call2(&mut service, req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        assert_ne!(&json!({ "key": "value", "current.time": "2024-10-10T00:00:00-09:00" }), res.body());
     }
 
     #[tokio::test]
     async fn test_echo_json_post() {
         let mut service = AppRouter::default().service();
 
-        call_with_assert(
-            &mut service,
-            Request::builder()
-                .uri("/echo/json")
-                .method(Method::POST)
-                .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
-                .body(Body::from(r#"{"key": "value"}"#))
-                .unwrap(),
-            StatusCode::OK,
-            json!({ "key": "value" }),
-        )
-        .await;
+        let req = Request::builder()
+            .uri("/echo/json")
+            .method(Method::POST)
+            .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
+            .body(Body::from(r#"{"key": "value"}"#))
+            .unwrap();
+        let res: Response<serde_json::Value> = call2(&mut service, req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        assert_eq!(&json!({ "key": "value" }), res.body());
     }
 }

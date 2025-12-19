@@ -6,10 +6,7 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    app::AppState,
-    error::{kind::Retriable, AppErrorDetail, Logged},
-};
+use crate::app::AppState;
 
 pub fn route_health() -> Router<AppState> {
     Router::new()
@@ -69,12 +66,8 @@ pub async fn health_heavy() -> Health {
 }
 
 #[tracing::instrument]
-pub async fn disabled() -> Result<()> {
-    Err(AppErrorDetail::<Retriable, _>::new(
-        StatusCode::SERVICE_UNAVAILABLE,
-        Logged("requested to disabled endpoint".to_string()),
-        Health { status: StatusCode::SERVICE_UNAVAILABLE },
-    ))?
+pub async fn disabled() -> Health {
+    Health { status: StatusCode::SERVICE_UNAVAILABLE }
 }
 
 #[cfg(test)]
@@ -82,12 +75,9 @@ mod tests {
 
     use axum::{body::Body, http::Request};
 
-    use crate::{
-        app::{
-            tests::{call_bytes, call_with_assert},
-            AppRouter,
-        },
-        error::{kind::Kind, ErrorResponseInner},
+    use crate::app::{
+        tests::{call2, call_bytes2},
+        AppRouter,
     };
 
     use super::*;
@@ -96,61 +86,49 @@ mod tests {
     async fn test_health() {
         let mut service = AppRouter::default().service();
 
-        let (status, body) =
-            call_bytes(&mut service, Request::builder().uri("/health").body(Body::empty()).unwrap()).await;
-        assert_eq!(status, StatusCode::OK);
-        assert_eq!(&body[..], b"ok");
+        let req = Request::builder().uri("/health").body(Body::empty()).unwrap();
+        let res = call_bytes2(&mut service, req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        assert_eq!(&**res.body(), b"ok");
     }
 
     #[tokio::test]
     async fn test_healthz() {
         let mut service = AppRouter::default().service();
 
-        let (status, body) =
-            call_bytes(&mut service, Request::builder().uri("/healthz").body(Body::empty()).unwrap()).await;
-        assert_eq!(status, StatusCode::OK);
-        assert_eq!(&body[..], b"ok");
+        let req = Request::builder().uri("/healthz").body(Body::empty()).unwrap();
+        let res = call_bytes2(&mut service, req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        assert_eq!(&**res.body(), b"ok");
     }
 
     #[tokio::test]
     async fn test_health_rich() {
         let mut service = AppRouter::default().service();
 
-        call_with_assert(
-            &mut service,
-            Request::builder().uri("/health/rich").body(Body::empty()).unwrap(),
-            StatusCode::OK,
-            Health { status: StatusCode::OK },
-        )
-        .await;
+        let req = Request::builder().uri("/health/rich").body(Body::empty()).unwrap();
+        let res = call2(&mut service, req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        assert_eq!(&Health { status: StatusCode::OK }, res.body());
     }
 
     #[tokio::test]
     async fn test_health_heavy() {
         let mut service = AppRouter::default().service();
 
-        call_with_assert(
-            &mut service,
-            Request::builder().uri("/health/heavy").body(Body::empty()).unwrap(),
-            StatusCode::TOO_MANY_REQUESTS,
-            Health { status: StatusCode::TOO_MANY_REQUESTS },
-        )
-        .await;
+        let req = Request::builder().uri("/health/heavy").body(Body::empty()).unwrap();
+        let res = call2(&mut service, req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::TOO_MANY_REQUESTS);
+        assert_eq!(&Health { status: StatusCode::TOO_MANY_REQUESTS }, res.body());
     }
 
     #[tokio::test]
     async fn test_health_disabled() {
         let mut service = AppRouter::default().service();
 
-        call_with_assert(
-            &mut service,
-            Request::builder().uri("/health/disabled").body(Body::empty()).unwrap(),
-            StatusCode::SERVICE_UNAVAILABLE,
-            ErrorResponseInner {
-                msg: Retriable::msg().to_string(),
-                detail: Health { status: StatusCode::SERVICE_UNAVAILABLE },
-            },
-        )
-        .await;
+        let req = Request::builder().uri("/health/disabled").body(Body::empty()).unwrap();
+        let res = call2(&mut service, req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(&Health { status: StatusCode::SERVICE_UNAVAILABLE }, res.body());
     }
 }

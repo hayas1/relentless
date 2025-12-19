@@ -78,7 +78,7 @@ pub async fn information(
     OriginalUri(uri): OriginalUri,
     request: Request,
 ) -> Result<Json<InformationResponse>> {
-    let datetime = if !cfg!(test) { Some(Utc::now()) } else { None }; // TODO should we use cfg! ?
+    let datetime = if !cfg!(test) { Some(Utc::now()) } else { None }; // TODO should not use cfg! ?
     let scheme = None; // TODO cannot get scheme in axum handler now https://github.com/tokio-rs/axum/pull/2507
     let (Parts { method, version, headers, .. }, b) = request.into_parts();
     let path = uri.path().to_string();
@@ -130,7 +130,7 @@ mod tests {
     use mime::{APPLICATION_JSON, APPLICATION_WWW_FORM_URLENCODED};
     use serde_json::json;
 
-    use crate::app::{tests::call_with_assert, AppRouter};
+    use crate::app::{tests::call2, AppRouter};
 
     use super::*;
 
@@ -139,19 +139,18 @@ mod tests {
         let mut service = AppRouter::default().service();
 
         let req = Request::builder().uri("http://localhost:3000/information").body(Body::empty()).unwrap();
-        call_with_assert(
-            &mut service,
-            req,
-            StatusCode::OK,
-            InformationResponse {
+        let res = call2(&mut service, req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        assert_eq!(
+            &InformationResponse {
                 hostname: "localhost:3000".to_string(),
                 // BUG? in test, include scheme and authority, but server response include only path and query
                 uri: Uri::from_static("http://localhost:3000/information"),
                 path: "/information".to_string(),
                 ..Default::default()
             },
-        )
-        .await;
+            res.body(),
+        );
     }
 
     #[tokio::test]
@@ -162,19 +161,18 @@ mod tests {
             .uri("http://localhost:3000/information/path/to/query/?q=test&k=1&k=2&k=3")
             .body(Body::empty())
             .unwrap();
-        call_with_assert(
-            &mut service,
-            req,
-            StatusCode::OK,
-            InformationResponse {
+        let res = call2(&mut service, req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        assert_eq!(
+            &InformationResponse {
                 hostname: "localhost:3000".to_string(),
                 uri: Uri::from_static("http://localhost:3000/information/path/to/query?q=test&k=1&k=2&k=3"),
                 path: "/information/path/to/query".to_string(),
                 query: json!({ "q": "test", "k": ["1", "2", "3"] }).as_object().unwrap().clone(),
                 ..Default::default()
             },
-        )
-        .await;
+            res.body(),
+        );
     }
 
     #[tokio::test]
@@ -187,11 +185,10 @@ mod tests {
             .header(CONTENT_TYPE, APPLICATION_WWW_FORM_URLENCODED.as_ref())
             .body(Body::from("body=body"))
             .unwrap();
-        call_with_assert(
-            &mut service,
-            req,
-            StatusCode::OK,
-            InformationResponse {
+        let res = call2(&mut service, req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        assert_eq!(
+            &InformationResponse {
                 scheme: None,
                 hostname: "localhost:3000".to_string(),
                 method: Method::POST,
@@ -205,8 +202,8 @@ mod tests {
                 body: json!({"body": "body"}),
                 ..Default::default()
             },
-        )
-        .await;
+            res.body(),
+        );
 
         let req = Request::builder()
             .method(Method::POST)
@@ -214,11 +211,10 @@ mod tests {
             .header(CONTENT_TYPE, APPLICATION_JSON.as_ref())
             .body(Body::from(r#"{"name": "json", "key": [1, 2, 3]}"#))
             .unwrap();
-        call_with_assert(
-            &mut service,
-            req,
-            StatusCode::OK,
-            InformationResponse {
+        let res = call2(&mut service, req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        assert_eq!(
+            &InformationResponse {
                 scheme: None,
                 hostname: "localhost:3000".to_string(),
                 method: Method::POST,
@@ -232,7 +228,7 @@ mod tests {
                 body: json!({"name": "json", "key": [1, 2, 3]}),
                 ..Default::default()
             },
-        )
-        .await;
+            res.body(),
+        );
     }
 }
