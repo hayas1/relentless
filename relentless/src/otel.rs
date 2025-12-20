@@ -20,7 +20,7 @@ impl Otel {
         let tracer = provider.tracer(env!("CARGO_PKG_NAME"));
         let telemetry = tracing_opentelemetry::layer().with_tracer(tracer);
         let subscriber = Registry::default()
-            .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| "debug".into()))
+            .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()))
             .with(telemetry);
         tracing::subscriber::set_global_default(subscriber).map_err(crate::Error::boxed)
     }
