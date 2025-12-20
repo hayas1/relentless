@@ -1,4 +1,4 @@
-use std::convert::Infallible;
+use std::{convert::Infallible, fmt::Debug};
 
 use bytes::Bytes;
 use http_body::Body;
@@ -30,9 +30,10 @@ pub enum HttpRequestBody {
     Json(serde_json::Value),
 }
 
-impl<ReqB: Body + Default + From<Bytes>> RequestSource<http::Request<ReqB>> for HttpRequest {
+impl<ReqB: Body + Default + From<Bytes> + Debug> RequestSource<http::Request<ReqB>> for HttpRequest {
     type Error = Infallible;
 
+    #[tracing::instrument(ret, err)]
     async fn produce(&self, destination: &http::Uri, target: &str) -> Result<http::Request<ReqB>, Self::Error> {
         let uri =
             http::uri::Builder::from(destination.clone()).path_and_query(target).build().unwrap_or_else(|_| todo!());

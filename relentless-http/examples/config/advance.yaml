@@ -1,0 +1,23 @@
+name: advance http test
+destinations:
+  actual: http://localhost:3000
+  expect: http://localhost:3000
+
+testcases:
+  - target: /health/disabled
+    description: health check disabled
+    profile:
+      allow: true
+  - target: /echo/body
+    description: echo body
+    profile:
+      request:
+        method: POST
+        body:
+          plaintext: hello world
+  - target: /counter/increment
+    profile:
+      repeat: 10
+  - target: /wait/200ms
+  - target: /echo/json/functional?key=value&now.time=$now&now.string=now
+

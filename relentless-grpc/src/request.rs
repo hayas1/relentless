@@ -24,6 +24,7 @@ pub enum GrpcRequestMessage {
 
 impl RequestSource<(PathAndQuery, tonic::Request<serde_json::Value>)> for GrpcRequest {
     type Error = relentless::Error;
+    #[tracing::instrument(ret, err)]
     async fn produce(
         &self,
         destination: &http::Uri,

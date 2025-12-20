@@ -1,4 +1,4 @@
-use std::convert::Infallible;
+use std::{convert::Infallible, fmt::Debug};
 
 use http_body::Body;
 #[cfg(feature = "json")]
@@ -51,8 +51,9 @@ pub enum HttpRequestBody {
     Json(JsonEvaluator),
 }
 
-impl<ResB: Body + Send, E: Send> ResponseSink<Result<http::Response<ResB>, E>> for HttpResponse {
+impl<ResB: Body + Debug + Send, E: Debug + Send> ResponseSink<Result<http::Response<ResB>, E>> for HttpResponse {
     type Error = Infallible;
+    #[tracing::instrument(err)]
     async fn consume(&self, res: Destinations<Result<http::Response<ResB>, E>>) -> Result<(), Self::Error> {
         Ok(())
     }

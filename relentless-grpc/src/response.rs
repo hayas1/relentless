@@ -1,4 +1,4 @@
-use std::convert::Infallible;
+use std::{convert::Infallible, fmt::Debug};
 
 use relentless::{
     evaluator::{json::JsonEvaluator, plaintext::PlaintextEvaluator},
@@ -46,8 +46,9 @@ pub enum GrpcResponseMessage {
     Json(JsonEvaluator),
 }
 
-impl<Se: Send> ResponseSink<Result<tonic::Response<Se>, tonic::Status>> for GrpcResponse {
+impl<Se: Debug + Send> ResponseSink<Result<tonic::Response<Se>, tonic::Status>> for GrpcResponse {
     type Error = Infallible;
+    #[tracing::instrument(err)]
     async fn consume(&self, res: Destinations<Result<tonic::Response<Se>, tonic::Status>>) -> Result<(), Self::Error> {
         Ok(())
     }
