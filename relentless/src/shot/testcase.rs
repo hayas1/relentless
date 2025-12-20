@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use futures::StreamExt;
 use semigroup::{CombineStream, Semigroup};
 use serde::{Deserialize, Serialize};
@@ -31,7 +33,7 @@ pub struct CaseReport<'a, Q, P> {
 }
 
 impl<Q, P> Testcase<Q, P> {
-    #[tracing::instrument(name = "testcase", skip_all)]
+    #[tracing::instrument(name = "testcase", skip(services))]
     pub async fn shot<T, S, C>(
         &self,
         services: &Destinations<C::Service>,
@@ -40,11 +42,11 @@ impl<Q, P> Testcase<Q, P> {
     ) -> crate::Result<CaseReport<'_, Q, P>>
     where
         T: Clone + Service<C::TransportReq, Response = C::TransportRes> + Send,
-        S: SignContract<T, C> + Default,
+        S: Debug + SignContract<T, C> + Default,
         C: Contract<T, Sign = S, ReqSource = Q, ResSink = P> + Layer<T>,
         C::Service: Clone + Service<C::Request, Response = C::Response>,
-        Q: Clone + Semigroup + RequestSource<C::Request>,
-        P: Clone + Semigroup + ResponseSink<Result<C::Response, ServiceError<T, C>>>,
+        Q: Debug + Clone + Semigroup + RequestSource<C::Request>,
+        P: Debug + Clone + Semigroup + ResponseSink<Result<C::Response, ServiceError<T, C>>>,
     {
         let profile = &self.profile.clone().semigroup(suite.profile.clone());
         let buffers = if Hierarchy::Testcase.contains(&job.sequential) { 1 } else { profile.repeat.times().max(1) };

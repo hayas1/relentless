@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use futures::{StreamExt, TryStreamExt};
 use http::Uri;
 use semigroup::{CombineIterator, Lazy, Semigroup};
@@ -125,16 +127,16 @@ pub struct SuiteReport<'a, C, Q, P> {
     pub evaluated: Evaluated,
 }
 impl<S, Q, P> SuiteCase<S, Q, P> {
-    #[tracing::instrument(name = "suite", skip_all)]
+    #[tracing::instrument(name = "suite", skip(make_service))]
     pub async fn shot<M, T, C>(&self, make_service: M, job: &JobSpec) -> crate::Result<SuiteReport<'_, S, Q, P>>
     where
         M: Clone + MakeService<http::Uri, C::TransportReq, Service = T>,
         T: Clone + Service<C::TransportReq, Response = C::TransportRes> + Send,
-        S: SignContract<T, C> + Default,
+        S: Debug + SignContract<T, C> + Default,
         C: Contract<T, Sign = S, ReqSource = Q, ResSink = P> + Layer<T>,
         C::Service: Clone + Service<C::Request, Response = C::Response> + Send,
-        Q: Clone + Semigroup + RequestSource<C::Request>,
-        P: Clone + Semigroup + ResponseSink<Result<C::Response, ServiceError<T, C>>>,
+        Q: Debug + Clone + Semigroup + RequestSource<C::Request>,
+        P: Debug + Clone + Semigroup + ResponseSink<Result<C::Response, ServiceError<T, C>>>,
     {
         let buffers = if Hierarchy::Suite.contains(&job.sequential) { 1 } else { self.testcases.len().max(1) };
         let destinations = job.destinations(&self.suite.destinations).unwrap_or_else(|e| todo!("{e}"));

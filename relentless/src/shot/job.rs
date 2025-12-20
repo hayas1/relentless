@@ -1,3 +1,4 @@
+use std::fmt::Debug;
 use std::str::FromStr;
 use std::{fs::File, path::PathBuf};
 
@@ -156,16 +157,16 @@ pub struct JobReport<'a, C, Q, P> {
     pub evaluated: Evaluated,
 }
 impl<S, Q, P> Job<S, Q, P> {
-    #[tracing::instrument(name = "job", skip_all)]
+    #[tracing::instrument(name = "job", skip(make_service))]
     pub async fn shot<M, T, C>(&self, make_service: M, job: &JobSpec) -> crate::Result<JobReport<'_, S, Q, P>>
     where
         M: Clone + MakeService<http::Uri, C::TransportReq, Service = T>,
         T: Clone + Service<C::TransportReq, Response = C::TransportRes> + Send,
-        S: SignContract<T, C> + Default,
+        S: Debug + SignContract<T, C> + Default,
         C: Contract<T, Sign = S, ReqSource = Q, ResSink = P> + Layer<T>,
         C::Service: Clone + Service<C::Request, Response = C::Response> + Send,
-        Q: Clone + Semigroup + RequestSource<C::Request>,
-        P: Clone + Semigroup + ResponseSink<Result<C::Response, ServiceError<T, C>>>,
+        Q: Debug + Clone + Semigroup + RequestSource<C::Request>,
+        P: Debug + Clone + Semigroup + ResponseSink<Result<C::Response, ServiceError<T, C>>>,
     {
         let buffers = if Hierarchy::Job.contains(&job.sequential) { 1 } else { self.0.len().max(1) };
         let suites: Vec<_> = futures::stream::iter(&self.0)

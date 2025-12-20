@@ -1,4 +1,4 @@
-use std::{ops::Range, time::Duration};
+use std::{fmt::Debug, ops::Range, time::Duration};
 
 use futures::{StreamExt, TryStreamExt};
 use semigroup::Semigroup;
@@ -45,7 +45,7 @@ impl Repeat {
 }
 
 impl<Q, P> Profile<Q, P> {
-    #[tracing::instrument(name = "profile", skip_all)]
+    #[tracing::instrument(name = "profile", skip(services))]
     pub async fn shot<T, C>(
         &self,
         services: &Destinations<C::Service>,
@@ -56,8 +56,8 @@ impl<Q, P> Profile<Q, P> {
         T: Service<C::TransportReq, Response = C::TransportRes>,
         C: Contract<T, ReqSource = Q, ResSink = P> + Layer<T>,
         C::Service: Clone + Service<C::Request, Response = C::Response>,
-        Q: RequestSource<C::Request>,
-        P: ResponseSink<Result<C::Response, ServiceError<T, C>>>,
+        Q: Debug + RequestSource<C::Request>,
+        P: Debug + ResponseSink<Result<C::Response, ServiceError<T, C>>>,
     {
         let buffers = services.len().max(1);
         let responses = futures::stream::iter(services)
