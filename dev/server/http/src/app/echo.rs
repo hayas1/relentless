@@ -25,8 +25,8 @@ pub fn route_echo() -> Router<AppState> {
         .route("/path/{*rest}", any(path))
         .route("/method", any(method))
         .route("/headers", any(headers))
-        .route("/json", get(Jsonizer::handler::<false>).post(json_body))
-        .route("/json/rich", get(Jsonizer::handler::<true>))
+        .route("/json", get(Jsonizer::handler::<false>).post(json_body)) // TODO move from echo
+        .route("/json/functional", get(Jsonizer::handler::<true>))
 }
 
 #[tracing::instrument]
@@ -125,7 +125,7 @@ impl Jsonizer {
             }
         }
     }
-    pub fn parse<const RICH: bool>(v: &str) -> Result<Value, JsonizeError> {
+    pub fn parse<const B: bool>(v: &str) -> Result<Value, JsonizeError> {
         if let Ok(int) = v.parse::<i64>() {
             Ok(json!(int))
         } else if let Ok(float) = v.parse::<f64>() {
@@ -134,13 +134,13 @@ impl Jsonizer {
             Ok(json!(bool))
         } else if v == "null" {
             Ok(json!(null))
-        } else if RICH {
-            Self::parse_rich(v)
+        } else if B {
+            Self::parse_functional(v)
         } else {
             Ok(json!(v))
         }
     }
-    pub fn parse_rich(v: &str) -> Result<Value, JsonizeError> {
+    pub fn parse_functional(v: &str) -> Result<Value, JsonizeError> {
         match v.strip_prefix('$') {
             Some("randint") => Ok(json!(rand::random::<i64>())),
             Some("rand") => Ok(json!(rand::random::<f64>())),
@@ -156,19 +156,17 @@ impl Jsonizer {
             None => Ok(json!(v)),
         }
     }
-    pub fn jsonize<const RICH: bool>(&self) -> Result<Value, JsonizeError> {
+    pub fn jsonize<const B: bool>(&self) -> Result<Value, JsonizeError> {
         let mut value = Value::Null;
         for (k, v) in &self.0 {
-            Self::put(Self::entry(&mut value, k.split('.'))?, Self::parse::<RICH>(v)?);
+            Self::put(Self::entry(&mut value, k.split('.'))?, Self::parse::<B>(v)?);
         }
         Ok(value)
     }
 
     #[tracing::instrument]
-    pub async fn handler<const RICH: bool>(
-        Query(v): Query<Vec<(String, String)>>,
-    ) -> AppResult<Json<Value>, EchoError> {
-        Ok(Json(Self(v).jsonize::<RICH>().response_map(|e| EchoError::JsonizeError(e.to_string()))?))
+    pub async fn handler<const B: bool>(Query(v): Query<Vec<(String, String)>>) -> AppResult<Json<Value>, EchoError> {
+        Ok(Json(Self(v).jsonize::<B>().response_map(|e| EchoError::JsonizeError(e.to_string()))?))
     }
 }
 
