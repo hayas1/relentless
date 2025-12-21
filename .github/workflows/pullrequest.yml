@@ -27,7 +27,7 @@ jobs:
         key: cargo-${{ hashFiles('**/Cargo.toml') }}
 
     - name: Setup grpc for tests
-      run: ./dev/server/grpc/scripts/setup.sh
+      run: ./dev/scripts/setup-grpc.sh
 
     - run: cargo clippy --all --tests -- --deny warnings
     - run: cargo fmt --all --check

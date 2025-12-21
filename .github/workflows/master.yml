@@ -29,7 +29,7 @@ jobs:
         key: cargo-${{ hashFiles('**/Cargo.toml') }}
 
     - name: Setup grpc for tests
-      run: ./dev/server/grpc/scripts/setup.sh
+      run: ./dev/scripts/setup-grpc.sh
 
     - name: Release test
       run: cargo test --all --release
@@ -89,7 +89,7 @@ jobs:
           ${{ steps.cargo-home.outputs.path }}
         key: cargo-${{ hashFiles('**/Cargo.toml') }}
     - name: Setup grpc for tests
-      run: ./dev/server/grpc/scripts/setup.sh
+      run: ./dev/scripts/setup-grpc.sh
 
     - name: Release build
       run: cargo build --release --features=cli
