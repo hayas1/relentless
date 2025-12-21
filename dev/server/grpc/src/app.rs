@@ -10,13 +10,17 @@ use tonic_tracing_opentelemetry::middleware::{filters, server::OtelGrpcLayer};
 use tower::layer::util::{Identity, Stack};
 
 use crate::{
-    runner::RunCommand,
-    service::{
+    app::{
         counter::{pb::counter_server::CounterServer, CounterImpl, CounterState},
         echo::{pb::echo_server::EchoServer, EchoImpl},
         greeter::{pb::greeter_server::GreeterServer, GreeterImpl},
     },
+    runner::RunCommand,
 };
+
+pub mod counter;
+pub mod echo;
+pub mod greeter;
 
 pub const FILE_DESCRIPTOR_SET: &[u8] = tonic::include_file_descriptor_set!("file_descriptor");
 
@@ -26,12 +30,11 @@ pub struct AppRouter {
 }
 impl AppRouter {
     pub async fn service(self) -> Router<Stack<OtelGrpcLayer, Identity>> {
-        let mut server = Server::builder().layer(OtelGrpcLayer::default().filter(filters::reject_healthcheck));
-        // router(&mut server, env, initial_count)
-        self.router(&mut server).add_service(Self::health_service().await).add_service(Self::reflection_service())
+        let mut builder = Server::builder().layer(OtelGrpcLayer::default().filter(filters::reject_healthcheck));
+        self.router(&mut builder).add_service(Self::health_service().await).add_service(Self::reflection_service())
     }
-    pub fn router<L: Clone>(self, server: &mut Server<L>) -> Router<L> {
-        server
+    pub fn router<L: Clone>(self, builder: &mut Server<L>) -> Router<L> {
+        builder
             .add_service(GreeterServer::new(GreeterImpl))
             .add_service(CounterServer::new(CounterImpl::new(self.state.counter)))
             .add_service(EchoServer::new(EchoImpl))

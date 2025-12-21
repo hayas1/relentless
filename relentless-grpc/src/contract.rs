@@ -283,14 +283,14 @@ where
 
 #[cfg(test)]
 mod tests {
-    use relentless_grpc_dev_server::service::reflection_service;
+    use relentless_grpc_dev_server::app::AppRouter;
 
     use super::*;
 
     #[tokio::test]
     async fn test_from_reflection() {
         let destination = "127.0.0.1:50051".parse().unwrap();
-        let service = reflection_service();
+        let service = AppRouter::reflection_service();
         let pool = GrpcDescriptor::from_reflection(service, &destination).await.unwrap();
         let files: Vec<_> = pool.files().map(|f| f.name().to_string()).collect();
         assert_eq!(

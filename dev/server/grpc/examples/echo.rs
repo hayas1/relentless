@@ -1,5 +1,5 @@
 use prost_types::{Any, Value};
-use relentless_grpc_dev_server::service::echo::pb::echo_client::EchoClient;
+use relentless_grpc_dev_server::app::echo::pb::echo_client::EchoClient;
 use tonic::Request;
 
 #[tokio::main]

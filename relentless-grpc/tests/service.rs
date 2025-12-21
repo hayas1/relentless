@@ -3,7 +3,7 @@ use relentless::{
     shot::job::{Job, JobSpec},
 };
 use relentless_grpc::{contract::DynamicContract, wip::JsonSerializer};
-use relentless_grpc_dev_server::service::greeter::{pb::greeter_server::GreeterServer, GreeterImpl};
+use relentless_grpc_dev_server::app::greeter::{pb::greeter_server::GreeterServer, GreeterImpl};
 use tower::make::Shared;
 
 #[tokio::test]
