@@ -4,16 +4,19 @@ use std::{
     task::{Context, Poll},
 };
 
-use tonic::transport::Channel;
-use tower::{Layer, Service};
+use tonic::{
+    service::{interceptor::InterceptedService, Interceptor},
+    transport::Channel,
+};
+use tower::Service;
 
 #[derive(Debug, Clone)]
-pub struct MakeChannel<L>(pub L);
-impl<L> Service<http::Uri> for MakeChannel<L>
+pub struct MakeChannel<I>(pub I);
+impl<I> Service<http::Uri> for MakeChannel<I>
 where
-    L: Layer<tonic::transport::Channel> + Clone + Send + 'static,
+    I: Interceptor + Clone + Send + 'static,
 {
-    type Response = L::Service;
+    type Response = InterceptedService<Channel, I>;
     type Error = tonic::transport::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
@@ -22,10 +25,10 @@ where
     }
 
     fn call(&mut self, destination: http::Uri) -> Self::Future {
-        let layer = self.0.clone();
+        let interceptor = self.0.clone();
         Box::pin(async move {
             let channel = Channel::builder(destination).connect().await?;
-            Ok(layer.layer(channel))
+            Ok(InterceptedService::new(channel, interceptor))
         })
     }
 }

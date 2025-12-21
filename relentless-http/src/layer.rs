@@ -46,7 +46,6 @@ where
         });
 
         let mut inner = self.inner.clone();
-
         Box::pin(async move { inner.call(req).await })
     }
 }

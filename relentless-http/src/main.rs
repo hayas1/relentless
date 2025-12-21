@@ -8,7 +8,7 @@ pub async fn main() -> Result<ExitCode, Box<dyn std::error::Error>> {
         report::Reporter,
         shot::job::{Cli, Job},
     };
-    use relentless_http::{contract::HttpContract, otel::OtelInjectLayer, service::ReqwestClient};
+    use relentless_http::{contract::HttpContract, layer::OtelInjectLayer, service::ReqwestClient};
     use reqwest::Body;
     use tower::ServiceBuilder;
 

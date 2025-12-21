@@ -2241,6 +2241,7 @@ dependencies = [
  "futures",
  "glob",
  "http",
+ "opentelemetry",
  "prost 0.13.5",
  "prost-build",
  "prost-reflect",
@@ -2258,6 +2259,7 @@ dependencies = [
  "tonic-reflection",
  "tower",
  "tracing",
+ "tracing-opentelemetry",
 ]
 
 [[package]]

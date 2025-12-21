@@ -30,6 +30,8 @@ prost-reflect = { version = "0.15.3", features = [
 tonic = "0.13.1"
 tonic-reflection = "0.13.1"
 tracing = "0.1.43"
+opentelemetry = "0.31.0"
+tracing-opentelemetry = "0.32.0"
 
 bytes = "1.10.1"
 futures = "0.3.31"
@@ -44,6 +46,7 @@ semigroup = { git = "https://github.com/hayas1/semigroup.git", branch = "master"
     "histogram",
     "async",
 ] }
+
 
 [dev-dependencies]
 relentless-grpc-dev-server = { path = "../dev/server/grpc" }

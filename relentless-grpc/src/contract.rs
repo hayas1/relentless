@@ -240,7 +240,7 @@ where
     type ReqSource = GrpcRequest;
     type Request = (PathAndQuery, tonic::Request<D>);
     type TransportReq = http::Request<tonic::body::Body>;
-    type TransportRes = http::Response<tonic::body::Body>;
+    type TransportRes = http::Response<G::ResponseBody>;
     type Response = tonic::Response<<JsonSerializer as Serializer>::Ok>;
     type ResSink = GrpcResponse;
 
