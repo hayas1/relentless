@@ -2266,6 +2266,7 @@ dependencies = [
 name = "relentless-grpc-dev-server"
 version = "0.2.0"
 dependencies = [
+ "clap",
  "init-tracing-opentelemetry",
  "num",
  "prost 0.13.5",

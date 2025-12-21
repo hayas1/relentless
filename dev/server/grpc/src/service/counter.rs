@@ -39,9 +39,14 @@ pub mod pb {
     }
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct CounterState {
+    pub count: Arc<RwLock<BigInt>>,
+}
+
 #[derive(Debug, Default)]
 pub struct CounterImpl {
-    pub counter: Arc<RwLock<BigInt>>,
+    pub state: CounterState,
 }
 
 #[tonic::async_trait]
@@ -94,21 +99,21 @@ impl pb::counter_server::Counter for CounterImpl {
 }
 
 impl CounterImpl {
-    pub fn new(initial_count: BigInt) -> Self {
-        Self { counter: Arc::new(RwLock::new(initial_count)) }
+    pub fn new(state: CounterState) -> Self {
+        Self { state }
     }
 
     pub fn bigint_increment(&self, value: BigInt) -> Result<BigInt, Status> {
-        let mut counter = self.counter.write().map_err(|e| Status::internal(e.to_string()))?;
+        let mut counter = self.state.count.write().map_err(|e| Status::internal(e.to_string()))?;
         *counter += value;
         Ok((*counter).clone())
     }
     pub fn bigint_show(&self) -> Result<BigInt, Status> {
-        let counter = self.counter.read().map_err(|e| Status::internal(e.to_string()))?;
+        let counter = self.state.count.read().map_err(|e| Status::internal(e.to_string()))?;
         Ok((*counter).clone())
     }
     pub fn bigint_reset(&self) -> Result<BigInt, Status> {
-        let mut counter = self.counter.write().map_err(|e| Status::internal(e.to_string())).unwrap();
+        let mut counter = self.state.count.write().map_err(|e| Status::internal(e.to_string())).unwrap();
         *counter = BigInt::from(0);
         Ok((*counter).clone())
     }
@@ -138,7 +143,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_counter_basic() {
-        let server = CounterServer::new(CounterImpl::new(BigInt::from(0)));
+        let server = CounterServer::new(CounterImpl::new(Default::default()));
         let mut client = CounterClient::new(server);
 
         assert_eq!(client.increment(1).await.unwrap().into_inner(), 1);
@@ -153,7 +158,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_counter_too_large_bigint() {
-        let server = CounterServer::new(CounterImpl::new(BigInt::from(0)));
+        let server = CounterServer::new(CounterImpl::new(Default::default()));
         let mut client = CounterClient::new(server);
 
         let large: BigInt = "9999999999999999999999999999999".parse().unwrap();

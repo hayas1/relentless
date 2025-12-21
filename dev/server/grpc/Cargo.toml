@@ -27,6 +27,7 @@ init-tracing-opentelemetry = { version = "0.34.0", features = [
 
 num = "0.4.3"
 thiserror = "2.0.12"
+clap = { version = "4.5.53", features = ["env", "derive"] }
 
 [build-dependencies]
 tonic-build = "0.13.1"
