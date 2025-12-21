@@ -17,7 +17,7 @@ testcases:
         message:
           json:
             name: John Doe
-  - target: echo.Echo/Echo
+  - target: echo.Echo/EchoValue
     profile:
       request:
         message:

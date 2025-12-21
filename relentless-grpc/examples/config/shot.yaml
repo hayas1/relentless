@@ -6,18 +6,25 @@ contract:
     protos:
       - ./dev/server/grpc/proto/greeter.proto
       - ./dev/server/grpc/proto/echo.proto
+      - ./dev/server/grpc/proto/counter.proto
     includes: [./dev/server/grpc/proto]
 
 testcases:
-  - target: greeter.Greeter/SayHello
+  - target: /greeter.Greeter/SayHello
     profile:
       request:
         message:
           json:
             name: John Doe
-  - target: echo.Echo/Echo
+  - target: /echo.Echo/EchoValue
     profile:
       request:
         message:
           json: 100
+  - target: /counter.Counter/Increment
+    profile:
+      request:
+        message:
+          json: 10
+
 
