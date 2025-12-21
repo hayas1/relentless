@@ -30,6 +30,7 @@ impl ErrorResponse {
 }
 
 #[derive(Error, Debug)]
+#[error("{}", self.response.error)]
 pub struct AppError<E> {
     #[source]
     source: Option<Box<dyn std::error::Error>>,
@@ -44,10 +45,6 @@ impl<E> AppError<E> {
         let status = response.status_code();
         Self { source: None, status, response: response.into() }
     }
-    // pub fn response_into<F: From<E>>(self) -> AppError<F> {
-    //     let response = ErrorResponse { error: self.response.error.into() };
-    //     AppError { source: self.source, status: self.status, response }
-    // }
 }
 impl<E: Debug + Serialize> IntoResponse for AppError<E> {
     fn into_response(self) -> Response {

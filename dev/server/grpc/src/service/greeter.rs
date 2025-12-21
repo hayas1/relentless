@@ -9,7 +9,7 @@ pub struct GreeterImpl;
 
 #[tonic::async_trait]
 impl pb::greeter_server::Greeter for GreeterImpl {
-    #[tracing::instrument(ret)]
+    #[tracing::instrument(err)]
     async fn say_hello(&self, request: Request<pb::HelloRequest>) -> Result<Response<pb::HelloResponse>, Status> {
         let pb::HelloRequest { name } = request.into_inner();
         let response = pb::HelloResponse { greeting: format!("Hello {name}!") };

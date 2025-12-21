@@ -164,7 +164,7 @@ impl Jsonizer {
         Ok(value)
     }
 
-    #[tracing::instrument]
+    #[tracing::instrument(err)]
     pub async fn handler<const B: bool>(Query(v): Query<Vec<(String, String)>>) -> AppResult<Json<Value>, EchoError> {
         Ok(Json(Self(v).jsonize::<B>().response_map(|e| EchoError::JsonizeError(e.to_string()))?))
     }

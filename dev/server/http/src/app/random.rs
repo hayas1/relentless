@@ -80,7 +80,7 @@ impl DistributionParameter<Binomial> for Query<BinomialParameter> {
     }
 }
 
-#[tracing::instrument]
+#[tracing::instrument(err)]
 pub async fn random_display<P, T, D>(param: P) -> AppResult<String, RandomError>
 where
     P: DistributionParameter<D> + Debug,
@@ -103,7 +103,7 @@ impl Default for RandomString {
         Self { len: 32 }
     }
 }
-#[tracing::instrument]
+#[tracing::instrument(err)]
 pub async fn random_string<P, T, D>(param: P, rs: Query<RandomString>) -> AppResult<String, RandomError>
 where
     P: DistributionParameter<D> + Debug,
@@ -165,7 +165,7 @@ impl<T: Display> Display for DistRangeParam<T> {
         )
     }
 }
-#[tracing::instrument]
+#[tracing::instrument(err)]
 pub async fn random_range<P, T, D>(param: P, range: Query<DistRangeParam<T>>) -> AppResult<String, RandomError>
 where
     P: DistributionParameter<D> + Debug,

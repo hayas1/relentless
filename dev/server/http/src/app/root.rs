@@ -1,4 +1,4 @@
-#[tracing::instrument]
+#[tracing::instrument(ret)]
 pub async fn root() -> String {
     "Hello World".to_string()
 }

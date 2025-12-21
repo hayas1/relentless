@@ -69,7 +69,7 @@ mod scheme {
     }
 }
 
-#[tracing::instrument]
+#[tracing::instrument(err)]
 pub async fn information(
     Host(hostname): Host,
     OriginalUri(uri): OriginalUri,

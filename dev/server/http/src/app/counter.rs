@@ -81,7 +81,7 @@ impl Display for BInt {
     }
 }
 
-#[tracing::instrument]
+#[tracing::instrument(err)]
 pub async fn counter<T>(
     State(AppState { counter, .. }): State<AppState>,
 ) -> AppResult<Json<CounterResponse<T>>, CounterError>
@@ -94,7 +94,7 @@ where
     Ok(Json(CounterResponse { count }))
 }
 
-#[tracing::instrument]
+#[tracing::instrument(err)]
 pub async fn increment<T>(state: State<AppState>) -> AppResult<Json<CounterResponse<T>>, CounterError>
 where
     T: TryFrom<BigInt> + One + Display,
@@ -102,7 +102,7 @@ where
 {
     increment_with::<T>(state, Path(T::one().to_string())).await
 }
-#[tracing::instrument]
+#[tracing::instrument(err)]
 pub async fn increment_with<T>(
     State(AppState { counter, .. }): State<AppState>,
     Path(value): Path<String>,
@@ -117,7 +117,7 @@ where
     Ok(Json(CounterResponse { count }))
 }
 
-#[tracing::instrument]
+#[tracing::instrument(err)]
 pub async fn decrement<T>(state: State<AppState>) -> AppResult<Json<CounterResponse<T>>, CounterError>
 where
     T: TryFrom<BigInt> + One + Display,
@@ -125,7 +125,7 @@ where
 {
     decrement_with::<T>(state, Path(T::one().to_string())).await
 }
-#[tracing::instrument]
+#[tracing::instrument(err)]
 pub async fn decrement_with<T>(
     State(AppState { counter, .. }): State<AppState>,
     Path(value): Path<String>,
@@ -140,7 +140,7 @@ where
     Ok(Json(CounterResponse { count }))
 }
 
-#[tracing::instrument]
+#[tracing::instrument(err)]
 pub async fn reset<T>(
     State(AppState { counter, .. }): State<AppState>,
 ) -> AppResult<Json<CounterResponse<T>>, CounterError>

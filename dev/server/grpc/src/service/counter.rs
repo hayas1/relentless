@@ -46,47 +46,47 @@ pub struct CounterImpl {
 
 #[tonic::async_trait]
 impl pb::counter_server::Counter for CounterImpl {
-    #[tracing::instrument(ret)]
+    #[tracing::instrument(err)]
     async fn increment(&self, request: Request<i64>) -> Result<Response<i64>, Status> {
         let value = BigInt::from(request.into_inner());
         let incremented = self.bigint_increment(value)?;
         Ok(Response::new(Self::cast_bigint(incremented)?))
     }
-    #[tracing::instrument(ret)]
+    #[tracing::instrument(err)]
     async fn bincrement(&self, request: Request<pb::BigInt>) -> Result<Response<pb::BigInt>, Status> {
         let bint = request.into_inner().into();
         let incremented = self.bigint_increment(bint)?;
         Ok(Response::new(incremented.into()))
     }
-    #[tracing::instrument(ret)]
+    #[tracing::instrument(err)]
     async fn decrement(&self, request: Request<i64>) -> Result<Response<i64>, Status> {
         let value = request.into_inner();
         let decremented = self.bigint_increment(BigInt::from(-value))?;
         Ok(Response::new(Self::cast_bigint(decremented)?))
     }
-    #[tracing::instrument(ret)]
+    #[tracing::instrument(err)]
     async fn bdecrement(&self, request: Request<pb::BigInt>) -> Result<Response<pb::BigInt>, Status> {
         let bint = BigInt::from(request.into_inner());
         let decremented = self.bigint_increment(-bint)?;
         Ok(Response::new(decremented.into()))
     }
 
-    #[tracing::instrument(ret)]
+    #[tracing::instrument(err)]
     async fn show(&self, _: Request<()>) -> Result<Response<i64>, Status> {
         let shown = self.bigint_show()?;
         Ok(Response::new(Self::cast_bigint(shown)?))
     }
-    #[tracing::instrument(ret)]
+    #[tracing::instrument(err)]
     async fn bshow(&self, _: Request<()>) -> Result<Response<pb::BigInt>, Status> {
         let shown = self.bigint_show()?;
         Ok(Response::new(shown.into()))
     }
-    #[tracing::instrument(ret)]
+    #[tracing::instrument(err)]
     async fn reset(&self, _: Request<()>) -> Result<Response<i64>, Status> {
         let reset = self.bigint_reset()?;
         Ok(Response::new(Self::cast_bigint(reset)?))
     }
-    #[tracing::instrument(ret)]
+    #[tracing::instrument(err)]
     async fn breset(&self, _: Request<()>) -> Result<Response<pb::BigInt>, Status> {
         let reset = self.bigint_reset()?;
         Ok(Response::new(reset.into()))

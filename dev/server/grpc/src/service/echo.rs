@@ -60,17 +60,17 @@ pub struct EchoImpl;
 
 #[tonic::async_trait]
 impl pb::echo_server::Echo for EchoImpl {
-    #[tracing::instrument(ret)]
+    #[tracing::instrument(err)]
     async fn echo(&self, request: Request<Any>) -> Result<Response<Any>, Status> {
         let value = request.into_inner();
         Ok(Response::new(value))
     }
-    #[tracing::instrument(ret)]
+    #[tracing::instrument(err)]
     async fn echo_value(&self, request: Request<Value>) -> Result<Response<Value>, Status> {
         let value = request.into_inner();
         Ok(Response::new(value))
     }
-    #[tracing::instrument(ret)]
+    #[tracing::instrument(err)]
     async fn echo_metadata(&self, request: Request<()>) -> Result<Response<pb::MetadataMap>, Status> {
         let map = request.metadata();
         Ok(Response::new(pb::MetadataMap::from(map)))

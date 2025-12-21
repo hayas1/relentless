@@ -49,23 +49,23 @@ mod health_response {
     }
 }
 
-#[tracing::instrument]
+#[tracing::instrument(ret)]
 pub async fn health() -> String {
     "ok".to_string()
 }
 
-#[tracing::instrument]
+#[tracing::instrument(ret)]
 pub async fn health_rich() -> Health {
     Health { status: StatusCode::OK }
 }
 
-#[tracing::instrument]
+#[tracing::instrument(ret)]
 pub async fn health_heavy() -> Health {
     tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
     Health { status: StatusCode::TOO_MANY_REQUESTS }
 }
 
-#[tracing::instrument]
+#[tracing::instrument(ret)]
 pub async fn disabled() -> Health {
     Health { status: StatusCode::SERVICE_UNAVAILABLE }
 }
