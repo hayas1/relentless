@@ -4,7 +4,6 @@ use std::process::ExitCode;
 #[tokio::main]
 pub async fn main() -> Result<ExitCode, Box<dyn std::error::Error>> {
     use relentless::{
-        record::metric::MeasureLayer,
         report::Reporter,
         shot::job::{Cli, Job},
     };
@@ -13,12 +12,12 @@ pub async fn main() -> Result<ExitCode, Box<dyn std::error::Error>> {
     };
 
     Cli::run(|job: Job<_, _, _>, spec| async move {
-        let measure = MeasureLayer::new();
+        // let measure = MeasureLayer::new();
         let otel = OtelInterceptor;
         let make = MakeChannel(otel);
         let report = job.shot::<_, _, DynamicContract<serde_json::Value, JsonSerializer>>(make, &spec).await?;
         spec.report_format.report(&report)?;
-        dbg!(measure.aggregated().times());
+        // dbg!(measure.aggregated().times());
         Ok((!report.evaluated.pass as u8).into())
     })
     .await

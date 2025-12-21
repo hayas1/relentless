@@ -8,6 +8,7 @@ use tonic_health::{
     server::HealthService,
 };
 use tonic_reflection::server::v1::{ServerReflection, ServerReflectionServer};
+use tonic_tracing_opentelemetry::middleware::{filters, server::OtelGrpcLayer};
 use tower::layer::util::{Identity, Stack};
 
 use crate::{env::Env, middleware::logging::LoggingLayer};
@@ -18,14 +19,16 @@ pub mod greeter;
 
 pub const FILE_DESCRIPTOR_SET: &[u8] = tonic::include_file_descriptor_set!("file_descriptor");
 
-pub async fn app(env: Env) -> Router<Stack<LoggingLayer, Identity>> {
+pub async fn app(env: Env) -> Router<Stack<OtelGrpcLayer, Identity>> {
     app_with(env, 0.into()).await
 }
-pub async fn app_with(env: Env, initial_count: BigInt) -> Router<Stack<LoggingLayer, Identity>> {
+pub async fn app_with(env: Env, initial_count: BigInt) -> Router<Stack<OtelGrpcLayer, Identity>> {
     let health_service = health_service().await;
     let reflection_service = reflection_service();
 
-    let mut builder = Server::builder().trace_fn(|_| tracing::info_span!(env!("CARGO_PKG_NAME"))).layer(LoggingLayer);
+    let mut builder = Server::builder().layer(OtelGrpcLayer::default().filter(filters::reject_healthcheck));
+    // .trace_fn(|_| tracing::info_span!(env!("CARGO_PKG_NAME")))
+    // .layer(LoggingLayer);
     router(&mut builder, env, initial_count).add_service(health_service).add_service(reflection_service)
 }
 pub async fn health_service() -> HealthServer<impl Health> {
@@ -48,10 +51,10 @@ pub fn reflection_service() -> ServerReflectionServer<impl ServerReflection> {
     reflection_service
 }
 pub fn router(
-    builder: &mut Server<Stack<LoggingLayer, Identity>>,
+    builder: &mut Server<Stack<OtelGrpcLayer, Identity>>,
     env: Env,
     initial_count: BigInt,
-) -> Router<Stack<LoggingLayer, Identity>> {
+) -> Router<Stack<OtelGrpcLayer, Identity>> {
     let _ = env;
 
     builder

@@ -20,6 +20,10 @@ tokio = { version = "1.45.1", features = [
 ] }
 tracing = "0.1.41"
 tracing-subscriber = "0.3.19"
+tonic-tracing-opentelemetry = "0.32.0"
+init-tracing-opentelemetry = { version = "0.34.0", features = [
+    "tracing_subscriber_ext",
+] }
 
 num = "0.4.3"
 thiserror = "2.0.12"
