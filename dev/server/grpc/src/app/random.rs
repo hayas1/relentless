@@ -131,3 +131,62 @@ impl pb::random_server::Random for RandomImpl {
         Ok(Response::new(pb::RandomString { value }))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use pb::{random_client::RandomClient, random_server::RandomServer};
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_random_basic() {
+        let server = RandomServer::new(RandomImpl);
+        let mut client = RandomClient::new(server);
+
+        let standard_int =
+            pb::DistributionInt { distribution: Some(pb::distribution_int::Distribution::Standard(pb::Standard {})) };
+        assert_ne!(
+            client.int(standard_int).await.unwrap().into_inner(),
+            client.int(standard_int).await.unwrap().into_inner()
+        );
+
+        let uniform_float = pb::DistributionFloat {
+            distribution: Some(pb::distribution_float::Distribution::Uniform(pb::UniformFloat {
+                min: 0.,
+                max: 1.,
+                inclusive: false,
+            })),
+        };
+        assert_ne!(
+            client.float(uniform_float).await.unwrap().into_inner(),
+            client.float(uniform_float).await.unwrap().into_inner()
+        );
+
+        let alphabetic_string = pb::DistributionString {
+            length: 10,
+            distribution: Some(pb::distribution_string::Distribution::Alphanumeric(pb::Alphanumeric {})),
+        };
+        assert_ne!(
+            client.string(alphabetic_string).await.unwrap().into_inner(),
+            client.string(alphabetic_string).await.unwrap().into_inner()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_random_error() {
+        let server = RandomServer::new(RandomImpl);
+        let mut client = RandomClient::new(server);
+
+        let uniform_uint = pb::DistributionInt {
+            distribution: Some(pb::distribution_int::Distribution::Uniform(pb::UniformInt {
+                min: 100,
+                max: -100,
+                inclusive: false,
+            })),
+        };
+        assert_eq!(
+            client.int(uniform_uint).await.unwrap_err().message(),
+            "low > high (or equal if exclusive) in uniform distribution"
+        );
+    }
+}
