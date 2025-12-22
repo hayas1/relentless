@@ -1,5 +1,9 @@
-use axum::{extract::Path, routing::get, Json, Router};
-use jiff::Span;
+use axum::{
+    extract::{Path, Query},
+    routing::get,
+    Json, Router,
+};
+use jiff::{Span, Timestamp};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -11,19 +15,28 @@ use crate::{
 pub fn route_wait() -> Router<AppState> {
     Router::new().route("/{time}", get(wait))
 }
+#[derive(Debug, Clone, PartialEq, Eq, Default, Hash, Serialize, Deserialize)]
+pub struct WaitQuery {
+    pub now: Option<Timestamp>,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Hash, Serialize, Deserialize)]
 pub struct WaitResponse {
+    pub from: i64,
     pub wait: String,
 }
 
 #[tracing::instrument(err)]
-pub async fn wait(Path(time): Path<String>) -> AppResult<Json<WaitResponse>, WaitError> {
+pub async fn wait(
+    Path(time): Path<String>,
+    Query(query): Query<WaitQuery>,
+) -> AppResult<Json<WaitResponse>, WaitError> {
+    let from = query.now.unwrap_or_else(Timestamp::now).as_millisecond();
     let span: Span = time.parse().response(WaitError::InvalidTime(time))?;
     let duration = span.try_into().response(WaitError::CannotWait(span))?;
     tokio::time::sleep(duration).await;
     let wait = format!("{span:#}");
-    Ok(Json(WaitResponse { wait }))
+    Ok(Json(WaitResponse { from, wait }))
 }
 
 #[derive(Debug, Error, Serialize, Deserialize)]
@@ -38,7 +51,10 @@ impl AsStatusCode for WaitError {}
 
 #[cfg(test)]
 mod tests {
-    use std::time::{Duration, Instant};
+    use std::{
+        str::FromStr,
+        time::{Duration, Instant},
+    };
 
     use axum::{
         body::Body,
@@ -56,12 +72,18 @@ mod tests {
     async fn test_wait() {
         let mut service = AppRouter::default().service();
 
-        let req = Request::builder().uri("/wait/500ms").body(Body::empty()).unwrap();
+        let req = Request::builder().uri("/wait/500ms?now=2026-01-01T00:00:00Z").body(Body::empty()).unwrap();
         let now = Instant::now();
         let res = call(&mut service, req).await.unwrap();
         assert!(now.elapsed() >= Duration::from_millis(500));
         assert_eq!(res.status(), StatusCode::OK);
-        assert_eq!(&WaitResponse { wait: "500ms".to_string() }, res.body());
+        assert_eq!(
+            &WaitResponse {
+                from: Timestamp::from_str("2026-01-01T00:00:00Z").unwrap().as_millisecond(),
+                wait: "500ms".to_string()
+            },
+            res.body()
+        );
     }
 
     #[tokio::test]
