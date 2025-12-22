@@ -48,6 +48,7 @@ where
     <G::ResponseBody as Body>::Error: Into<Box<dyn std::error::Error + Send + Sync + 'static>> + Send,
 {
     type Error = relentless::Error;
+    #[tracing::instrument(skip(service), err)]
     async fn sign_contract(&self, service: G, destination: &http::Uri) -> Result<DynamicContract<D, S>, Self::Error> {
         let pool = match self {
             Self::ProtoFiles { protos, includes } => Self::from_protos(protos, includes)?,
@@ -58,11 +59,13 @@ where
     }
 }
 impl GrpcDescriptor {
+    #[tracing::instrument(err)]
     pub fn from_protos(protos: &[PathBuf], includes: &[PathBuf]) -> relentless::Result<DescriptorPool> {
         let builder = &mut prost_build::Config::new();
         let fds = builder.load_fds(protos, includes).map_err(relentless::Error::boxed)?;
         DescriptorPool::from_file_descriptor_set(fds).map_err(relentless::Error::boxed)
     }
+    #[tracing::instrument(err)]
     pub fn descriptor_from_file(path: &PathBuf) -> relentless::Result<DescriptorPool> {
         let mut descriptor_bytes = Vec::new();
         File::open(path)
@@ -71,6 +74,7 @@ impl GrpcDescriptor {
             .map_err(relentless::Error::boxed)?;
         DescriptorPool::decode(Bytes::from(descriptor_bytes)).map_err(relentless::Error::boxed)
     }
+    #[tracing::instrument(skip(service), err)]
     pub async fn from_reflection<G>(service: G, destination: &http::Uri) -> relentless::Result<DescriptorPool>
     where
         G: Clone + GrpcService<tonic::body::Body> + Send + Sync + 'static,
