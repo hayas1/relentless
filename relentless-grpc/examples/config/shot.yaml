@@ -10,18 +10,18 @@ contract:
     includes: [./dev/server/grpc/proto]
 
 testcases:
-  - target: /greeter.Greeter/SayHello
+  - target: greeter.Greeter/SayHello
     profile:
       request:
         message:
           json:
             name: John Doe
-  - target: /echo.Echo/EchoValue
+  - target: echo.Echo/EchoValue
     profile:
       request:
         message:
           json: 100
-  - target: /counter.Counter/Increment
+  - target: counter.Counter/Increment
     profile:
       request:
         message:

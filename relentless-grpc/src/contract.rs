@@ -6,6 +6,7 @@ use std::{
     marker::PhantomData,
     path::PathBuf,
     pin::Pin,
+    str::FromStr,
     task::{Context, Poll},
 };
 
@@ -238,7 +239,7 @@ where
 {
     type Sign = GrpcDescriptor;
     type ReqSource = GrpcRequest;
-    type Request = (PathAndQuery, tonic::Request<D>);
+    type Request = (MethodPath, tonic::Request<D>);
     type TransportReq = http::Request<tonic::body::Body>;
     type TransportRes = http::Response<G::ResponseBody>;
     type Response = tonic::Response<<JsonSerializer as Serializer>::Ok>;
@@ -253,7 +254,7 @@ pub struct DynamicService<G, D, S> {
     service: G,
     phantom: PhantomData<(D, S)>,
 }
-impl<G, D, S> Service<(PathAndQuery, tonic::Request<D>)> for DynamicService<G, D, S>
+impl<G, D, S> Service<(MethodPath, tonic::Request<D>)> for DynamicService<G, D, S>
 where
     G: GrpcService<tonic::body::Body> + Clone + Send + 'static,
     G::ResponseBody: Send,
@@ -270,14 +271,52 @@ where
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, req: (PathAndQuery, tonic::Request<D>)) -> Self::Future {
+    fn call(&mut self, req: (MethodPath, tonic::Request<D>)) -> Self::Future {
+        let (method_path, request) = req;
+        let codec = DynamicCodec::with_pool(self.pool.clone(), &method_path, JsonSerializer::default()).unwrap();
         let mut grpc = tonic::client::Grpc::new(self.service.clone());
-        let (target, request) = req;
-        let codec = DynamicCodec::with_pool(self.pool.clone(), &target, JsonSerializer::default()).unwrap();
         Box::pin(async move {
+            let path = method_path.format().map_err(|e| Status::unknown(e.to_string()))?;
             grpc.ready().await.map_err(|e| Status::unknown(format!("Service was not ready: {}", e.into())))?; // ref https://github.com/hyperium/tonic/blob/v0.14.2/tonic-build/src/client.rs#L240-L242
-            grpc.unary(request, target, codec).await
+            grpc.unary(request, path, codec).await
         })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash)]
+pub struct MethodPath {
+    service: String,
+    method: String,
+}
+impl FromStr for MethodPath {
+    type Err = Infallible;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match &s.split('/').collect::<Vec<_>>()[..] {
+            &[service, method] | &["", service, method] => Ok((service, method).into()),
+            _ => todo!(),
+        }
+    }
+}
+impl<S: Into<String>, M: Into<String>> From<(S, M)> for MethodPath {
+    fn from((service, method): (S, M)) -> Self {
+        Self { service: service.into(), method: method.into() }
+    }
+}
+impl From<MethodPath> for (String, String) {
+    fn from(MethodPath { service, method }: MethodPath) -> Self {
+        (service, method)
+    }
+}
+impl MethodPath {
+    pub fn parts(&self) -> (&str, &str) {
+        let Self { service, method } = self;
+        (service, method)
+    }
+    pub fn format(&self) -> Result<PathAndQuery, <PathAndQuery as FromStr>::Err> {
+        // ref https://github.com/hyperium/tonic/blob/v0.14.2/tonic-build/src/lib.rs#L158-L164
+        let Self { service, method } = self;
+        format!("/{service}/{method}").parse()
     }
 }
 
@@ -305,5 +344,22 @@ mod tests {
                 "google/protobuf/struct.proto",
             ]
         );
+    }
+
+    #[test]
+    fn test_method_path() {
+        let method_path1 = MethodPath::from_str("greeter.Greeter/SayHello").unwrap();
+        assert_eq!(method_path1.parts(), ("greeter.Greeter", "SayHello"));
+        assert_eq!(method_path1.format().unwrap(), PathAndQuery::from_static("/greeter.Greeter/SayHello"));
+
+        let method_path2 = MethodPath::from_str("/greeter.Greeter/SayHello").unwrap();
+        assert_eq!(method_path2.parts(), ("greeter.Greeter", "SayHello"));
+        assert_eq!(method_path2.format().unwrap(), PathAndQuery::from_static("/greeter.Greeter/SayHello"));
+
+        // let error = MethodPath::from_str("//greeter.Greeter/SayHello").unwrap_err();
+        // assert_eq!(
+        //     error.to_string(),
+        //     todo!()
+        // );
     }
 }

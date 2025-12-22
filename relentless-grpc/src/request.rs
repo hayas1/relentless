@@ -1,9 +1,10 @@
 use std::{convert::Infallible, str::FromStr};
 
-use http::uri::PathAndQuery;
 use relentless::shot::contract::RequestSource;
 use semigroup::Semigroup;
 use serde::{Deserialize, Serialize};
+
+use crate::contract::MethodPath;
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, Semigroup)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
@@ -22,15 +23,15 @@ pub enum GrpcRequestMessage {
     Json(serde_json::Value),
 }
 
-impl RequestSource<(PathAndQuery, tonic::Request<serde_json::Value>)> for GrpcRequest {
+impl RequestSource<(MethodPath, tonic::Request<serde_json::Value>)> for GrpcRequest {
     type Error = relentless::Error;
     #[tracing::instrument(ret, err)]
     async fn produce(
         &self,
         destination: &http::Uri,
         target: &str,
-    ) -> Result<(PathAndQuery, tonic::Request<serde_json::Value>), Self::Error> {
-        let pq = PathAndQuery::from_str(target).map_err(relentless::Error::boxed)?;
+    ) -> Result<(MethodPath, tonic::Request<serde_json::Value>), Self::Error> {
+        let pq = MethodPath::from_str(target).map_err(relentless::Error::boxed)?;
         let request = self.message.as_ref().unwrap_or(&Default::default()).produce(destination, target).await?;
         Ok((pq, tonic::Request::from_parts(Default::default(), Default::default(), request)))
     }

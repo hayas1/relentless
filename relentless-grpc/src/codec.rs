@@ -1,13 +1,14 @@
 use std::marker::PhantomData;
 
 use bytes::Buf;
-use http::uri::PathAndQuery;
 use prost_reflect::{prost::Message, DescriptorPool, DynamicMessage, MessageDescriptor, MethodDescriptor};
 use serde::{Deserializer, Serialize, Serializer};
 use tonic::{
     codec::{Codec, Decoder, Encoder},
     Status,
 };
+
+use crate::contract::MethodPath;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct DynamicCodec<D, S> {
@@ -24,11 +25,11 @@ impl<D, S> DynamicCodec<D, S> {
     pub fn new(method: MethodDescriptor, serializer: S) -> Self {
         Self { method, serializer, phantom: PhantomData }
     }
-    pub fn with_pool(pool: DescriptorPool, target: &PathAndQuery, serializer: S) -> Option<Self> {
-        Some(Self::new(Self::get_method(pool, target)?, serializer))
+    pub fn with_pool(pool: DescriptorPool, method_path: &MethodPath, serializer: S) -> Option<Self> {
+        Some(Self::new(Self::get_method(pool, method_path)?, serializer))
     }
-    pub fn get_method(pool: DescriptorPool, target: &PathAndQuery) -> Option<MethodDescriptor> {
-        let (svc, mtd) = target.as_str().split_once('/')?;
+    pub fn get_method(pool: DescriptorPool, method_path: &MethodPath) -> Option<MethodDescriptor> {
+        let (svc, mtd) = method_path.parts();
         let service = pool.get_service_by_name(svc)?;
         let method = service.methods().find(|m| m.name() == mtd)?;
         Some(method)

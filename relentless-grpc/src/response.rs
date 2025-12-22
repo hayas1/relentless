@@ -50,6 +50,9 @@ impl<Se: Debug + Send> ResponseSink<Result<tonic::Response<Se>, tonic::Status>> 
     type Error = Infallible;
     #[tracing::instrument(err)]
     async fn consume(&self, res: Destinations<Result<tonic::Response<Se>, tonic::Status>>) -> Result<(), Self::Error> {
+        for (_, res) in res {
+            dbg!(res.unwrap());
+        }
         Ok(())
     }
 }
