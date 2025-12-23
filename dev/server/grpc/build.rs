@@ -10,6 +10,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .build_server(true)
         .build_client(true)
         .file_descriptor_set_path(std::path::PathBuf::from(std::env::var("OUT_DIR")?).join("file_descriptor.bin"))
+        .protoc_arg("--experimental_allow_proto3_optional")
         .compile_protos(&protos, &["proto/"])?;
     Ok(())
 }

@@ -1,0 +1,19 @@
+syntax = "proto3";
+package wait;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+
+service Wait {
+  rpc Wait(WaitRequest) returns (WaitResponse);
+}
+
+message WaitRequest {
+  optional google.protobuf.Timestamp now  = 1;
+  google.protobuf.Duration           wait = 2;
+}
+
+message WaitResponse {
+  google.protobuf.Timestamp from = 1;
+  google.protobuf.Duration  wait = 2;
+}

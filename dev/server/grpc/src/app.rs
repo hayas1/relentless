@@ -15,6 +15,7 @@ use crate::{
         echo::{pb::echo_server::EchoServer, EchoImpl},
         greeter::{pb::greeter_server::GreeterServer, GreeterImpl},
         random::{pb::random_server::RandomServer, RandomImpl},
+        wait::{pb::wait_server::WaitServer, WaitImpl},
     },
     runner::RunCommand,
 };
@@ -23,6 +24,7 @@ pub mod counter;
 pub mod echo;
 pub mod greeter;
 pub mod random;
+pub mod wait;
 
 pub const FILE_DESCRIPTOR_SET: &[u8] = tonic::include_file_descriptor_set!("file_descriptor");
 
@@ -41,6 +43,7 @@ impl AppRouter {
             .add_service(CounterServer::new(CounterImpl::new(self.state.counter)))
             .add_service(EchoServer::new(EchoImpl))
             .add_service(RandomServer::new(RandomImpl))
+            .add_service(WaitServer::new(WaitImpl))
     }
 
     pub async fn health_service() -> HealthServer<impl Health> {
@@ -50,6 +53,7 @@ impl AppRouter {
         health_reporter.set_serving::<CounterServer<CounterImpl>>().await;
         health_reporter.set_serving::<EchoServer<EchoImpl>>().await;
         health_reporter.set_serving::<RandomServer<RandomImpl>>().await;
+        health_reporter.set_serving::<WaitServer<WaitImpl>>().await;
 
         health_service
     }

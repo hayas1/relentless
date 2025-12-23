@@ -92,6 +92,7 @@ pub struct RandomImpl;
 
 #[tonic::async_trait]
 impl pb::random_server::Random for RandomImpl {
+    #[tracing::instrument(err)]
     async fn int(&self, request: Request<pb::DistributionInt>) -> Result<Response<pb::RandomInt>, Status> {
         let pb::DistributionInt { distribution } = request.into_inner();
         let value = match distribution.unwrap() {
@@ -107,6 +108,7 @@ impl pb::random_server::Random for RandomImpl {
         };
         Ok(Response::new(pb::RandomInt { value }))
     }
+    #[tracing::instrument(err)]
     async fn float(&self, request: Request<pb::DistributionFloat>) -> Result<Response<pb::RandomFloat>, Status> {
         let pb::DistributionFloat { distribution } = request.into_inner();
         let value = match distribution.unwrap() {
@@ -118,6 +120,7 @@ impl pb::random_server::Random for RandomImpl {
         };
         Ok(Response::new(pb::RandomFloat { value }))
     }
+    #[tracing::instrument(err)]
     async fn string(&self, request: Request<pb::DistributionString>) -> Result<Response<pb::RandomString>, Status> {
         let pb::DistributionString { length, distribution } = request.into_inner();
         let value = match distribution.unwrap() {
