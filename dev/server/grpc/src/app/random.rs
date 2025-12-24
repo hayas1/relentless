@@ -150,7 +150,7 @@ mod tests {
             pb::DistributionInt { distribution: Some(pb::distribution_int::Distribution::Standard(pb::Standard {})) };
         assert_ne!(
             client.int(standard_int).await.unwrap().into_inner(),
-            client.int(standard_int).await.unwrap().into_inner()
+            client.int(standard_int).await.unwrap().into_inner(),
         );
 
         let uniform_float = pb::DistributionFloat {
@@ -162,7 +162,7 @@ mod tests {
         };
         assert_ne!(
             client.float(uniform_float).await.unwrap().into_inner(),
-            client.float(uniform_float).await.unwrap().into_inner()
+            client.float(uniform_float).await.unwrap().into_inner(),
         );
 
         let alphabetic_string = pb::DistributionString {
@@ -171,7 +171,7 @@ mod tests {
         };
         assert_ne!(
             client.string(alphabetic_string).await.unwrap().into_inner(),
-            client.string(alphabetic_string).await.unwrap().into_inner()
+            client.string(alphabetic_string).await.unwrap().into_inner(),
         );
     }
 
@@ -189,7 +189,7 @@ mod tests {
         };
         assert_eq!(
             client.int(uniform_uint).await.unwrap_err().message(),
-            "low > high (or equal if exclusive) in uniform distribution"
+            "low > high (or equal if exclusive) in uniform distribution",
         );
     }
 }
