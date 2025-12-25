@@ -51,7 +51,8 @@ impl<Se: Debug + Send> ResponseSink<Result<tonic::Response<Se>, tonic::Status>> 
     #[tracing::instrument(err)]
     async fn consume(&self, res: Destinations<Result<tonic::Response<Se>, tonic::Status>>) -> Result<(), Self::Error> {
         for (_, res) in res {
-            dbg!(res.unwrap());
+            let resp = res.unwrap();
+            // dbg!(resp);
         }
         Ok(())
     }

@@ -56,7 +56,8 @@ impl<ResB: Body + Debug + Send, E: Debug + Send> ResponseSink<Result<http::Respo
     #[tracing::instrument(err)]
     async fn consume(&self, res: Destinations<Result<http::Response<ResB>, E>>) -> Result<(), Self::Error> {
         for (_, res) in res {
-            dbg!(res.unwrap());
+            let resp = res.unwrap();
+            // dbg!(resp);
         }
         Ok(())
     }
