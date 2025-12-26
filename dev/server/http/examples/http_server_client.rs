@@ -6,32 +6,28 @@ use relentless_http_dev_server::{
 };
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+async fn main() {
     tokio::spawn(server());
-    wait().await;
     tokio::spawn(client()).await.unwrap();
-    Ok(())
 }
 
 async fn server() {
-    let rc = RunCommand { listen: "0.0.0.0".into(), port: "3030".into() };
+    let rc = RunCommand { listen: "0.0.0.0".into(), port: "3333".into() };
     rc.serve().await.unwrap()
 }
 
-async fn wait() {
-    while reqwest::get("http://localhost:3030").await.is_err() {
+async fn client() {
+    while reqwest::get("http://localhost:3333").await.is_err() {
         tokio::time::sleep(Duration::from_millis(200)).await;
     }
-}
 
-async fn client() {
-    let hello: String = reqwest::get("http://localhost:3030").await.unwrap().text().await.unwrap();
+    let hello: String = reqwest::get("http://localhost:3333").await.unwrap().text().await.unwrap();
     println!("hello: {hello}");
 
-    let health: Health = reqwest::get("http://localhost:3030/health/rich").await.unwrap().json().await.unwrap();
+    let health: Health = reqwest::get("http://localhost:3333/health/rich").await.unwrap().json().await.unwrap();
     println!("health: {health:?}");
 
     let counter: CounterResponse<i64> =
-        reqwest::get("http://localhost:3030/counter/increment").await.unwrap().json().await.unwrap();
+        reqwest::get("http://localhost:3333/counter/increment").await.unwrap().json().await.unwrap();
     println!("counter: {counter:?}");
 }
