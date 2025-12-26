@@ -78,6 +78,14 @@ pub enum Assessment {
     Poor,
     Bad,
 }
+impl Assessment {
+    pub fn success(&self) -> bool {
+        matches!(self, Self::Good | Self::Acceptable)
+    }
+    pub fn failure(&self) -> bool {
+        matches!(self, Self::Bad | Self::Poor)
+    }
+}
 
 pub type ContractError<T, C> = ContractErrorWrap<
     <C as Contract<T>>::SignError,
