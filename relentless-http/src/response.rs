@@ -46,6 +46,7 @@ pub enum HttpResponseStatus {
 pub enum HttpResponseHeaders {
     #[default]
     AnyOrEqual,
+    // Allowlist(Vec<String>), // TODO
     Expect(ExpectEvaluator<http_newtype_serde::HeaderMap>),
     Ignore,
 }
@@ -129,8 +130,8 @@ impl Evaluator<HeaderMap> for HttpResponseHeaders {
     }
     fn evaluate_compare(&self, res1: &HeaderMap, res2: &HeaderMap) -> Result<(), Self::Error> {
         let (resp1, resp2): (HashMap<_, _>, HashMap<_, _>) = (
-            Self::DEFAULT_WHITELIST.iter().filter_map(|&k| Some((k, res1.get(k)?))).collect(),
-            Self::DEFAULT_WHITELIST.iter().filter_map(|&k| Some((k, res2.get(k)?))).collect(),
+            self.allowlist().iter().filter_map(|&k| Some((k, res1.get(k)?))).collect(),
+            self.allowlist().iter().filter_map(|&k| Some((k, res2.get(k)?))).collect(),
         );
         match self {
             Self::AnyOrEqual => self.evaluate(resp1 == resp2, |_| EvaluateError::custom("not equal headers")),
@@ -140,8 +141,11 @@ impl Evaluator<HeaderMap> for HttpResponseHeaders {
     }
 }
 impl HttpResponseHeaders {
-    pub const DEFAULT_WHITELIST: &[&str] =
+    pub const DEFAULT_ALLOWLIST: &[&str] =
         &["content-type", "content-length", "content-language", "content-encoding", "cache-control"];
+    pub fn allowlist(&self) -> &[&str] {
+        Self::DEFAULT_ALLOWLIST
+    }
 }
 impl Evaluator<Bytes> for HttpResponseBody {
     type Error = EvaluateError;
