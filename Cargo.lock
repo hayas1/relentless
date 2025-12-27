@@ -2311,6 +2311,7 @@ dependencies = [
  "assert-json-diff",
  "axum",
  "bytes",
+ "futures",
  "glob",
  "http",
  "http-body",
