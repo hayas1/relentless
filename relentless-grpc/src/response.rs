@@ -1,7 +1,7 @@
 use std::{convert::Infallible, fmt::Debug};
 
 use relentless::{
-    evaluator::{json::JsonEvaluator, plaintext::PlaintextEvaluator},
+    evaluator::{evaluate::Messages, json::JsonEvaluator, plaintext::PlaintextEvaluator},
     shot::{contract::ResponseSink, destinations::Destinations},
 };
 use semigroup::Semigroup;
@@ -47,10 +47,13 @@ pub enum GrpcResponseMessage {
 }
 
 impl<Se: Debug + Send> ResponseSink<Result<tonic::Response<Se>, tonic::Status>> for GrpcResponse {
+    type Warn = Infallible;
     type Error = Infallible;
     #[tracing::instrument(err)]
-    async fn consume(&self, res: Destinations<Result<tonic::Response<Se>, tonic::Status>>) -> Result<(), Self::Error> {
-        let Self { status, metadata_map, message } = self;
-        Ok(())
+    async fn consume(
+        &self,
+        res: Destinations<Result<tonic::Response<Se>, tonic::Status>>,
+    ) -> Result<Messages<Self::Warn>, Messages<Self::Error>> {
+        Ok(Messages::empty())
     }
 }

@@ -6,7 +6,7 @@ use std::{
 use semigroup::Semigroup;
 use tower::{Layer, MakeService, Service};
 
-use crate::shot::destinations::Destinations;
+use crate::{evaluator::evaluate::Messages, shot::destinations::Destinations};
 
 #[trait_variant::make(Send)]
 pub trait Contract<T>: Sized {
@@ -26,7 +26,7 @@ pub type ServiceResponse<T, C> = <<C as Layer<T>>::Service as Service<<C as Cont
 pub type ServiceError<T, C> = <<C as Layer<T>>::Service as Service<<C as Contract<T>>::Request>>::Error;
 pub type ReqSourceError<T, C> = <<C as Contract<T>>::ReqSource as RequestSource<<C as Contract<T>>::Request>>::Error;
 pub type ResSinkError<T, C> =
-    <<C as Contract<T>>::ResSink as ResponseSink<Result<ServiceResponse<T, C>, ServiceError<T, C>>>>::Error;
+    Messages<<<C as Contract<T>>::ResSink as ResponseSink<Result<ServiceResponse<T, C>, ServiceError<T, C>>>>::Error>;
 
 pub trait SignContract<T, C> {
     type Error;
@@ -41,8 +41,9 @@ pub trait RequestSource<De> {
 
 #[trait_variant::make(Send)]
 pub trait ResponseSink<Se> {
+    type Warn;
     type Error;
-    async fn consume(&self, res: Destinations<Se>) -> Result<(), Self::Error>;
+    async fn consume(&self, res: Destinations<Se>) -> Result<Messages<Self::Warn>, Messages<Self::Error>>;
 }
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash, Semigroup)]
 #[semigroup(monoid, commutative, with = "semigroup::op::Sum")]
@@ -56,7 +57,7 @@ pub struct Evaluated {
     pub times: usize,
 }
 impl Evaluated {
-    pub fn new<E>(evaluated: Result<(), E>, allow: Option<bool>) -> Self {
+    pub fn new<T, E>(evaluated: &Result<T, E>, allow: Option<bool>) -> Self {
         let pass = evaluated.is_ok();
         let allow = pass || allow.unwrap_or_default();
         Self { pass, passed: pass as usize, allow, allowed: allow as usize, times: 1 }

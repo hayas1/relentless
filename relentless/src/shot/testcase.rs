@@ -1,17 +1,20 @@
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 
 use futures::StreamExt;
-use semigroup::{CombineStream, Semigroup};
+use semigroup::{CombineStream, Monoid, Semigroup};
 use serde::{Deserialize, Serialize};
 use tower::{Layer, Service};
 
-use crate::shot::{
-    contract::{Contract, Evaluated, RequestSource, ResponseSink, ServiceError, SignContract},
-    destinations::Destinations,
-    hierarchy::Hierarchy,
-    job::JobSpec,
-    profile::Profile,
-    suite::Suite,
+use crate::{
+    evaluator::evaluate::Messages,
+    shot::{
+        contract::{Contract, Evaluated, RequestSource, ResponseSink, ServiceError, SignContract},
+        destinations::Destinations,
+        hierarchy::Hierarchy,
+        job::JobSpec,
+        profile::Profile,
+        suite::Suite,
+    },
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -29,7 +32,7 @@ pub struct Testcase<Q, P> {
 pub struct CaseReport<'a, Q, P> {
     pub case: &'a Testcase<Q, P>,
     pub evaluated: Evaluated,
-    // messages: Messages<T>,
+    pub messages: Messages<String>,
 }
 
 impl<Q, P> Testcase<Q, P> {
@@ -47,19 +50,20 @@ impl<Q, P> Testcase<Q, P> {
         C::Service: Clone + Service<C::Request, Response = C::Response>,
         Q: Debug + Clone + Semigroup + RequestSource<C::Request>,
         P: Debug + Clone + Semigroup + ResponseSink<Result<C::Response, ServiceError<T, C>>>,
+        P::Warn: Display,
+        P::Error: Display,
     {
         let profile = &self.profile.clone().semigroup(suite.profile.clone());
         let buffers = if Hierarchy::Testcase.contains(&job.sequential) { 1 } else { profile.repeat.times().max(1) };
 
         let destinations = suite.destinations.iter().map(|(d, u)| (d, (**u).clone())).collect();
-        let evaluated = futures::stream::iter(profile.repeat.range())
+        let (evaluated, messages) = futures::stream::iter(profile.repeat.range())
             .map(|_| async {
-                let evaluated = profile.shot::<T, C>(services, &destinations, &self.target).await;
-                Evaluated::new(evaluated, profile.allow)
+                profile.shot::<T, C>(services, &destinations, &self.target).await.unwrap_or_else(|_| todo!())
             })
             .buffer_unordered(buffers)
             .combine_monoid()
             .await;
-        Ok(CaseReport { case: self, evaluated })
+        Ok(CaseReport { case: self, evaluated, messages })
     }
 }

@@ -1,13 +1,20 @@
-use std::{fmt::Debug, ops::Range, time::Duration};
+use std::{
+    fmt::{Debug, Display},
+    ops::Range,
+    time::Duration,
+};
 
 use futures::{StreamExt, TryStreamExt};
 use semigroup::Semigroup;
 use serde::{Deserialize, Serialize};
 use tower::{Layer, Service, ServiceExt};
 
-use crate::shot::{
-    contract::{Contract, ContractError, RequestSource, ResponseSink, ServiceError},
-    destinations::Destinations,
+use crate::{
+    evaluator::evaluate::Messages,
+    shot::{
+        contract::{Contract, ContractError, Evaluated, RequestSource, ResponseSink, ServiceError},
+        destinations::Destinations,
+    },
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, Semigroup)]
@@ -51,13 +58,15 @@ impl<Q, P> Profile<Q, P> {
         services: &Destinations<C::Service>,
         destinations: &Destinations<http::Uri>,
         target: &str,
-    ) -> Result<(), ContractError<T, C>>
+    ) -> Result<(Evaluated, Messages<String>), ContractError<T, C>>
     where
         T: Service<C::TransportReq, Response = C::TransportRes>,
         C: Contract<T, ReqSource = Q, ResSink = P> + Layer<T>,
         C::Service: Clone + Service<C::Request, Response = C::Response>,
         Q: Debug + RequestSource<C::Request>,
         P: Debug + ResponseSink<Result<C::Response, ServiceError<T, C>>>,
+        P::Warn: Display,
+        P::Error: Display,
     {
         let buffers = services.len().max(1);
         let responses = futures::stream::iter(services)
@@ -66,12 +75,13 @@ impl<Q, P> Profile<Q, P> {
                 let request =
                     self.request.produce(destination, target).await.map_err(ContractError::<T, C>::ReqSource)?;
                 let response = service.clone().oneshot(request).await;
-                Ok((name, response))
+                Ok::<_, ContractError<T, C>>((name, response))
             })
             .buffer_unordered(buffers)
             .try_collect()
             .await?;
-        self.response.consume(responses).await.map_err(ContractError::<T, C>::ResSink)
+        let evaluated = self.response.consume(responses).await;
+        Ok((Evaluated::new(&evaluated, self.allow), Messages::flatten_display(&evaluated)))
     }
 }
 

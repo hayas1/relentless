@@ -1,4 +1,4 @@
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 use std::str::FromStr;
 use std::{fs::File, path::PathBuf};
 
@@ -167,6 +167,8 @@ impl<S, Q, P> Job<S, Q, P> {
         C::Service: Clone + Service<C::Request, Response = C::Response> + Send,
         Q: Debug + Clone + Semigroup + RequestSource<C::Request>,
         P: Debug + Clone + Semigroup + ResponseSink<Result<C::Response, ServiceError<T, C>>>,
+        P::Warn: Display,
+        P::Error: Display,
     {
         let buffers = if Hierarchy::Job.contains(&job.sequential) { 1 } else { self.0.len().max(1) };
         let suites: Vec<_> = futures::stream::iter(&self.0)

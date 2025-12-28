@@ -12,7 +12,11 @@ use http_body_util::BodyExt;
 use relentless::evaluator::json::JsonEvaluator;
 use relentless::{
     error::EvaluateError,
-    evaluator::{evaluate::Evaluator, expect::ExpectEvaluator, plaintext::PlaintextEvaluator},
+    evaluator::{
+        evaluate::{Evaluator, Messages},
+        expect::ExpectEvaluator,
+        plaintext::PlaintextEvaluator,
+    },
     http_newtype_serde,
     shot::{contract::ResponseSink, destinations::Destinations},
 };
@@ -66,24 +70,29 @@ where
     ResB::Data: Send,
     E: Display + Debug + Send,
 {
+    type Warn = EvaluateError;
     type Error = EvaluateError;
     #[tracing::instrument(err)]
-    async fn consume(&self, res: Destinations<Result<http::Response<ResB>, E>>) -> Result<(), Self::Error> {
+    async fn consume(
+        &self,
+        res: Destinations<Result<http::Response<ResB>, E>>,
+    ) -> Result<Messages<Self::Warn>, Messages<Self::Error>> {
         let buffers = res.len().max(1);
         let collected: Destinations<_> = futures::stream::iter(res)
             .map(|(d, r)| async {
                 let (parts, body) = r.map_err(EvaluateError::custom)?.into_parts();
                 let collected = body.collect().await.map_err(|_| EvaluateError::custom("failed to collect body"))?;
-                Ok((d, http::Response::from_parts(parts, collected.to_bytes())))
+                Ok::<_, EvaluateError>((d, http::Response::from_parts(parts, collected.to_bytes())))
             })
             .buffer_unordered(buffers)
             .try_collect()
             .await?;
-        if collected.len() == 1 {
-            self.evaluate_shots(collected)
-        } else {
-            self.evaluate_compares(collected)
-        }
+        // if collected.len() == 1 {
+        //     self.evaluate_shots(collected)
+        // } else {
+        //     self.evaluate_compares(collected)
+        // }
+        Ok(Messages::empty())
     }
 }
 impl Evaluator<http::Response<Bytes>> for HttpResponse {
