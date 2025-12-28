@@ -1,7 +1,7 @@
 use std::fmt::{Debug, Display};
 
 use futures::StreamExt;
-use semigroup::{CombineStream, Monoid, Semigroup};
+use semigroup::{CombineStream, Semigroup};
 use serde::{Deserialize, Serialize};
 use tower::{Layer, Service};
 

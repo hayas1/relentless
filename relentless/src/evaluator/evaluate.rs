@@ -6,41 +6,47 @@ use crate::{error::EvaluateError, shot::destinations::Destinations};
 
 // TODO error handling
 pub trait Evaluator<S> {
+    type Warn;
     type Error;
-    fn evaluate_shot(&self, res: &S) -> Result<(), Self::Error>;
-    fn evaluate_compare(&self, res1: &S, res2: &S) -> Result<(), Self::Error>;
+    fn evaluate_shot(&self, res: &S) -> Result<Messages<Self::Warn>, Messages<Self::Error>>;
+    fn evaluate_compare(&self, res1: &S, res2: &S) -> Result<Messages<Self::Warn>, Messages<Self::Error>>;
 
-    fn evaluate<F: Fn(bool) -> Self::Error>(&self, judge: bool, e: F) -> Result<(), Self::Error> {
+    fn evaluate<F: Fn(bool) -> Self::Error>(
+        &self,
+        judge: bool,
+        e: F,
+    ) -> Result<Messages<Self::Warn>, Messages<Self::Error>> {
         if judge {
-            Ok(())
+            Ok(Messages::empty())
         } else {
-            Err(e(judge))
+            Err(e(judge))?
         }
     }
-    fn evaluate_shots(&self, res: Destinations<S>) -> Result<(), Self::Error>
+    fn evaluate_shots(&self, res: Destinations<S>) -> Result<Messages<Self::Warn>, Messages<Self::Error>>
     where
         Self::Error: From<EvaluateError>,
     {
         let mut popper = res.into_iter();
-        let (_, resp) = popper.next().ok_or(EvaluateError::EmptyTarget)?;
+        let (_, resp) = popper.next().ok_or(EvaluateError::EmptyTarget).map_err(|e| Messages::one(e.into()))?;
         match popper.next() {
-            Some(_) => Err(EvaluateError::ShouldCompare)?,
+            Some(_) => Err(EvaluateError::ShouldCompare).map_err(|e| Messages::one(e.into()))?,
             None => self.evaluate_shot(&resp),
         }
     }
-    fn evaluate_compares(&self, res: Destinations<S>) -> Result<(), Self::Error>
+    fn evaluate_compares(&self, res: Destinations<S>) -> Result<Messages<Self::Warn>, Messages<Self::Error>>
     where
         Self::Error: From<EvaluateError>,
     {
         match res.len() {
-            0 => Err(EvaluateError::EmptyTarget)?,
-            1 => Err(EvaluateError::ShouldShot)?,
+            0 => Err(EvaluateError::EmptyTarget).map_err(|e| Messages::one(e.into()))?,
+            1 => Err(EvaluateError::ShouldShot).map_err(|e| Messages::one(e.into()))?,
             _ => (),
         }
         let v: Vec<_> = res.into_iter().collect();
-        let ok = v.windows(2).try_fold((), |(), w| {
+        // TODO try_combine
+        let ok = v.windows(2).try_fold(Messages::empty(), |warn, w| {
             let ((_, a), (_, b)) = (&w[0], &w[1]);
-            self.evaluate_compare(a, b)
+            Ok(warn.semigroup(self.evaluate_compare(a, b)?))
         });
         ok
     }
@@ -74,10 +80,16 @@ impl<T> Messages<T> {
     pub fn one(msg: T) -> Self {
         Self(vec![msg])
     }
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
     pub fn display_lines<'a>(&'a self) -> (impl 'a + Iterator<Item = &'a T>, Option<usize>) {
-        let (m, n) = (self.0.len(), 3);
-        let iter = self.0[..n.min(m)].iter().take(m);
-        let more = (m > n).then_some(m - n);
+        let (n, m) = (self.0.len(), 3);
+        let iter = self.0.iter().take(m);
+        let more = (n > m).then(|| n - m);
         (iter, more)
     }
     pub fn as_ref(&self) -> Messages<&T> {
@@ -92,11 +104,11 @@ impl<T> From<T> for Messages<T> {
 }
 impl<T: Display> Display for Messages<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let (lines, more) = self.display_lines();
+        let (lines, and_more) = self.display_lines();
         for line in lines {
             writeln!(f, "{line}")?;
         }
-        if let Some(num) = more {
+        if let Some(num) = and_more {
             writeln!(f, "... and {num} more")?;
         }
         Ok(())

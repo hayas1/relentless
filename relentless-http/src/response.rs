@@ -87,57 +87,71 @@ where
             .buffer_unordered(buffers)
             .try_collect()
             .await?;
-        // if collected.len() == 1 {
-        //     self.evaluate_shots(collected)
-        // } else {
-        //     self.evaluate_compares(collected)
-        // }
-        Ok(Messages::empty())
+        if collected.len() == 1 {
+            self.evaluate_shots(collected)
+        } else {
+            self.evaluate_compares(collected)
+        }
     }
 }
 impl Evaluator<http::Response<Bytes>> for HttpResponse {
+    type Warn = EvaluateError;
     type Error = EvaluateError;
-    fn evaluate_shot(&self, res: &http::Response<Bytes>) -> Result<(), Self::Error> {
+    fn evaluate_shot(&self, res: &http::Response<Bytes>) -> Result<Messages<Self::Warn>, Messages<Self::Error>> {
         self.status.as_ref().unwrap_or(&Default::default()).evaluate_shot(&res.status())?;
         self.header.as_ref().unwrap_or(&Default::default()).evaluate_shot(res.headers())?;
         self.body.as_ref().unwrap_or(&Default::default()).evaluate_shot(res.body())?;
-        Ok(())
+        Ok(Messages::empty())
     }
-    fn evaluate_compare(&self, res1: &http::Response<Bytes>, res2: &http::Response<Bytes>) -> Result<(), Self::Error> {
+    fn evaluate_compare(
+        &self,
+        res1: &http::Response<Bytes>,
+        res2: &http::Response<Bytes>,
+    ) -> Result<Messages<Self::Warn>, Messages<Self::Error>> {
         self.status.as_ref().unwrap_or(&Default::default()).evaluate_compare(&res1.status(), &res2.status())?;
         self.header.as_ref().unwrap_or(&Default::default()).evaluate_compare(res1.headers(), res2.headers())?;
         self.body.as_ref().unwrap_or(&Default::default()).evaluate_compare(res1.body(), res2.body())?;
-        Ok(())
+        Ok(Messages::empty())
     }
 }
 
 impl Evaluator<StatusCode> for HttpResponseStatus {
+    type Warn = EvaluateError;
     type Error = EvaluateError;
-    fn evaluate_shot(&self, res: &StatusCode) -> Result<(), Self::Error> {
+    fn evaluate_shot(&self, res: &StatusCode) -> Result<Messages<Self::Warn>, Messages<Self::Error>> {
         match self {
             Self::OkOrEqual => self.evaluate(res.is_success(), |_| EvaluateError::custom("not success status")),
             Self::Expect(e) => todo!(),
-            Self::Ignore => Ok(()),
+            Self::Ignore => Ok(Messages::empty()),
         }
     }
-    fn evaluate_compare(&self, res1: &StatusCode, res2: &StatusCode) -> Result<(), Self::Error> {
+    fn evaluate_compare(
+        &self,
+        res1: &StatusCode,
+        res2: &StatusCode,
+    ) -> Result<Messages<Self::Warn>, Messages<Self::Error>> {
         match self {
             Self::OkOrEqual => self.evaluate(res1 == res2, |_| EvaluateError::custom("not equal status")),
             Self::Expect(e) => todo!(),
-            Self::Ignore => Ok(()),
+            Self::Ignore => Ok(Messages::empty()),
         }
     }
 }
 impl Evaluator<HeaderMap> for HttpResponseHeaders {
+    type Warn = EvaluateError;
     type Error = EvaluateError;
-    fn evaluate_shot(&self, res: &HeaderMap) -> Result<(), Self::Error> {
+    fn evaluate_shot(&self, res: &HeaderMap) -> Result<Messages<Self::Warn>, Messages<Self::Error>> {
         match self {
-            Self::AnyOrEqual => Ok(()),
+            Self::AnyOrEqual => Ok(Messages::empty()),
             Self::Expect(e) => todo!(),
-            Self::Ignore => Ok(()),
+            Self::Ignore => Ok(Messages::empty()),
         }
     }
-    fn evaluate_compare(&self, res1: &HeaderMap, res2: &HeaderMap) -> Result<(), Self::Error> {
+    fn evaluate_compare(
+        &self,
+        res1: &HeaderMap,
+        res2: &HeaderMap,
+    ) -> Result<Messages<Self::Warn>, Messages<Self::Error>> {
         let (resp1, resp2): (HashMap<_, _>, HashMap<_, _>) = (
             self.allowlist().iter().filter_map(|&k| Some((k, res1.get(k)?))).collect(),
             self.allowlist().iter().filter_map(|&k| Some((k, res2.get(k)?))).collect(),
@@ -145,7 +159,7 @@ impl Evaluator<HeaderMap> for HttpResponseHeaders {
         match self {
             Self::AnyOrEqual => self.evaluate(resp1 == resp2, |_| EvaluateError::custom("not equal headers")),
             Self::Expect(e) => todo!(),
-            Self::Ignore => Ok(()),
+            Self::Ignore => Ok(Messages::empty()),
         }
     }
 }
@@ -157,16 +171,17 @@ impl HttpResponseHeaders {
     }
 }
 impl Evaluator<Bytes> for HttpResponseBody {
+    type Warn = EvaluateError;
     type Error = EvaluateError;
-    fn evaluate_shot(&self, res: &Bytes) -> Result<(), Self::Error> {
+    fn evaluate_shot(&self, res: &Bytes) -> Result<Messages<Self::Warn>, Messages<Self::Error>> {
         match self {
-            Self::AnyOrEqual => Ok(()),
+            Self::AnyOrEqual => Ok(Messages::empty()),
             Self::Plaintext(e) => todo!(),
             #[cfg(feature = "json")]
             Self::Json(e) => todo!(),
         }
     }
-    fn evaluate_compare(&self, res1: &Bytes, res2: &Bytes) -> Result<(), Self::Error> {
+    fn evaluate_compare(&self, res1: &Bytes, res2: &Bytes) -> Result<Messages<Self::Warn>, Messages<Self::Error>> {
         match self {
             Self::AnyOrEqual => self.evaluate(res1 == res2, |_| EvaluateError::custom("not equal body")),
             Self::Plaintext(e) => todo!(),

@@ -39,6 +39,12 @@ impl Console {
     pub fn styled<T>(&self, value: T, assessment: &Assessment) -> StyledObject<T> {
         self.style(assessment).apply_to(value)
     }
+    pub fn message_style(&self) -> Style {
+        Style::new().dim()
+    }
+    pub fn message<T>(&self, msg: T) -> StyledObject<T> {
+        self.message_style().apply_to(msg)
+    }
 }
 impl<C, Q, P> Reporter<&JobReport<'_, C, Q, P>> for Console {
     type Error = std::fmt::Error;
@@ -110,13 +116,10 @@ impl<Q, P> Reporter<&CaseReport<'_, Q, P>> for Console {
         };
         l1?;
         writer.scope(|w| {
-            let messages: Vec<String> = Vec::new();
             let l2 = {
-                if !messages.is_empty() {
-                    writeln!(w, "{} messages", Self::CASE_MESSAGE_EMOJI)?; // TODO usize scope indent
-                    messages.iter().try_fold((), |(), m| writeln!(w, "{m}"))?;
-                }
-                Ok::<_, std::fmt::Error>(())
+                let (mut lines, and_more) = report.messages.display_lines();
+                lines.try_for_each(|l| writeln!(w, "{} {}", Self::CASE_MESSAGE_EMOJI, self.message(l)))?;
+                and_more.iter().try_for_each(|m| writeln!(w, "... and {} more", m))
             };
             l2
         })?;
