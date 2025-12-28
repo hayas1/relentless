@@ -6,7 +6,10 @@ use std::{
 use semigroup::Semigroup;
 use tower::{Layer, MakeService, Service};
 
-use crate::{evaluator::evaluate::Messages, shot::destinations::Destinations};
+use crate::{
+    evaluator::evaluate::{Failure, Message, Messages},
+    shot::destinations::Destinations,
+};
 
 #[trait_variant::make(Send)]
 pub trait Contract<T>: Sized {
@@ -26,7 +29,7 @@ pub type ServiceResponse<T, C> = <<C as Layer<T>>::Service as Service<<C as Cont
 pub type ServiceError<T, C> = <<C as Layer<T>>::Service as Service<<C as Contract<T>>::Request>>::Error;
 pub type ReqSourceError<T, C> = <<C as Contract<T>>::ReqSource as RequestSource<<C as Contract<T>>::Request>>::Error;
 pub type ResSinkError<T, C> =
-    Messages<<<C as Contract<T>>::ResSink as ResponseSink<Result<ServiceResponse<T, C>, ServiceError<T, C>>>>::Error>;
+    <<C as Contract<T>>::ResSink as ResponseSink<Result<ServiceResponse<T, C>, ServiceError<T, C>>>>::Message;
 
 pub trait SignContract<T, C> {
     type Error;
@@ -41,9 +44,8 @@ pub trait RequestSource<De> {
 
 #[trait_variant::make(Send)]
 pub trait ResponseSink<Se> {
-    type Warn;
-    type Error;
-    async fn consume(&self, res: Destinations<Se>) -> Result<Messages<Self::Warn>, Messages<Self::Error>>;
+    type Message;
+    async fn consume(&self, res: Destinations<Se>, msg: &mut Messages<Message<Self::Message>>) -> Result<(), Failure>;
 }
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash, Semigroup)]
 #[semigroup(monoid, commutative, with = "semigroup::op::Sum")]

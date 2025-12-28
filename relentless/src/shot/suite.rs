@@ -137,8 +137,7 @@ impl<S, Q, P> SuiteCase<S, Q, P> {
         C::Service: Clone + Service<C::Request, Response = C::Response> + Send,
         Q: Debug + Clone + Semigroup + RequestSource<C::Request>,
         P: Debug + Clone + Semigroup + ResponseSink<Result<C::Response, ServiceError<T, C>>>,
-        P::Warn: Display,
-        P::Error: Display,
+        P::Message: Display,
     {
         let buffers = if Hierarchy::Suite.contains(&job.sequential) { 1 } else { self.testcases.len().max(1) };
         let destinations = job.destinations(&self.suite.destinations).unwrap_or_else(|e| todo!("{e}"));

@@ -65,8 +65,7 @@ impl<Q, P> Profile<Q, P> {
         C::Service: Clone + Service<C::Request, Response = C::Response>,
         Q: Debug + RequestSource<C::Request>,
         P: Debug + ResponseSink<Result<C::Response, ServiceError<T, C>>>,
-        P::Warn: Display,
-        P::Error: Display,
+        P::Message: Display,
     {
         let buffers = services.len().max(1);
         let responses = futures::stream::iter(services)
@@ -80,8 +79,9 @@ impl<Q, P> Profile<Q, P> {
             .buffer_unordered(buffers)
             .try_collect()
             .await?;
-        let evaluated = self.response.consume(responses).await;
-        Ok((Evaluated::new(&evaluated, self.allow), Messages::flatten_display(&evaluated)))
+        let mut messages = Messages::new();
+        let evaluated = self.response.consume(responses, &mut messages).await;
+        Ok((Evaluated::new(&evaluated, self.allow), messages.displayable()))
     }
 }
 

@@ -52,10 +52,64 @@ pub trait Evaluator<S> {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash)]
+pub struct Failure;
+impl std::error::Error for Failure {}
+impl Display for Failure {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "fail")
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash)]
+pub struct Message<M> {
+    pub message: M,
+    pub kind: MessageKind,
+}
+impl<M: Display> Display for Message<M> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.message)
+    }
+}
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash)]
+pub enum MessageKind {
+    #[default]
+    Warn,
+    Error,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash, Semigroup)]
 #[semigroup(monoid, commutative, identity = "Messages::empty()", with = "semigroup::op::Concat")]
 // TODO size limit ? but causes it to no longer satisfy the properties of a semigroup, however strictly speaking, it already fails to satisfy the commutative property.
 pub struct Messages<T>(Vec<T>);
+impl<M> Messages<Message<M>> {
+    pub fn new() -> Self {
+        Self(Vec::new())
+    }
+
+    pub fn warn(&mut self, message: M) {
+        self.0.push(Message { message, kind: MessageKind::Warn });
+    }
+    pub fn error(&mut self, message: M) -> Failure {
+        self.0.push(Message { message, kind: MessageKind::Error });
+        Failure
+    }
+
+    pub fn warn_result(&mut self, message: M) -> Result<(), Failure> {
+        self.warn(message);
+        Ok(())
+    }
+    pub fn error_result(&mut self, message: M) -> Result<(), Failure> {
+        Err(self.error(message))
+    }
+    pub fn displayable(self) -> Messages<String>
+    where
+        M: Display,
+    {
+        self.map(|m| m.message.to_string())
+    }
+}
+
 impl Messages<String> {
     pub fn flatten_display<W: Display, E: Display>(evaluated: &Result<Messages<W>, Messages<E>>) -> Self {
         match evaluated {
@@ -119,5 +173,10 @@ impl<T> IntoIterator for Messages<T> {
     type IntoIter = <Vec<T> as IntoIterator>::IntoIter;
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
+    }
+}
+impl<T> Extend<T> for Messages<T> {
+    fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
+        self.0.extend(iter)
     }
 }

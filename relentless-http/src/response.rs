@@ -13,7 +13,7 @@ use relentless::evaluator::json::JsonEvaluator;
 use relentless::{
     error::EvaluateError,
     evaluator::{
-        evaluate::{Evaluator, Messages},
+        evaluate::{Evaluator, Failure, Message, Messages},
         expect::ExpectEvaluator,
         plaintext::PlaintextEvaluator,
     },
@@ -70,13 +70,13 @@ where
     ResB::Data: Send,
     E: Display + Debug + Send,
 {
-    type Warn = EvaluateError;
-    type Error = EvaluateError;
+    type Message = EvaluateError;
     #[tracing::instrument(err)]
     async fn consume(
         &self,
         res: Destinations<Result<http::Response<ResB>, E>>,
-    ) -> Result<Messages<Self::Warn>, Messages<Self::Error>> {
+        msg: &mut Messages<Message<Self::Message>>,
+    ) -> Result<(), Failure> {
         let buffers = res.len().max(1);
         let collected: Destinations<_> = futures::stream::iter(res)
             .map(|(d, r)| async {
@@ -86,12 +86,14 @@ where
             })
             .buffer_unordered(buffers)
             .try_collect()
-            .await?;
-        if collected.len() == 1 {
-            self.evaluate_shots(collected)
-        } else {
-            self.evaluate_compares(collected)
-        }
+            .await
+            .map_err(|e| msg.error(e))?;
+        // if collected.len() == 1 {
+        //     self.evaluate_shots(collected)
+        // } else {
+        //     self.evaluate_compares(collected)
+        // }
+        Ok(())
     }
 }
 impl Evaluator<http::Response<Bytes>> for HttpResponse {

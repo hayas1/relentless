@@ -50,8 +50,7 @@ impl<Q, P> Testcase<Q, P> {
         C::Service: Clone + Service<C::Request, Response = C::Response>,
         Q: Debug + Clone + Semigroup + RequestSource<C::Request>,
         P: Debug + Clone + Semigroup + ResponseSink<Result<C::Response, ServiceError<T, C>>>,
-        P::Warn: Display,
-        P::Error: Display,
+        P::Message: Display,
     {
         let profile = &self.profile.clone().semigroup(suite.profile.clone());
         let buffers = if Hierarchy::Testcase.contains(&job.sequential) { 1 } else { profile.repeat.times().max(1) };

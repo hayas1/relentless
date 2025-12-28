@@ -80,13 +80,13 @@ pub enum EvaluateError {
     ShouldShot,
     NotOk,
     Custom(String),
-    Box(Box<dyn std::error::Error>),
+    Box(Box<dyn std::error::Error + Send + Sync + 'static>),
 }
 impl EvaluateError {
     pub fn custom<T: Display>(e: T) -> Self {
         Self::Custom(e.to_string())
     }
-    pub fn boxed<E: Into<Box<dyn std::error::Error>>>(e: E) -> Self {
+    pub fn boxed<E: Into<Box<dyn std::error::Error + Send + Sync + 'static>>>(e: E) -> Self {
         Self::Box(e.into())
     }
 }
