@@ -45,7 +45,7 @@ pub trait RequestSource<De> {
 #[trait_variant::make(Send)]
 pub trait ResponseSink<Se> {
     type Message;
-    async fn consume(&self, res: Destinations<Se>, msg: &mut Messages<Message<Self::Message>>) -> Result<(), Failure>;
+    async fn consume(&self, msg: &mut Messages<Message<Self::Message>>, res: Destinations<Se>) -> Result<(), Failure>;
 }
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash, Semigroup)]
 #[semigroup(monoid, commutative, with = "semigroup::op::Sum")]

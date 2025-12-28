@@ -6,49 +6,47 @@ use crate::{error::EvaluateError, shot::destinations::Destinations};
 
 // TODO error handling
 pub trait Evaluator<S> {
-    type Warn;
-    type Error;
-    fn evaluate_shot(&self, res: &S) -> Result<Messages<Self::Warn>, Messages<Self::Error>>;
-    fn evaluate_compare(&self, res1: &S, res2: &S) -> Result<Messages<Self::Warn>, Messages<Self::Error>>;
+    type Message;
+    fn evaluate_shot(&self, msg: &mut Messages<Message<Self::Message>>, res: &S) -> Result<(), Failure>;
+    fn evaluate_compare(&self, msg: &mut Messages<Message<Self::Message>>, res1: &S, res2: &S) -> Result<(), Failure>;
 
-    fn evaluate<F: Fn(bool) -> Self::Error>(
+    fn evaluate<F: Fn(bool) -> Self::Message>(
         &self,
+        msg: &mut Messages<Message<Self::Message>>,
         judge: bool,
         e: F,
-    ) -> Result<Messages<Self::Warn>, Messages<Self::Error>> {
+    ) -> Result<(), Failure> {
         if judge {
-            Ok(Messages::empty())
+            Ok(())
         } else {
-            Err(e(judge))?
+            Err(msg.error(e(judge)))
         }
     }
-    fn evaluate_shots(&self, res: Destinations<S>) -> Result<Messages<Self::Warn>, Messages<Self::Error>>
+    fn evaluate_shots(&self, msg: &mut Messages<Message<Self::Message>>, res: Destinations<S>) -> Result<(), Failure>
     where
-        Self::Error: From<EvaluateError>,
+        Self::Message: From<EvaluateError>,
     {
         let mut popper = res.into_iter();
-        let (_, resp) = popper.next().ok_or(EvaluateError::EmptyTarget).map_err(|e| Messages::one(e.into()))?;
+        let (_, resp) = popper.next().ok_or(EvaluateError::EmptyTarget).map_err(|e| msg.error(e.into()))?;
         match popper.next() {
-            Some(_) => Err(EvaluateError::ShouldCompare).map_err(|e| Messages::one(e.into()))?,
-            None => self.evaluate_shot(&resp),
+            Some(_) => Err(msg.error(EvaluateError::ShouldCompare.into())),
+            None => self.evaluate_shot(msg, &resp),
         }
     }
-    fn evaluate_compares(&self, res: Destinations<S>) -> Result<Messages<Self::Warn>, Messages<Self::Error>>
+    fn evaluate_compares(&self, msg: &mut Messages<Message<Self::Message>>, res: Destinations<S>) -> Result<(), Failure>
     where
-        Self::Error: From<EvaluateError>,
+        Self::Message: From<EvaluateError>,
     {
         match res.len() {
-            0 => Err(EvaluateError::EmptyTarget).map_err(|e| Messages::one(e.into()))?,
-            1 => Err(EvaluateError::ShouldShot).map_err(|e| Messages::one(e.into()))?,
+            0 => Err(EvaluateError::EmptyTarget).map_err(|e| msg.error(e.into()))?,
+            1 => Err(EvaluateError::ShouldShot).map_err(|e| msg.error(e.into()))?,
             _ => (),
         }
         let v: Vec<_> = res.into_iter().collect();
-        // TODO try_combine
-        let ok = v.windows(2).try_fold(Messages::empty(), |warn, w| {
+        v.windows(2).try_fold((), |(), w| {
             let ((_, a), (_, b)) = (&w[0], &w[1]);
-            Ok(warn.semigroup(self.evaluate_compare(a, b)?))
-        });
-        ok
+            self.evaluate_compare(msg, a, b)
+        })
     }
 }
 
@@ -80,7 +78,6 @@ pub enum MessageKind {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash, Semigroup)]
 #[semigroup(monoid, commutative, identity = "Messages::empty()", with = "semigroup::op::Concat")]
-// TODO size limit ? but causes it to no longer satisfy the properties of a semigroup, however strictly speaking, it already fails to satisfy the commutative property.
 pub struct Messages<T>(Vec<T>);
 impl<M> Messages<Message<M>> {
     pub fn new() -> Self {
@@ -95,13 +92,6 @@ impl<M> Messages<Message<M>> {
         Failure
     }
 
-    pub fn warn_result(&mut self, message: M) -> Result<(), Failure> {
-        self.warn(message);
-        Ok(())
-    }
-    pub fn error_result(&mut self, message: M) -> Result<(), Failure> {
-        Err(self.error(message))
-    }
     pub fn displayable(self) -> Messages<String>
     where
         M: Display,
@@ -110,29 +100,12 @@ impl<M> Messages<Message<M>> {
     }
 }
 
-impl Messages<String> {
-    pub fn flatten_display<W: Display, E: Display>(evaluated: &Result<Messages<W>, Messages<E>>) -> Self {
-        match evaluated {
-            Ok(m) => m.as_ref().map(|m| m.to_string()),
-            Err(m) => m.as_ref().map(|m| m.to_string()),
-        }
-    }
-}
 impl<T> Messages<T> {
-    pub fn flatten<W: Into<T>, E: Into<T>>(evaluated: Result<Messages<W>, Messages<E>>) -> Self {
-        match evaluated {
-            Ok(m) => m.map(Into::into),
-            Err(m) => m.map(Into::into),
-        }
-    }
     pub fn map<U>(self, f: impl FnMut(T) -> U) -> Messages<U> {
         Messages(self.0.into_iter().map(f).collect())
     }
     pub fn empty() -> Self {
         Self(Vec::new())
-    }
-    pub fn one(msg: T) -> Self {
-        Self(vec![msg])
     }
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
@@ -151,11 +124,6 @@ impl<T> Messages<T> {
     }
 }
 impl<T: std::error::Error> std::error::Error for Messages<T> {} // TODO multiple sources ?
-impl<T> From<T> for Messages<T> {
-    fn from(t: T) -> Self {
-        Self::one(t)
-    }
-}
 impl<T: Display> Display for Messages<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let (lines, and_more) = self.display_lines();

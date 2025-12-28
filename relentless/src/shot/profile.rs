@@ -80,7 +80,7 @@ impl<Q, P> Profile<Q, P> {
             .try_collect()
             .await?;
         let mut messages = Messages::new();
-        let evaluated = self.response.consume(responses, &mut messages).await;
+        let evaluated = self.response.consume(&mut messages, responses).await;
         Ok((Evaluated::new(&evaluated, self.allow), messages.displayable()))
     }
 }

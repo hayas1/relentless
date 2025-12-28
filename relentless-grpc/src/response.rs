@@ -55,8 +55,8 @@ impl<Se: Debug + Send> ResponseSink<Result<tonic::Response<Se>, tonic::Status>> 
     #[tracing::instrument(err)]
     async fn consume(
         &self,
-        res: Destinations<Result<tonic::Response<Se>, tonic::Status>>,
         msg: &mut Messages<Message<Self::Message>>,
+        res: Destinations<Result<tonic::Response<Se>, tonic::Status>>,
     ) -> Result<(), Failure> {
         Ok(())
     }
