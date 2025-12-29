@@ -1,6 +1,7 @@
 use std::fmt::Display;
 
 use semigroup::Semigroup;
+use serde::{Deserialize, Serialize};
 
 use crate::{error::EvaluateError, shot::destinations::Destinations};
 
@@ -59,7 +60,7 @@ impl Display for Failure {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash, Serialize, Deserialize)]
 pub struct Message<M> {
     pub message: M,
     pub kind: MessageKind,
@@ -69,14 +70,14 @@ impl<M: Display> Display for Message<M> {
         write!(f, "{}", self.message)
     }
 }
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash, Serialize, Deserialize)]
 pub enum MessageKind {
     #[default]
     Warn,
     Error,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash, Semigroup)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash, Serialize, Deserialize, Semigroup)]
 #[semigroup(monoid, commutative, identity = "Messages::empty()", with = "semigroup::op::Concat")]
 pub struct Messages<T>(Vec<Message<T>>);
 impl<T> Messages<T> {
@@ -114,21 +115,9 @@ impl<T> Messages<T> {
 }
 impl<T: Display> Display for Messages<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let (lines, and_more) = self.display_lines();
-        for line in lines {
-            writeln!(f, "{line}")?;
-        }
-        if let Some(num) = and_more {
-            writeln!(f, "... and {num} more")?;
-        }
-        Ok(())
-    }
-}
-impl<T> IntoIterator for Messages<T> {
-    type Item = Message<T>;
-    type IntoIter = <Vec<Message<T>> as IntoIterator>::IntoIter;
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.into_iter()
+        let (mut lines, and_more) = self.display_lines();
+        lines.try_for_each(|l| writeln!(f, "{l}"))?;
+        and_more.iter().try_for_each(|m| writeln!(f, "... and {m} more"))
     }
 }
 impl<T> Extend<Message<T>> for Messages<T> {

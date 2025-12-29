@@ -119,7 +119,7 @@ impl<Q, P, M: Display> Reporter<&CaseReport<'_, Q, P, M>> for Console {
             let l2 = {
                 let (mut lines, and_more) = report.messages.display_lines();
                 lines.try_for_each(|l| writeln!(w, "{} {}", Self::CASE_MESSAGE_EMOJI, self.styled_message(l)))?;
-                and_more.iter().try_for_each(|m| writeln!(w, "... and {} more", m))
+                and_more.iter().try_for_each(|m| writeln!(w, "... and {m} more"))
             };
             l2
         })?;
