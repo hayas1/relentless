@@ -7,12 +7,12 @@ use crate::{error::EvaluateError, shot::destinations::Destinations};
 // TODO error handling
 pub trait Evaluator<S> {
     type Message;
-    fn evaluate_shot(&self, msg: &mut Messages<Message<Self::Message>>, res: &S) -> Result<(), Failure>;
-    fn evaluate_compare(&self, msg: &mut Messages<Message<Self::Message>>, res1: &S, res2: &S) -> Result<(), Failure>;
+    fn evaluate_shot(&self, msg: &mut Messages<Self::Message>, res: &S) -> Result<(), Failure>;
+    fn evaluate_compare(&self, msg: &mut Messages<Self::Message>, res1: &S, res2: &S) -> Result<(), Failure>;
 
     fn evaluate<F: Fn(bool) -> Self::Message>(
         &self,
-        msg: &mut Messages<Message<Self::Message>>,
+        msg: &mut Messages<Self::Message>,
         judge: bool,
         e: F,
     ) -> Result<(), Failure> {
@@ -22,7 +22,7 @@ pub trait Evaluator<S> {
             Err(msg.error(e(judge)))
         }
     }
-    fn evaluate_shots(&self, msg: &mut Messages<Message<Self::Message>>, res: Destinations<S>) -> Result<(), Failure>
+    fn evaluate_shots(&self, msg: &mut Messages<Self::Message>, res: Destinations<S>) -> Result<(), Failure>
     where
         Self::Message: From<EvaluateError>,
     {
@@ -33,7 +33,7 @@ pub trait Evaluator<S> {
             None => self.evaluate_shot(msg, &resp),
         }
     }
-    fn evaluate_compares(&self, msg: &mut Messages<Message<Self::Message>>, res: Destinations<S>) -> Result<(), Failure>
+    fn evaluate_compares(&self, msg: &mut Messages<Self::Message>, res: Destinations<S>) -> Result<(), Failure>
     where
         Self::Message: From<EvaluateError>,
     {
@@ -55,7 +55,7 @@ pub struct Failure;
 impl std::error::Error for Failure {}
 impl Display for Failure {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "fail")
+        write!(f, "failure")
     }
 }
 
@@ -78,32 +78,24 @@ pub enum MessageKind {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash, Semigroup)]
 #[semigroup(monoid, commutative, identity = "Messages::empty()", with = "semigroup::op::Concat")]
-pub struct Messages<T>(Vec<T>);
-impl<M> Messages<Message<M>> {
+pub struct Messages<T>(Vec<Message<T>>);
+impl<T> Messages<T> {
     pub fn new() -> Self {
         Self(Vec::new())
     }
-
-    pub fn warn(&mut self, message: M) {
-        self.0.push(Message { message, kind: MessageKind::Warn });
+    pub fn push(&mut self, message: Message<T>) {
+        self.0.push(message);
     }
-    pub fn error(&mut self, message: M) -> Failure {
-        self.0.push(Message { message, kind: MessageKind::Error });
+    pub fn warn(&mut self, message: T) {
+        self.push(Message { message, kind: MessageKind::Warn });
+    }
+    pub fn error(&mut self, message: T) -> Failure {
+        self.push(Message { message, kind: MessageKind::Error });
         Failure
-    }
-
-    pub fn displayable(self) -> Messages<String>
-    where
-        M: Display,
-    {
-        self.map(|m| m.message.to_string())
     }
 }
 
 impl<T> Messages<T> {
-    pub fn map<U>(self, f: impl FnMut(T) -> U) -> Messages<U> {
-        Messages(self.0.into_iter().map(f).collect())
-    }
     pub fn empty() -> Self {
         Self(Vec::new())
     }
@@ -113,17 +105,13 @@ impl<T> Messages<T> {
     pub fn len(&self) -> usize {
         self.0.len()
     }
-    pub fn display_lines<'a>(&'a self) -> (impl 'a + Iterator<Item = &'a T>, Option<usize>) {
+    pub fn display_lines<'a>(&'a self) -> (impl 'a + Iterator<Item = &'a Message<T>>, Option<usize>) {
         let (n, m) = (self.0.len(), 3);
         let iter = self.0.iter().take(m);
         let more = (n > m).then(|| n - m);
         (iter, more)
     }
-    pub fn as_ref(&self) -> Messages<&T> {
-        Messages(self.0.iter().collect())
-    }
 }
-impl<T: std::error::Error> std::error::Error for Messages<T> {} // TODO multiple sources ?
 impl<T: Display> Display for Messages<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let (lines, and_more) = self.display_lines();
@@ -137,14 +125,14 @@ impl<T: Display> Display for Messages<T> {
     }
 }
 impl<T> IntoIterator for Messages<T> {
-    type Item = T;
-    type IntoIter = <Vec<T> as IntoIterator>::IntoIter;
+    type Item = Message<T>;
+    type IntoIter = <Vec<Message<T>> as IntoIterator>::IntoIter;
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
     }
 }
-impl<T> Extend<T> for Messages<T> {
-    fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
+impl<T> Extend<Message<T>> for Messages<T> {
+    fn extend<I: IntoIterator<Item = Message<T>>>(&mut self, iter: I) {
         self.0.extend(iter)
     }
 }

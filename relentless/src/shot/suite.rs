@@ -1,4 +1,4 @@
-use std::fmt::{Debug, Display};
+use std::fmt::Debug;
 
 use futures::{StreamExt, TryStreamExt};
 use http::Uri;
@@ -120,15 +120,19 @@ pub struct Suite<C, Q, P> {
 // }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct SuiteReport<'a, C, Q, P> {
+pub struct SuiteReport<'a, C, Q, P, M> {
     pub destinations: Lazy<Destinations<Uri>>,
     pub suite: &'a Suite<C, Q, P>,
-    pub cases: Vec<CaseReport<'a, Q, P>>,
+    pub cases: Vec<CaseReport<'a, Q, P, M>>,
     pub evaluated: Evaluated,
 }
 impl<S, Q, P> SuiteCase<S, Q, P> {
     #[tracing::instrument(name = "suite", skip(make_service))]
-    pub async fn shot<M, T, C>(&self, make_service: M, job: &JobSpec) -> crate::Result<SuiteReport<'_, S, Q, P>>
+    pub async fn shot<M, T, C>(
+        &self,
+        make_service: M,
+        job: &JobSpec,
+    ) -> crate::Result<SuiteReport<'_, S, Q, P, P::Message>>
     where
         M: Clone + MakeService<http::Uri, C::TransportReq, Service = T>,
         T: Clone + Service<C::TransportReq, Response = C::TransportRes> + Send,
@@ -137,7 +141,6 @@ impl<S, Q, P> SuiteCase<S, Q, P> {
         C::Service: Clone + Service<C::Request, Response = C::Response> + Send,
         Q: Debug + Clone + Semigroup + RequestSource<C::Request>,
         P: Debug + Clone + Semigroup + ResponseSink<Result<C::Response, ServiceError<T, C>>>,
-        P::Message: Display,
     {
         let buffers = if Hierarchy::Suite.contains(&job.sequential) { 1 } else { self.testcases.len().max(1) };
         let destinations = job.destinations(&self.suite.destinations).unwrap_or_else(|e| todo!("{e}"));

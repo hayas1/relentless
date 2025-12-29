@@ -152,13 +152,17 @@ where
     }
 }
 #[derive(Debug, Clone, PartialEq)]
-pub struct JobReport<'a, C, Q, P> {
-    pub suites: Vec<SuiteReport<'a, C, Q, P>>,
+pub struct JobReport<'a, C, Q, P, M> {
+    pub suites: Vec<SuiteReport<'a, C, Q, P, M>>,
     pub evaluated: Evaluated,
 }
 impl<S, Q, P> Job<S, Q, P> {
     #[tracing::instrument(name = "job", skip(make_service))]
-    pub async fn shot<M, T, C>(&self, make_service: M, job: &JobSpec) -> crate::Result<JobReport<'_, S, Q, P>>
+    pub async fn shot<M, T, C>(
+        &self,
+        make_service: M,
+        job: &JobSpec,
+    ) -> crate::Result<JobReport<'_, S, Q, P, P::Message>>
     where
         M: Clone + MakeService<http::Uri, C::TransportReq, Service = T>,
         T: Clone + Service<C::TransportReq, Response = C::TransportRes> + Send,

@@ -2,7 +2,7 @@ use std::fmt::Debug;
 
 use relentless::{
     evaluator::{
-        evaluate::{Failure, Message, Messages},
+        evaluate::{Failure, Messages},
         json::JsonEvaluator,
         plaintext::PlaintextEvaluator,
     },
@@ -55,7 +55,7 @@ impl<Se: Debug + Send> ResponseSink<Result<tonic::Response<Se>, tonic::Status>> 
     #[tracing::instrument(err)]
     async fn consume(
         &self,
-        msg: &mut Messages<Message<Self::Message>>,
+        msg: &mut Messages<Self::Message>,
         res: Destinations<Result<tonic::Response<Se>, tonic::Status>>,
     ) -> Result<(), Failure> {
         Ok(())

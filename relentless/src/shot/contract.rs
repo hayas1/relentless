@@ -7,7 +7,7 @@ use semigroup::Semigroup;
 use tower::{Layer, MakeService, Service};
 
 use crate::{
-    evaluator::evaluate::{Failure, Message, Messages},
+    evaluator::evaluate::{Failure, Messages},
     shot::destinations::Destinations,
 };
 
@@ -45,7 +45,7 @@ pub trait RequestSource<De> {
 #[trait_variant::make(Send)]
 pub trait ResponseSink<Se> {
     type Message;
-    async fn consume(&self, msg: &mut Messages<Message<Self::Message>>, res: Destinations<Se>) -> Result<(), Failure>;
+    async fn consume(&self, msg: &mut Messages<Self::Message>, res: Destinations<Se>) -> Result<(), Failure>;
 }
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash, Semigroup)]
 #[semigroup(monoid, commutative, with = "semigroup::op::Sum")]

@@ -1,4 +1,4 @@
-use std::fmt::{Debug, Display};
+use std::fmt::Debug;
 
 use futures::StreamExt;
 use semigroup::{CombineStream, Semigroup};
@@ -29,10 +29,10 @@ pub struct Testcase<Q, P> {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct CaseReport<'a, Q, P> {
+pub struct CaseReport<'a, Q, P, M> {
     pub case: &'a Testcase<Q, P>,
     pub evaluated: Evaluated,
-    pub messages: Messages<String>,
+    pub messages: Messages<M>,
 }
 
 impl<Q, P> Testcase<Q, P> {
@@ -42,7 +42,7 @@ impl<Q, P> Testcase<Q, P> {
         services: &Destinations<C::Service>,
         job: &JobSpec,
         suite: &Suite<S, Q, P>,
-    ) -> crate::Result<CaseReport<'_, Q, P>>
+    ) -> crate::Result<CaseReport<'_, Q, P, P::Message>>
     where
         T: Clone + Service<C::TransportReq, Response = C::TransportRes> + Send,
         S: Debug + SignContract<T, C> + Default,
@@ -50,7 +50,6 @@ impl<Q, P> Testcase<Q, P> {
         C::Service: Clone + Service<C::Request, Response = C::Response>,
         Q: Debug + Clone + Semigroup + RequestSource<C::Request>,
         P: Debug + Clone + Semigroup + ResponseSink<Result<C::Response, ServiceError<T, C>>>,
-        P::Message: Display,
     {
         let profile = &self.profile.clone().semigroup(suite.profile.clone());
         let buffers = if Hierarchy::Testcase.contains(&job.sequential) { 1 } else { profile.repeat.times().max(1) };

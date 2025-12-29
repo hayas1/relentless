@@ -1,8 +1,4 @@
-use std::{
-    fmt::{Debug, Display},
-    ops::Range,
-    time::Duration,
-};
+use std::{fmt::Debug, ops::Range, time::Duration};
 
 use futures::{StreamExt, TryStreamExt};
 use semigroup::Semigroup;
@@ -51,6 +47,13 @@ impl Repeat {
     }
 }
 
+// TODO
+// #[derive(Debug, Clone, PartialEq)]
+// pub struct ProfileReport<'a, Q, P, M> {
+//     pub profile: &'a Profile<Q, P>,
+//     pub evaluated: Evaluated,
+//     pub messages: Messages<M>,
+// }
 impl<Q, P> Profile<Q, P> {
     #[tracing::instrument(name = "profile", skip(services))]
     pub async fn shot<T, C>(
@@ -58,14 +61,13 @@ impl<Q, P> Profile<Q, P> {
         services: &Destinations<C::Service>,
         destinations: &Destinations<http::Uri>,
         target: &str,
-    ) -> Result<(Evaluated, Messages<String>), ContractError<T, C>>
+    ) -> Result<(Evaluated, Messages<P::Message>), ContractError<T, C>>
     where
         T: Service<C::TransportReq, Response = C::TransportRes>,
         C: Contract<T, ReqSource = Q, ResSink = P> + Layer<T>,
         C::Service: Clone + Service<C::Request, Response = C::Response>,
         Q: Debug + RequestSource<C::Request>,
         P: Debug + ResponseSink<Result<C::Response, ServiceError<T, C>>>,
-        P::Message: Display,
     {
         let buffers = services.len().max(1);
         let responses = futures::stream::iter(services)
@@ -81,7 +83,7 @@ impl<Q, P> Profile<Q, P> {
             .await?;
         let mut messages = Messages::new();
         let evaluated = self.response.consume(&mut messages, responses).await;
-        Ok((Evaluated::new(&evaluated, self.allow), messages.displayable()))
+        Ok((Evaluated::new(&evaluated, self.allow), messages))
     }
 }
 

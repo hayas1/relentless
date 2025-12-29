@@ -1,4 +1,4 @@
-use std::fmt::Write as _;
+use std::fmt::{Display, Write as _};
 
 use console::{Emoji, Style, StyledObject};
 
@@ -42,16 +42,16 @@ impl Console {
     pub fn message_style(&self) -> Style {
         Style::new().dim()
     }
-    pub fn message<T>(&self, msg: T) -> StyledObject<T> {
+    pub fn styled_message<T>(&self, msg: T) -> StyledObject<T> {
         self.message_style().apply_to(msg)
     }
 }
-impl<C, Q, P> Reporter<&JobReport<'_, C, Q, P>> for Console {
+impl<C, Q, P, M: Display> Reporter<&JobReport<'_, C, Q, P, M>> for Console {
     type Error = std::fmt::Error;
     fn write_report<W: std::io::Write>(
         &self,
         writer: &mut ReportWriter<W>,
-        report: &JobReport<C, Q, P>,
+        report: &JobReport<C, Q, P, M>,
     ) -> Result<(), Self::Error> {
         report.suites.iter().try_fold((), |(), s| {
             self.write_report(writer, s)?;
@@ -68,12 +68,12 @@ impl<C, Q, P> Reporter<&JobReport<'_, C, Q, P>> for Console {
         Ok(())
     }
 }
-impl<C, Q, P> Reporter<&SuiteReport<'_, C, Q, P>> for Console {
+impl<C, Q, P, M: Display> Reporter<&SuiteReport<'_, C, Q, P, M>> for Console {
     type Error = std::fmt::Error;
     fn write_report<W: std::io::Write>(
         &self,
         writer: &mut ReportWriter<W>,
-        report: &SuiteReport<C, Q, P>,
+        report: &SuiteReport<C, Q, P, M>,
     ) -> Result<(), Self::Error> {
         writeln!(writer, "{} {}", Self::SUITE_NAME_EMOJI, report.suite.name)?;
         writer.scope(|w| {
@@ -90,12 +90,12 @@ impl<C, Q, P> Reporter<&SuiteReport<'_, C, Q, P>> for Console {
         report.cases.iter().try_fold((), |(), c| self.write_report(writer, c))
     }
 }
-impl<Q, P> Reporter<&CaseReport<'_, Q, P>> for Console {
+impl<Q, P, M: Display> Reporter<&CaseReport<'_, Q, P, M>> for Console {
     type Error = std::fmt::Error;
     fn write_report<W: std::io::Write>(
         &self,
         writer: &mut ReportWriter<W>,
-        report: &CaseReport<Q, P>,
+        report: &CaseReport<Q, P, M>,
     ) -> Result<(), Self::Error> {
         let assessment = report.evaluated.assess();
         let Evaluated { pass, passed, allow, .. } = &report.evaluated;
@@ -118,7 +118,7 @@ impl<Q, P> Reporter<&CaseReport<'_, Q, P>> for Console {
         writer.scope(|w| {
             let l2 = {
                 let (mut lines, and_more) = report.messages.display_lines();
-                lines.try_for_each(|l| writeln!(w, "{} {}", Self::CASE_MESSAGE_EMOJI, self.message(l)))?;
+                lines.try_for_each(|l| writeln!(w, "{} {}", Self::CASE_MESSAGE_EMOJI, self.styled_message(l)))?;
                 and_more.iter().try_for_each(|m| writeln!(w, "... and {} more", m))
             };
             l2

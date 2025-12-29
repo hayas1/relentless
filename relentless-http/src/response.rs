@@ -13,7 +13,7 @@ use relentless::evaluator::json::JsonEvaluator;
 use relentless::{
     error::EvaluateError,
     evaluator::{
-        evaluate::{Evaluator, Failure, Message, Messages},
+        evaluate::{Evaluator, Failure, Messages},
         expect::ExpectEvaluator,
         plaintext::PlaintextEvaluator,
     },
@@ -74,7 +74,7 @@ where
     #[tracing::instrument(err)]
     async fn consume(
         &self,
-        msg: &mut Messages<Message<Self::Message>>,
+        msg: &mut Messages<Self::Message>,
         res: Destinations<Result<http::Response<ResB>, E>>,
     ) -> Result<(), Failure> {
         let buffers = res.len().max(1);
@@ -97,11 +97,7 @@ where
 }
 impl Evaluator<http::Response<Bytes>> for HttpResponse {
     type Message = EvaluateError;
-    fn evaluate_shot(
-        &self,
-        msg: &mut Messages<Message<Self::Message>>,
-        res: &http::Response<Bytes>,
-    ) -> Result<(), Failure> {
+    fn evaluate_shot(&self, msg: &mut Messages<Self::Message>, res: &http::Response<Bytes>) -> Result<(), Failure> {
         self.status.as_ref().unwrap_or(&Default::default()).evaluate_shot(msg, &res.status())?;
         self.header.as_ref().unwrap_or(&Default::default()).evaluate_shot(msg, res.headers())?;
         self.body.as_ref().unwrap_or(&Default::default()).evaluate_shot(msg, res.body())?;
@@ -109,7 +105,7 @@ impl Evaluator<http::Response<Bytes>> for HttpResponse {
     }
     fn evaluate_compare(
         &self,
-        msg: &mut Messages<Message<Self::Message>>,
+        msg: &mut Messages<Self::Message>,
         res1: &http::Response<Bytes>,
         res2: &http::Response<Bytes>,
     ) -> Result<(), Failure> {
@@ -122,7 +118,7 @@ impl Evaluator<http::Response<Bytes>> for HttpResponse {
 
 impl Evaluator<StatusCode> for HttpResponseStatus {
     type Message = EvaluateError;
-    fn evaluate_shot(&self, msg: &mut Messages<Message<Self::Message>>, res: &StatusCode) -> Result<(), Failure> {
+    fn evaluate_shot(&self, msg: &mut Messages<Self::Message>, res: &StatusCode) -> Result<(), Failure> {
         match self {
             Self::OkOrEqual => self.evaluate(msg, res.is_success(), |_| EvaluateError::custom("not success status")),
             Self::Expect(e) => todo!(),
@@ -131,7 +127,7 @@ impl Evaluator<StatusCode> for HttpResponseStatus {
     }
     fn evaluate_compare(
         &self,
-        msg: &mut Messages<Message<Self::Message>>,
+        msg: &mut Messages<Self::Message>,
         res1: &StatusCode,
         res2: &StatusCode,
     ) -> Result<(), Failure> {
@@ -144,7 +140,7 @@ impl Evaluator<StatusCode> for HttpResponseStatus {
 }
 impl Evaluator<HeaderMap> for HttpResponseHeaders {
     type Message = EvaluateError;
-    fn evaluate_shot(&self, msg: &mut Messages<Message<Self::Message>>, res: &HeaderMap) -> Result<(), Failure> {
+    fn evaluate_shot(&self, msg: &mut Messages<Self::Message>, res: &HeaderMap) -> Result<(), Failure> {
         match self {
             Self::AnyOrEqual => Ok(()),
             Self::Expect(e) => todo!(),
@@ -153,7 +149,7 @@ impl Evaluator<HeaderMap> for HttpResponseHeaders {
     }
     fn evaluate_compare(
         &self,
-        msg: &mut Messages<Message<Self::Message>>,
+        msg: &mut Messages<Self::Message>,
         res1: &HeaderMap,
         res2: &HeaderMap,
     ) -> Result<(), Failure> {
@@ -177,7 +173,7 @@ impl HttpResponseHeaders {
 }
 impl Evaluator<Bytes> for HttpResponseBody {
     type Message = EvaluateError;
-    fn evaluate_shot(&self, msg: &mut Messages<Message<Self::Message>>, res: &Bytes) -> Result<(), Failure> {
+    fn evaluate_shot(&self, msg: &mut Messages<Self::Message>, res: &Bytes) -> Result<(), Failure> {
         match self {
             Self::AnyOrEqual => Ok(()),
             Self::Plaintext(e) => todo!(),
@@ -185,12 +181,7 @@ impl Evaluator<Bytes> for HttpResponseBody {
             Self::Json(e) => todo!(),
         }
     }
-    fn evaluate_compare(
-        &self,
-        msg: &mut Messages<Message<Self::Message>>,
-        res1: &Bytes,
-        res2: &Bytes,
-    ) -> Result<(), Failure> {
+    fn evaluate_compare(&self, msg: &mut Messages<Self::Message>, res1: &Bytes, res2: &Bytes) -> Result<(), Failure> {
         match self {
             Self::AnyOrEqual => self.evaluate(msg, res1 == res2, |_| EvaluateError::custom("not equal body")),
             Self::Plaintext(e) => todo!(),
