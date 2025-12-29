@@ -25,6 +25,11 @@ impl DerefMut for Method {
         &mut self.0
     }
 }
+impl PartialEq<http::Method> for Method {
+    fn eq(&self, other: &http::Method) -> bool {
+        self.0 == *other
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash, Serialize, Deserialize)]
 pub struct StatusCode(#[serde(with = "http_serde::status_code")] pub http::StatusCode);
@@ -47,6 +52,11 @@ impl Deref for StatusCode {
 impl DerefMut for StatusCode {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
+    }
+}
+impl PartialEq<http::StatusCode> for StatusCode {
+    fn eq(&self, other: &http::StatusCode) -> bool {
+        self.0 == *other
     }
 }
 
@@ -73,6 +83,11 @@ impl DerefMut for Uri {
         &mut self.0
     }
 }
+impl PartialEq<http::Uri> for Uri {
+    fn eq(&self, other: &http::Uri) -> bool {
+        self.0 == *other
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash, Serialize, Deserialize)]
 pub struct Version(#[serde(with = "http_serde::version")] pub http::Version);
@@ -95,6 +110,11 @@ impl Deref for Version {
 impl DerefMut for Version {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
+    }
+}
+impl PartialEq<http::Version> for Version {
+    fn eq(&self, other: &http::Version) -> bool {
+        self.0 == *other
     }
 }
 
@@ -121,6 +141,11 @@ impl DerefMut for HeaderMap {
         &mut self.0
     }
 }
+impl PartialEq<http::HeaderMap> for HeaderMap {
+    fn eq(&self, other: &http::HeaderMap) -> bool {
+        self.0 == *other
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Authority(#[serde(with = "http_serde::authority")] pub http::uri::Authority);
@@ -143,5 +168,10 @@ impl Deref for Authority {
 impl DerefMut for Authority {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
+    }
+}
+impl PartialEq<http::uri::Authority> for Authority {
+    fn eq(&self, other: &http::uri::Authority) -> bool {
+        self.0 == *other
     }
 }

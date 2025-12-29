@@ -121,7 +121,7 @@ impl Evaluator<StatusCode> for HttpResponseStatus {
     fn evaluate_shot(&self, msg: &mut Messages<Self::Message>, res: &StatusCode) -> Result<(), Failure> {
         match self {
             Self::OkOrEqual => self.evaluate(msg, res.is_success(), |_| EvaluateError::custom("not success status")),
-            Self::Expect(e) => todo!(),
+            Self::Expect(e) => e.evaluate_shot(msg, res),
             Self::Ignore => Ok(()),
         }
     }
@@ -133,7 +133,7 @@ impl Evaluator<StatusCode> for HttpResponseStatus {
     ) -> Result<(), Failure> {
         match self {
             Self::OkOrEqual => self.evaluate(msg, res1 == res2, |_| EvaluateError::custom("not equal status")),
-            Self::Expect(e) => todo!(),
+            Self::Expect(e) => e.evaluate_compare(msg, res1, res2),
             Self::Ignore => Ok(()),
         }
     }
@@ -143,7 +143,7 @@ impl Evaluator<HeaderMap> for HttpResponseHeaders {
     fn evaluate_shot(&self, msg: &mut Messages<Self::Message>, res: &HeaderMap) -> Result<(), Failure> {
         match self {
             Self::AnyOrEqual => Ok(()),
-            Self::Expect(e) => todo!(),
+            Self::Expect(e) => e.evaluate_shot(msg, res),
             Self::Ignore => Ok(()),
         }
     }
@@ -153,13 +153,19 @@ impl Evaluator<HeaderMap> for HttpResponseHeaders {
         res1: &HeaderMap,
         res2: &HeaderMap,
     ) -> Result<(), Failure> {
-        let (resp1, resp2): (HashMap<_, _>, HashMap<_, _>) = (
-            self.allowlist().iter().filter_map(|&k| Some((k, res1.get(k)?))).collect(),
-            self.allowlist().iter().filter_map(|&k| Some((k, res2.get(k)?))).collect(),
+        let (resp1, resp2): (HeaderMap, HeaderMap) = (
+            self.allowlist()
+                .iter()
+                .filter_map(|&k| Some((k.parse().unwrap_or_else(|_| unreachable!()), res1.get(k)?.clone())))
+                .collect(),
+            self.allowlist()
+                .iter()
+                .filter_map(|&k| Some((k.parse().unwrap_or_else(|_| unreachable!()), res2.get(k)?.clone())))
+                .collect(),
         );
         match self {
             Self::AnyOrEqual => self.evaluate(msg, resp1 == resp2, |_| EvaluateError::custom("not equal headers")),
-            Self::Expect(e) => todo!(),
+            Self::Expect(e) => e.evaluate_compare(msg, &resp1, &resp2),
             Self::Ignore => Ok(()),
         }
     }
