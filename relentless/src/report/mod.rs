@@ -59,21 +59,28 @@ impl<W> ReportWriter<W> {
         Self { indent, buf, at_start_line }
     }
     pub fn indent(&self) -> String {
-        "  ".repeat(self.indent)
+        " ".repeat(self.indent)
     }
-    pub fn increment(&mut self) {
-        self.indent += 1;
+    pub fn increment(&mut self, indent: usize) {
+        self.indent += indent;
     }
-    pub fn decrement(&mut self) {
-        self.indent -= 1;
+    pub fn decrement(&mut self, indent: usize) {
+        self.indent -= indent;
     }
     pub fn scope<F, T>(&mut self, f: F) -> T
     where
         F: FnOnce(&mut Self) -> T,
     {
-        self.increment();
+        self.scope_n(2, f)
+    }
+    // TODO const generic, but F, T must be supplied explicitly like `self.scope_n::<1, _, _>(f)`
+    pub fn scope_n<F, T>(&mut self, n: usize, f: F) -> T
+    where
+        F: FnOnce(&mut Self) -> T,
+    {
+        self.increment(n);
         let ret = f(self);
-        self.decrement();
+        self.decrement(n);
         ret
     }
 }

@@ -75,7 +75,7 @@ impl<C, Q, P, M: Display> Reporter<&SuiteReport<'_, C, Q, P, M>> for Console {
         writer: &mut ReportWriter<W>,
         report: &SuiteReport<C, Q, P, M>,
     ) -> Result<(), Self::Error> {
-        writeln!(writer, "{} {}", Self::SUITE_NAME_EMOJI, report.suite.name)?;
+        writeln!(writer, "{} {} {}", Self::SUITE_NAME_EMOJI, report.suite.name, Self::SUITE_NAME_EMOJI)?;
         writer.scope(|w| {
             let (first, last) = (report.destinations.first(), report.destinations.last());
             report.destinations.combine_rev_clone().iter().try_fold((), |(), (name, dest)| {
@@ -118,7 +118,10 @@ impl<Q, P, M: Display> Reporter<&CaseReport<'_, Q, P, M>> for Console {
         writer.scope(|w| {
             let l2 = {
                 let (mut lines, and_more) = report.messages.display_lines();
-                lines.try_for_each(|l| writeln!(w, "{} {}", Self::CASE_MESSAGE_EMOJI, self.styled_message(l)))?;
+                lines.try_for_each(|l| {
+                    write!(w, "{} ", Self::CASE_MESSAGE_EMOJI)?;
+                    w.scope_n(3, |w| writeln!(w, "{}", self.styled_message(l)))
+                })?;
                 and_more.iter().try_for_each(|m| writeln!(w, "... and {m} more"))
             };
             l2
