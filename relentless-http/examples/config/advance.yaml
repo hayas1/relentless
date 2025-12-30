@@ -6,8 +6,6 @@ destinations:
 testcases:
   - target: /health/disabled
     description: health check disabled
-    profile:
-      allow: true
   - target: /echo/body
     description: echo body
     profile:
@@ -18,6 +16,13 @@ testcases:
   - target: /counter/increment
     profile:
       repeat: 10
+      allow: true
   - target: /wait/200ms
+    profile:
+      response:
+        status:
+          expect: 200
+        body:
+          regex: '\{"from":\d+,"wait":"200ms"\}'
   - target: /echo/json/functional?key=value&now.time=$now&now.string=now
 

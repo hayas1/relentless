@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use crate::{error::EvaluateError, shot::destinations::Destinations};
 
 // TODO error handling
-pub trait Evaluator<S> {
+pub trait Evaluator<S: ?Sized> {
     type Message;
     fn evaluate_shot(&self, msg: &mut Messages<Self::Message>, res: &S) -> Result<(), Failure>;
     fn evaluate_compare(&self, msg: &mut Messages<Self::Message>, res1: &S, res2: &S) -> Result<(), Failure>;
@@ -26,6 +26,7 @@ pub trait Evaluator<S> {
     fn evaluate_shots(&self, msg: &mut Messages<Self::Message>, res: Destinations<S>) -> Result<(), Failure>
     where
         Self::Message: From<EvaluateError>,
+        S: Sized,
     {
         let mut popper = res.into_iter();
         let (_, resp) = popper.next().ok_or(EvaluateError::EmptyTarget).map_err(|e| msg.error(e.into()))?;
@@ -37,6 +38,7 @@ pub trait Evaluator<S> {
     fn evaluate_compares(&self, msg: &mut Messages<Self::Message>, res: Destinations<S>) -> Result<(), Failure>
     where
         Self::Message: From<EvaluateError>,
+        S: Sized,
     {
         match res.len() {
             0 => Err(EvaluateError::EmptyTarget).map_err(|e| msg.error(e.into()))?,

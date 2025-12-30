@@ -4,7 +4,7 @@ use relentless::{
     evaluator::{
         evaluate::{Failure, Messages},
         json::JsonEvaluator,
-        plaintext::PlaintextEvaluator,
+        plaintext::RegexEvaluator,
     },
     shot::{contract::ResponseSink, destinations::Destinations},
 };
@@ -46,7 +46,7 @@ pub enum GrpcResponseMetadataMap {
 pub enum GrpcResponseMessage {
     #[default]
     AnyOrEqual,
-    Plaintext(PlaintextEvaluator),
+    Plaintext(RegexEvaluator),
     Json(JsonEvaluator),
 }
 

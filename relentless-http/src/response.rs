@@ -15,7 +15,7 @@ use relentless::{
     evaluator::{
         evaluate::{Evaluator, Failure, Messages},
         expect::ExpectEvaluator,
-        plaintext::PlaintextEvaluator,
+        plaintext::RegexEvaluator,
     },
     http_newtype_serde,
     shot::{contract::ResponseSink, destinations::Destinations},
@@ -59,7 +59,7 @@ pub enum HttpResponseHeaders {
 pub enum HttpResponseBody {
     #[default]
     AnyOrEqual,
-    Plaintext(PlaintextEvaluator),
+    Regex(RegexEvaluator),
     #[cfg(feature = "json")]
     Json(JsonEvaluator),
 }
@@ -182,7 +182,7 @@ impl Evaluator<Bytes> for HttpResponseBody {
     fn evaluate_shot(&self, msg: &mut Messages<Self::Message>, res: &Bytes) -> Result<(), Failure> {
         match self {
             Self::AnyOrEqual => Ok(()),
-            Self::Plaintext(e) => todo!(),
+            Self::Regex(e) => e.evaluate_shot(msg, &String::from_utf8_lossy(res)[..]),
             #[cfg(feature = "json")]
             Self::Json(e) => todo!(),
         }
@@ -190,7 +190,9 @@ impl Evaluator<Bytes> for HttpResponseBody {
     fn evaluate_compare(&self, msg: &mut Messages<Self::Message>, res1: &Bytes, res2: &Bytes) -> Result<(), Failure> {
         match self {
             Self::AnyOrEqual => self.evaluate(msg, res1 == res2, |_| EvaluateError::custom("not equal body")),
-            Self::Plaintext(e) => todo!(),
+            Self::Regex(e) => {
+                e.evaluate_compare(msg, &String::from_utf8_lossy(res1)[..], &String::from_utf8_lossy(res2)[..])
+            }
             #[cfg(feature = "json")]
             Self::Json(e) => todo!(),
         }

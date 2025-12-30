@@ -14,6 +14,7 @@ impl<T> ExpectEvaluator<T> {
     }
 }
 impl<T: PartialEq<U>, U> Evaluator<U> for ExpectEvaluator<T> {
+    // TODO T: Display for error message, but the status code (main use case), does not impl Display.
     type Message = EvaluateError;
     fn evaluate_shot(&self, msg: &mut Messages<Self::Message>, res: &U) -> Result<(), Failure> {
         // TODO error message
