@@ -2,7 +2,7 @@ use std::fmt::{Debug, Display};
 
 use bytes::Bytes;
 use futures::{StreamExt, TryStreamExt};
-use http::{HeaderMap, StatusCode};
+use http::{HeaderMap, HeaderName, StatusCode};
 use http_body::Body;
 use http_body_util::BodyExt;
 #[cfg(feature = "json")]
@@ -149,14 +149,8 @@ impl Evaluator<HeaderMap> for HttpResponseHeaders {
         res2: &HeaderMap,
     ) -> Result<(), Failure> {
         let (resp1, resp2): (HeaderMap, HeaderMap) = (
-            self.allowlist()
-                .iter()
-                .filter_map(|&k| Some((k.parse().unwrap_or_else(|_| unreachable!()), res1.get(k)?.clone())))
-                .collect(),
-            self.allowlist()
-                .iter()
-                .filter_map(|&k| Some((k.parse().unwrap_or_else(|_| unreachable!()), res2.get(k)?.clone())))
-                .collect(),
+            self.allowlist().filter_map(|k| Some((k.clone(), res1.get(&k)?.clone()))).collect(),
+            self.allowlist().filter_map(|k| Some((k.clone(), res2.get(&k)?.clone()))).collect(),
         );
         match self {
             Self::AnyOrEqual => self.evaluate_bool(msg, resp1 == resp2, |_| EvaluateError::custom("not equal headers")),
@@ -168,8 +162,11 @@ impl Evaluator<HeaderMap> for HttpResponseHeaders {
 impl HttpResponseHeaders {
     pub const DEFAULT_ALLOWLIST: &[&str] =
         &["content-type", "content-length", "content-language", "content-encoding", "cache-control"];
-    pub fn allowlist(&self) -> &[&str] {
+    pub fn raw_allowlist(&self) -> &[&str] {
         Self::DEFAULT_ALLOWLIST
+    }
+    pub fn allowlist(&self) -> impl '_ + Iterator<Item = HeaderName> {
+        self.raw_allowlist().iter().map(|&s| s.parse().unwrap_or_else(|_| unreachable!()))
     }
 }
 impl Evaluator<Bytes> for HttpResponseBody {
