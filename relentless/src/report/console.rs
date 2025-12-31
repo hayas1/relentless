@@ -3,6 +3,7 @@ use std::fmt::{Display, Write as _};
 use console::{Emoji, Style, StyledObject};
 
 use crate::{
+    evaluator::evaluate::{Message, MessageKind},
     report::{ReportWriter, Reporter},
     shot::{
         contract::{Assessment, Evaluated},
@@ -39,11 +40,14 @@ impl Console {
     pub fn styled<T>(&self, value: T, assessment: &Assessment) -> StyledObject<T> {
         self.style(assessment).apply_to(value)
     }
-    pub fn message_style(&self) -> Style {
-        Style::new().dim()
+    pub fn message_style(&self, kind: &MessageKind) -> Style {
+        match kind {
+            MessageKind::Warn => Style::new().yellow().dim(),
+            MessageKind::Error => Style::new().red().dim(),
+        }
     }
-    pub fn styled_message<T>(&self, msg: T) -> StyledObject<T> {
-        self.message_style().apply_to(msg)
+    pub fn styled_message<'a, T>(&self, msg: &'a Message<T>) -> StyledObject<&'a T> {
+        self.message_style(&msg.kind).apply_to(&msg.message)
     }
 }
 impl<C, Q, P, M: Display> Reporter<&JobReport<'_, C, Q, P, M>> for Console {
