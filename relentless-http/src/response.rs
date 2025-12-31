@@ -1,7 +1,4 @@
-use std::{
-    collections::HashMap,
-    fmt::{Debug, Display},
-};
+use std::fmt::{Debug, Display};
 
 use bytes::Bytes;
 use futures::{StreamExt, TryStreamExt};
@@ -120,7 +117,9 @@ impl Evaluator<StatusCode> for HttpResponseStatus {
     type Message = EvaluateError;
     fn evaluate_shot(&self, msg: &mut Messages<Self::Message>, res: &StatusCode) -> Result<(), Failure> {
         match self {
-            Self::OkOrEqual => self.evaluate(msg, res.is_success(), |_| EvaluateError::custom("not success status")),
+            Self::OkOrEqual => {
+                self.evaluate_bool(msg, res.is_success(), |_| EvaluateError::custom("not success status"))
+            }
             Self::Expect(e) => e.evaluate_shot(msg, res),
             Self::Ignore => Ok(()),
         }
@@ -132,7 +131,7 @@ impl Evaluator<StatusCode> for HttpResponseStatus {
         res2: &StatusCode,
     ) -> Result<(), Failure> {
         match self {
-            Self::OkOrEqual => self.evaluate(msg, res1 == res2, |_| EvaluateError::custom("not equal status")),
+            Self::OkOrEqual => self.evaluate_bool(msg, res1 == res2, |_| EvaluateError::custom("not equal status")),
             Self::Expect(e) => e.evaluate_compare(msg, res1, res2),
             Self::Ignore => Ok(()),
         }
@@ -164,7 +163,7 @@ impl Evaluator<HeaderMap> for HttpResponseHeaders {
                 .collect(),
         );
         match self {
-            Self::AnyOrEqual => self.evaluate(msg, resp1 == resp2, |_| EvaluateError::custom("not equal headers")),
+            Self::AnyOrEqual => self.evaluate_bool(msg, resp1 == resp2, |_| EvaluateError::custom("not equal headers")),
             Self::Expect(e) => e.evaluate_compare(msg, &resp1, &resp2),
             Self::Ignore => Ok(()),
         }
@@ -189,7 +188,7 @@ impl Evaluator<Bytes> for HttpResponseBody {
     }
     fn evaluate_compare(&self, msg: &mut Messages<Self::Message>, res1: &Bytes, res2: &Bytes) -> Result<(), Failure> {
         match self {
-            Self::AnyOrEqual => self.evaluate(msg, res1 == res2, |_| EvaluateError::custom("not equal body")),
+            Self::AnyOrEqual => self.evaluate_bool(msg, res1 == res2, |_| EvaluateError::custom("not equal body")),
             Self::Regex(e) => {
                 e.evaluate_compare(msg, &String::from_utf8_lossy(res1)[..], &String::from_utf8_lossy(res2)[..])
             }

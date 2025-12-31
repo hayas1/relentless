@@ -24,12 +24,12 @@ impl Evaluator<str> for RegexEvaluator {
     type Message = EvaluateError;
     fn evaluate_shot(&self, msg: &mut Messages<Self::Message>, res: &str) -> Result<(), Failure> {
         let regex = self.regex().map_err(|e| msg.error(EvaluateError::boxed(e)))?;
-        self.evaluate(msg, regex.is_match(res), |_| EvaluateError::custom("not match"))
+        self.evaluate_bool(msg, regex.is_match(res), |_| EvaluateError::custom("not match"))
     }
     fn evaluate_compare(&self, msg: &mut Messages<Self::Message>, res1: &str, res2: &str) -> Result<(), Failure> {
         let regex = self.regex().map_err(|e| msg.error(EvaluateError::boxed(e)))?;
-        self.evaluate(msg, regex.is_match(res1), |_| EvaluateError::custom("not match"))?;
-        self.evaluate(msg, regex.is_match(res2), |_| EvaluateError::custom("not match"))?;
+        self.evaluate_bool(msg, regex.is_match(res1), |_| EvaluateError::custom("not match"))?;
+        self.evaluate_bool(msg, regex.is_match(res2), |_| EvaluateError::custom("not match"))?;
         Ok(())
     }
 }

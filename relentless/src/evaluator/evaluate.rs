@@ -11,7 +11,7 @@ pub trait Evaluator<S: ?Sized> {
     fn evaluate_shot(&self, msg: &mut Messages<Self::Message>, res: &S) -> Result<(), Failure>;
     fn evaluate_compare(&self, msg: &mut Messages<Self::Message>, res1: &S, res2: &S) -> Result<(), Failure>;
 
-    fn evaluate<F: Fn(bool) -> Self::Message>(
+    fn evaluate_bool<F: Fn(bool) -> Self::Message>(
         &self,
         msg: &mut Messages<Self::Message>,
         judge: bool,
