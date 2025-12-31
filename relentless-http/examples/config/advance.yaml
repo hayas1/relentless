@@ -15,14 +15,14 @@ testcases:
           plaintext: hello world
   - target: /counter/increment
     profile:
-      repeat: 10
+      repeat: 5
       allow: true
   - target: /wait/200ms
     profile:
+      repeat: 5
       response:
         status:
           expect: 200
         body:
-          regex: '\{"from":\d+,"wait":"200ms"\}'
+          regex: \{"from":\d+,"wait":"200ms"\}
   - target: /echo/json/functional?key=value&now.time=$now&now.string=now
-

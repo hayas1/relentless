@@ -10,6 +10,17 @@ pub trait Evaluator<S: ?Sized> {
     type Message;
     fn evaluate_shot(&self, msg: &mut Messages<Self::Message>, res: &S) -> Result<(), Failure>;
     fn evaluate_compare(&self, msg: &mut Messages<Self::Message>, res1: &S, res2: &S) -> Result<(), Failure>;
+    fn evaluate(&self, msg: &mut Messages<Self::Message>, res: Destinations<S>) -> Result<(), Failure>
+    where
+        Self::Message: From<EvaluateError>,
+        S: Sized,
+    {
+        match res.len() {
+            0 => Err(EvaluateError::EmptyTarget).map_err(|e| msg.error(e.into()))?,
+            1 => self.evaluate_shots(msg, res),
+            _ => self.evaluate_compares(msg, res),
+        }
+    }
 
     fn evaluate_bool<F: Fn(bool) -> Self::Message>(
         &self,
@@ -28,23 +39,14 @@ pub trait Evaluator<S: ?Sized> {
         Self::Message: From<EvaluateError>,
         S: Sized,
     {
-        let mut popper = res.into_iter();
-        let (_, resp) = popper.next().ok_or(EvaluateError::EmptyTarget).map_err(|e| msg.error(e.into()))?;
-        match popper.next() {
-            Some(_) => Err(msg.error(EvaluateError::ShouldCompare.into())),
-            None => self.evaluate_shot(msg, &resp),
-        }
+        let (_, resp) = res.into_iter().next().ok_or(EvaluateError::EmptyTarget).map_err(|e| msg.error(e.into()))?;
+        self.evaluate_shot(msg, &resp)
     }
     fn evaluate_compares(&self, msg: &mut Messages<Self::Message>, res: Destinations<S>) -> Result<(), Failure>
     where
         Self::Message: From<EvaluateError>,
         S: Sized,
     {
-        match res.len() {
-            0 => Err(EvaluateError::EmptyTarget).map_err(|e| msg.error(e.into()))?,
-            1 => Err(EvaluateError::ShouldShot).map_err(|e| msg.error(e.into()))?,
-            _ => (),
-        }
         let v: Vec<_> = res.into_iter().collect();
         v.windows(2).try_fold((), |(), w| {
             let ((_, a), (_, b)) = (&w[0], &w[1]);

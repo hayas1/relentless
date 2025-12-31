@@ -85,11 +85,7 @@ where
             .try_collect()
             .await
             .map_err(|e| msg.error(e))?;
-        if collected.len() == 1 {
-            self.evaluate_shots(msg, collected)
-        } else {
-            self.evaluate_compares(msg, collected)
-        }
+        self.evaluate(msg, collected)
     }
 }
 impl Evaluator<http::Response<Bytes>> for HttpResponse {
