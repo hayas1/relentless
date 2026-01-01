@@ -89,10 +89,6 @@ pub struct JobSpec {
     #[cfg_attr(feature = "cli", arg(short, long, num_args=0.., value_parser = Cli::separated::<String, '=', String>))]
     pub destination: Vec<(String, String)>,
 
-    /// deny allowed testcases
-    #[cfg_attr(feature = "cli", arg(env, long))]
-    pub strict: bool,
-
     /// spec of report
     #[cfg_attr(feature = "cli", command(flatten))]
     pub report_spec: ReportSpec,

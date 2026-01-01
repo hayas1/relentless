@@ -109,19 +109,19 @@ impl<Q, P, M: Display> Reporter<&CaseReport<'_, Q, P, M>> for Console<'_> {
         report: &CaseReport<Q, P, M>,
     ) -> Result<(), Self::Error> {
         let assessment = report.evaluated.assess();
-        let Evaluated { pass, passed, allow, .. } = &report.evaluated;
+        let Evaluated { allowed, .. } = &report.evaluated;
         if self.spec.ng_only && assessment != Assessment::Bad {
             return Ok(());
         }
         let l1 = {
-            let icon = match (pass, allow) {
-                (true, _) => self.styled(Self::CASE_PASS_EMOJI, &assessment),
-                (false, true) => self.styled(Self::CASE_ALLOW_EMOJI, &assessment),
-                (false, false) => self.styled(Self::CASE_FAIL_EMOJI, &assessment),
+            let icon = match assessment {
+                Assessment::Good => self.styled(Self::CASE_PASS_EMOJI, &assessment),
+                Assessment::Acceptable | Assessment::Poor => self.styled(Self::CASE_ALLOW_EMOJI, &assessment),
+                Assessment::Bad => self.styled(Self::CASE_FAIL_EMOJI, &assessment),
             };
             write!(writer, "{icon} {}", self.styled(&report.case.target, &assessment))?;
             if let Repeat(Some(repeat)) = &report.case.profile.repeat {
-                write!(writer, " {}{passed}/{repeat}", Self::CASE_REPEAT_EMOJI)?;
+                write!(writer, " {}{allowed}/{repeat}", Self::CASE_REPEAT_EMOJI)?;
             }
             if let Some(description) = &report.case.description {
                 write!(writer, " {} {description}", Self::CASE_DESCRIPTION_EMOJI)?;
