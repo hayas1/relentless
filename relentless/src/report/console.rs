@@ -44,7 +44,7 @@ impl<'a> Console<'a> {
             Assessment::Bad => Style::new().red(),
         }
     }
-    pub fn styled<T>(&self, value: T, assessment: &Assessment) -> StyledObject<T> {
+    pub fn styled<T>(&self, assessment: &Assessment, value: T) -> StyledObject<T> {
         self.style(assessment).apply_to(value)
     }
     pub fn message_style(&self, kind: &MessageKind) -> Style {
@@ -115,11 +115,11 @@ impl<Q, P, M: Display> Reporter<&CaseReport<'_, Q, P, M>> for Console<'_> {
         }
         let l1 = {
             let icon = match assessment {
-                Assessment::Good => self.styled(Self::CASE_PASS_EMOJI, &assessment),
-                Assessment::Acceptable | Assessment::Poor => self.styled(Self::CASE_ALLOW_EMOJI, &assessment),
-                Assessment::Bad => self.styled(Self::CASE_FAIL_EMOJI, &assessment),
+                Assessment::Good => self.styled(&assessment, Self::CASE_PASS_EMOJI),
+                Assessment::Acceptable | Assessment::Poor => self.styled(&assessment, Self::CASE_ALLOW_EMOJI),
+                Assessment::Bad => self.styled(&assessment, Self::CASE_FAIL_EMOJI),
             };
-            write!(writer, "{icon} {}", self.styled(&report.case.target, &assessment))?;
+            write!(writer, "{icon} {}", self.styled(&assessment, &report.case.target))?;
             if let Repeat(Some(repeat)) = &report.case.profile.repeat {
                 write!(writer, " {}{allowed}/{repeat}", Self::CASE_REPEAT_EMOJI)?;
             }
