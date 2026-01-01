@@ -16,7 +16,7 @@ pub async fn main() -> Result<ExitCode, Box<dyn std::error::Error>> {
         let otel = OtelInterceptor;
         let make = MakeChannel(otel);
         let report = job.shot::<_, _, DynamicContract<serde_json::Value, JsonSerializer>>(make, &spec).await?;
-        spec.report_format.report(&report)?;
+        spec.report(&report)?;
         // dbg!(measure.aggregated().times());
         Ok((!report.evaluated.assess().success() as u8).into())
     })

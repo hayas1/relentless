@@ -1,14 +1,27 @@
 use std::io::BufWriter;
 
-use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
+
+use crate::shot::job::JobSpec;
 
 #[cfg(feature = "console-report")]
 pub mod console;
 pub mod github_markdown;
 pub mod null_device;
 
-#[cfg_attr(feature = "cli", derive(ValueEnum))]
+#[cfg_attr(feature = "cli", derive(clap::Args))]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Hash, Serialize, Deserialize)]
+pub struct ReportSpec {
+    /// report only failed testcases
+    #[cfg_attr(feature = "cli", arg(env, long))]
+    pub ng_only: bool,
+
+    /// without colorize output
+    #[cfg_attr(feature = "cli", arg(env, long))]
+    pub no_color: bool,
+}
+
+#[cfg_attr(feature = "cli", derive(clap::ValueEnum))]
 #[derive(Debug, Clone, PartialEq, Eq, Default, Hash, Serialize, Deserialize)]
 pub enum ReportFormat {
     /// without report
@@ -32,7 +45,7 @@ pub trait Reporter<R> {
     }
     fn write_report<W: std::io::Write>(&self, writer: &mut ReportWriter<W>, report: R) -> Result<(), Self::Error>;
 }
-impl<R, E> Reporter<R> for ReportFormat
+impl<R, E> Reporter<R> for JobSpec
 where
     null_device::NullDevice: Reporter<R, Error = E>,
     console::Console: Reporter<R, Error = E>,
@@ -40,10 +53,12 @@ where
 {
     type Error = E;
     fn write_report<W: std::io::Write>(&self, writer: &mut ReportWriter<W>, report: R) -> Result<(), Self::Error> {
-        match self {
+        match self.report_format {
             ReportFormat::NullDevice => null_device::NullDevice.write_report(writer, report),
-            ReportFormat::Console => console::Console.write_report(writer, report),
-            ReportFormat::GithubMarkdown => github_markdown::GithubMarkdown.write_report(writer, report),
+            ReportFormat::Console => console::Console::new(self.report_spec.clone()).write_report(writer, report),
+            ReportFormat::GithubMarkdown => {
+                github_markdown::GithubMarkdown::new(self.report_spec.clone()).write_report(writer, report)
+            }
         }
     }
 }

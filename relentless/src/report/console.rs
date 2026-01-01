@@ -4,7 +4,7 @@ use console::{Emoji, Style, StyledObject};
 
 use crate::{
     evaluator::evaluate::{Message, MessageKind},
-    report::{ReportWriter, Reporter},
+    report::{ReportSpec, ReportWriter, Reporter},
     shot::{
         contract::{Assessment, Evaluated},
         job::JobReport,
@@ -14,7 +14,9 @@ use crate::{
     },
 };
 
-pub struct Console;
+pub struct Console {
+    pub spec: ReportSpec,
+}
 impl Console {
     pub const SUITE_NAME_EMOJI: Emoji<'_, '_> = Emoji("🚀", "");
     pub const SUITE_DESTINATION_EMOJI: Emoji<'_, '_> = Emoji("🌐", ":");
@@ -28,6 +30,11 @@ impl Console {
     pub const CASE_MESSAGE_EMOJI: Emoji<'_, '_> = Emoji("💬", "");
 
     pub const SUMMARY_EMOJI: Emoji<'_, '_> = Emoji("💥", "");
+
+    pub fn new(spec: ReportSpec) -> Self {
+        console::set_colors_enabled(!spec.no_color); // TODO global setting
+        Self { spec }
+    }
 
     pub fn style(&self, assessment: &Assessment) -> Style {
         match assessment {

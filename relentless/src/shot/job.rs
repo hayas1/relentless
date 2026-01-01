@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use tower::Layer;
 use tower::{MakeService, Service};
 
+use crate::report::ReportSpec;
 use crate::{
     report::ReportFormat,
     shot::{
@@ -88,17 +89,13 @@ pub struct JobSpec {
     #[cfg_attr(feature = "cli", arg(short, long, num_args=0.., value_parser = Cli::separated::<String, '=', String>))]
     pub destination: Vec<(String, String)>,
 
-    /// allow invalid testcases
+    /// deny allowed testcases
     #[cfg_attr(feature = "cli", arg(env, long))]
     pub strict: bool,
 
-    /// report only failed testcases
-    #[cfg_attr(feature = "cli", arg(env, long))]
-    pub ng_only: bool,
-
-    /// without colorize output
-    #[cfg_attr(feature = "cli", arg(env, long))]
-    pub no_color: bool,
+    /// spec of report
+    #[cfg_attr(feature = "cli", command(flatten))]
+    pub report_spec: ReportSpec,
 
     /// format of report
     #[cfg_attr(feature = "cli", arg(env, short, long, value_enum, default_value_t))]
