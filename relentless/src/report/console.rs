@@ -110,6 +110,9 @@ impl<Q, P, M: Display> Reporter<&CaseReport<'_, Q, P, M>> for Console<'_> {
     ) -> Result<(), Self::Error> {
         let assessment = report.evaluated.assess();
         let Evaluated { pass, passed, allow, .. } = &report.evaluated;
+        if self.spec.ng_only && assessment != Assessment::Bad {
+            return Ok(());
+        }
         let l1 = {
             let icon = match (pass, allow) {
                 (true, _) => self.styled(Self::CASE_PASS_EMOJI, &assessment),
