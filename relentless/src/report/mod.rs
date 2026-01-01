@@ -48,16 +48,16 @@ pub trait Reporter<R> {
 impl<R, E> Reporter<R> for JobSpec
 where
     null_device::NullDevice: Reporter<R, Error = E>,
-    console::Console: Reporter<R, Error = E>,
-    github_markdown::GithubMarkdown: Reporter<R, Error = E>,
+    for<'a> console::Console<'a>: Reporter<R, Error = E>,
+    for<'a> github_markdown::GithubMarkdown<'a>: Reporter<R, Error = E>,
 {
     type Error = E;
     fn write_report<W: std::io::Write>(&self, writer: &mut ReportWriter<W>, report: R) -> Result<(), Self::Error> {
         match self.report_format {
             ReportFormat::NullDevice => null_device::NullDevice.write_report(writer, report),
-            ReportFormat::Console => console::Console::new(self.report_spec.clone()).write_report(writer, report),
+            ReportFormat::Console => console::Console::new(&self.report_spec).write_report(writer, report),
             ReportFormat::GithubMarkdown => {
-                github_markdown::GithubMarkdown::new(self.report_spec.clone()).write_report(writer, report)
+                github_markdown::GithubMarkdown::new(&self.report_spec).write_report(writer, report)
             }
         }
     }

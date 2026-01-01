@@ -3,15 +3,15 @@ use crate::{
     shot::job::JobReport,
 };
 
-pub struct GithubMarkdown {
-    pub spec: ReportSpec,
+pub struct GithubMarkdown<'a> {
+    pub spec: &'a ReportSpec,
 }
-impl GithubMarkdown {
-    pub fn new(spec: ReportSpec) -> Self {
+impl<'a> GithubMarkdown<'a> {
+    pub fn new(spec: &'a ReportSpec) -> Self {
         Self { spec }
     }
 }
-impl<C, Q, P, M> Reporter<&JobReport<'_, C, Q, P, M>> for GithubMarkdown {
+impl<C, Q, P, M> Reporter<&JobReport<'_, C, Q, P, M>> for GithubMarkdown<'_> {
     type Error = std::fmt::Error;
     fn write_report<W: std::io::Write>(
         &self,

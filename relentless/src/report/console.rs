@@ -14,24 +14,24 @@ use crate::{
     },
 };
 
-pub struct Console {
-    pub spec: ReportSpec,
+pub struct Console<'a> {
+    pub spec: &'a ReportSpec,
 }
-impl Console {
-    pub const SUITE_NAME_EMOJI: Emoji<'_, '_> = Emoji("🚀", "");
-    pub const SUITE_DESTINATION_EMOJI: Emoji<'_, '_> = Emoji("🌐", ":");
-    pub const SUITE_OVERWRITE_DESTINATION_EMOJI: Emoji<'_, '_> = Emoji("👉", "->");
+impl<'a> Console<'a> {
+    pub const SUITE_NAME_EMOJI: Emoji<'static, 'static> = Emoji("🚀", "");
+    pub const SUITE_DESTINATION_EMOJI: Emoji<'static, 'static> = Emoji("🌐", ":");
+    pub const SUITE_OVERWRITE_DESTINATION_EMOJI: Emoji<'static, 'static> = Emoji("👉", "->");
 
-    pub const CASE_PASS_EMOJI: Emoji<'_, '_> = Emoji("✅", "PASS");
-    pub const CASE_FAIL_EMOJI: Emoji<'_, '_> = Emoji("❌", "FAIL");
-    pub const CASE_REPEAT_EMOJI: Emoji<'_, '_> = Emoji("🔁", "");
-    pub const CASE_DESCRIPTION_EMOJI: Emoji<'_, '_> = Emoji("📝", "");
-    pub const CASE_ALLOW_EMOJI: Emoji<'_, '_> = Emoji("👀", "");
-    pub const CASE_MESSAGE_EMOJI: Emoji<'_, '_> = Emoji("💬", "");
+    pub const CASE_PASS_EMOJI: Emoji<'static, 'static> = Emoji("✅", "PASS");
+    pub const CASE_FAIL_EMOJI: Emoji<'static, 'static> = Emoji("❌", "FAIL");
+    pub const CASE_REPEAT_EMOJI: Emoji<'static, 'static> = Emoji("🔁", "");
+    pub const CASE_DESCRIPTION_EMOJI: Emoji<'static, 'static> = Emoji("📝", "");
+    pub const CASE_ALLOW_EMOJI: Emoji<'static, 'static> = Emoji("👀", "");
+    pub const CASE_MESSAGE_EMOJI: Emoji<'static, 'static> = Emoji("💬", "");
 
-    pub const SUMMARY_EMOJI: Emoji<'_, '_> = Emoji("💥", "");
+    pub const SUMMARY_EMOJI: Emoji<'static, 'static> = Emoji("💥", "");
 
-    pub fn new(spec: ReportSpec) -> Self {
+    pub fn new(spec: &'a ReportSpec) -> Self {
         console::set_colors_enabled(!spec.no_color); // TODO global setting
         Self { spec }
     }
@@ -53,11 +53,11 @@ impl Console {
             MessageKind::Error => Style::new().red().dim(),
         }
     }
-    pub fn styled_message<'a, T>(&self, msg: &'a Message<T>) -> StyledObject<&'a T> {
+    pub fn styled_message<'b, T>(&self, msg: &'b Message<T>) -> StyledObject<&'b T> {
         self.message_style(&msg.kind).apply_to(&msg.message)
     }
 }
-impl<C, Q, P, M: Display> Reporter<&JobReport<'_, C, Q, P, M>> for Console {
+impl<C, Q, P, M: Display> Reporter<&JobReport<'_, C, Q, P, M>> for Console<'_> {
     type Error = std::fmt::Error;
     fn write_report<W: std::io::Write>(
         &self,
@@ -79,7 +79,7 @@ impl<C, Q, P, M: Display> Reporter<&JobReport<'_, C, Q, P, M>> for Console {
         Ok(())
     }
 }
-impl<C, Q, P, M: Display> Reporter<&SuiteReport<'_, C, Q, P, M>> for Console {
+impl<C, Q, P, M: Display> Reporter<&SuiteReport<'_, C, Q, P, M>> for Console<'_> {
     type Error = std::fmt::Error;
     fn write_report<W: std::io::Write>(
         &self,
@@ -101,7 +101,7 @@ impl<C, Q, P, M: Display> Reporter<&SuiteReport<'_, C, Q, P, M>> for Console {
         report.cases.iter().try_fold((), |(), c| self.write_report(writer, c))
     }
 }
-impl<Q, P, M: Display> Reporter<&CaseReport<'_, Q, P, M>> for Console {
+impl<Q, P, M: Display> Reporter<&CaseReport<'_, Q, P, M>> for Console<'_> {
     type Error = std::fmt::Error;
     fn write_report<W: std::io::Write>(
         &self,
