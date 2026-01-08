@@ -132,20 +132,41 @@ impl SignContract<Self, Self> for EchoClient {
 
 #[cfg(test)]
 mod tests {
-    use crate::shot::{
-        job::{Job, JobSpec},
-        suite::SuiteCase,
+    use crate::{
+        report::Reporter,
+        shot::{
+            job::{Job, JobSpec},
+            suite::{Suite, SuiteCase},
+            testcase::Testcase,
+        },
     };
 
     use super::*;
 
     #[tokio::test]
-    async fn test() {
-        let suites = vec![SuiteCase { suite: Default::default(), testcases: Default::default() }];
+    async fn test_with_echo_service() {
+        let suites = vec![SuiteCase {
+            suite: Suite {
+                name: "echo".to_string(),
+                contract: Some(EchoClient),
+                destinations: vec![(
+                    "test".to_string(),
+                    crate::http_newtype_serde::Uri("http://localhost:8080".parse().unwrap()),
+                )]
+                .into_iter()
+                .collect(),
+                ..Default::default()
+            },
+            testcases: vec![
+                Testcase { target: "hello".to_string(), ..Default::default() },
+                Testcase { target: "world".to_string(), ..Default::default() },
+            ],
+        }];
         let (job, spec) = (Job(suites), JobSpec::default());
         let make = EchoClient;
 
         let report = job.shot::<EchoClient, EchoClient, EchoClient>(make, &spec).await.unwrap();
+        spec.report(&report).unwrap();
         assert!(report.evaluated.assess().success());
     }
 }
