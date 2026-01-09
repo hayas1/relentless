@@ -144,6 +144,16 @@ mod tests {
     use super::*;
 
     #[tokio::test]
+    async fn test_compile_with_echo_service() {
+        let (job, spec) = (Job(Vec::new()), JobSpec::default());
+        let make = EchoClient;
+
+        let report = job.shot::<EchoClient, EchoClient, EchoClient>(make, &spec).await.unwrap();
+        spec.report(&report).unwrap();
+        assert!(report.evaluated.assess().success());
+    }
+
+    #[tokio::test]
     async fn test_with_echo_service() {
         let suites = vec![SuiteCase {
             suite: Suite {
