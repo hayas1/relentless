@@ -9,6 +9,9 @@ use crate::{
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct ExpectEvaluator<T>(T);
 impl<T> ExpectEvaluator<T> {
+    pub fn new(expected: T) -> Self {
+        Self(expected)
+    }
     pub fn expected(&self) -> &T {
         &self.0
     }

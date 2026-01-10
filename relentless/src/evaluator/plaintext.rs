@@ -10,6 +10,9 @@ use crate::{
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct RegexEvaluator(String);
 impl RegexEvaluator {
+    pub fn new(raw_regex: impl Into<String>) -> Self {
+        RegexEvaluator(raw_regex.into())
+    }
     pub fn raw_regex(&self) -> &str {
         &self.0
     }
