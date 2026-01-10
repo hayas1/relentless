@@ -159,12 +159,9 @@ mod tests {
             suite: Suite {
                 name: "echo".to_string(),
                 contract: Some(EchoClient),
-                destinations: vec![(
-                    "test".to_string(),
-                    crate::http_newtype_serde::Uri("http://localhost:8080".parse().unwrap()),
-                )]
-                .into_iter()
-                .collect(),
+                destinations: vec![("test", crate::http_newtype_serde::Uri("http://localhost:8080".parse().unwrap()))]
+                    .into_iter()
+                    .collect(),
                 ..Default::default()
             },
             testcases: vec![
