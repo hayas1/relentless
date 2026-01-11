@@ -136,6 +136,7 @@ mod tests {
         report::Reporter,
         shot::{
             job::{Job, JobSpec},
+            profile::Profile,
             suite::{Suite, SuiteCase},
             testcase::Testcase,
         },
@@ -165,8 +166,28 @@ mod tests {
                 ..Default::default()
             },
             testcases: vec![
-                Testcase { target: "hello".to_string(), ..Default::default() },
-                Testcase { target: "world".to_string(), ..Default::default() },
+                Testcase {
+                    target: String::new(),
+                    profile: Profile {
+                        request: StringRequest { message: Some("hello".to_string()) },
+                        response: StringResponse {
+                            message: Some(StringResponseInner::Expect(ExpectEvaluator::new("hello".to_string()))),
+                        },
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
+                Testcase {
+                    target: String::new(),
+                    profile: Profile {
+                        request: StringRequest { message: Some("world".to_string()) },
+                        response: StringResponse {
+                            message: Some(StringResponseInner::Expect(ExpectEvaluator::new("world".to_string()))),
+                        },
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
             ],
         }];
         let (job, spec) = (Job(suites), JobSpec::default());
