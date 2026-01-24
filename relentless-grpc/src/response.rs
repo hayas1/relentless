@@ -1,8 +1,9 @@
 use std::fmt::Debug;
 
 use relentless::{
+    error::EvaluateError,
     evaluator::{
-        evaluate::{Failure, Messages},
+        evaluate::{Evaluator, Failure, Messages},
         json::JsonEvaluator,
         plaintext::RegexEvaluator,
     },
@@ -51,13 +52,69 @@ pub enum GrpcResponseMessage {
 }
 
 impl<Se: Debug + Send> ResponseSink<Result<tonic::Response<Se>, tonic::Status>> for GrpcResponse {
-    type Message = String;
+    type Message = EvaluateError;
     #[tracing::instrument(err)]
     async fn consume(
         &self,
         msg: &mut Messages<Self::Message>,
         res: Destinations<Result<tonic::Response<Se>, tonic::Status>>,
     ) -> Result<(), Failure> {
+        self.evaluate(msg, res)
+    }
+}
+
+impl<Se> Evaluator<Result<tonic::Response<Se>, tonic::Status>> for GrpcResponse {
+    type Message = EvaluateError;
+    fn evaluate_shot(
+        &self,
+        msg: &mut Messages<Self::Message>,
+        res: &Result<tonic::Response<Se>, tonic::Status>,
+    ) -> Result<(), Failure> {
+        self.status.as_ref().unwrap_or(&Default::default()).evaluate_shot(msg, res)?;
         Ok(())
+    }
+    fn evaluate_compare(
+        &self,
+        msg: &mut Messages<Self::Message>,
+        res1: &Result<tonic::Response<Se>, tonic::Status>,
+        res2: &Result<tonic::Response<Se>, tonic::Status>,
+    ) -> Result<(), Failure> {
+        self.status.as_ref().unwrap_or(&Default::default()).evaluate_compare(msg, res1, res2)?;
+        Ok(())
+    }
+}
+
+impl<Se> Evaluator<Result<tonic::Response<Se>, tonic::Status>> for GrpcResponseStatus {
+    type Message = EvaluateError;
+    fn evaluate_shot(
+        &self,
+        msg: &mut Messages<Self::Message>,
+        res: &Result<tonic::Response<Se>, tonic::Status>,
+    ) -> Result<(), Failure> {
+        match self {
+            Self::OkOrEqual => <Self as Evaluator<Result<tonic::Response<Se>, tonic::Status>>>::evaluate_bool(
+                self,
+                msg,
+                res.is_ok(),
+                |_| EvaluateError::custom("not success status"),
+            ),
+            Self::Ignore => Ok(()),
+        }
+    }
+    fn evaluate_compare(
+        &self,
+        msg: &mut Messages<Self::Message>,
+        res1: &Result<tonic::Response<Se>, tonic::Status>,
+        res2: &Result<tonic::Response<Se>, tonic::Status>,
+    ) -> Result<(), Failure> {
+        match self {
+            Self::OkOrEqual => <Self as Evaluator<Result<tonic::Response<Se>, tonic::Status>>>::evaluate_bool(
+                self,
+                msg,
+                res1.is_ok() == res2.is_ok() || res1.is_err() == res2.is_err(),
+                |_| EvaluateError::custom("not equal status"),
+            ),
+            Self::Ignore => Ok(()),
+        }
     }
 }
