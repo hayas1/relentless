@@ -11,6 +11,7 @@ use relentless::{
 };
 use semigroup::Semigroup;
 use serde::{Deserialize, Serialize};
+use tonic::metadata::MetadataMap;
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, Semigroup)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
@@ -71,6 +72,8 @@ impl<Se> Evaluator<Result<tonic::Response<Se>, tonic::Status>> for GrpcResponse 
         res: &Result<tonic::Response<Se>, tonic::Status>,
     ) -> Result<(), Failure> {
         self.status.as_ref().unwrap_or(&Default::default()).evaluate_shot(msg, res)?;
+        let resp = res.as_ref().map_err(|_| Failure)?;
+        self.metadata_map.as_ref().unwrap_or(&Default::default()).evaluate_shot(msg, resp.metadata())?;
         Ok(())
     }
     fn evaluate_compare(
@@ -80,6 +83,13 @@ impl<Se> Evaluator<Result<tonic::Response<Se>, tonic::Status>> for GrpcResponse 
         res2: &Result<tonic::Response<Se>, tonic::Status>,
     ) -> Result<(), Failure> {
         self.status.as_ref().unwrap_or(&Default::default()).evaluate_compare(msg, res1, res2)?;
+        let resp1 = res1.as_ref().map_err(|_| Failure)?;
+        let resp2 = res2.as_ref().map_err(|_| Failure)?;
+        self.metadata_map.as_ref().unwrap_or(&Default::default()).evaluate_compare(
+            msg,
+            resp1.metadata(),
+            resp2.metadata(),
+        )?;
         Ok(())
     }
 }
@@ -114,6 +124,30 @@ impl<Se> Evaluator<Result<tonic::Response<Se>, tonic::Status>> for GrpcResponseS
                 res1.is_ok() == res2.is_ok() || res1.is_err() == res2.is_err(),
                 |_| EvaluateError::custom("not equal status"),
             ),
+            Self::Ignore => Ok(()),
+        }
+    }
+}
+
+impl Evaluator<MetadataMap> for GrpcResponseMetadataMap {
+    type Message = EvaluateError;
+    fn evaluate_shot(&self, _msg: &mut Messages<Self::Message>, _res: &MetadataMap) -> Result<(), Failure> {
+        match self {
+            Self::AnyOrEqual => Ok(()),
+            Self::Ignore => Ok(()),
+        }
+    }
+    fn evaluate_compare(
+        &self,
+        msg: &mut Messages<Self::Message>,
+        res1: &MetadataMap,
+        res2: &MetadataMap,
+    ) -> Result<(), Failure> {
+        match self {
+            // TODO use http impl ?
+            Self::AnyOrEqual => {
+                self.evaluate_bool(msg, res1.as_ref() == res2.as_ref(), |_| EvaluateError::custom("not equal metadata"))
+            }
             Self::Ignore => Ok(()),
         }
     }
