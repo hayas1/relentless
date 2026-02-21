@@ -52,7 +52,7 @@ pub enum GrpcResponseMessage {
     Json(JsonEvaluator),
 }
 
-impl<Se: Debug + Send> ResponseSink<Result<tonic::Response<Se>, tonic::Status>> for GrpcResponse {
+impl<Se: Debug + Send + PartialEq> ResponseSink<Result<tonic::Response<Se>, tonic::Status>> for GrpcResponse {
     type Message = EvaluateError;
     #[tracing::instrument(err)]
     async fn consume(
@@ -64,7 +64,7 @@ impl<Se: Debug + Send> ResponseSink<Result<tonic::Response<Se>, tonic::Status>> 
     }
 }
 
-impl<Se> Evaluator<Result<tonic::Response<Se>, tonic::Status>> for GrpcResponse {
+impl<Se: PartialEq> Evaluator<Result<tonic::Response<Se>, tonic::Status>> for GrpcResponse {
     type Message = EvaluateError;
     fn evaluate_shot(
         &self,
@@ -74,6 +74,7 @@ impl<Se> Evaluator<Result<tonic::Response<Se>, tonic::Status>> for GrpcResponse 
         self.status.as_ref().unwrap_or(&Default::default()).evaluate_shot(msg, res)?;
         let resp = res.as_ref().map_err(|_| Failure)?;
         self.metadata_map.as_ref().unwrap_or(&Default::default()).evaluate_shot(msg, resp.metadata())?;
+        self.message.as_ref().unwrap_or(&Default::default()).evaluate_shot(msg, resp.get_ref())?;
         Ok(())
     }
     fn evaluate_compare(
@@ -90,6 +91,7 @@ impl<Se> Evaluator<Result<tonic::Response<Se>, tonic::Status>> for GrpcResponse 
             resp1.metadata(),
             resp2.metadata(),
         )?;
+        self.message.as_ref().unwrap_or(&Default::default()).evaluate_compare(msg, resp1.get_ref(), resp2.get_ref())?;
         Ok(())
     }
 }
@@ -149,6 +151,26 @@ impl Evaluator<MetadataMap> for GrpcResponseMetadataMap {
                 self.evaluate_bool(msg, res1.as_ref() == res2.as_ref(), |_| EvaluateError::custom("not equal metadata"))
             }
             Self::Ignore => Ok(()),
+        }
+    }
+}
+
+impl<Se: PartialEq> Evaluator<Se> for GrpcResponseMessage {
+    type Message = EvaluateError;
+    fn evaluate_shot(&self, _msg: &mut Messages<Self::Message>, _res: &Se) -> Result<(), Failure> {
+        match self {
+            Self::AnyOrEqual => Ok(()),
+            Self::Plaintext(_) => todo!(),
+            Self::Json(_) => todo!(),
+        }
+    }
+    fn evaluate_compare(&self, msg: &mut Messages<Self::Message>, res1: &Se, res2: &Se) -> Result<(), Failure> {
+        match self {
+            Self::AnyOrEqual => <Self as Evaluator<Se>>::evaluate_bool(self, msg, res1 == res2, |_| {
+                EvaluateError::custom("not equal message")
+            }),
+            Self::Plaintext(_) => todo!(),
+            Self::Json(_) => todo!(),
         }
     }
 }
