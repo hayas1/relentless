@@ -2269,7 +2269,7 @@ dependencies = [
  "opentelemetry_sdk",
  "pin-project",
  "regex",
- "relentless-http-dev-server",
+ "relentless",
  "semigroup",
  "serde",
  "serde_json",

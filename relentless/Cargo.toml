@@ -15,6 +15,7 @@ json = ["serde_json", "json-patch", "jsonptr"]
 yaml = ["serde_yaml"]
 cli = ["clap", "console-report"]
 console-report = ["console"]
+testing = []
 
 
 [dependencies]
@@ -60,7 +61,7 @@ opentelemetry_sdk = "0.31.0"
 opentelemetry-semantic-conventions = "0.31.0"
 
 [dev-dependencies]
-relentless-http-dev-server = { path = "../dev/server/http" }
+relentless = { path = ".", features = ["testing"] }
 axum = "0.8.1"
 glob = "0.3.2"
 httptest = "0.16.3"

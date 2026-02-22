@@ -5,6 +5,7 @@ pub mod otel;
 pub mod record;
 pub mod report;
 pub mod shot;
+#[cfg(feature = "testing")]
 pub mod testing;
 
 pub use {error::RelentlessError as Error, error::RelentlessResult as Result};
