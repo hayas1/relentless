@@ -15,10 +15,10 @@ testcases:
     profile:
       request:
         message:
-          json:
+          value:
             name: John Doe
   - target: echo.Echo/EchoValue
     profile:
       request:
         message:
-          json: 100
+          value: 100

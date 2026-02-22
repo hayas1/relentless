@@ -12,7 +12,18 @@ use crate::contract::MethodPath;
 pub struct GrpcRequest {
     #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
     #[serde(default)]
+    metadata: Option<GrpcRequestMetadata>,
+    #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
+    #[serde(default)]
     message: Option<GrpcRequestMessage>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
+pub enum GrpcRequestMetadata {
+    #[default]
+    Empty,
+    // TODO
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -20,7 +31,7 @@ pub struct GrpcRequest {
 pub enum GrpcRequestMessage {
     #[default]
     Empty,
-    Json(serde_json::Value),
+    Value(serde_json::Value),
 }
 
 impl RequestSource<(MethodPath, tonic::Request<serde_json::Value>)> for GrpcRequest {
@@ -41,7 +52,7 @@ impl RequestSource<serde_json::Value> for GrpcRequestMessage {
     async fn produce(&self, _: &http::Uri, _: &str) -> Result<serde_json::Value, Self::Error> {
         match self {
             Self::Empty => Ok(serde_json::json!({})),
-            Self::Json(v) => Ok(v.clone()),
+            Self::Value(v) => Ok(v.clone()),
         }
     }
 }

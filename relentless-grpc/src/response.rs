@@ -5,7 +5,6 @@ use relentless::{
     evaluator::{
         evaluate::{Evaluator, Failure, Messages},
         json::JsonEvaluator,
-        plaintext::RegexEvaluator,
     },
     shot::{contract::ResponseSink, destinations::Destinations},
 };
@@ -48,8 +47,7 @@ pub enum GrpcResponseMetadataMap {
 pub enum GrpcResponseMessage {
     #[default]
     AnyOrEqual,
-    Plaintext(RegexEvaluator),
-    Json(JsonEvaluator),
+    Value(JsonEvaluator),
 }
 
 impl<Se: Debug + Send + PartialEq> ResponseSink<Result<tonic::Response<Se>, tonic::Status>> for GrpcResponse {
@@ -160,8 +158,7 @@ impl<Se: PartialEq> Evaluator<Se> for GrpcResponseMessage {
     fn evaluate_shot(&self, _msg: &mut Messages<Self::Message>, _res: &Se) -> Result<(), Failure> {
         match self {
             Self::AnyOrEqual => Ok(()),
-            Self::Plaintext(_) => todo!(),
-            Self::Json(_) => todo!(),
+            Self::Value(_) => todo!(),
         }
     }
     fn evaluate_compare(&self, msg: &mut Messages<Self::Message>, res1: &Se, res2: &Se) -> Result<(), Failure> {
@@ -169,8 +166,7 @@ impl<Se: PartialEq> Evaluator<Se> for GrpcResponseMessage {
             Self::AnyOrEqual => <Self as Evaluator<Se>>::evaluate_bool(self, msg, res1 == res2, |_| {
                 EvaluateError::custom("not equal message")
             }),
-            Self::Plaintext(_) => todo!(),
-            Self::Json(_) => todo!(),
+            Self::Value(_) => todo!(),
         }
     }
 }
