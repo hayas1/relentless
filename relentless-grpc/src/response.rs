@@ -4,7 +4,7 @@ use relentless::{
     error::EvaluateError,
     evaluator::{
         evaluate::{Evaluator, Failure, Messages},
-        json::JsonEvaluator,
+        expect::ExpectEvaluator,
     },
     shot::{contract::ResponseSink, destinations::Destinations},
 };
@@ -47,10 +47,12 @@ pub enum GrpcResponseMetadataMap {
 pub enum GrpcResponseMessage {
     #[default]
     AnyOrEqual,
-    Value(JsonEvaluator),
+    Value(ExpectEvaluator<serde_json::Value>),
 }
 
-impl<Se: Debug + Send + PartialEq> ResponseSink<Result<tonic::Response<Se>, tonic::Status>> for GrpcResponse {
+impl<Se: Debug + Send + PartialEq + Serialize> ResponseSink<Result<tonic::Response<Se>, tonic::Status>>
+    for GrpcResponse
+{
     type Message = EvaluateError;
     #[tracing::instrument(err)]
     async fn consume(
@@ -62,7 +64,7 @@ impl<Se: Debug + Send + PartialEq> ResponseSink<Result<tonic::Response<Se>, toni
     }
 }
 
-impl<Se: PartialEq> Evaluator<Result<tonic::Response<Se>, tonic::Status>> for GrpcResponse {
+impl<Se: PartialEq + Serialize> Evaluator<Result<tonic::Response<Se>, tonic::Status>> for GrpcResponse {
     type Message = EvaluateError;
     fn evaluate_shot(
         &self,
@@ -153,12 +155,15 @@ impl Evaluator<MetadataMap> for GrpcResponseMetadataMap {
     }
 }
 
-impl<Se: PartialEq> Evaluator<Se> for GrpcResponseMessage {
+impl<Se: PartialEq + Serialize> Evaluator<Se> for GrpcResponseMessage {
     type Message = EvaluateError;
-    fn evaluate_shot(&self, _msg: &mut Messages<Self::Message>, _res: &Se) -> Result<(), Failure> {
+    fn evaluate_shot(&self, msg: &mut Messages<Self::Message>, res: &Se) -> Result<(), Failure> {
         match self {
             Self::AnyOrEqual => Ok(()),
-            Self::Value(_) => todo!(),
+            Self::Value(e) => {
+                let resp = serde_json::to_value(res).map_err(|e| msg.error(EvaluateError::boxed(e)))?;
+                e.evaluate_shot(msg, &resp)
+            }
         }
     }
     fn evaluate_compare(&self, msg: &mut Messages<Self::Message>, res1: &Se, res2: &Se) -> Result<(), Failure> {
@@ -166,7 +171,11 @@ impl<Se: PartialEq> Evaluator<Se> for GrpcResponseMessage {
             Self::AnyOrEqual => <Self as Evaluator<Se>>::evaluate_bool(self, msg, res1 == res2, |_| {
                 EvaluateError::custom("not equal message")
             }),
-            Self::Value(_) => todo!(),
+            Self::Value(e) => {
+                let resp1 = serde_json::to_value(res1).map_err(|e| msg.error(EvaluateError::boxed(e)))?;
+                let resp2 = serde_json::to_value(res2).map_err(|e| msg.error(EvaluateError::boxed(e)))?;
+                e.evaluate_compare(msg, &resp1, &resp2)
+            }
         }
     }
 }
