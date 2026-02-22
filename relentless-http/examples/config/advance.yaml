@@ -25,4 +25,15 @@ testcases:
           expect: 200
         body:
           regex: \{"from":\d+,"wait":"200ms"\}
+  - target: /echo/body
+    profile:
+      request:
+        method: POST
+        body:
+          json:
+            key: value
+      response:
+        body:
+          json:
+            key: value
   - target: /echo/json/functional?key=value&now.time=$now&now.string=now

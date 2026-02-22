@@ -5,8 +5,6 @@ use futures::{StreamExt, TryStreamExt};
 use http::{HeaderMap, HeaderName, StatusCode};
 use http_body::Body;
 use http_body_util::BodyExt;
-#[cfg(feature = "json")]
-use relentless::evaluator::json::JsonEvaluator;
 use relentless::{
     error::EvaluateError,
     evaluator::{
@@ -58,7 +56,7 @@ pub enum HttpResponseBody {
     AnyOrEqual,
     Regex(RegexEvaluator),
     #[cfg(feature = "json")]
-    Json(JsonEvaluator),
+    Json(ExpectEvaluator<serde_json::Value>),
 }
 
 impl<ResB, E> ResponseSink<Result<http::Response<ResB>, E>> for HttpResponse
@@ -176,7 +174,11 @@ impl Evaluator<Bytes> for HttpResponseBody {
             Self::AnyOrEqual => Ok(()),
             Self::Regex(e) => e.evaluate_shot(msg, &String::from_utf8_lossy(res)[..]),
             #[cfg(feature = "json")]
-            Self::Json(e) => todo!(),
+            Self::Json(e) => {
+                let resp: serde_json::Value =
+                    serde_json::from_slice(res).map_err(|e| msg.error(EvaluateError::boxed(e)))?;
+                e.evaluate_shot(msg, &resp)
+            }
         }
     }
     fn evaluate_compare(&self, msg: &mut Messages<Self::Message>, res1: &Bytes, res2: &Bytes) -> Result<(), Failure> {
@@ -186,7 +188,13 @@ impl Evaluator<Bytes> for HttpResponseBody {
                 e.evaluate_compare(msg, &String::from_utf8_lossy(res1)[..], &String::from_utf8_lossy(res2)[..])
             }
             #[cfg(feature = "json")]
-            Self::Json(e) => todo!(),
+            Self::Json(e) => {
+                let resp1: serde_json::Value =
+                    serde_json::from_slice(res1).map_err(|e| msg.error(EvaluateError::boxed(e)))?;
+                let resp2: serde_json::Value =
+                    serde_json::from_slice(res2).map_err(|e| msg.error(EvaluateError::boxed(e)))?;
+                e.evaluate_compare(msg, &resp1, &resp2)
+            }
         }
     }
 }

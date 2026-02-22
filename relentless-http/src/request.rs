@@ -55,7 +55,8 @@ impl<ReqB: Body + Default + From<Bytes>> RequestSource<ReqB> for HttpRequestBody
             Self::Plaintext(s) => Ok(Bytes::from(s.to_string()).into()),
             #[cfg(feature = "json")]
             Self::Json(v) => {
-                todo!()
+                let s = serde_json::to_string(v).unwrap_or_else(|_| todo!());
+                Ok(Bytes::from(s).into())
             }
         }
     }
