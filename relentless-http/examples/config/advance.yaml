@@ -37,3 +37,5 @@ testcases:
           json:
             key: value
   - target: /echo/json/functional?key=value&now.time=$now&now.string=now
+    profile:
+      allow: true

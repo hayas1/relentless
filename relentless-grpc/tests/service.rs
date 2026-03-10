@@ -15,5 +15,5 @@ async fn test_example_yaml_config() {
     let server = Shared::new(GreeterServer::new(GreeterImpl));
     let report = job.shot::<_, _, DynamicContract<serde_json::Value, JsonSerializer>>(server, &spec).await.unwrap();
 
-    assert!(report.evaluated.pass);
+    assert!(report.evaluated.allow);
 }
