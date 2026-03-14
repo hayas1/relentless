@@ -8,7 +8,7 @@ use tower::{Layer, MakeService, Service};
 
 use crate::{
     evaluator::evaluate::{Failure, Messages},
-    shot::destinations::Destinations,
+    shot::{destinations::Destinations, job::BasePath},
 };
 
 #[trait_variant::make(Send)]
@@ -33,7 +33,12 @@ pub type ResSinkError<T, C> =
 
 pub trait SignContract<T, C> {
     type Error;
-    fn sign_contract(&self, service: T, destination: &http::Uri) -> impl Future<Output = Result<C, Self::Error>>;
+    fn sign_contract(
+        &self,
+        service: T,
+        destination: &http::Uri,
+        base_path: &Option<BasePath>,
+    ) -> impl Future<Output = Result<C, Self::Error>>;
 }
 
 #[trait_variant::make(Send)]

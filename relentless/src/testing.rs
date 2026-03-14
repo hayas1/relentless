@@ -20,6 +20,7 @@ use crate::{
     shot::{
         contract::{Contract, RequestSource, ResponseSink, SignContract},
         destinations::Destinations,
+        job::BasePath,
     },
 };
 
@@ -125,7 +126,7 @@ impl Contract<Self> for EchoClient {
 }
 impl SignContract<Self, Self> for EchoClient {
     type Error = Infallible;
-    async fn sign_contract(&self, _: Self, _: &http::Uri) -> Result<Self, Self::Error> {
+    async fn sign_contract(&self, _: Self, _: &http::Uri, _: &Option<BasePath>) -> Result<Self, Self::Error> {
         Ok(EchoClient)
     }
 }

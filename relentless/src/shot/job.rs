@@ -1,6 +1,9 @@
 use std::fmt::{Debug, Display};
 use std::str::FromStr;
-use std::{fs::File, path::PathBuf};
+use std::{
+    fs::File,
+    path::{Path, PathBuf},
+};
 
 #[cfg(feature = "cli")]
 use clap::{Args, Parser};
@@ -105,6 +108,10 @@ pub struct JobSpec {
     #[cfg_attr(feature = "cli", arg(env, short, long, num_args=0.., value_delimiter = ' '))]
     pub sequential: Vec<Hierarchy>, // TODO dedup in advance
 
+    /// base path
+    #[cfg_attr(feature = "cli", arg(env, long))]
+    pub base_path: Option<BasePath>,
+
     /// requests per second
     #[cfg_attr(feature = "cli", arg(env, long))]
     pub rps: Option<f64>,
@@ -122,6 +129,20 @@ impl JobSpec {
             self.destination.iter().map(|(d, u)| u.parse().map(|u| (d, u))).collect();
         let base: Destinations<_> = destinations.iter().map(|(d, u)| (d, u.clone().into())).collect();
         Ok(Lazy::from(base).semigroup(overwrite?.into()))
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub struct BasePath(PathBuf);
+impl FromStr for BasePath {
+    type Err = std::io::Error;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self(PathBuf::from(s)))
+    }
+}
+impl BasePath {
+    pub fn resolve<A: AsRef<Path>>(&self, relative: &A) -> PathBuf {
+        self.0.join(relative)
     }
 }
 

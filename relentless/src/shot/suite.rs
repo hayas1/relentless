@@ -152,7 +152,7 @@ impl<S, Q, P> SuiteCase<S, Q, P> {
                 .contract
                 .as_ref()
                 .unwrap_or(&Default::default())
-                .sign_contract(transport.clone(), dest)
+                .sign_contract(transport.clone(), dest, &job.base_path)
                 .await
                 .unwrap_or_else(|_| todo!());
             services.insert(d.to_string(), contract.layer(transport));

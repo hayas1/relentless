@@ -1,6 +1,9 @@
 use std::{convert::Infallible, marker::PhantomData};
 
-use relentless::shot::contract::{Contract, SignContract};
+use relentless::shot::{
+    contract::{Contract, SignContract},
+    job::BasePath,
+};
 use serde::{Deserialize, Serialize};
 use tower::{layer::util::Identity, Layer, Service};
 
@@ -13,7 +16,12 @@ pub struct HttpContract<ReqB, ResB> {
 impl<T, ReqB, ResB> SignContract<T, Self> for HttpContract<ReqB, ResB> {
     type Error = Infallible;
     #[tracing::instrument(skip(self, _service), err)]
-    async fn sign_contract(&self, _service: T, destination: &http::Uri) -> Result<Self, Self::Error> {
+    async fn sign_contract(
+        &self,
+        _service: T,
+        destination: &http::Uri,
+        _: &Option<BasePath>,
+    ) -> Result<Self, Self::Error> {
         Ok(HttpContract { phantom: PhantomData })
     }
 }

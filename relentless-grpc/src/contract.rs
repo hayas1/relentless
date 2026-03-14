@@ -16,7 +16,10 @@ use http::uri::PathAndQuery;
 use prost::Message;
 use prost_reflect::DescriptorPool;
 use prost_types::FileDescriptorProto;
-use relentless::shot::contract::{Contract, SignContract};
+use relentless::shot::{
+    contract::{Contract, SignContract},
+    job::BasePath,
+};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use tonic::{client::GrpcService, transport::Body, Status};
 use tonic_reflection::pb::v1::{
@@ -49,9 +52,14 @@ where
 {
     type Error = relentless::Error;
     #[tracing::instrument(skip(service), err)]
-    async fn sign_contract(&self, service: G, destination: &http::Uri) -> Result<DynamicContract<D, S>, Self::Error> {
+    async fn sign_contract(
+        &self,
+        service: G,
+        destination: &http::Uri,
+        base_path: &Option<BasePath>,
+    ) -> Result<DynamicContract<D, S>, Self::Error> {
         let pool = match self {
-            Self::ProtoFiles { protos, includes } => Self::from_protos(protos, includes)?,
+            Self::ProtoFiles { protos, includes } => Self::from_protos(base_path, protos, includes)?,
             Self::Bin(path) => Self::descriptor_from_file(path)?,
             Self::Reflection => Self::from_reflection(service, destination).await?,
         };
@@ -60,9 +68,17 @@ where
 }
 impl GrpcDescriptor {
     #[tracing::instrument(err)]
-    pub fn from_protos(protos: &[PathBuf], includes: &[PathBuf]) -> relentless::Result<DescriptorPool> {
+    pub fn from_protos(
+        base_path: &Option<BasePath>,
+        protos: &[PathBuf],
+        includes: &[PathBuf],
+    ) -> relentless::Result<DescriptorPool> {
         let builder = &mut prost_build::Config::new();
-        let fds = builder.load_fds(protos, includes).map_err(relentless::Error::boxed)?;
+        let abs_protos: Vec<_> =
+            protos.iter().map(|p| base_path.as_ref().map(|b| b.resolve(p)).unwrap_or_else(|| p.clone())).collect();
+        let abs_includes: Vec<_> =
+            includes.iter().map(|p| base_path.as_ref().map(|b| b.resolve(p)).unwrap_or_else(|| p.clone())).collect();
+        let fds = builder.load_fds(&abs_protos, &abs_includes).map_err(relentless::Error::boxed)?;
         DescriptorPool::from_file_descriptor_set(fds).map_err(relentless::Error::boxed)
     }
     #[tracing::instrument(err)]
