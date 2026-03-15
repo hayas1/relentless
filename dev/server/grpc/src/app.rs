@@ -1,6 +1,9 @@
 use std::sync::Arc;
 
-use tonic::transport::{server::Router, Server};
+use tonic::{
+    service::Routes,
+    transport::{server::Router, Server},
+};
 use tonic_health::{
     pb::health_server::{Health, HealthServer},
     server::HealthService,
@@ -29,21 +32,26 @@ pub mod wait;
 pub const FILE_DESCRIPTOR_SET: &[u8] = tonic::include_file_descriptor_set!("file_descriptor");
 
 #[derive(Debug, Clone, Default)]
-pub struct AppRouter {
+pub struct Application {
     pub state: AppState,
 }
-impl AppRouter {
-    pub async fn service(self) -> Router<Stack<OtelGrpcLayer, Identity>> {
+impl Application {
+    pub async fn router(self) -> Router<Stack<OtelGrpcLayer, Identity>> {
         let mut builder = Server::builder().layer(OtelGrpcLayer::default().filter(filters::reject_healthcheck));
-        self.router(&mut builder).add_service(Self::health_service().await).add_service(Self::reflection_service())
+        builder
+            .add_routes(self.routes())
+            .add_service(Self::health_service().await)
+            .add_service(Self::reflection_service())
     }
-    pub fn router<L: Clone>(self, builder: &mut Server<L>) -> Router<L> {
+    pub fn routes(self) -> Routes {
+        let mut builder = Routes::builder();
         builder
             .add_service(GreeterServer::new(GreeterImpl))
             .add_service(CounterServer::new(CounterImpl::new(self.state.counter)))
             .add_service(EchoServer::new(EchoImpl))
             .add_service(RandomServer::new(RandomImpl))
-            .add_service(WaitServer::new(WaitImpl))
+            .add_service(WaitServer::new(WaitImpl));
+        builder.routes()
     }
 
     pub async fn health_service() -> HealthServer<impl Health> {

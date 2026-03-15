@@ -342,14 +342,14 @@ impl MethodPath {
 
 #[cfg(test)]
 mod tests {
-    use relentless_grpc_dev_server::app::AppRouter;
+    use relentless_grpc_dev_server::app::Application;
 
     use super::*;
 
     #[tokio::test]
     async fn test_from_reflection() {
         let destination = "127.0.0.1:50051".parse().unwrap();
-        let service = AppRouter::reflection_service();
+        let service = Application::reflection_service();
         let pool = GrpcDescriptor::from_reflection(service, &destination).await.unwrap();
         let files: Vec<_> = pool.files().map(|f| f.name().to_string()).collect();
         assert_eq!(

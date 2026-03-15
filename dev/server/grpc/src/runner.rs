@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use clap::Parser;
 
-use crate::app::{AppRouter, AppState};
+use crate::app::{AppState, Application};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash, Parser)]
 pub struct RunCommand {
@@ -20,10 +20,10 @@ impl RunCommand {
     }
     pub async fn serve(self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let addr = self.bind().parse()?;
-        let service = self.app().service().await;
+        let router = self.app().router().await;
 
         tracing::info!("start app on {}", addr);
-        service
+        router
             .serve_with_shutdown(addr, async {
                 tokio::signal::ctrl_c().await.expect("failed to install Ctrl+C handler");
             })
@@ -36,8 +36,8 @@ impl RunCommand {
     pub fn bind(&self) -> String {
         format!("{}:{}", self.listen, self.port)
     }
-    pub fn app(&self) -> AppRouter {
+    pub fn app(&self) -> Application {
         let state = AppState { rc: Arc::new(self.clone()), counter: Default::default() };
-        AppRouter { state }
+        Application { state }
     }
 }
