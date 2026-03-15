@@ -79,6 +79,7 @@ pub struct MeasureLayer {
     agg: Arc<Mutex<MetricAgg>>,
 }
 impl MeasureLayer {
+    #[allow(clippy::new_without_default)] // TODO
     pub fn new() -> Self {
         let agg = Arc::new(Mutex::new(MetricAgg::identity()));
         Self { agg }

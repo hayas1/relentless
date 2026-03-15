@@ -55,6 +55,7 @@ impl Repeat {
 //     pub messages: Messages<M>,
 // }
 impl<Q, P> Profile<Q, P> {
+    #[allow(clippy::type_complexity)] // TODO
     #[tracing::instrument(name = "profile", skip(services))]
     pub async fn shot<T, C>(
         &self,
