@@ -78,7 +78,10 @@ impl Cli {
             let (suites, job) = Self::job::<C, Q, P>().await?;
             f(suites, job).await?
         };
-        provider.force_flush()?;
+        match provider.force_flush() {
+            Ok(()) => (),
+            Err(err) => tracing::warn!("failed to flush OpenTelemetry: {err}"),
+        }
         provider.shutdown()?;
 
         Ok(res)
