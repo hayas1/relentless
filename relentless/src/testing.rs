@@ -134,7 +134,7 @@ impl SignContract<Self, Self> for EchoClient {
 #[cfg(test)]
 mod tests {
     use crate::{
-        report::Reporter,
+        report::{ReportFormat, Reporter},
         shot::{
             job::{Job, JobSpec},
             profile::Profile,
@@ -168,7 +168,7 @@ mod tests {
             },
             testcases: vec![
                 Testcase {
-                    target: String::new(),
+                    target: "echo test case 1: hello".to_string(),
                     profile: Profile {
                         request: StringRequest { message: Some("hello".to_string()) },
                         response: StringResponse {
@@ -179,7 +179,7 @@ mod tests {
                     ..Default::default()
                 },
                 Testcase {
-                    target: String::new(),
+                    target: "echo test case 2: world".to_string(),
                     profile: Profile {
                         request: StringRequest { message: Some("world".to_string()) },
                         response: StringResponse {
@@ -191,7 +191,7 @@ mod tests {
                 },
             ],
         }];
-        let (job, spec) = (Job(suites), JobSpec::default());
+        let (job, spec) = (Job(suites), JobSpec { report_format: ReportFormat::NullDevice, ..Default::default() });
         let make = EchoClient;
 
         let report = job.shot::<EchoClient, EchoClient, EchoClient>(make, &spec).await.unwrap();
