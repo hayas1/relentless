@@ -157,7 +157,7 @@ where
     Q: for<'x> Deserialize<'x> + Default,
     P: for<'x> Deserialize<'x> + Default,
 {
-    pub fn from_files(files: &[PathBuf]) -> crate::Result<Self> {
+    pub fn from_files<A: AsRef<Path>>(files: &[A]) -> crate::Result<Self> {
         let suites: Result<Vec<_>, _> = files
             .iter()
             .map(|f| {
