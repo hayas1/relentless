@@ -57,7 +57,7 @@ impl<Q, P> Testcase<Q, P> {
 
         let (evaluated, messages) = futures::stream::iter(profile.repeat.range())
             .map(|_| async {
-                profile.shot::<T, C>(services, &destinations, &self.target).await.unwrap_or_else(|_| todo!())
+                profile.shot::<T, C>(services, destinations, &self.target).await.unwrap_or_else(|_| todo!())
             })
             .buffer_unordered(buffers)
             .combine_monoid()
