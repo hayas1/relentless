@@ -8,10 +8,9 @@ license-file.workspace = true
 
 [features]
 default = ["full"]
-full = ["relentless/full", "yaml", "toml", "cli"]
+full = ["relentless/full", "yaml", "cli"]
 
 yaml = ["relentless/yaml", "serde_yaml"]
-toml = ["relentless/toml"]
 cli = ["relentless/cli", "console-report"]
 console-report = ["relentless/console-report"]
 

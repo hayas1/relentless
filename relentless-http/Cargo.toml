@@ -8,12 +8,10 @@ license-file.workspace = true
 
 [features]
 default = ["full"]
-full = ["relentless/full", "json", "yaml", "toml", "default-http-client", "cli"]
+full = ["relentless/full", "json", "yaml", "cli"]
 
 json = ["relentless/json", "serde_json"]
 yaml = ["serde_yaml"]
-toml = ["relentless/toml"]
-default-http-client = ["reqwest"]
 cli = ["relentless/cli", "console-report"]
 console-report = ["relentless/console-report"]
 
@@ -28,7 +26,7 @@ http-serde = "2.1.1"
 http-body = "1.0.1"
 http-body-util = "0.1.3"
 mime = "0.3.17"
-reqwest = { version = "0.12.15", optional = true }
+reqwest = "0.12.15"
 tracing = "0.1.43"
 opentelemetry-http = "0.31.0"
 
