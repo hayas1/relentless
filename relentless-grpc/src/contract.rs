@@ -342,6 +342,8 @@ impl MethodPath {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
+
     use relentless_grpc_dev_server::app::Application;
 
     use super::*;
@@ -351,7 +353,7 @@ mod tests {
         let destination = "127.0.0.1:50051".parse().unwrap();
         let service = Application::reflection_service();
         let pool = GrpcDescriptor::from_reflection(service, &destination).await.unwrap();
-        let files: Vec<_> = pool.files().map(|f| f.name().to_string()).collect();
+        let files: HashSet<_> = pool.files().map(|f| f.name().to_string()).collect();
         assert_eq!(
             files,
             vec![
@@ -366,6 +368,9 @@ mod tests {
                 "google/protobuf/any.proto",
                 "google/protobuf/struct.proto",
             ]
+            .into_iter()
+            .map(|p| p.to_string())
+            .collect()
         );
     }
 
