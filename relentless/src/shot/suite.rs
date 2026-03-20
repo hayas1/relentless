@@ -144,8 +144,9 @@ impl<S, Q, P> SuiteCase<S, Q, P> {
     {
         let buffers = if Hierarchy::Suite.contains(&job.sequential) { 1 } else { self.testcases.len().max(1) };
         let destinations = job.destinations(&self.suite.destinations).unwrap_or_else(|e| todo!("{e}"));
+        let uris = destinations.combine_rev_clone();
         let mut services = Destinations::default();
-        for (d, dest) in destinations.combine_rev_clone().iter() {
+        for (d, dest) in uris.iter() {
             let transport = make_service.clone().make_service(dest.clone()).await.unwrap_or_else(|_| todo!());
             let contract = self
                 .suite
@@ -158,7 +159,7 @@ impl<S, Q, P> SuiteCase<S, Q, P> {
             services.insert(d.to_string(), contract.layer(transport));
         }
         let cases: Vec<_> = futures::stream::iter(&self.testcases)
-            .map(|t| t.shot(&services, job, &self.suite))
+            .map(|t| t.shot(&services, &uris, job, &self.suite))
             .buffered(buffers)
             .try_collect()
             .await?;

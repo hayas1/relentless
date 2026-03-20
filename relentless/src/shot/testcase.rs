@@ -40,6 +40,7 @@ impl<Q, P> Testcase<Q, P> {
     pub async fn shot<T, S, C>(
         &self,
         services: &Destinations<C::Service>,
+        destinations: &Destinations<http::Uri>,
         job: &JobSpec,
         suite: &Suite<S, Q, P>,
     ) -> crate::Result<CaseReport<'_, Q, P, P::Message>>
@@ -54,7 +55,6 @@ impl<Q, P> Testcase<Q, P> {
         let profile = &self.profile.clone().semigroup(suite.profile.clone());
         let buffers = if Hierarchy::Testcase.contains(&job.sequential) { 1 } else { profile.repeat.times().max(1) };
 
-        let destinations = suite.destinations.iter().map(|(d, u)| (d, (**u).clone())).collect();
         let (evaluated, messages) = futures::stream::iter(profile.repeat.range())
             .map(|_| async {
                 profile.shot::<T, C>(services, &destinations, &self.target).await.unwrap_or_else(|_| todo!())
