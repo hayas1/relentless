@@ -1,0 +1,26 @@
+name: test config for repeat
+destinations:
+  expect: http://localhost:3000
+  actual: http://localhost:3001
+
+testcases:
+  - target: /wait
+    profile:
+      repeat: 1000
+      request:
+        value: 1
+  - target: /wait
+    profile:
+      repeat: 100
+      request:
+        value: 10
+  - target: /wait
+    profile:
+      repeat: 10
+      request:
+        value: 100
+  - target: /wait
+    profile:
+      repeat: 1
+      request:
+        value: 1000

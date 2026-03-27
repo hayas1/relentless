@@ -1,5 +1,5 @@
 use relentless::{
-    report::ReportFormat,
+    report::{ReportFormat, Reporter},
     shot::job::{Job, JobSpec},
     testing::TestingClient,
 };
@@ -14,6 +14,7 @@ async fn test_feature() {
 
         let make = TestingClient;
         let report = job.shot::<TestingClient, TestingClient, TestingClient>(make, &spec).await.unwrap();
+        spec.report(&report);
 
         match expect {
             "pass" => assert!(report.evaluated.pass && report.evaluated.allow),

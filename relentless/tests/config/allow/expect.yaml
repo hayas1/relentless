@@ -4,7 +4,7 @@ destinations:
 
 
 testcases:
-  - target: echo
+  - target: /echo
     profile:
       request:
         value: hello world

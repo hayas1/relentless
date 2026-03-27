@@ -9,7 +9,7 @@ use std::{
 use futures::{StreamExt, TryStreamExt};
 use semigroup::Semigroup;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{json, Value};
 use tower::{layer::util::Identity, Layer, Service};
 
 use crate::{
@@ -35,8 +35,13 @@ impl RequestSource<Value> for ValueRequest {
     type Error = crate::Error;
     async fn produce(&self, _: &http::Uri, target: &str) -> Result<Value, Self::Error> {
         match target {
-            "echo" => Ok(self.value.clone().unwrap_or_default()),
-            "fail" => Err(crate::Error::custom("fail")),
+            "/echo" => Ok(self.value.clone().unwrap_or_default()),
+            "/fail" => Err(crate::Error::custom("fail")),
+            "/wait" => {
+                let wait = self.value.as_ref().unwrap_or_default().as_u64().unwrap_or(100);
+                tokio::time::sleep(std::time::Duration::from_millis(wait)).await;
+                Ok(json!(wait))
+            }
             _ => Err(crate::Error::custom("unimplemented")),
         }
     }
@@ -168,7 +173,7 @@ mod tests {
     async fn test_with_echo_service() {
         let suites = vec![SuiteCase {
             suite: Suite {
-                name: "echo".to_string(),
+                name: "/echo".to_string(),
                 contract: Some(TestingClient),
                 destinations: vec![("test", crate::http_newtype_serde::Uri("http://localhost:8080".parse().unwrap()))]
                     .into_iter()
@@ -177,22 +182,22 @@ mod tests {
             },
             testcases: vec![
                 Testcase {
-                    target: "echo".to_string(),
+                    target: "/echo".to_string(),
                     profile: Profile {
-                        request: ValueRequest { value: Some(serde_json::json!("hello")) },
+                        request: ValueRequest { value: Some(json!("hello")) },
                         response: ValueResponse {
-                            value: Some(ValueResponseInner::Expect(ExpectEvaluator::new(serde_json::json!("hello")))),
+                            value: Some(ValueResponseInner::Expect(ExpectEvaluator::new(json!("hello")))),
                         },
                         ..Default::default()
                     },
                     ..Default::default()
                 },
                 Testcase {
-                    target: "echo".to_string(),
+                    target: "/echo".to_string(),
                     profile: Profile {
-                        request: ValueRequest { value: Some(serde_json::json!("value")) },
+                        request: ValueRequest { value: Some(json!("value")) },
                         response: ValueResponse {
-                            value: Some(ValueResponseInner::Expect(ExpectEvaluator::new(serde_json::json!("value")))),
+                            value: Some(ValueResponseInner::Expect(ExpectEvaluator::new(json!("value")))),
                         },
                         ..Default::default()
                     },

@@ -3,7 +3,7 @@ destinations:
   test-api: http://localhost:3000
 
 testcases:
-  - target: echo
+  - target: /echo
     profile:
       request:
         value: hello world
