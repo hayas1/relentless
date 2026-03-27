@@ -31,19 +31,10 @@ use crate::{
 pub struct ValueRequest {
     pub value: Option<Value>,
 }
-impl RequestSource<Value> for ValueRequest {
-    type Error = crate::Error;
-    async fn produce(&self, _: &http::Uri, target: &str) -> Result<Value, Self::Error> {
-        match target {
-            "/echo" => Ok(self.value.clone().unwrap_or_default()),
-            "/fail" => Err(crate::Error::custom("fail")),
-            "/wait" => {
-                let wait = self.value.as_ref().unwrap_or_default().as_u64().unwrap_or(100);
-                tokio::time::sleep(std::time::Duration::from_millis(wait)).await;
-                Ok(json!(wait))
-            }
-            _ => Err(crate::Error::custom("unimplemented")),
-        }
+impl RequestSource<(String, Value)> for ValueRequest {
+    type Error = Infallible;
+    async fn produce(&self, _: &http::Uri, target: &str) -> Result<(String, Value), Self::Error> {
+        Ok((target.to_string(), self.value.clone().unwrap_or_default()))
     }
 }
 
@@ -97,15 +88,26 @@ impl Evaluator<Value> for ValueResponseInner {
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, Semigroup)]
 pub struct TestingClient;
-impl Service<Value> for TestingClient {
+impl Service<(String, Value)> for TestingClient {
     type Response = Value;
-    type Error = Infallible;
+    type Error = crate::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
     fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
     }
-    fn call(&mut self, req: Value) -> Self::Future {
-        Box::pin(async move { Ok(req) })
+    fn call(&mut self, (target, value): (String, Value)) -> Self::Future {
+        Box::pin(async move {
+            match &target[..] {
+                "/echo" => Ok(value.clone()),
+                "/fail" => Err(crate::Error::custom("fail")),
+                "/wait" => {
+                    let wait = value.as_u64().unwrap_or(100);
+                    tokio::time::sleep(std::time::Duration::from_millis(wait)).await;
+                    Ok(json!(wait))
+                }
+                _ => Err(crate::Error::custom("unimplemented")),
+            }
+        })
     }
 }
 // MakeService
@@ -130,8 +132,8 @@ impl<S> Layer<S> for TestingClient {
 impl Contract<Self> for TestingClient {
     type Sign = Self;
     type ReqSource = ValueRequest;
-    type Request = Value;
-    type TransportReq = Value;
+    type Request = (String, Value);
+    type TransportReq = (String, Value);
     type TransportRes = Value;
     type Response = Value;
     type ResSink = ValueResponse;

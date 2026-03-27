@@ -1,6 +1,7 @@
 use std::{
     fmt::{Debug, Display, Formatter},
     future::Future,
+    time::Duration,
 };
 
 use semigroup::Semigroup;
@@ -109,6 +110,7 @@ pub enum ContractErrorWrap<NE, TE, SE, QE, PE> {
     Service(SE),
     ReqSource(QE),
     ResSink(PE),
+    Timeout(Duration),
 }
 impl<NE, TE, SE, QE, PE> std::error::Error for ContractErrorWrap<NE, TE, SE, QE, PE>
 where
@@ -125,6 +127,7 @@ where
             Self::Service(e) => Some(e),
             Self::ReqSource(e) => Some(e),
             Self::ResSink(e) => Some(e),
+            Self::Timeout(_) => None,
         }
     }
 }
@@ -143,6 +146,7 @@ where
             Self::Service(e) => e.fmt(f),
             Self::ReqSource(e) => e.fmt(f),
             Self::ResSink(e) => e.fmt(f),
+            Self::Timeout(d) => write!(f, "request timed out after {:?}", d),
         }
     }
 }

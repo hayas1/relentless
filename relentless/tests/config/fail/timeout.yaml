@@ -1,0 +1,12 @@
+name: test config for timeout
+destinations:
+  test-api: http://localhost:3000
+
+testcases:
+  - target: /wait
+    profile:
+      request:
+        value: 1000
+      timeout:
+        secs: 0
+        nanos: 500000000

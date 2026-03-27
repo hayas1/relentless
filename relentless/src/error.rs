@@ -8,7 +8,7 @@ pub type RelentlessResult<T> = Result<T, RelentlessError>;
 pub enum RelentlessError {
     CommandError(CommandError),
     EvaluateError(EvaluateError),
-    Box(Box<dyn std::error::Error>),
+    Box(Box<dyn std::error::Error + Send>),
     Custom(String),
 }
 impl std::error::Error for RelentlessError {
@@ -40,7 +40,7 @@ impl RelentlessError {
     pub fn custom<T: Display>(e: T) -> Self {
         Self::Custom(e.to_string())
     }
-    pub fn boxed<E: std::error::Error + 'static>(e: E) -> Self {
+    pub fn boxed<E: std::error::Error + Send + 'static>(e: E) -> Self {
         Self::Box(Box::new(e))
     }
     pub fn error(&self) -> &(dyn std::error::Error + 'static) {

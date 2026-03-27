@@ -76,7 +76,15 @@ impl<Q, P> Profile<Q, P> {
                 let destination = destinations.get(name).unwrap_or_else(|| todo!());
                 let request =
                     self.request.produce(destination, target).await.map_err(ContractError::<T, C>::ReqSource)?;
-                let response = service.clone().oneshot(request).await;
+                let service = service.clone().oneshot(request);
+                let response = if let Some(timeout) = self.timeout {
+                    match tokio::time::timeout(timeout, service).await {
+                        Ok(response) => response,
+                        Err(_) => Err(ContractError::<T, C>::Timeout(timeout))?,
+                    }
+                } else {
+                    service.await
+                };
                 Ok::<_, ContractError<T, C>>((name, response))
             })
             .buffer_unordered(buffers)
