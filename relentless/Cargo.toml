@@ -57,3 +57,4 @@ opentelemetry-semantic-conventions = "0.31.0"
 
 [dev-dependencies]
 relentless = { path = ".", features = ["testing"] }
+glob = "0.3.3"

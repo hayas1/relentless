@@ -26,27 +26,32 @@ use crate::{
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, Semigroup)]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
+#[semigroup(with = "semigroup::op::Coalesce")]
 pub struct ValueRequest {
-    #[semigroup(with = "semigroup::op::Coalesce")]
-    pub arg: Option<Value>,
+    pub value: Option<Value>,
 }
 impl RequestSource<Value> for ValueRequest {
-    type Error = Infallible;
+    type Error = crate::Error;
     async fn produce(&self, _: &http::Uri, target: &str) -> Result<Value, Self::Error> {
         match target {
-            "echo" => Ok(self.arg.clone().unwrap_or_default()),
-            _ => todo!(),
+            "echo" => Ok(self.value.clone().unwrap_or_default()),
+            "fail" => Err(crate::Error::custom("fail")),
+            _ => Err(crate::Error::custom("unimplemented")),
         }
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, Semigroup)]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
+#[semigroup(with = "semigroup::op::Coalesce")]
 pub struct ValueResponse {
-    #[semigroup(with = "semigroup::op::Coalesce")]
-    pub message: Option<StringResponseInner>,
+    #[cfg_attr(feature = "yaml", serde(with = "serde_yaml::with::singleton_map_recursive"))]
+    pub value: Option<ValueResponseInner>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
-pub enum StringResponseInner {
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
+pub enum ValueResponseInner {
     #[default]
     AnyOrEqual,
     Expect(ExpectEvaluator<Value>),
@@ -66,10 +71,10 @@ impl<E: Display + Send> ResponseSink<Result<Value, E>> for ValueResponse {
             .try_collect()
             .await
             .map_err(|e| msg.error(e))?;
-        self.message.as_ref().unwrap_or(&Default::default()).evaluate(msg, collected)
+        self.value.as_ref().unwrap_or(&Default::default()).evaluate(msg, collected)
     }
 }
-impl Evaluator<Value> for StringResponseInner {
+impl Evaluator<Value> for ValueResponseInner {
     type Message = EvaluateError;
     fn evaluate_shot(&self, msg: &mut Messages<Self::Message>, res: &Value) -> Result<(), Failure> {
         match self {
@@ -174,11 +179,9 @@ mod tests {
                 Testcase {
                     target: "echo".to_string(),
                     profile: Profile {
-                        request: ValueRequest { arg: Some(serde_json::json!("hello")) },
+                        request: ValueRequest { value: Some(serde_json::json!("hello")) },
                         response: ValueResponse {
-                            message: Some(StringResponseInner::Expect(ExpectEvaluator::new(serde_json::json!(
-                                "hello"
-                            )))),
+                            value: Some(ValueResponseInner::Expect(ExpectEvaluator::new(serde_json::json!("hello")))),
                         },
                         ..Default::default()
                     },
@@ -187,11 +190,9 @@ mod tests {
                 Testcase {
                     target: "echo".to_string(),
                     profile: Profile {
-                        request: ValueRequest { arg: Some(serde_json::json!("value")) },
+                        request: ValueRequest { value: Some(serde_json::json!("value")) },
                         response: ValueResponse {
-                            message: Some(StringResponseInner::Expect(ExpectEvaluator::new(serde_json::json!(
-                                "value"
-                            )))),
+                            value: Some(ValueResponseInner::Expect(ExpectEvaluator::new(serde_json::json!("value")))),
                         },
                         ..Default::default()
                     },

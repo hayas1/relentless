@@ -1,0 +1,14 @@
+name: expect config for allow
+destinations:
+  test-api: http://localhost:3000
+
+
+testcases:
+  - target: echo
+    profile:
+      request:
+        value: hello world
+      response:
+        value:
+          expect: hell
+      allow: true
