@@ -1,7 +1,10 @@
 use std::{
     convert::Infallible,
     fmt::{Display, Formatter},
+    time::Duration,
 };
+
+use crate::evaluator::evaluate::MessageExt;
 
 pub type RelentlessResult<T> = Result<T, RelentlessError>;
 #[derive(Debug)]
@@ -79,6 +82,7 @@ pub enum EvaluateError {
     ShouldCompare,
     ShouldShot,
     NotOk,
+    Timeout(Duration),
     Custom(String),
     Box(Box<dyn std::error::Error + Send + Sync + 'static>),
 }
@@ -88,6 +92,11 @@ impl EvaluateError {
     }
     pub fn boxed<E: Into<Box<dyn std::error::Error + Send + Sync + 'static>>>(e: E) -> Self {
         Self::Box(e.into())
+    }
+}
+impl MessageExt for EvaluateError {
+    fn timeout(time: Duration) -> Self {
+        Self::Timeout(time)
     }
 }
 impl From<EvaluateError> for RelentlessError {
@@ -110,6 +119,7 @@ impl Display for EvaluateError {
             Self::ShouldCompare => write!(f, "should compare"),
             Self::ShouldShot => write!(f, "should shot"),
             Self::NotOk => write!(f, "not ok"),
+            Self::Timeout(d) => write!(f, "request timed out after {d:?}"),
             Self::Custom(e) => write!(f, "{e}"),
             Self::Box(e) => write!(f, "{e}"),
         }

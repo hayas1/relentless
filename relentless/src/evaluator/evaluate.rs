@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{fmt::Display, time::Duration};
 
 use semigroup::Semigroup;
 use serde::{Deserialize, Serialize};
@@ -64,6 +64,9 @@ impl Display for Failure {
     }
 }
 
+pub trait MessageExt {
+    fn timeout(time: Duration) -> Self;
+}
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash, Serialize, Deserialize)]
 pub struct Message<M> {
     pub message: M,

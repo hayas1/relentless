@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use tower::{Layer, Service, ServiceExt};
 
 use crate::{
-    evaluator::evaluate::Messages,
+    evaluator::evaluate::{MessageExt, Messages},
     shot::{
         contract::{Contract, ContractError, Evaluated, RequestSource, ResponseSink, ServiceError},
         destinations::Destinations,
@@ -89,10 +89,19 @@ impl<Q, P> Profile<Q, P> {
             })
             .buffer_unordered(buffers)
             .try_collect()
-            .await?;
+            .await;
         let mut messages = Messages::new();
-        let evaluated = self.response.consume(&mut messages, responses).await;
-        Ok((Evaluated::new(&evaluated, self.allow), messages))
+        match responses {
+            Ok(responses) => {
+                let evaluated = self.response.consume(&mut messages, responses).await;
+                Ok((Evaluated::new(&evaluated, self.allow), messages))
+            }
+            e @ Err(ContractError::<T, C>::Timeout(t)) => {
+                messages.error(<P as ResponseSink<Result<C::Response, ServiceError<T, C>>>>::Message::timeout(t));
+                Ok((Evaluated::new(&e, self.allow), messages))
+            }
+            _ => todo!(),
+        }
     }
 }
 
