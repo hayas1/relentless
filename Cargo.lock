@@ -2235,7 +2235,6 @@ dependencies = [
  "console",
  "futures",
  "glob",
- "hdrhistogram",
  "http",
  "http-serde",
  "opentelemetry",
@@ -2578,8 +2577,9 @@ dependencies = [
 
 [[package]]
 name = "semigroup"
-version = "0.4.3"
-source = "git+https://github.com/hayas1/semigroup.git?branch=master#3d337f2935b8d1baa51bd114b7c83e1880c71160"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b93bdf28371d9c1c864168c4c62d311d51d7ba1b5402703a56ed84e29920101c"
 dependencies = [
  "futures",
  "hdrhistogram",
@@ -2589,8 +2589,9 @@ dependencies = [
 
 [[package]]
 name = "semigroup_derive"
-version = "0.4.3"
-source = "git+https://github.com/hayas1/semigroup.git?branch=master#3d337f2935b8d1baa51bd114b7c83e1880c71160"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0b3fe071ba29aae2cbb6952f732ce1aa1b1d471f0bacb3e9cdf524686e1748e7"
 dependencies = [
  "comfy-table",
  "darling 0.23.0",
