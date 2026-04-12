@@ -6,6 +6,7 @@ use relentless::{
 use relentless_http::contract::HttpContract;
 
 #[tokio::test]
+#[cfg(feature = "yaml")]
 async fn test_example_yaml_config() {
     let spec = JobSpec { report_format: ReportFormat::NullDevice, ..Default::default() };
     let files: Result<Vec<_>, _> = glob::glob("examples/config/*.yaml").unwrap().collect();

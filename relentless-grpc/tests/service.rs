@@ -7,6 +7,7 @@ use relentless_grpc_dev_server::runner::RunCommand;
 use tower::make::Shared;
 
 #[tokio::test]
+#[cfg(feature = "yaml")]
 async fn test_example_yaml_config() {
     let spec = JobSpec {
         report_format: ReportFormat::NullDevice,

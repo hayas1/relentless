@@ -8,9 +8,8 @@ license-file.workspace = true
 
 [features]
 default = ["full"]
-full = ["relentless/full", "json", "yaml", "cli"]
+full = ["relentless/full", "yaml", "cli"]
 
-json = ["relentless/json", "serde_json"]
 yaml = ["serde_yaml"]
 cli = ["relentless/cli", "console-report"]
 console-report = ["relentless/console-report"]
@@ -32,7 +31,7 @@ opentelemetry-http = "0.31.0"
 bytes = "1.10.1"
 thiserror = "2.0.12"
 serde = { version = "1.0.219", features = ["derive"] }
-serde_json = { version = "1.0.140", optional = true }
+serde_json = "1.0.140"
 serde_yaml = { version = "0.9.34", optional = true }
 # semigroup = { version = "0.4.3", features = ["derive"] }
 semigroup = { git = "https://github.com/hayas1/semigroup.git", branch = "master", features = [

@@ -55,7 +55,6 @@ pub enum HttpResponseBody {
     #[default]
     AnyOrEqual,
     Regex(RegexEvaluator),
-    #[cfg(feature = "json")]
     Json(ExpectEvaluator<serde_json::Value>),
 }
 
@@ -173,7 +172,6 @@ impl Evaluator<Bytes> for HttpResponseBody {
         match self {
             Self::AnyOrEqual => Ok(()),
             Self::Regex(e) => e.evaluate_shot(msg, &String::from_utf8_lossy(res)[..]),
-            #[cfg(feature = "json")]
             Self::Json(e) => {
                 let resp: serde_json::Value =
                     serde_json::from_slice(res).map_err(|e| msg.error(EvaluateError::boxed(e)))?;
@@ -187,7 +185,6 @@ impl Evaluator<Bytes> for HttpResponseBody {
             Self::Regex(e) => {
                 e.evaluate_compare(msg, &String::from_utf8_lossy(res1)[..], &String::from_utf8_lossy(res2)[..])
             }
-            #[cfg(feature = "json")]
             Self::Json(e) => {
                 let resp1: serde_json::Value =
                     serde_json::from_slice(res1).map_err(|e| msg.error(EvaluateError::boxed(e)))?;

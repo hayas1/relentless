@@ -68,6 +68,7 @@
 //!
 //! ## Testing
 //! ```
+//! # #[cfg(feature="yaml")]
 //! # tokio_test::block_on(async {
 //! use relentless::{
 //!     report::ReportFormat,
