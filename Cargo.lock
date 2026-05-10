@@ -2577,9 +2577,9 @@ dependencies = [
 
 [[package]]
 name = "semigroup"
-version = "0.5.0"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b93bdf28371d9c1c864168c4c62d311d51d7ba1b5402703a56ed84e29920101c"
+checksum = "93bacd6095858c7a9d7f77562d4c84e2d04a25f9989f11e867ead694958b42df"
 dependencies = [
  "futures",
  "hdrhistogram",
@@ -2589,9 +2589,9 @@ dependencies = [
 
 [[package]]
 name = "semigroup_derive"
-version = "0.5.0"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0b3fe071ba29aae2cbb6952f732ce1aa1b1d471f0bacb3e9cdf524686e1748e7"
+checksum = "9584469d49be0084ee54a201a62ecb844202fc6b86fb9d5f4648fbb2434f67e4"
 dependencies = [
  "comfy-table",
  "darling 0.23.0",
