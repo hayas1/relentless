@@ -33,8 +33,14 @@ pub struct ValueRequest {
 }
 impl RequestSource<(String, Value)> for ValueRequest {
     type Error = Infallible;
-    async fn produce(&self, _: &http::Uri, target: &str) -> Result<(String, Value), Self::Error> {
-        Ok((target.to_string(), self.value.clone().unwrap_or_default()))
+    async fn produce(
+        &self,
+        _: &http::Uri,
+        target: &str,
+        template: &crate::template::Template,
+    ) -> Result<(String, Value), Self::Error> {
+        let target = template.render(target).unwrap_or_else(|_| target.to_string());
+        Ok((target, self.value.clone().unwrap_or_default()))
     }
 }
 

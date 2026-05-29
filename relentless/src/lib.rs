@@ -28,6 +28,7 @@ pub mod otel;
 pub mod record;
 pub mod report;
 pub mod shot;
+pub mod template;
 #[cfg(feature = "testing")]
 pub mod testing;
 

@@ -10,6 +10,7 @@ use tower::{Layer, MakeService, Service};
 use crate::{
     evaluator::evaluate::{Failure, MessageExt, Messages},
     shot::{destinations::Destinations, job::BasePath},
+    template::Template,
 };
 
 #[trait_variant::make(Send)]
@@ -45,7 +46,7 @@ pub trait SignContract<T, C> {
 #[trait_variant::make(Send)]
 pub trait RequestSource<De> {
     type Error;
-    async fn produce(&self, destination: &http::Uri, target: &str) -> Result<De, Self::Error>;
+    async fn produce(&self, destination: &http::Uri, target: &str, template: &Template) -> Result<De, Self::Error>;
 }
 
 #[trait_variant::make(Send)]

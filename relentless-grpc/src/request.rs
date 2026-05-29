@@ -1,6 +1,6 @@
 use std::{convert::Infallible, str::FromStr};
 
-use relentless::shot::contract::RequestSource;
+use relentless::{shot::contract::RequestSource, template::Template};
 use semigroup::Semigroup;
 use serde::{Deserialize, Serialize};
 
@@ -41,15 +41,18 @@ impl RequestSource<(MethodPath, tonic::Request<serde_json::Value>)> for GrpcRequ
         &self,
         destination: &http::Uri,
         target: &str,
+        template: &Template,
     ) -> Result<(MethodPath, tonic::Request<serde_json::Value>), Self::Error> {
-        let pq = MethodPath::from_str(target).map_err(relentless::Error::boxed)?;
-        let request = self.message.as_ref().unwrap_or(&Default::default()).produce(destination, target).await?;
+        let target = template.render(target)?;
+        let pq = MethodPath::from_str(&target).map_err(relentless::Error::boxed)?;
+        let request =
+            self.message.as_ref().unwrap_or(&Default::default()).produce(destination, &target, template).await?;
         Ok((pq, tonic::Request::from_parts(Default::default(), Default::default(), request)))
     }
 }
 impl RequestSource<serde_json::Value> for GrpcRequestMessage {
     type Error = Infallible;
-    async fn produce(&self, _: &http::Uri, _: &str) -> Result<serde_json::Value, Self::Error> {
+    async fn produce(&self, _: &http::Uri, _: &str, _template: &Template) -> Result<serde_json::Value, Self::Error> {
         match self {
             Self::Empty => Ok(serde_json::json!({})),
             Self::Value(v) => Ok(v.clone()),

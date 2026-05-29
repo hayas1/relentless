@@ -2237,6 +2237,7 @@ dependencies = [
  "glob",
  "http",
  "http-serde",
+ "nom",
  "opentelemetry",
  "opentelemetry-otlp",
  "opentelemetry-semantic-conventions",

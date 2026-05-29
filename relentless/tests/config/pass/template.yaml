@@ -1,0 +1,23 @@
+name: test config for template
+destinations:
+  dest1: http://localhost:3000
+  dest2: http://localhost:3001
+
+testcases:
+  - target: /${route}
+    profile:
+      template:
+        route:
+          dest1: echo
+          dest2: echo
+  - target: /${route}
+    profile:
+      template:
+        route:
+          dest1: echo
+          dest2: echo
+      request:
+        value: hello
+      response:
+        value:
+          expect: hello

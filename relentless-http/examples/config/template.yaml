@@ -1,0 +1,61 @@
+name: template http test
+destinations:
+  server1: http://localhost:3000
+  server2: http://localhost:3000
+
+testcases:
+  # template variable in target path (responses differ → allow)
+  - target: /echo/path/${var}
+    profile:
+      template:
+        var:
+          server1: hello
+          server2: world
+      allow: true
+
+  # template variable in plaintext body (same value for both destinations)
+  - target: /echo/body
+    profile:
+      template:
+        greeting:
+          server1: hello
+          server2: hello
+      request:
+        method: POST
+        body:
+          plaintext: ${greeting} world
+      response:
+        body:
+          regex: ^hello world$
+
+  # template variable in JSON body (same value for both destinations)
+  - target: /echo/body
+    profile:
+      template:
+        key:
+          server1: value
+          server2: value
+      request:
+        method: POST
+        body:
+          json:
+            key: ${key}
+      response:
+        body:
+          json:
+            key: value
+
+  # template variable in request header (same token for both destinations)
+  - target: /echo/body
+    profile:
+      template:
+        token:
+          server1: mytoken
+          server2: mytoken
+      request:
+        method: POST
+        body:
+          plaintext: ${token}
+      response:
+        body:
+          regex: ^mytoken$

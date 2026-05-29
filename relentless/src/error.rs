@@ -11,6 +11,7 @@ pub type RelentlessResult<T> = Result<T, RelentlessError>;
 pub enum RelentlessError {
     CommandError(CommandError),
     EvaluateError(EvaluateError),
+    TemplateError(TemplateError),
     Box(Box<dyn std::error::Error + Send>),
     Custom(String),
 }
@@ -19,6 +20,7 @@ impl std::error::Error for RelentlessError {
         match self {
             Self::CommandError(e) => Some(e),
             Self::EvaluateError(e) => Some(e),
+            Self::TemplateError(e) => Some(e),
             Self::Box(e) => e.source(),
             Self::Custom(_) => None,
         }
@@ -29,6 +31,7 @@ impl Display for RelentlessError {
         match self {
             Self::CommandError(e) => e.fmt(f),
             Self::EvaluateError(e) => e.fmt(f),
+            Self::TemplateError(e) => e.fmt(f),
             Self::Box(e) => e.fmt(f),
             Self::Custom(e) => e.fmt(f),
         }
@@ -37,6 +40,11 @@ impl Display for RelentlessError {
 impl From<Infallible> for RelentlessError {
     fn from(value: Infallible) -> Self {
         match value {}
+    }
+}
+impl From<TemplateError> for RelentlessError {
+    fn from(value: TemplateError) -> Self {
+        Self::TemplateError(value)
     }
 }
 impl RelentlessError {
@@ -50,6 +58,7 @@ impl RelentlessError {
         match self {
             Self::CommandError(e) => e as _,
             Self::EvaluateError(e) => e as _,
+            Self::TemplateError(e) => e as _,
             Self::Box(e) => &**e,
             Self::Custom(_) => self,
         }
@@ -122,6 +131,23 @@ impl Display for EvaluateError {
             Self::Timeout(d) => write!(f, "request timed out after {d:?}"),
             Self::Custom(e) => write!(f, "{e}"),
             Self::Box(e) => write!(f, "{e}"),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum TemplateError {
+    NomParseError(String),
+    RemainingTemplate(String),
+    VariableNotDefined(String),
+}
+impl std::error::Error for TemplateError {}
+impl Display for TemplateError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NomParseError(s) => write!(f, "{s}"),
+            Self::RemainingTemplate(s) => write!(f, "remaining template: {s}"),
+            Self::VariableNotDefined(s) => write!(f, "variable `{s}` is not defined"),
         }
     }
 }
