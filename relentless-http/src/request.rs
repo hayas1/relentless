@@ -1,4 +1,4 @@
-use std::{convert::Infallible, fmt::Debug};
+use std::fmt::Debug;
 
 use bytes::Bytes;
 use http_body::Body;
@@ -39,13 +39,13 @@ impl HttpRequestBody {
         }
     }
 
-    async fn produce_bytes<ReqB: Body + Default + From<Bytes>>(&self) -> ReqB {
+    async fn produce_bytes<ReqB: Body + Default + From<Bytes>>(&self) -> relentless::Result<ReqB> {
         match self {
-            Self::Empty => Default::default(),
-            Self::Plaintext(s) => Bytes::from(s.to_string()).into(),
+            Self::Empty => Ok(Default::default()),
+            Self::Plaintext(s) => Ok(Bytes::from(s.to_string()).into()),
             Self::Json(v) => {
-                let s = serde_json::to_string(v).unwrap_or_else(|_| todo!());
-                Bytes::from(s).into()
+                let s = serde_json::to_string(v).map_err(relentless::Error::boxed)?;
+                Ok(Bytes::from(s).into())
             }
         }
     }
@@ -65,27 +65,31 @@ impl<ReqB: Body + Default + From<Bytes> + Debug> RequestSource<http::Request<Req
         let uri = http::uri::Builder::from(destination.clone())
             .path_and_query(target.as_str())
             .build()
-            .unwrap_or_else(|_| todo!());
+            .map_err(relentless::Error::boxed)?;
         let method = self.method.as_deref().unwrap_or(&Default::default()).clone();
         let raw_headers = self.headers.as_deref().unwrap_or(&Default::default()).clone();
         let mut header = http::HeaderMap::new();
         for (k, v) in raw_headers.iter() {
             let rendered = template.render(v.to_str().unwrap_or_default())?;
-            let new_v = http::HeaderValue::from_str(&rendered).unwrap_or_else(|_| todo!());
+            let new_v = http::HeaderValue::from_str(&rendered).map_err(relentless::Error::boxed)?;
             header.insert(k, new_v);
         }
         let rendered_body = self.body.as_ref().unwrap_or(&Default::default()).render(template)?;
-        let body = rendered_body.produce_bytes::<ReqB>().await;
-        let mut request = http::Request::builder().uri(uri).method(method).body(body).unwrap_or_else(|_| todo!());
+        let body = rendered_body.produce_bytes::<ReqB>().await?;
+        let mut request = http::Request::builder()
+            .uri(uri)
+            .method(method)
+            .body(body)
+            .map_err(relentless::Error::boxed)?;
         request.headers_mut().extend(header);
         Ok(request)
     }
 }
 
 impl<ReqB: Body + Default + From<Bytes>> RequestSource<ReqB> for HttpRequestBody {
-    type Error = Infallible;
+    type Error = relentless::Error;
 
     async fn produce(&self, _: &http::Uri, _: &str, _template: &Template) -> Result<ReqB, Self::Error> {
-        Ok(self.produce_bytes().await)
+        self.produce_bytes().await
     }
 }
