@@ -2,14 +2,23 @@ name: basic grpc comparison test
 destinations:
   actual: http://localhost:50051
   expect: http://localhost:50051
+contract:
+  proto-files:
+    protos:
+      - ./dev/server/grpc/proto/greeter.proto
+      - ./dev/server/grpc/proto/echo.proto
+    includes: [./dev/server/grpc/proto]
+
 
 testcases:
   - target: greeter.Greeter/SayHello
-    setting:
+    profile:
       request:
-        descriptor:
-          protos: [./dev/server/grpc/proto/greeter.proto]
-          import_path: [./dev/server/grpc/proto]
         message:
-          json:
+          value:
             name: John Doe
+  - target: echo.Echo/EchoValue
+    profile:
+      request:
+        message:
+          value: 100

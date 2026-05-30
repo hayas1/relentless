@@ -1,0 +1,12 @@
+name: expect config for pass
+destinations:
+  test-api: http://localhost:3000
+
+testcases:
+  - target: /echo
+    profile:
+      request:
+        value: hello world
+      response:
+        value:
+          expect: hello world

@@ -1,0 +1,58 @@
+syntax = "proto3";
+package random;
+
+service Random {
+  rpc Int(DistributionInt) returns (RandomInt);
+  rpc Float(DistributionFloat) returns (RandomFloat);
+  rpc String(DistributionString) returns (RandomString);
+}
+
+message Standard {}
+message Normal {}
+message Binomial {
+  uint64 n = 1;
+  double p = 2;
+}
+message UniformInt {
+  int64 min       = 1;
+  int64 max       = 2;
+  bool  inclusive = 3;
+}
+message UniformFloat {
+  double min       = 1;
+  double max       = 2;
+  bool   inclusive = 3;
+}
+message Alphanumeric {}
+
+message DistributionInt {
+  oneof distribution {
+    Standard   standard = 1;
+    Binomial   binomial = 2;
+    UniformInt uniform  = 3;
+  }
+}
+message DistributionFloat {
+  oneof distribution {
+    Standard     standard = 1;
+    Normal       normal   = 2;
+    UniformFloat uniform  = 3;
+  }
+}
+message DistributionString {
+  int64 length = 1;
+  oneof distribution {
+    Standard     standard     = 2;
+    Alphanumeric alphanumeric = 3;
+  }
+}
+
+message RandomInt {
+  int64 value = 1;
+}
+message RandomFloat {
+  double value = 1;
+}
+message RandomString {
+  string value = 1;
+}

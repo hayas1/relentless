@@ -27,7 +27,7 @@ jobs:
         key: cargo-${{ hashFiles('**/Cargo.toml') }}
 
     - name: Setup grpc for tests
-      run: ./dev/server/grpc/scripts/setup.sh
+      run: ./dev/scripts/setup-grpc.sh
 
     - run: cargo clippy --all --tests -- --deny warnings
     - run: cargo fmt --all --check
@@ -76,18 +76,8 @@ jobs:
         set -euo pipefail
         {
           cargo run --manifest-path relentless-http/Cargo.toml --features cli -- \
-            -f relentless-http/examples/config/assault.yaml relentless-http/examples/config/compare.yaml -d actual=http://localhost:3000 \
-            -s testcases repeats -r github-markdown \
-            --no-color --ng-only
-        } >> target/report.txt
-    - name: Run configs e2e test and comment on pull request
-      run: |
-        set -euo pipefail
-        {
-          cargo run --manifest-path relentless-http/Cargo.toml --features cli -- \
-            -f tests/config/basic/*.yaml -d actual=http://localhost:3001 \
-            -s testcases repeats -r github-markdown \
-            --no-color --ng-only
+            relentless-http/examples/config/*.yaml \
+            -r github-markdown --no-color --ng-only
         } >> target/report.txt
     - name: Comment on pull request
       if: failure()

@@ -1,0 +1,14 @@
+name: expect config for allow override
+destinations:
+  test-api: http://localhost:3000
+profile:
+  allow: true
+
+testcases:
+  - target: /echo
+    profile:
+      request:
+        value: hello world
+      response:
+        value:
+          expect: hell

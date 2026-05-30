@@ -1,0 +1,24 @@
+name: advance grpc test
+destinations:
+  actual: http://localhost:50051
+  expect: http://localhost:50051
+contract:
+  proto-files:
+    protos:
+      - ./dev/server/grpc/proto/greeter.proto
+      - ./dev/server/grpc/proto/echo.proto
+    includes: [./dev/server/grpc/proto]
+
+
+testcases:
+  - target: greeter.Greeter/SayHello
+    profile:
+      request:
+        message:
+          value:
+            name: John Doe
+      response:
+        message:
+          value:
+            greeting: Hello John Doe!
+

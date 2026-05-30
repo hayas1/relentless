@@ -2,14 +2,27 @@ use std::process::ExitCode;
 
 #[cfg(feature = "cli")]
 #[tokio::main]
-pub async fn main() -> Result<ExitCode, Box<dyn std::error::Error + Send + Sync>> {
-    use relentless::interface::command::{Assault, Relentless};
-    use relentless_http::{client::DefaultHttpClient, command::HttpAssault};
+pub async fn main() -> Result<ExitCode, Box<dyn std::error::Error>> {
+    use relentless::{
+        record::metric::MeasureLayer,
+        report::Reporter,
+        shot::job::{Cli, Job},
+    };
+    use relentless_http::{contract::HttpContract, layer::OtelInjectLayer, service::ReqwestClient};
+    use reqwest::Body;
+    use tower::ServiceBuilder;
 
-    let assault = HttpAssault::new(Relentless::parse_cli());
-    let client = DefaultHttpClient::<reqwest::Body, reqwest::Body>::new().await?;
-    let record = assault.build_service(client);
-    Ok(assault.execute(record).await?)
+    Cli::run(|job: Job<_, _, _>, spec| async move {
+        let measure = MeasureLayer::new();
+        let inject = OtelInjectLayer;
+        let client = ReqwestClient::new().await?;
+        let service = ServiceBuilder::new().layer(&measure).layer(inject).service(client);
+        let report = job.shot::<_, _, HttpContract<Body, Body>>(tower::make::Shared::new(service), &spec).await?;
+        spec.report(&report)?;
+        dbg!(measure.aggregated().times());
+        Ok((!report.evaluated.assess().success() as u8).into())
+    })
+    .await
 }
 
 #[cfg(not(feature = "cli"))]

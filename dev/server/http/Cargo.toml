@@ -9,8 +9,14 @@ license-file.workspace = true
 [dependencies]
 axum = { version = "0.8.1", features = ["tokio", "original-uri"] }
 axum-extra = "0.10.1"
+axum-tracing-opentelemetry = "0.32.2"
 chrono = { version = "0.4.41", features = ["serde"] }
+clap = { version = "4.5.53", features = ["env", "derive"] }
 http-serde = "2.1.1"
+init-tracing-opentelemetry = { version = "0.34.0", features = [
+    "tracing_subscriber_ext",
+] }
+jiff = { version = "0.2.16", features = ["serde"] }
 num = { version = "0.4.3", features = ["serde"] }
 rand = "0.9.1"
 rand_distr = "0.5.1"
@@ -21,12 +27,12 @@ serde_urlencoded = "0.7.1"
 thiserror = "2.0.12"
 tokio = { version = "1.45.1", features = ["full"] }
 tower = { version = "0.5.2", features = ["util"] }
-tower-http = { version = "0.6.6", features = ["normalize-path"] }
+tower-http = { version = "0.6.6", features = ["normalize-path", "trace"] }
 tracing = "0.1.41"
-tracing-subscriber = "0.3.19"
 
 [dev-dependencies]
 mime = "0.3.17"
+reqwest = { version = "0.12.28", features = ["json"] }
 
 [lints.clippy]
 result_large_err = "allow" # TODO

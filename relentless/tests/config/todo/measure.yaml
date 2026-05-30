@@ -1,0 +1,14 @@
+name: test config for measure
+destinations:
+  test-api: http://localhost:3000
+
+testcases:
+  - target: /health
+    profile:
+      repeat: 100
+  - target: /health
+    profile:
+      repeat: 1000
+  - target: /health
+    profile:
+      repeat: 10000

@@ -1,0 +1,53 @@
+use std::{
+    collections::HashMap,
+    ops::{Deref, DerefMut},
+};
+
+use semigroup::Semigroup;
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Semigroup)]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
+pub struct Destinations<T>(#[semigroup(with = "semigroup::op::UnionMap")] HashMap<String, T>);
+impl<T> Default for Destinations<T> {
+    fn default() -> Self {
+        // derive(Default) do not implement Default when T are not implement Default
+        // https://github.com/rust-lang/rust/issues/26925
+        Self(HashMap::default())
+    }
+}
+impl<T> Deref for Destinations<T> {
+    type Target = HashMap<String, T>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl<T> DerefMut for Destinations<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+impl<T> IntoIterator for Destinations<T> {
+    type Item = <HashMap<String, T> as IntoIterator>::Item;
+    type IntoIter = <HashMap<String, T> as IntoIterator>::IntoIter;
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+impl<'a, T> IntoIterator for &'a Destinations<T> {
+    type Item = <&'a HashMap<String, T> as IntoIterator>::Item;
+    type IntoIter = <&'a HashMap<String, T> as IntoIterator>::IntoIter;
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
+    }
+}
+impl<S: Into<String>, T> FromIterator<(S, T)> for Destinations<T> {
+    fn from_iter<I: IntoIterator<Item = (S, T)>>(iter: I) -> Self {
+        Self(iter.into_iter().map(|(d, v)| (d.into(), v)).collect())
+    }
+}
+impl<S: Into<String>, T> Extend<(S, T)> for Destinations<T> {
+    fn extend<I: IntoIterator<Item = (S, T)>>(&mut self, iter: I) {
+        self.0.extend(iter.into_iter().map(|(d, v)| (d.into(), v)))
+    }
+}

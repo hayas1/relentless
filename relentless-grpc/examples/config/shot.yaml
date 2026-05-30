@@ -1,0 +1,30 @@
+name: basic grpc shot test
+destinations:
+  test-api: http://localhost:50051
+contract:
+  proto-files:
+    protos:
+      - ./dev/server/grpc/proto/greeter.proto
+      - ./dev/server/grpc/proto/echo.proto
+      - ./dev/server/grpc/proto/counter.proto
+    includes: [./dev/server/grpc/proto]
+
+testcases:
+  - target: greeter.Greeter/SayHello
+    profile:
+      request:
+        message:
+          value:
+            name: John Doe
+  - target: echo.Echo/EchoValue
+    profile:
+      request:
+        message:
+          value: 100
+  - target: counter.Counter/Increment
+    profile:
+      request:
+        message:
+          value: 10
+
+
