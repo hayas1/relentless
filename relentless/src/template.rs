@@ -74,7 +74,7 @@ impl Variable {
                 Ok(defined.vars.get(key).ok_or(TemplateError::VariableNotDefined(key.clone()))?.clone())
             }
             Self::Environment(key) => {
-                std::env::var(key).map_err(|e| crate::Error::boxed(e))
+                std::env::var(key).map_err(crate::Error::boxed)
             }
         }
     }
