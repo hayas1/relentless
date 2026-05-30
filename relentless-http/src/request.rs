@@ -38,17 +38,6 @@ impl HttpRequestBody {
             Self::Json(v) => Ok(Self::Json(template.render_json_recursive(v)?)),
         }
     }
-
-    async fn produce_bytes<ReqB: Body + Default + From<Bytes>>(&self) -> relentless::Result<ReqB> {
-        match self {
-            Self::Empty => Ok(Default::default()),
-            Self::Plaintext(s) => Ok(Bytes::from(s.to_string()).into()),
-            Self::Json(v) => {
-                let s = serde_json::to_string(v).map_err(relentless::Error::boxed)?;
-                Ok(Bytes::from(s).into())
-            }
-        }
-    }
 }
 
 impl<ReqB: Body + Default + From<Bytes> + Debug> RequestSource<http::Request<ReqB>> for HttpRequest {
@@ -75,7 +64,7 @@ impl<ReqB: Body + Default + From<Bytes> + Debug> RequestSource<http::Request<Req
             header.insert(k, new_v);
         }
         let rendered_body = self.body.as_ref().unwrap_or(&Default::default()).render(template)?;
-        let body = rendered_body.produce_bytes::<ReqB>().await?;
+        let body: ReqB = rendered_body.produce(destination, &target, template).await?;
         let mut request = http::Request::builder()
             .uri(uri)
             .method(method)
@@ -89,7 +78,14 @@ impl<ReqB: Body + Default + From<Bytes> + Debug> RequestSource<http::Request<Req
 impl<ReqB: Body + Default + From<Bytes>> RequestSource<ReqB> for HttpRequestBody {
     type Error = relentless::Error;
 
-    async fn produce(&self, _: &http::Uri, _: &str, _template: &Template) -> Result<ReqB, Self::Error> {
-        self.produce_bytes().await
+    async fn produce(&self, _: &http::Uri, _: &str, _: &Template) -> Result<ReqB, Self::Error> {
+        match self {
+            Self::Empty => Ok(Default::default()),
+            Self::Plaintext(s) => Ok(Bytes::from(s.to_string()).into()),
+            Self::Json(v) => {
+                let s = serde_json::to_string(v).map_err(relentless::Error::boxed)?;
+                Ok(Bytes::from(s).into())
+            }
+        }
     }
 }
