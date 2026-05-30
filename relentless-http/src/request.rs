@@ -65,11 +65,8 @@ impl<ReqB: Body + Default + From<Bytes> + Debug> RequestSource<http::Request<Req
         }
         let rendered_body = self.body.as_ref().unwrap_or(&Default::default()).render(template)?;
         let body: ReqB = rendered_body.produce(destination, &target, template).await?;
-        let mut request = http::Request::builder()
-            .uri(uri)
-            .method(method)
-            .body(body)
-            .map_err(relentless::Error::boxed)?;
+        let mut request =
+            http::Request::builder().uri(uri).method(method).body(body).map_err(relentless::Error::boxed)?;
         request.headers_mut().extend(header);
         Ok(request)
     }

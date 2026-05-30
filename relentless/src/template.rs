@@ -73,9 +73,7 @@ impl Variable {
             Self::Defined(key) => {
                 Ok(defined.vars.get(key).ok_or(TemplateError::VariableNotDefined(key.clone()))?.clone())
             }
-            Self::Environment(key) => {
-                std::env::var(key).map_err(crate::Error::boxed)
-            }
+            Self::Environment(key) => std::env::var(key).map_err(crate::Error::boxed),
         }
     }
 
@@ -102,12 +100,8 @@ impl Variable {
     }
 
     pub fn parse(input: &str) -> IResult<&str, Vec<Self>> {
-        let parser = alt((
-            Self::parse_environment_variable,
-            Self::parse_variable,
-            Self::parse_literal,
-            Self::parse_lone_dollar,
-        ));
+        let parser =
+            alt((Self::parse_environment_variable, Self::parse_variable, Self::parse_literal, Self::parse_lone_dollar));
         many0(parser).parse(input)
     }
 }
@@ -127,14 +121,13 @@ pub mod destinations_serde {
     where
         S: Serializer,
     {
-        let transposed: HashMap<String, HashMap<String, String>> =
-            template.iter().flat_map(|(dest, t)| t.vars.iter().map(move |(var, val)| (var.clone(), dest.clone(), val.clone()))).fold(
-                HashMap::new(),
-                |mut acc, (var, dest, val)| {
-                    acc.entry(var).or_default().insert(dest, val);
-                    acc
-                },
-            );
+        let transposed: HashMap<String, HashMap<String, String>> = template
+            .iter()
+            .flat_map(|(dest, t)| t.vars.iter().map(move |(var, val)| (var.clone(), dest.clone(), val.clone())))
+            .fold(HashMap::new(), |mut acc, (var, dest, val)| {
+                acc.entry(var).or_default().insert(dest, val);
+                acc
+            });
         transposed.serialize(serializer)
     }
 
@@ -175,7 +168,12 @@ mod tests {
 
     #[test]
     fn test_template_render() {
-        let template = Template { vars: [("foo", "hoge"), ("bar", "fuga"), ("baz", "piyo")].into_iter().map(|(k, v)| (k.to_string(), v.to_string())).collect() };
+        let template = Template {
+            vars: [("foo", "hoge"), ("bar", "fuga"), ("baz", "piyo")]
+                .into_iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect(),
+        };
         std::env::set_var("SECRET", "VERY_SENSITIVE_VALUE");
         let rendered = template.render("${foo} bar ${baz} ${env:SECRET}").unwrap();
         assert_eq!(rendered, "hoge bar piyo VERY_SENSITIVE_VALUE".to_string());
@@ -183,7 +181,12 @@ mod tests {
 
     #[test]
     fn test_template_render_with_undefined() {
-        let template = Template { vars: [("foo", "hoge"), ("bar", "fuga"), ("baz", "piyo")].into_iter().map(|(k, v)| (k.to_string(), v.to_string())).collect() };
+        let template = Template {
+            vars: [("foo", "hoge"), ("bar", "fuga"), ("baz", "piyo")]
+                .into_iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect(),
+        };
         let error = template.render("hoge ${fuga} piyo").unwrap_err();
         assert!(matches!(
             error,
@@ -193,7 +196,12 @@ mod tests {
 
     #[test]
     fn test_template_render_with_invalid() {
-        let template = Template { vars: [("foo", "hoge"), ("bar", "fuga"), ("baz", "piyo")].into_iter().map(|(k, v)| (k.to_string(), v.to_string())).collect() };
+        let template = Template {
+            vars: [("foo", "hoge"), ("bar", "fuga"), ("baz", "piyo")]
+                .into_iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect(),
+        };
         let error = template.render("foo ${bar baz").unwrap_err();
         assert!(matches!(
             error,
