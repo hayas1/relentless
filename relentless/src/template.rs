@@ -1,8 +1,4 @@
-use std::{
-    collections::{hash_map::IntoIter as HashMapIter, HashMap},
-    convert::Infallible,
-    ops::{Deref, DerefMut},
-};
+use std::{collections::HashMap, convert::Infallible};
 
 use nom::{
     branch::alt,
@@ -23,30 +19,6 @@ use crate::error::TemplateError;
 pub struct Template {
     #[serde(flatten)]
     vars: HashMap<String, String>,
-}
-
-impl Deref for Template {
-    type Target = HashMap<String, String>;
-    fn deref(&self) -> &Self::Target {
-        &self.vars
-    }
-}
-impl DerefMut for Template {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.vars
-    }
-}
-impl IntoIterator for Template {
-    type Item = (String, String);
-    type IntoIter = HashMapIter<String, String>;
-    fn into_iter(self) -> Self::IntoIter {
-        self.vars.into_iter()
-    }
-}
-impl<R: ToString, L: ToString> FromIterator<(R, L)> for Template {
-    fn from_iter<I: IntoIterator<Item = (R, L)>>(iter: I) -> Self {
-        Self { vars: iter.into_iter().map(|(var, val)| (var.to_string(), val.to_string())).collect() }
-    }
 }
 
 impl Template {
@@ -99,7 +71,7 @@ impl Variable {
         match self {
             Self::Literal(text) => Ok(text.clone()),
             Self::Defined(key) => {
-                Ok(defined.get(key).ok_or(TemplateError::VariableNotDefined(key.clone()))?.clone())
+                Ok(defined.vars.get(key).ok_or(TemplateError::VariableNotDefined(key.clone()))?.clone())
             }
             Self::Environment(key) => {
                 std::env::var(key).map_err(|e| crate::Error::boxed(e))
@@ -156,7 +128,7 @@ pub mod destinations_serde {
         S: Serializer,
     {
         let transposed: HashMap<String, HashMap<String, String>> =
-            template.iter().flat_map(|(dest, t)| t.iter().map(move |(var, val)| (var.clone(), dest.clone(), val.clone()))).fold(
+            template.iter().flat_map(|(dest, t)| t.vars.iter().map(move |(var, val)| (var.clone(), dest.clone(), val.clone()))).fold(
                 HashMap::new(),
                 |mut acc, (var, dest, val)| {
                     acc.entry(var).or_default().insert(dest, val);
@@ -177,7 +149,7 @@ pub mod destinations_serde {
                 by_dest.entry(dest).or_default().insert(var.clone(), val);
             }
         }
-        Ok(by_dest.into_iter().map(|(dest, vars)| (dest, vars.into_iter().collect::<Template>())).collect())
+        Ok(by_dest.into_iter().map(|(dest, vars)| (dest, Template { vars })).collect())
     }
 }
 
@@ -203,7 +175,7 @@ mod tests {
 
     #[test]
     fn test_template_render() {
-        let template: Template = vec![("foo", "hoge"), ("bar", "fuga"), ("baz", "piyo")].into_iter().collect();
+        let template = Template { vars: [("foo", "hoge"), ("bar", "fuga"), ("baz", "piyo")].into_iter().map(|(k, v)| (k.to_string(), v.to_string())).collect() };
         std::env::set_var("SECRET", "VERY_SENSITIVE_VALUE");
         let rendered = template.render("${foo} bar ${baz} ${env:SECRET}").unwrap();
         assert_eq!(rendered, "hoge bar piyo VERY_SENSITIVE_VALUE".to_string());
@@ -211,7 +183,7 @@ mod tests {
 
     #[test]
     fn test_template_render_with_undefined() {
-        let template: Template = vec![("foo", "hoge"), ("bar", "fuga"), ("baz", "piyo")].into_iter().collect();
+        let template = Template { vars: [("foo", "hoge"), ("bar", "fuga"), ("baz", "piyo")].into_iter().map(|(k, v)| (k.to_string(), v.to_string())).collect() };
         let error = template.render("hoge ${fuga} piyo").unwrap_err();
         assert!(matches!(
             error,
@@ -221,7 +193,7 @@ mod tests {
 
     #[test]
     fn test_template_render_with_invalid() {
-        let template: Template = vec![("foo", "hoge"), ("bar", "fuga"), ("baz", "piyo")].into_iter().collect();
+        let template = Template { vars: [("foo", "hoge"), ("bar", "fuga"), ("baz", "piyo")].into_iter().map(|(k, v)| (k.to_string(), v.to_string())).collect() };
         let error = template.render("foo ${bar baz").unwrap_err();
         assert!(matches!(
             error,
