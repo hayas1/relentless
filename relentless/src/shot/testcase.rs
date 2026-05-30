@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 
 use futures::StreamExt;
-use semigroup::{CombineStream, Semigroup};
+use semigroup::{Semigroup, TryCombineStream};
 use serde::{Deserialize, Serialize};
 use tower::{Layer, Service};
 
@@ -56,12 +56,11 @@ impl<Q, P> Testcase<Q, P> {
         let buffers = if Hierarchy::Testcase.contains(&job.sequential) { 1 } else { profile.repeat.times().max(1) };
 
         let (evaluated, messages) = futures::stream::iter(profile.repeat.range())
-            .map(|_| async {
-                profile.shot::<T, C>(services, destinations, &self.target).await.unwrap_or_else(|_| todo!())
-            })
+            .map(|_| async { profile.shot::<T, C>(services, destinations, &self.target).await })
             .buffer_unordered(buffers)
-            .combine_monoid()
-            .await;
+            .try_combine_monoid()
+            .await
+            .unwrap_or_else(|_| todo!());
         Ok(CaseReport { case: self, evaluated, messages })
     }
 }
